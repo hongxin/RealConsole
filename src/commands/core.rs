@@ -137,79 +137,69 @@ fn cmd_help_all() -> String {
     format!(
         r#"{}
 
-━━━ 核心命令 ━━━
-  {} [主题]       显示帮助信息
-    别名: /h, /?
-    主题: all, tools, memory, log, shell
+{}
+  {} [主题]  显示帮助 (别名: /h, /?)  主题: all, tools, memory, log, shell
+  {}         退出程序 (别名: /q, /exit)
+  {}      显示版本信息 (别名: /v)
+  {}      列出所有可用命令
 
-  {}              退出程序
-    别名: /q, /exit
+{}
+  {}          显示 LLM 状态
+  {} <问题>   直接提问（使用 fallback）
 
-  {}           显示版本信息
-    别名: /v
-
-  {}         列出所有可用命令
-
-━━━ LLM 命令 ━━━
-  {}               显示 LLM 状态
-  {} <问题>        直接提问（使用 fallback）
-
-━━━ 工具管理 ━━━
+{}
   {}                    列出所有工具
-  {}             列出所有工具（同上）
   {} <name>        查看工具详情
   {} <name> <args> 调用工具
+  示例: /tools call calculator {{"expression": "10+5"}}
 
-  示例:
-    /tools call calculator {{"expression": "10+5"}}
-    /tools info http_get
-
-━━━ 记忆系统 ━━━
+{}
   {} [n]        显示最近 n 条对话（默认5）
   {} <关键词>   搜索对话历史
   {}             清空记忆
   {} [文件]       保存到文件
 
-━━━ 执行日志 ━━━
+{}
   {} [n]           显示最近 n 条日志
   {} <关键词>      搜索日志
   {}                显示统计信息
   {}               显示失败记录
 
-━━━ Shell 执行 ━━━
-  {}                   执行 shell 命令
+{}
+  {}              执行 shell 命令
+  安全限制: 禁止 rm -rf /, sudo, shutdown 等危险命令 | 超时: 30秒
+  示例: !ls -la  !pwd  !echo "hello"
 
-  安全限制: 禁止 rm -rf /, sudo, shutdown 等危险命令
-  超时时间: 30 秒
-
-  示例:
-    !ls -la
-    !pwd
-    !echo "hello"
-
-更多信息: 使用 {} 查看使用示例
+更多: {} | {} | {}
 "#,
         format!("{} - 完整命令参考", "RealConsole".bold().cyan()),
+        "核心命令".bold(),
         "/help".green(),
         "/quit".green(),
         "/version".green(),
         "/commands".green(),
+        "LLM 命令".bold(),
         "/llm".green(),
         "/ask".green(),
+        "工具管理".bold(),
         "/tools".green(),
-        "/tools list".green(),
         "/tools info".green(),
         "/tools call".green(),
+        "记忆系统".bold(),
         "/memory recent".green(),
         "/memory search".green(),
         "/memory clear".green(),
         "/memory save".green(),
+        "执行日志".bold(),
         "/log recent".green(),
         "/log search".green(),
         "/log stats".green(),
         "/log failed".green(),
+        "Shell 执行".bold(),
         "!<命令>".yellow(),
-        "/examples".cyan()
+        "/examples".cyan(),
+        "/help tools".cyan(),
+        "/quickref".cyan()
     )
 }
 
@@ -430,13 +420,13 @@ fn cmd_examples(_arg: &str) -> String {
     format!(
         r#"{}
 
-━━━ 智能对话 ━━━
+{}
   计算 2 的 10 次方
   用 Rust 写一个 hello world
   解释一下什么是闭包
   推荐一些 Rust 学习资源
 
-━━━ 智能命令路由 (新!) ━━━
+{}
   ls                           # 自动识别为 shell 命令
   pwd                          # 无需 ! 前缀
   git status                   # 常见命令直接执行
@@ -444,19 +434,19 @@ fn cmd_examples(_arg: &str) -> String {
   cargo build --release        # 开发工具命令
   !custom_script.sh            # 强制 shell 执行
 
-━━━ 工具调用 ━━━
+{}
   /tools call calculator {{"expression": "sqrt(144)"}}
   /tools call datetime {{"format": "RFC3339"}}
   /tools call http_get {{"url": "https://api.github.com/users/octocat"}}
   /tools call json_parse {{"text": "{{\"name\": \"John\", \"age\": 30}}"}}
   /tools call base64 {{"operation": "encode", "text": "Hello World"}}
 
-━━━ 记忆查询 ━━━
+{}
   /memory recent 10
   /memory search "Rust"
   /memory save my_history.json
 
-━━━ 日志分析 ━━━
+{}
   /log stats
   /log failed
   /log recent 20
@@ -468,6 +458,11 @@ fn cmd_examples(_arg: &str) -> String {
   使用 {} 查看智能路由说明
 "#,
         "💡 RealConsole 使用示例".bold(),
+        "智能对话".bold(),
+        "智能命令路由 (新!)".bold(),
+        "工具调用".bold(),
+        "记忆查询".bold(),
+        "日志分析".bold(),
         "提示:".bold().dimmed(),
         "/help <命令>".cyan(),
         "/help shell".cyan()
@@ -477,32 +472,32 @@ fn cmd_examples(_arg: &str) -> String {
 /// /quickref 命令处理器
 fn cmd_quickref(_arg: &str) -> String {
     format!(
-        r#"
-╭─────────────── {} ───────────────╮
-│                                                     │
-│  {}        直接输入问题                        │
-│  {}      !<命令>                            │
-│  {}        /<命令>                            │
-│                                                     │
-│  {}:                                          │
-│    {}         帮助                               │
-│    {}        工具列表                           │
-│    {}       记忆管理                           │
-│    {}          日志查询                           │
-│    {}         退出                               │
-│                                                     │
-│  {}:                                            │
-│    {}        取消当前操作                       │
-│    {}        退出程序                           │
-│    {}          历史命令                            │
-│                                                     │
-│  {}: {} 或 {} │
-╰─────────────────────────────────────────────────────╯
+        r#"{}
+
+{}
+  直接输入问题                    {}  你好
+  执行 Shell 命令                 {}  ls
+  系统命令                        {}  /help
+
+{}
+  {}       帮助
+  {}      工具列表
+  {}     记忆管理
+  {}        日志查询
+  {}       退出
+
+{}
+  {}      取消当前操作
+  {}      退出程序
+  {}        历史命令
+
+{}: {} | {}
 "#,
-        "RealConsole 快速参考".cyan(),
-        "智能对话".bold(),
-        "执行 Shell".bold(),
-        "系统命令".bold(),
+        "RealConsole 快速参考".bold().cyan(),
+        "基本用法".bold(),
+        "示例:".dimmed(),
+        "示例:".dimmed(),
+        "示例:".dimmed(),
         "常用命令".bold(),
         "/help".green(),
         "/tools".green(),

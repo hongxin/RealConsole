@@ -59,6 +59,7 @@ impl From<SubTaskJson> for SubTask {
 
 /// 分解记录（用于学习和优化）
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct DecompositionRecord {
     goal: String,
     context: ExecutionContext,

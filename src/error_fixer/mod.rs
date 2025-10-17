@@ -19,9 +19,11 @@ pub mod fixer;
 pub mod patterns;
 
 pub use analyzer::{ErrorAnalysis, ErrorAnalyzer, ErrorCategory, ErrorSeverity};
+#[allow(unused_imports)]
 pub use feedback::{
     FeedbackLearner, FeedbackRecord, FeedbackType, FixOutcome, LearningSummary, PatternStats,
     StrategyStats,
 };
 pub use fixer::{ErrorFixer, FixResult, FixStrategy};
+#[allow(unused_imports)]
 pub use patterns::ErrorPattern;

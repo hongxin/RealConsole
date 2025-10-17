@@ -9,6 +9,10 @@
 //! - Type system for DSL
 //! - Memory and execution logging
 
+// Allow unused code for library exports and future use
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 // Public modules
 pub mod advanced_tools;
 pub mod agent;

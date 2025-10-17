@@ -40,11 +40,17 @@ pub mod types;
 
 // 重新导出核心类型
 pub use decomposer::TaskDecomposer;
-pub use error::{TaskError, TaskResult};
-pub use executor::{ProgressCallback, TaskExecutor};
-pub use planner::{PlanAnalysis, TaskPlanner};
+pub use executor::TaskExecutor;
+#[allow(unused_imports)]
+pub use executor::ProgressCallback;
+pub use planner::TaskPlanner;
+#[allow(unused_imports)]
+pub use planner::PlanAnalysis;
+pub use types::{ExecutionContext, ExecutionMode, ExecutionPlan, ExecutionResult, TaskStatus};
+#[allow(unused_imports)]
 pub use types::{
-    DependencyGraph, ExecutionContext, ExecutionMode, ExecutionPlan, ExecutionResult,
-    ExecutionStage, RetryPolicy, SubTask, TaskProgress, TaskResult as TaskExecutionResult,
-    TaskStatus, TaskType,
+    DependencyGraph, ExecutionStage, RetryPolicy, SubTask, TaskProgress,
+    TaskResult as TaskExecutionResult, TaskType,
 };
+#[allow(unused_imports)]
+pub use error::{TaskError, TaskResult};

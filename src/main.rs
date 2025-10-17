@@ -2,6 +2,10 @@
 //!
 //! 基于 Rust 的智能 CLI 代理，结合易经智慧与现代 AI
 
+// Allow unused code for future use and module exports
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 mod advanced_tools;
 mod agent;
 mod builtin_tools;
