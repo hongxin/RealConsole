@@ -1,0 +1,17 @@
+prefix: "/"
+
+memory:
+  capacity: 50
+  persistent_file: "memory/test_memory.jsonl"
+  auto_save: true
+
+llm:
+  primary:
+    provider: "deepseek"
+    model: "deepseek-reasoner"
+    api_key: "${DEEPSEEK_API_KEY}"
+    endpoint: "https://api.deepseek.com/v1"
+
+features:
+  shell_enabled: true
+  shell_timeout: 10

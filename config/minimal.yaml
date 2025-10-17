@@ -1,0 +1,40 @@
+# RealConsole 最小配置示例
+# 适用于快速上手和测试
+
+# 命令前缀
+prefix: "/"
+
+# LLM 配置（统一架构：primary + fallback）
+llm:
+  # 主 LLM（优先使用）
+  primary:
+    provider: deepseek
+    model: deepseek-chat
+    endpoint: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+
+  # 备用 LLM（可选，主 LLM 不可用时使用）
+  # fallback:
+  #   provider: ollama
+  #   model: qwen3:4b
+  #   endpoint: ${OLLAMA_ENDPOINT:-http://localhost:11434}
+
+# 功能配置
+features:
+  # Shell 执行
+  shell_enabled: true
+  shell_timeout: 10
+
+  # 工具调用（推荐开启）
+  tool_calling_enabled: true
+
+# 记忆系统（可选）
+# memory:
+#   capacity: 50
+#   persistent_file: "memory/session.jsonl"
+#   auto_save: true
+
+# Intent DSL（默认值已优化，通常无需配置）
+# intent:
+#   llm_extraction_enabled: false
+#   llm_validation_enabled: false

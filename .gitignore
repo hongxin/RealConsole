@@ -1,0 +1,79 @@
+# Rust 编译产物
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 密钥和敏感信息
+.env
+*.key
+*.pem
+*.p12
+id_rsa*
+*.secret
+
+# 本地配置
+*.local.yaml
+config.local.yaml
+
+# 开发工件
+/coverage/
+/flamegraph/
+/memory/
+/sandbox/
+/testbed/
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+test.txt
+temp/
+
+# macOS 系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows 系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 性能分析
+perf.data*
+*.svg
+*.prof
+
+# Claude 配置（私有）
+.claude/
+
+# 备份文件
+*.bak
+*.backup
+*~
+
+# 本地数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# Node modules（如果有）
+node_modules/
+
+# Python（如果有）
+__pycache__/
+*.py[cod]
+venv/
+.venv/

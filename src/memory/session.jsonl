@@ -1,0 +1,6 @@
+{"timestamp":"2025-10-15T18:22:34.695472Z","type":"assistant","content":"\u001b[2m/Users/hongxin/Workspace/claude-ai-playground/real-console/src\u001b[0m"}
+{"timestamp":"2025-10-15T19:17:53.861006Z","type":"assistant","content":"\u001b[2m/Users/hongxin/Workspace/claude-ai-playground/real-console/src\u001b[0m"}
+{"timestamp":"2025-10-15T19:18:24.922075Z","type":"assistant","content":"\u001b[31m处理失败:\u001b[0m LLM 调用失败: HTTP 400: {\"error\":{\"message\":\"An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'. (insufficient tool m..."}
+{"timestamp":"2025-10-15T19:18:34.034992Z","type":"assistant","content":"\u001b[1;36mRealConsole\u001b[0m \u001b[2mv0.5.2\u001b[0m\n\n\u001b[1;32m💬 智能对话:\u001b[0m\n  直接输入问题即可，无需命令前缀\n  \u001b[2m示例:\u001b[0m 计算 2 的 10 次方\n  \u001b[2m示例:\u001b[0m 用 Rust 写一个 hello..."}
+{"timestamp":"2025-10-16T01:29:26.839641Z","type":"assistant","content":"\u001b[31m处理失败:\u001b[0m LLM 调用失败: HTTP 400: {\"error\":{\"message\":\"An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'. (insufficient tool m..."}
+{"timestamp":"2025-10-16T01:29:49.805132Z","type":"assistant","content":"__QUIT__"}

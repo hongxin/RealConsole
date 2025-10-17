@@ -1,0 +1,92 @@
+# SimpleConsole 配置文件
+# 使用环境变量: ${VAR} 或 ${VAR:-default}
+
+# 命令前缀
+prefix: "/"
+
+# LLM 配置
+llm:
+  # Primary LLM（通常是远程 API，用于生产）
+  primary:
+    provider: deepseek
+    model: deepseek-reasoner
+    endpoint: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+
+  # Fallback LLM（通常是本地 Ollama，快速响应）
+  # 注：目前 Ollama 与 Rust reqwest 存在兼容性问题，暂时禁用
+  # fallback:
+    # provider: ollama
+    # model: qwen3:4b
+    # endpoint: http://192.168.3.120:11434
+
+# 功能开关
+features:
+  shell_enabled: true
+  shell_timeout: 10
+  tool_calling_enabled: true
+
+  # 工具调用迭代限制（可选）
+  max_tool_iterations: 30      # 最多迭代轮数（默认 5）
+  max_tools_per_round: 5      # 每轮最多工具数（默认 3）
+
+memory:
+  capacity: 100
+  persistent_file: "memory/session.jsonl"
+  auto_save: true
+
+# 显示模式配置 (v0.5.2+)
+display:
+  # 显示模式：minimal（极简）、standard（标准）、debug（调试）
+  # minimal：只显示必要信息，无启动信息、无中间过程（默认）
+  # standard：显示适中信息，有简化的启动和执行信息
+  # debug：显示所有细节，包括配置路径、LLM 信息、完整命令等
+  mode: minimal
+
+# Intent DSL 智能增强配置 (v0.5.2+)
+intent:
+  # LLM 智能参数提取（默认 false - 保持高性能）
+  # 当 Regex 提取失败时，使用 LLM 理解语义并提取参数
+  llm_extraction_enabled: false
+
+  # LLM 命令验证（默认 false - 保持高性能）
+  # 在执行前使用 LLM 验证命令的合理性
+  llm_validation_enabled: false
+
+  # 命令验证置信度阈值（0.0-1.0，默认 0.7）
+  # 低于此阈值会触发警告
+  validation_threshold: 0.7
+
+  # 验证失败时是否需要用户确认（默认 true）
+  require_confirmation: true
+
+  # ✨ Phase 7: LLM 驱动的 Pipeline 生成（默认 false - 实验性功能）
+  # 让 LLM 理解用户意图，动态生成 Pipeline 执行计划
+  llm_generation_enabled: true
+
+  # LLM 生成失败时是否降级到规则匹配（默认 true）
+  llm_generation_fallback: true
+
+# ============================================================================
+# 配置说明
+# ============================================================================
+#
+# 支持的 LLM Providers:
+#
+# 1. Ollama (本地)
+#    provider: ollama
+#    model: qwen3:4b (或 gemma3:27b, deepseek-r1:8b 等)
+#    endpoint: http://localhost:11434
+#
+# 2. Deepseek (远程)
+#    provider: deepseek
+#    model: deepseek-chat
+#    endpoint: https://api.deepseek.com/v1
+#    api_key: sk-...
+#
+# 环境变量示例:
+#   export DEEPSEEK_API_KEY="sk-your-api-key"
+#
+# 然后在配置中使用:
+#   api_key: ${DEEPSEEK_API_KEY}
+#

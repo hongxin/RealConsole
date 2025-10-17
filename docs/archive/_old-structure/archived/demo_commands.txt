@@ -1,0 +1,9 @@
+/help
+!date
+!echo "Hello from SimpleConsole"
+!ls -la src/*.rs | head -5
+/mem
+/tool list
+/llm
+/log
+/exit
