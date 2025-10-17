@@ -12,7 +12,7 @@ An intelligent CLI agent beloved by programmers and DevOps engineers - High-perf
 
 ## ⚠️ Disclaimer
 
-**Important Notice**: This program is primarily developed using the VIBE CODING methodology with [Claude Code](https://claude.com/claude-code), an exploratory development approach. Therefore, we cannot guarantee the security and stability of the program.
+**Important Notice**: This program is primarily developed using the Vibe Coding methodology with [Claude Code](https://claude.com/claude-code), an exploratory development approach. Therefore, we cannot guarantee the security and stability of the program.
 
 **Intended Use**:
 - This program is intended for **educational**, **research**, and **technical exploration** purposes only

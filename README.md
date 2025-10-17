@@ -12,7 +12,7 @@
 
 ## ⚠️ 免责声明
 
-**重要提示**：本程序主要采用 [Claude Code](https://claude.com/claude-code) 的氛围编程（Atmosphere Programming）方法实现，这是一种探索性的开发模式，因此我们无法保证程序的安全性和稳定性。
+**重要提示**：本程序主要采用 [Claude Code](https://claude.com/claude-code) 的氛围编程（Vibe Coding）方法实现，这是一种探索性的开发模式，因此我们无法保证程序的安全性和稳定性。
 
 **使用目的**：
 - 本程序仅供**教育**、**科研**和**技术探索**目的使用
