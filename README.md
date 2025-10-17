@@ -270,19 +270,38 @@ features:
 
 ```bash
 » /help
-💬 RealConsole v0.7.0
+RealConsole v1.0.0
 
-智能对话:
+💬 智能对话:
   直接输入问题即可，无需命令前缀
   示例: 计算 2 的 10 次方
+  示例: 用 Rust 写一个 hello world
+
+🚀 智能命令路由 (Phase 10.1):
+  常见命令可直接输入，无需前缀（智能识别）
+  ls         列出文件（自动识别）
+  pwd         显示当前目录
+  git status   查看Git状态
+  !ls -la        强制Shell执行
 
 ⚡ 快速命令:
-  /help       显示此帮助
-  /help all   显示所有命令（详细）
+  /help      显示此帮助
+  /help all  显示所有命令（详细）
   /examples   查看使用示例
   /quickref   快速参考卡片
-  /quit       退出程序
-...
+  /quit      退出程序
+
+🛠️ 工具调用:
+  /tools        列出所有工具
+  /tools call <name> <args>   调用工具
+
+💾 记忆与日志:
+  /memory recent    查看最近对话
+  /log stats        查看执行统计
+
+提示:
+  使用 /help <命令> 查看命令详情
+  系统自动识别命令类型，使用 /help shell 查看路由说明
 
 » /help all           # 完整帮助
 » /help tools         # 工具管理帮助
@@ -292,19 +311,54 @@ features:
 » /examples           # 使用示例库
 💡 RealConsole 使用示例
 
-━━━ 智能对话 ━━━
+智能对话
   计算 2 的 10 次方
   用 Rust 写一个 hello world
-  ...
+  解释一下什么是闭包
+  推荐一些 Rust 学习资源
+
+智能命令路由 (新!)
+  ls                           # 自动识别为 shell 命令
+  pwd                          # 无需 ! 前缀
+  git status                   # 常见命令直接执行
+  docker ps -a                 # 80+ 命令自动识别
+  cargo build --release        # 开发工具命令
+  !custom_script.sh            # 强制 shell 执行
+
+工具调用
+  /tools call calculator {"expression": "sqrt(144)"}
+  /tools call datetime {"format": "RFC3339"}
+  /tools call http_get {"url": "https://api.github.com/users/octocat"}
+
+记忆查询
+  /memory recent 10
+  /memory search "Rust"
+
+日志分析
+  /log stats
+  /log failed
 
 » /quickref           # 快速参考卡片
-╭─────────────── RealConsole 快速参考 ───────────────╮
-│                                                   │
-│  智能对话        直接输入问题                        │
-│  执行 Shell      !<命令>                           │
-│  系统命令        /<命令>                            │
-│  ...                                              │
-╰───────────────────────────────────────────────────╯
+RealConsole 快速参考
+
+基本用法
+  直接输入问题                    示例:  你好
+  执行 Shell 命令                 示例:  ls
+  系统命令                        示例:  /help
+
+常用命令
+  /help       帮助
+  /tools      工具列表
+  /memory     记忆管理
+  /log        日志查询
+  /quit       退出
+
+快捷键
+  Ctrl+C      取消当前操作
+  Ctrl+D      退出程序
+  ↑/↓        历史命令
+
+更多: /help all | /examples
 
 » /quit
 Bye 👋
