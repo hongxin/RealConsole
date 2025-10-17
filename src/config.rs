@@ -163,12 +163,17 @@ pub struct DisplayConfig {
     /// 显示模式：minimal（默认）、standard、debug
     #[serde(default)]
     pub mode: DisplayMode,
+
+    /// 界面语言（zh-CN, en-US）
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 impl Default for DisplayConfig {
     fn default() -> Self {
         Self {
             mode: DisplayMode::Minimal,  // 默认极简模式
+            language: None,  // 未指定时从系统环境推断
         }
     }
 }

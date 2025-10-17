@@ -1,5 +1,7 @@
 # RealConsole (Rust)
 
+> **中文 | [English](README.en.md)**
+
 程序员和运维工程师都非常喜欢用的智能 CLI Agent - 基于 Rust 的高性能实现
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
@@ -7,6 +9,24 @@
 [![Tests](https://img.shields.io/badge/tests-645%2B%20passed-green.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-78%2B%25-yellow.svg)](docs/test_reports/)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](docs/CHANGELOG.md)
+
+## ⚠️ 免责声明
+
+**重要提示**：本程序主要采用 [Claude Code](https://claude.com/claude-code) 的氛围编程（Atmosphere Programming）方法实现，这是一种探索性的开发模式，因此我们无法保证程序的安全性和稳定性。
+
+**使用目的**：
+- 本程序仅供**教育**、**科研**和**技术探索**目的使用
+- 不建议在生产环境中使用
+
+**责任声明**：
+使用、编译或运行本程序即表示您已充分知晓其实验性质和潜在风险。因使用本程序而导致的任何问题、损失或损害，均由用户自行承担全部责任。本程序的开发者、贡献者和维护者对此概不负责。
+
+**建议**：
+- 在测试环境中谨慎使用
+- 定期备份重要数据
+- 理解每个命令的作用后再执行
+
+---
 
 ## ✨ 核心特性
 
@@ -279,12 +299,12 @@ features:
 
 » /quickref           # 快速参考卡片
 ╭─────────────── RealConsole 快速参考 ───────────────╮
-│                                                     │
+│                                                   │
 │  智能对话        直接输入问题                        │
-│  执行 Shell      !<命令>                            │
+│  执行 Shell      !<命令>                           │
 │  系统命令        /<命令>                            │
-│  ...                                                │
-╰─────────────────────────────────────────────────────╯
+│  ...                                              │
+╰───────────────────────────────────────────────────╯
 
 » /quit
 Bye 👋
@@ -647,7 +667,7 @@ realconsole/
 
 ```
 ┌─────────────────────────────────────────┐
-│              用户输入                      │
+│              用户输入                    │
 └────────────────┬────────────────────────┘
                  │
          ┌───────▼────────┐

@@ -470,7 +470,7 @@ fn analyze_state(state: &StateVector) {
 **文档版本**: 1.0
 **完成日期**: 2025-10-15
 **维护者**: RealConsole Team
-**项目地址**: https://github.com/hongxin/realconsole
+**项目地址**: https://github.com/hongxin/RealConsole
 
 **核心思想**：
 > 道生一，一生二，二生三，三生万物。

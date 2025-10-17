@@ -2,9 +2,11 @@
 //!
 //! 使用 rustyline 提供基础的 readline 功能
 //! ✨ Phase 8: 集成命令历史记录和 Ctrl+R 搜索
+//! ✨ Phase 11: 多语言支持
 
 use crate::agent::Agent;
 use crate::history::SortStrategy;
+use crate::i18n;
 use colored::Colorize;
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
@@ -58,16 +60,16 @@ pub fn run(agent: &Agent) -> RustyResult<()> {
             }
             Err(ReadlineError::Interrupted) => {
                 // Ctrl-C
-                println!("{}", "^C".dimmed());
+                println!("{}", i18n::t("command.interrupted").dimmed());
                 continue;
             }
             Err(ReadlineError::Eof) => {
                 // Ctrl-D
-                println!("{}", "Bye 👋".cyan());
+                println!("{}", i18n::t("command.bye").cyan());
                 break;
             }
             Err(err) => {
-                eprintln!("{} {:?}", "错误:".red(), err);
+                eprintln!("{} {:?}", i18n::t("command.error").red(), err);
                 break;
             }
         }
@@ -81,13 +83,13 @@ fn print_welcome() {
     let version = env!("CARGO_PKG_VERSION");
     // 极简单行显示：版本 | 用途 | 帮助 | 退出
     println!("{} {} {} {} {} {} {}",
-        "RealConsole".bold().cyan(),
-        format!("v{}", version).dimmed(),
+        i18n::t("welcome.app_name").bold().cyan(),
+        i18n::t_with_args("welcome.version", &[("version", version)]).dimmed(),
         "|".dimmed(),
-        "直接输入问题或".dimmed(),
-        "/help".cyan(),
+        i18n::t("welcome.hint").dimmed(),
+        i18n::t("welcome.help").cyan(),
         "|".dimmed(),
-        "Ctrl-D 退出".dimmed()
+        i18n::t("welcome.exit").dimmed()
     );
     // 去掉空行，让体验更接近普通 console
 }

@@ -1,221 +1,133 @@
 # RealConsole 文档中心
 
-> **融合东方哲学智慧的智能 CLI Agent**
->
-> 基于"一分为三"设计哲学，遵循道德经"道生一，一生二，二生三，三生万物"的演化智慧
+**版本**: v1.1.0 "International"
+**最后更新**: 2025-10-17
 
----
+欢迎来到 RealConsole 文档中心！本文档遵循"极简主义"设计理念，只保留对未来开发和用户使用有价值的核心文档。
 
-## 📚 文档架构
+## 📖 文档导航
 
-本文档系统采用**五态架构**，体现从认知到实践再到演化的完整路径：
+### 00-core - 核心理念（3个文档）
 
-```
-道（核心理念）
-  ↓
-理解态 → 实践态 → 演化态 → 协同报告
-  ↓       ↓       ↓         ↓
- 认知    应用    升华      记录
-  ↓       ↓       ↓         ↓
-        归档（历史文档）
-```
-
----
-
-## 🎯 快速导航
-
-### 【道】00-core/ - 核心理念层
-
-> "执古之道，以御今之有" - 把握核心，统领全局
-
-核心哲学和产品愿景，指导整个项目的发展方向。
+**定位**：道/核心哲学，指导整个项目的设计思想
 
 - [philosophy.md](00-core/philosophy.md) - 一分为三哲学思想
 - [vision.md](00-core/vision.md) - 产品愿景和定位
 - [roadmap.md](00-core/roadmap.md) - 技术路线图
 
-**适合**: 想要深入理解项目理念的所有人
+### 01-understanding - 理解态（6个文档）
 
----
+**定位**：设计文档与技术分析，供开发者理解系统架构
 
-### 【理解态】01-understanding/ - 认知和设计
-
-> "知其然，知其所以然" - 理解系统设计的本质
-
-系统架构、设计文档、分析报告和思考笔记。
-
+#### 核心设计
 - [overview.md](01-understanding/overview.md) - 架构总览
-- [design/](01-understanding/design/) - 设计文档集
-  - intent-philosophy.md - Intent系统设计哲学
-  - error-handling.md - 错误处理设计
-  - security.md - 安全设计
-- [analysis/](01-understanding/analysis/) - 分析文档
-  - technical-debt.md - 技术债务清单
-  - python-rust-gap.md - Python/Rust对比
-- [thinking/](01-understanding/thinking/) - 思考笔记
-  - dsl-philosophy.md - DSL设计哲学
+- [design/architecture.md](01-understanding/design/architecture.md) - 系统架构设计
+- [design/error-handling.md](01-understanding/design/error-handling.md) - 错误处理系统
+- [design/security.md](01-understanding/design/security.md) - 安全设计
+- [design/phase10-task-system-architecture.md](01-understanding/design/phase10-task-system-architecture.md) - 任务系统架构
 
-**适合**: 架构师、系统设计者、技术决策者
+#### 技术分析
+- [analysis/technical-debt.md](01-understanding/analysis/technical-debt.md) - 技术债务追踪
 
----
+### 02-practice - 实践态（15个文档）
 
-### 【实践态】02-practice/ - 使用和开发
+**定位**：实用指南和示例，供用户和开发者日常使用
 
-> "纸上得来终觉浅，绝知此事要躬行" - 从实践中掌握
+#### 用户指南（8个）
+- [user/quickstart.md](02-practice/user/quickstart.md) - 5分钟快速开始
+- [user/user-guide.md](02-practice/user/user-guide.md) - 完整用户手册
+- [user/env-config.md](02-practice/user/env-config.md) - 环境变量配置
+- [user/llm-setup.md](02-practice/user/llm-setup.md) - LLM 配置指南
+- [user/intent-dsl-guide.md](02-practice/user/intent-dsl-guide.md) - Intent DSL 使用指南
+- [user/tool-calling-guide.md](02-practice/user/tool-calling-guide.md) - 工具调用指南
+- [user/conversation-guide.md](02-practice/user/conversation-guide.md) - 多轮对话指南
+- [user/history-feature-guide.md](02-practice/user/history-feature-guide.md) - 历史记录功能
 
-用户指南、开发者指南、示例代码和使用场景。
+#### 开发者指南（4个）
+- [developer/developer-guide.md](02-practice/developer/developer-guide.md) - 开发者指南
+- [developer/tool-development.md](02-practice/developer/tool-development.md) - 工具开发指南
+- [developer/i18n-guide.md](02-practice/developer/i18n-guide.md) - 国际化指南
+- [developer/api-reference.md](02-practice/developer/api-reference.md) - API 参考
 
-#### 👥 [user/](02-practice/user/) - 用户实践
+#### 用例示例（2个）
+- [use-cases/README.md](02-practice/use-cases/README.md) - 用例索引
+- [use-cases/selected-cases.md](02-practice/use-cases/selected-cases.md) - 精选使用案例
 
-快速上手和日常使用指南：
+### 03-evolution - 演化态（2个文档）
 
-- [quickstart.md](02-practice/user/quickstart.md) - 5分钟快速开始
-- [user-guide.md](02-practice/user/user-guide.md) - 完整用户手册
-- [tool-calling-guide.md](02-practice/user/tool-calling-guide.md) - 工具调用指南
-- [intent-dsl-guide.md](02-practice/user/intent-dsl-guide.md) - Intent DSL使用
-- [llm-setup.md](02-practice/user/llm-setup.md) - LLM配置指南
-- [env-config.md](02-practice/user/env-config.md) - 环境变量配置
+**定位**：版本发布信息，记录重要里程碑
 
-#### 💻 [developer/](02-practice/developer/) - 开发者实践
+- [RELEASE-v1.0.0.md](03-evolution/RELEASE-v1.0.0.md) - v1.0.0 发布说明
+- [README.md](03-evolution/README.md) - 演化历程索引
 
-扩展和定制RealConsole：
+### archive - 归档（230个文档）
 
-- [developer-guide.md](02-practice/developer/developer-guide.md) - 开发者指南
-- [tool-development.md](02-practice/developer/tool-development.md) - 创建自定义工具
-- [api-reference.md](02-practice/developer/api-reference.md) - API参考
+**定位**：历史开发记录，仅供追溯参考
 
-#### 📦 [use-cases/](02-practice/use-cases/) - 使用场景
-
-- basic-10-cases.md / basic-20-cases.md - 基础场景
-- advanced-30-cases.md - 进阶场景
-- expert-50-cases.md - 专家场景
-- selected-cases.md - 精选案例
-
-**适合**: 所有用户和开发者
-
----
-
-### 【演化态】03-evolution/ - 进展和历史
-
-> "穷则变，变则通，通则久" - 持续演化，生生不息
-
-项目的发展历程、功能实现记录和未来规划。
-
-- [phases/](03-evolution/phases/) - 阶段总结
-  - phase3-intent-dsl.md - Phase 3完整记录
-  - phase5-pipeline.md - Phase 5 Pipeline DSL
-  - phase7-polish.md - Phase 7 最终打磨
-  - phase-9-v0.9.0-release.md - Phase 9 统计可视化
-  - phase9.1-week2-error-auto-fixing.md - Phase 9.1 错误修复
-  - phase-10-summary.md - Phase 10 任务编排系统 ⭐
-- [features/](03-evolution/features/) - 功能实现
-  - shell-execution.md - Shell执行系统
-  - streaming.md - 流式输出实现
-  - git-assistant.md - Git智能助手
-  - log-analyzer.md - 日志分析器
-  - system-monitor.md - 系统监控
-  - summary.md - 功能总览
-- [RELEASE-v1.0.0.md](03-evolution/RELEASE-v1.0.0.md) - **v1.0.0 正式发布** 🎉
-
-**适合**: 贡献者、项目维护者
-
----
-
-### 【协同报告】04-reports/ - 工作成果
-
-> "温故而知新" - 记录决策，追溯思考
-
-协同工作过程中产生的各类分析、总结和决策报告。
-
-- [reorganization-2025-10-16.md](04-reports/reorganization-2025-10-16.md) - 文档重组报告
-
-**适合**: 所有参与者，便于了解项目决策过程
-
----
-
-## 🗂️ 归档文档
-
-- [archive/](archive/) - 历史文档归档
-  - old-progress/ - 详细开发记录（80+文档）
-  - old-designs/ - 过时的设计文档
-
----
-
-## 🧭 推荐阅读路径
-
-### 路径 1: 新用户入门（5分钟）
-```
-quickstart.md → llm-setup.md → user-guide.md
-```
-
-### 路径 2: 理解设计哲学（15分钟）
-```
-philosophy.md → vision.md → overview.md → dsl-philosophy.md
-```
-
-### 路径 3: 开发者深度学习（30分钟）
-```
-overview.md → developer-guide.md → tool-development.md → api-reference.md
-```
-
-### 路径 4: 贡献者全面了解（60分钟）
-```
-philosophy.md → overview.md → roadmap.md → phases/ → technical-debt.md
-```
-
----
+包含所有历史的开发日志、会话记录、旧版文档等。这些文档已不再维护，但保留以供历史追溯。
 
 ## 📊 文档统计
 
-- **核心文档**: 3个
-- **理解态**: 12个（设计5 + 分析4 + 思考3）
-- **实践态**: 20个（用户6 + 开发者3 + 用例5 + 示例）
-- **演化态**: 14个（阶段4 + 功能8 + 里程碑2）
-- **协同报告**: 持续增长（当前1个）
-- **归档**: 226个历史文档
+**活跃文档数量**：
+- 00-core: 3个
+- 01-understanding: 6个
+- 02-practice: 15个
+- 03-evolution: 2个
+- **总计**: 26个核心文档（从82个精简而来）
 
-**总计**: 约50个活跃文档，清晰分类，易于导航
+**归档文档**：230个（不计入活跃文档）
+
+## 🌐 多语言支持计划
+
+RealConsole v1.1.0 开始支持多语言界面。文档多语言化计划：
+
+1. **中文优先**：所有核心文档默认中文
+2. **英文同步**：v2.0.0 大版本时同步英文版本
+3. **文档命名**：英文版本使用 `.en.md` 后缀
+
+示例：
+```
+philosophy.md      # 中文版（默认）
+philosophy.en.md   # 英文版（计划中）
+```
+
+## 🔍 快速查找
+
+### 新手入门
+1. 阅读 [quickstart.md](02-practice/user/quickstart.md) - 5分钟上手
+2. 阅读 [user-guide.md](02-practice/user/user-guide.md) - 完整功能了解
+3. 参考 [selected-cases.md](02-practice/use-cases/selected-cases.md) - 实战案例
+
+### 开发贡献
+1. 阅读 [philosophy.md](00-core/philosophy.md) - 理解设计哲学
+2. 阅读 [architecture.md](01-understanding/design/architecture.md) - 了解系统架构
+3. 阅读 [developer-guide.md](02-practice/developer/developer-guide.md) - 开发规范
+4. 参考 [tool-development.md](02-practice/developer/tool-development.md) - 创建工具
+
+### 问题排查
+1. 查看 [technical-debt.md](01-understanding/analysis/technical-debt.md) - 已知问题
+2. 查看 [CHANGELOG.md](CHANGELOG.md) - 版本历史
+3. 提交 Issue: https://github.com/hongxin/realconsole/issues
+
+## 📝 文档维护原则
+
+遵循"极简主义"设计理念：
+
+1. **保留核心**：只保留对未来有价值的文档
+2. **删除冗余**：历史开发记录移至 archive/
+3. **清晰分类**：文档按功能明确分类
+4. **易于导航**：README 提供完整索引
+5. **持续优化**：定期审查文档相关性
+
+## 🔗 相关资源
+
+- **项目主页**: https://github.com/hongxin/realconsole
+- **完整 CHANGELOG**: [CHANGELOG.md](CHANGELOG.md)
+- **项目指南**: [CLAUDE.md](../CLAUDE.md)
+- **发布说明**: [RELEASE-v1.0.0.md](03-evolution/RELEASE-v1.0.0.md)
 
 ---
 
-## 💡 文档设计原则
-
-1. **三态分离** - 理解、实践、演化各有其位
-2. **数字编排** - 00-03前缀体现演化路径
-3. **统一命名** - 全小写连字符，简洁语义化
-4. **清晰导航** - 每层都有README索引
-5. **精简高效** - 保留活跃文档，归档历史记录
-
----
-
-## 📝 最新更新
-
-**2025-10-17** - v1.0.0 正式发布 🎉
-- ✅ Phase 10 任务编排系统完成
-- ✅ 更新所有文档到 v1.0.0
-- ✅ 创建正式发布说明（RELEASE-v1.0.0.md）
-- ✅ 更新技术路线图和里程碑
-- ✅ 完整文档一致性验证
-
-**2025-10-16** - 文档体系完善
-- ✅ 实施"一分为三"五态架构（00-04 + archive）
-- ✅ 精简活跃文档至50个
-- ✅ 归档226个历史文档
-- ✅ 统一命名规范（全小写连字符）
-- ✅ 完善导航系统（7个README索引）
-- ✅ 新增04-reports/协同报告目录
-- ✅ 文档构建规则写入CLAUDE.md
-
----
-
-## 🔗 外部链接
-
-- **项目主页**: [../README.md](../README.md)
-- **项目说明**: [../CLAUDE.md](../CLAUDE.md)
-- **完整变更日志**: [CHANGELOG.md](CHANGELOG.md)
-- **配置文件**: [../realconsole.yaml](../realconsole.yaml)
-- **GitHub**: https://github.com/hongxin/realconsole
-
----
-
-**RealConsole 文档中心** | 道生一，一生二，二生三，三生万物 ✨
+**文档体系版本**: v2.0 (极简主义)
+**文档精简**: 82个 → 26个（保留核心 + 230个归档）
+**最后清理**: 2025-10-17

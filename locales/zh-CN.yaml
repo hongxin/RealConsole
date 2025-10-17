@@ -1,0 +1,61 @@
+# RealConsole 中文（简体）翻译文件
+# Language: Chinese Simplified (zh-CN)
+# Version: 1.1.0
+
+# 欢迎和提示信息
+welcome.app_name: "RealConsole"
+welcome.version: "v{version}"
+welcome.hint: "直接输入问题或"
+welcome.help: "/help"
+welcome.exit: "Ctrl-D 退出"
+
+# REPL 命令
+command.interrupted: "^C"
+command.bye: "Bye 👋"
+command.error: "错误:"
+
+# 配置向导
+config.wizard_title: "=== RealConsole 配置向导 ==="
+config.mode_quick: "模式: 快速配置（使用推荐默认值）"
+config.mode_complete: "模式: 完整配置（可自定义所有选项）"
+config.save_failed: "✗ 保存配置失败:"
+config.wizard_failed: "✗ 配置向导失败:"
+config.not_found: "配置文件不存在:"
+config.run_wizard: "请运行 'realconsole wizard' 创建配置"
+config.file_label: "配置文件:"
+config.read_failed: "读取配置文件失败:"
+
+# 首次运行
+first_run.welcome: "欢迎使用 RealConsole！"
+first_run.no_config: "未检测到配置文件，首次使用需要进行配置。"
+first_run.choose_one: "请选择以下方式之一："
+first_run.option1: "运行配置向导（推荐）"
+first_run.option1_cmd: "realconsole wizard"
+first_run.option2: "快速配置模式"
+first_run.option2_cmd: "realconsole wizard --quick"
+first_run.option3: "手动创建 realconsole.yaml 和 .env"
+first_run.option3_hint: "参考 config/minimal.yaml"
+first_run.hint: "提示: 向导将帮助你在 2 分钟内完成配置"
+
+# LLM 相关
+llm.init_failed: "⚠ {type} LLM 初始化失败:"
+llm.client_failed: "{provider} 客户端创建失败:"
+llm.unknown_provider: "未知的 LLM provider:"
+llm.need_api_key: "{provider} 需要 api_key"
+llm.type_primary: "Primary"
+llm.type_fallback: "Fallback"
+
+# 环境和错误
+error.env_load_failed: "⚠ .env 加载失败:"
+error.repl_error: "REPL 错误:"
+error.use_default_config: "使用默认配置继续运行..."
+
+# CLI 参数帮助
+cli.config_help: "配置文件路径"
+cli.once_help: "单次执行模式"
+cli.lang_help: "界面语言 (zh-CN, en-US)"
+cli.wizard_help: "运行配置向导（交互式配置生成）"
+cli.wizard_alias: "init"
+cli.wizard_quick_help: "快速配置模式（最小提问）"
+cli.config_cmd_help: "显示当前配置"
+cli.config_path_help: "显示配置路径"

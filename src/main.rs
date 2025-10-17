@@ -17,6 +17,7 @@ mod error_fixer;  // ✨ Phase 9.2: 错误自动修复
 mod execution_logger;
 mod git_assistant;  // ✨ Phase 6: Git 智能助手
 mod history;        // ✨ Phase 8: 命令历史记录管理
+mod i18n;           // ✨ Phase 11: 多语言支持
 mod llm;
 mod llm_manager;
 mod log_analyzer;  // ✨ Phase 6: 日志分析工具
@@ -53,6 +54,10 @@ struct Args {
     /// 单次执行模式
     #[arg(long)]
     once: Option<String>,
+
+    /// 界面语言 (zh-CN, en-US)
+    #[arg(short, long)]
+    lang: Option<String>,
 
     /// 子命令
     #[command(subcommand)]
@@ -95,13 +100,13 @@ fn create_llm_client(
 
             llm::OllamaClient::new(endpoint, model)
                 .map(|client| Arc::new(client) as Arc<dyn llm::LlmClient>)
-                .map_err(|e| format!("Ollama 客户端创建失败: {}", e))
+                .map_err(|e| format!("{}: {}", i18n::t_with_args("llm.client_failed", &[("provider", "Ollama")]), e))
         }
         "deepseek" => {
             let api_key = provider_config
                 .api_key
                 .as_ref()
-                .ok_or_else(|| "Deepseek 需要 api_key".to_string())?;
+                .ok_or_else(|| i18n::t_with_args("llm.need_api_key", &[("provider", "Deepseek")]))?;
             let model = provider_config
                 .model
                 .as_deref()
@@ -113,9 +118,9 @@ fn create_llm_client(
 
             llm::DeepseekClient::new(api_key, model, endpoint)
                 .map(|client| Arc::new(client) as Arc<dyn llm::LlmClient>)
-                .map_err(|e| format!("Deepseek 客户端创建失败: {}", e))
+                .map_err(|e| format!("{}: {}", i18n::t_with_args("llm.client_failed", &[("provider", "Deepseek")]), e))
         }
-        other => Err(format!("未知的 LLM provider: {}", other)),
+        other => Err(format!("{} {}", i18n::t("llm.unknown_provider"), other)),
     }
 }
 
@@ -123,13 +128,13 @@ fn create_llm_client(
 async fn run_wizard(quick: bool) {
     use wizard::{ConfigWizard, WizardMode};
 
-    println!("\n{}", "=== RealConsole 配置向导 ===\n".cyan().bold());
+    println!("\n{}\n", i18n::t("config.wizard_title").cyan().bold());
 
     let mode = if quick {
-        println!("{}", "模式: 快速配置（使用推荐默认值）\n".dimmed());
+        println!("{}\n", i18n::t("config.mode_quick").dimmed());
         WizardMode::Quick
     } else {
-        println!("{}", "模式: 完整配置（可自定义所有选项）\n".dimmed());
+        println!("{}\n", i18n::t("config.mode_complete").dimmed());
         WizardMode::Complete
     };
 
@@ -138,12 +143,12 @@ async fn run_wizard(quick: bool) {
     match wizard.run().await {
         Ok(config) => {
             if let Err(e) = wizard.generate_and_save(&config) {
-                eprintln!("\n{} {}", "✗ 保存配置失败:".red(), e);
+                eprintln!("\n{} {}", i18n::t("config.save_failed").red(), e);
                 process::exit(1);
             }
         }
         Err(e) => {
-            eprintln!("\n{} {}", "✗ 配置向导失败:".red(), e);
+            eprintln!("\n{} {}", i18n::t("config.wizard_failed").red(), e);
             process::exit(1);
         }
     }
@@ -161,18 +166,18 @@ fn show_config(config_path: &str, show_path: bool) {
 
     // 显示配置内容
     if !std::path::Path::new(config_path).exists() {
-        eprintln!("{} {}", "配置文件不存在:".red(), config_path);
-        eprintln!("{}", "请运行 'realconsole wizard' 创建配置".cyan());
+        eprintln!("{} {}", i18n::t("config.not_found").red(), config_path);
+        eprintln!("{}", i18n::t("config.run_wizard").cyan());
         process::exit(1);
     }
 
     match std::fs::read_to_string(config_path) {
         Ok(content) => {
-            println!("\n{} {}\n", "配置文件:".green().bold(), config_path);
+            println!("\n{} {}\n", i18n::t("config.file_label").green().bold(), config_path);
             println!("{}", content);
         }
         Err(e) => {
-            eprintln!("{} {}", "读取配置文件失败:".red(), e);
+            eprintln!("{} {}", i18n::t("config.read_failed").red(), e);
             process::exit(1);
         }
     }
@@ -210,6 +215,20 @@ fn load_env_file(config_path: &str) {
 async fn main() {
     let args = Args::parse();
 
+    // ✨ Phase 11: 初始化 i18n 系统
+    // 语言选择优先级：命令行 > 配置文件 > 环境变量 > 系统语言 > 默认中文
+    let selected_lang = if let Some(ref lang_str) = args.lang {
+        i18n::Language::from_str(lang_str).unwrap_or_else(|| {
+            eprintln!("⚠ 未知语言: {}，使用默认中文", lang_str);
+            i18n::Language::ZhCn
+        })
+    } else if let Ok(lang_env) = std::env::var("REALCONSOLE_LANG") {
+        i18n::Language::from_str(&lang_env).unwrap_or_else(i18n::Language::from_system)
+    } else {
+        i18n::Language::from_system()
+    };
+    i18n::init(selected_lang);
+
     // 处理子命令
     if let Some(command) = args.command {
         match command {
@@ -227,13 +246,13 @@ async fn main() {
     // 首次运行检测：如果配置文件不存在，提示运行 wizard
     if !std::path::Path::new(&args.config).exists()
         && !std::path::Path::new(".env").exists() {
-        println!("\n{}", "欢迎使用 RealConsole！".green().bold());
-        println!("\n{}", "未检测到配置文件，首次使用需要进行配置。".yellow());
-        println!("\n请选择以下方式之一：\n");
-        println!("  1. {} 运行配置向导（推荐）", "realconsole wizard".cyan());
-        println!("  2. {} 快速配置模式", "realconsole wizard --quick".cyan());
-        println!("  3. {} 手动创建 realconsole.yaml 和 .env\n", "参考 config/minimal.yaml".dimmed());
-        println!("{}", "提示: 向导将帮助你在 2 分钟内完成配置\n".dimmed());
+        println!("\n{}", i18n::t("first_run.welcome").green().bold());
+        println!("\n{}", i18n::t("first_run.no_config").yellow());
+        println!("\n{}\n", i18n::t("first_run.choose_one"));
+        println!("  1. {} {}", i18n::t("first_run.option1_cmd").cyan(), i18n::t("first_run.option1"));
+        println!("  2. {} {}", i18n::t("first_run.option2_cmd").cyan(), i18n::t("first_run.option2"));
+        println!("  3. {} {}\n", i18n::t("first_run.option3_hint").dimmed(), i18n::t("first_run.option3"));
+        println!("{}\n", i18n::t("first_run.hint").dimmed());
         process::exit(0);
     }
 
@@ -251,13 +270,13 @@ async fn main() {
             Err(e) => {
                 // 使用用户友好的错误格式显示详细信息
                 eprintln!("{}", e.format_user_friendly());
-                eprintln!("\n{}", "使用默认配置继续运行...".yellow());
+                eprintln!("\n{}", i18n::t("error.use_default_config").yellow());
                 config::Config::default()
             }
         }
     } else {
-        eprintln!("{} {}", "配置文件不存在:".yellow(), args.config);
-        eprintln!("{}", "请运行 'realconsole wizard' 创建配置\n".cyan());
+        eprintln!("{} {}", i18n::t("config.not_found").yellow(), args.config);
+        eprintln!("{}\n", i18n::t("config.run_wizard").cyan());
         process::exit(1);
     };
 
@@ -310,7 +329,8 @@ async fn main() {
                     }
                 }
                 Err(e) => {
-                    eprintln!("{} {}", "⚠ Primary LLM 初始化失败:".yellow(), e);
+                    let msg = i18n::t_with_args("llm.init_failed", &[("type", &i18n::t("llm.type_primary"))]);
+                    eprintln!("{} {}", msg.yellow(), e);
                 }
             }
         }
@@ -324,7 +344,8 @@ async fn main() {
                     manager.set_fallback(client);
                 }
                 Err(e) => {
-                    eprintln!("{} {}", "⚠ Fallback LLM 初始化失败:".yellow(), e);
+                    let msg = i18n::t_with_args("llm.init_failed", &[("type", &i18n::t("llm.type_fallback"))]);
+                    eprintln!("{} {}", msg.yellow(), e);
                 }
             }
         }
@@ -365,7 +386,7 @@ async fn main() {
     } else {
         // REPL 模式
         if let Err(e) = repl::run(&agent) {
-            eprintln!("{} {:?}", "REPL 错误:".red(), e);
+            eprintln!("{} {:?}", i18n::t("error.repl_error").red(), e);
             process::exit(1);
         }
     }

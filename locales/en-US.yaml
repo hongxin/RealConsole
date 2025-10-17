@@ -1,0 +1,61 @@
+# RealConsole English (US) Translation File
+# Language: English (en-US)
+# Version: 1.1.0
+
+# Welcome and hints
+welcome.app_name: "RealConsole"
+welcome.version: "v{version}"
+welcome.hint: "Enter your question or"
+welcome.help: "/help"
+welcome.exit: "Press Ctrl-D to exit"
+
+# REPL commands
+command.interrupted: "^C"
+command.bye: "Bye 👋"
+command.error: "Error:"
+
+# Configuration wizard
+config.wizard_title: "=== RealConsole Configuration Wizard ==="
+config.mode_quick: "Mode: Quick setup (using recommended defaults)"
+config.mode_complete: "Mode: Complete setup (customize all options)"
+config.save_failed: "✗ Failed to save configuration:"
+config.wizard_failed: "✗ Configuration wizard failed:"
+config.not_found: "Configuration file not found:"
+config.run_wizard: "Please run 'realconsole wizard' to create configuration"
+config.file_label: "Configuration file:"
+config.read_failed: "Failed to read configuration file:"
+
+# First run
+first_run.welcome: "Welcome to RealConsole!"
+first_run.no_config: "No configuration file detected. Initial setup required."
+first_run.choose_one: "Please choose one of the following:"
+first_run.option1: "Run configuration wizard (recommended)"
+first_run.option1_cmd: "realconsole wizard"
+first_run.option2: "Quick configuration mode"
+first_run.option2_cmd: "realconsole wizard --quick"
+first_run.option3: "Manually create realconsole.yaml and .env"
+first_run.option3_hint: "See config/minimal.yaml"
+first_run.hint: "Tip: The wizard will help you complete setup in 2 minutes"
+
+# LLM related
+llm.init_failed: "⚠ {type} LLM initialization failed:"
+llm.client_failed: "{provider} client creation failed:"
+llm.unknown_provider: "Unknown LLM provider:"
+llm.need_api_key: "{provider} requires api_key"
+llm.type_primary: "Primary"
+llm.type_fallback: "Fallback"
+
+# Environment and errors
+error.env_load_failed: "⚠ Failed to load .env:"
+error.repl_error: "REPL error:"
+error.use_default_config: "Continuing with default configuration..."
+
+# CLI arguments help
+cli.config_help: "Configuration file path"
+cli.once_help: "Single execution mode"
+cli.lang_help: "Interface language (zh-CN, en-US)"
+cli.wizard_help: "Run configuration wizard (interactive setup)"
+cli.wizard_alias: "init"
+cli.wizard_quick_help: "Quick configuration mode (minimal prompts)"
+cli.config_cmd_help: "Display current configuration"
+cli.config_path_help: "Display configuration file path"

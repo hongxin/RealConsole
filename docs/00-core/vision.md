@@ -943,7 +943,7 @@ $ realconsole metrics
 
 ### B. 联系方式
 
-**项目地址**: https://github.com/hongxin/realconsole
+**项目地址**: https://github.com/hongxin/RealConsole
 **文档**: https://realconsole.dev
 **邮件**: hello@realconsole.dev
 
