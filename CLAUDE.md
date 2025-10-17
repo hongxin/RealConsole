@@ -17,7 +17,7 @@
 ## 技术要点
 
 **语言与核心库**：
-- Rust 2021 (1.70+)，tokio 异步运行时
+- Rust 2021 (1.90+)，tokio 异步运行时
 - rustyline (REPL)，serde_yaml (配置)，colored (输出)
 
 **架构核心**：
