@@ -82,7 +82,7 @@ pub fn run(agent: &Agent) -> RustyResult<()> {
 fn print_welcome() {
     let version = env!("CARGO_PKG_VERSION");
     // 极简单行显示：版本 | 用途 | 帮助 | 退出
-    println!("{} {} {} {} {} {} {}",
+    println!(" {} {} {} {} {} {} {}",
         i18n::t("welcome.app_name").bold().cyan(),
         i18n::t_with_args("welcome.version", &[("version", version)]).dimmed(),
         "|".dimmed(),
@@ -120,6 +120,10 @@ fn load_history_to_editor(rl: &mut DefaultEditor, agent: &Agent) {
 
 /// 构建标准的 shell 提示符
 fn build_prompt() -> String {
+    // 获取版本号并提取主版本号
+    let version = env!("CARGO_PKG_VERSION");
+    let major_version = version.split('.').next().unwrap_or("1");
+
     // 获取用户名
     let username = env::var("USER")
         .or_else(|_| env::var("USERNAME"))
@@ -135,10 +139,13 @@ fn build_prompt() -> String {
         })
         .unwrap_or_else(|| "~".to_string());
 
-    // 构建提示符：username current_folder % （橙色）
-    format!("{} {} % ",
-        username.truecolor(255, 165, 0),      // 橙色用户名
-        current_dir.truecolor(255, 165, 0)    // 橙色目录名
+    // 构建提示符：(RealConsole v1) Username Pathname %
+    // 样式与欢迎信息保持一致：RealConsole 粗体青色，版本号灰色
+    format!("({} {}) {} {} % ",
+        "RealConsole".bold().cyan(),            // 粗体青色 RealConsole（与首行一致）
+        format!("v{}", major_version).dimmed(), // 灰色版本号（与首行一致）
+        username.truecolor(255, 165, 0),        // 橙色用户名
+        current_dir.truecolor(255, 165, 0)      // 橙色目录名
     )
 }
 
