@@ -1,5 +1,7 @@
 # RealConsole Development Roadmap
 
+> **[中文](roadmap.md) | English**
+
 **Current Version**: v1.0.0 🎉
 **Last Updated**: 2025-10-17
 

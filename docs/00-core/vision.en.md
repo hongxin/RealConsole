@@ -1,5 +1,7 @@
 # RealConsole - Product Vision & Top-Level Design
 
+> **[中文](vision.md) | English**
+
 > **Return to Fundamentals, Think from Scratch**
 > Version: 1.0
 > Date: 2025-10-15

@@ -1,5 +1,7 @@
 # RealConsole - Philosophy Summary
 
+> **[中文](philosophy.md) | English**
+
 > **From Simple Triads to the Wisdom of Change**
 > Completion Date: 2025-10-15
 > Version: 1.0
