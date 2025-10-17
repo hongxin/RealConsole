@@ -77,6 +77,43 @@ pub struct Agent {
 }
 
 impl Agent {
+    /// 规范化文件路径：
+    /// - 将 ~ 展开为用户主目录
+    /// - 将相对路径转换为基于用户数据目录的绝对路径
+    /// - 绝对路径保持不变
+    fn normalize_path(path: &str) -> String {
+        use std::env;
+        use std::path::PathBuf;
+
+        let path = path.trim();
+
+        // 处理 ~ 开头的路径
+        if path.starts_with('~') {
+            if let Some(home) = dirs::home_dir() {
+                return path.replacen('~', &home.display().to_string(), 1);
+            }
+        }
+
+        // 检查是否是绝对路径
+        let path_buf = PathBuf::from(path);
+        if path_buf.is_absolute() {
+            return path.to_string();
+        }
+
+        // 相对路径：转换为用户数据目录下的路径
+        // 使用 ~/.realconsole/ 作为基础目录
+        if let Some(home) = dirs::home_dir() {
+            let base_dir = home.join(".realconsole");
+            return base_dir.join(path).display().to_string();
+        }
+
+        // 降级：如果无法获取主目录，尝试使用当前目录
+        env::current_dir()
+            .ok()
+            .and_then(|d| Some(d.join(path).display().to_string()))
+            .unwrap_or_else(|| path.to_string())
+    }
+
     pub fn new(config: Config, registry: CommandRegistry) -> Self {
         // ✨ Phase 10.1: 初始化智能命令路由器
         let command_router = CommandRouter::new(config.prefix.clone());
@@ -91,7 +128,9 @@ impl Agent {
         // 如果配置了持久化文件，尝试加载历史记忆
         let memory = if let Some(ref mem_config) = config.memory {
             if let Some(ref path) = mem_config.persistent_file {
-                match Memory::load_from_file(path, memory_capacity) {
+                // 规范化路径，避免跟随工作目录改变
+                let normalized_path = Self::normalize_path(path);
+                match Memory::load_from_file(&normalized_path, memory_capacity) {
                     Ok(loaded) => {
                         if !loaded.is_empty() {
                             // 说明：由于环形缓冲区的容量限制，只保留最近的 N 条记忆
@@ -403,9 +442,11 @@ impl Agent {
                         if let Some(ref mem_config) = self.config.memory {
                             if mem_config.auto_save.unwrap_or(false) {
                                 if let Some(ref path) = mem_config.persistent_file {
+                                    // 规范化路径，避免跟随工作目录改变
+                                    let normalized_path = Self::normalize_path(path);
                                     let entries = memory.recent(1);
                                     if let Some(entry) = entries.first() {
-                                        let _ = Memory::append_to_file(path, entry);
+                                        let _ = Memory::append_to_file(&normalized_path, entry);
                                     }
                                 }
                             }

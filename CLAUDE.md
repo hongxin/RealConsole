@@ -61,7 +61,19 @@
 
 ## 快速操作
 
-**构建运行**：
+**安装使用**（推荐）：
+```bash
+# 1. 编译并安装到用户目录（~/.local/bin）
+make install
+
+# 2. 运行配置向导
+realconsole wizard
+
+# 3. 开始使用
+realconsole
+```
+
+**手动构建运行**：
 ```bash
 cargo build --release
 cp .env.example .env  # 填入 DEEPSEEK_API_KEY
@@ -70,9 +82,19 @@ cp .env.example .env  # 填入 DEEPSEEK_API_KEY
 
 **测试**：
 ```bash
-cargo test                    # 全部测试
-cargo test --test test_intent_*  # Intent 测试
-cargo llvm-cov --html         # 覆盖率报告
+make test                     # 全部测试（或 cargo test）
+make test-intent              # Intent 测试
+make coverage                 # 覆盖率报告
+```
+
+**安装位置**：
+- 可执行文件：`~/.local/bin/realconsole`
+- 配置目录：`~/.realconsole/`
+- Memory 数据：`~/.realconsole/memory/`
+
+**卸载**：
+```bash
+make uninstall                # 或 ./uninstall.sh
 ```
 
 **扩展开发**：

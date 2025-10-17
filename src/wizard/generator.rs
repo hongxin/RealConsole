@@ -71,9 +71,10 @@ impl ConfigGenerator {
         };
 
         let memory_config = if config.memory_enabled {
+            // 使用用户主目录下的固定位置，避免跟随工作目录改变
             r#"memory:
   capacity: 100
-  persistent_file: "memory/session.jsonl"
+  persistent_file: "~/.realconsole/memory/session.jsonl"
   auto_save: true"#
         } else {
             "# memory: (未启用)"
