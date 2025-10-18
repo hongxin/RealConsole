@@ -44,6 +44,9 @@ use crate::memory::ContextTracker;
 use crate::shell_executor::ShellExecutorWithFixer;
 use crate::error_fixer::{FeedbackLearner, FeedbackRecord, FeedbackType, FixOutcome};
 
+// ✨ Phase 8 (Workflow): Workflow Intent 支持
+use crate::dsl::intent::{WorkflowIntent, WorkflowExecutor};
+
 /// Agent 核心
 pub struct Agent {
     pub config: Config,
@@ -74,6 +77,9 @@ pub struct Agent {
     pub last_failed_command: Arc<RwLock<Option<String>>>,
     // ✨ Phase 10.1: 智能命令路由器
     pub command_router: CommandRouter,
+    // ✨ Phase 8 (Workflow): Workflow Intent 系统
+    pub workflow_intents: Vec<WorkflowIntent>,
+    pub workflow_executor: Option<Arc<WorkflowExecutor>>,
 }
 
 impl Agent {
@@ -117,6 +123,15 @@ impl Agent {
     pub fn new(config: Config, registry: CommandRegistry) -> Self {
         // ✨ Phase 10.1: 初始化智能命令路由器
         let command_router = CommandRouter::new(config.prefix.clone());
+
+        // ✨ Phase 8 (Workflow): 初始化 Workflow Intent 系统
+        let (workflow_intents, workflow_executor) = if config.features.workflow_enabled.unwrap_or(false) {
+            use crate::dsl::intent::register_builtin_workflows;
+            let intents = register_builtin_workflows();
+            (intents, None) // executor 在配置 LLM 后再初始化
+        } else {
+            (Vec::new(), None)
+        };
 
         // 初始化记忆系统
         let memory_capacity = config.memory.as_ref()
@@ -231,6 +246,8 @@ impl Agent {
                 shell_executor_with_fixer,
                 last_failed_command,
                 command_router,
+                workflow_intents: workflow_intents.clone(),
+                workflow_executor: workflow_executor.clone(),
             };
         }
 
@@ -260,6 +277,8 @@ impl Agent {
             shell_executor_with_fixer,
             last_failed_command,
             command_router,
+            workflow_intents,
+            workflow_executor,
         }
     }
 
@@ -321,6 +340,27 @@ impl Agent {
                 }
             })
         });
+    }
+
+    /// 配置 Workflow Executor（Phase 8）
+    ///
+    /// 在配置 LLM 客户端后调用，初始化 Workflow 执行器
+    pub fn configure_workflow_executor(&mut self) {
+        // 只在启用 Workflow 时初始化
+        if !self.config.features.workflow_enabled.unwrap_or(false) {
+            return;
+        }
+
+        // 创建 Workflow 执行器
+        let executor = WorkflowExecutor::new(
+            Arc::clone(&self.tool_registry),
+            Some(Arc::clone(&self.llm_manager)),
+        );
+
+        self.workflow_executor = Some(Arc::new(executor));
+
+        // 显示启动信息
+        Display::startup_workflow(self.config.display.mode, self.workflow_intents.len());
     }
 
     /// 处理用户输入
@@ -767,6 +807,12 @@ impl Agent {
             return self.handle_text_with_tools(text);
         }
 
+        // ✨ Phase 8: 尝试匹配 Workflow Intent（套路化复用）
+        // 优先于传统 Intent，因为 Workflow 性能更优
+        if let Some(response) = self.try_match_workflow(text) {
+            return response;
+        }
+
         // ✨ Phase 3: 回退到 Intent 识别（道法自然 - 先识别意图，未匹配则回退到流式LLM）
         if let Some(plan) = self.try_match_intent(text) {
             return self.execute_intent(&plan);
@@ -1021,6 +1067,78 @@ impl Agent {
         }
 
         Some(plan)
+    }
+
+    /// Phase 8: 尝试匹配 Workflow Intent
+    ///
+    /// 使用 Workflow Intent 系统匹配用户输入，如果匹配成功则执行工作流
+    ///
+    /// # 返回
+    /// - `Some(String)`: 匹配成功并执行，返回执行结果
+    /// - `None`: 没有匹配的工作流，应回退到传统 Intent 或 LLM
+    fn try_match_workflow(&self, text: &str) -> Option<String> {
+        // 如果 Workflow 未启用，直接返回 None
+        if !self.config.features.workflow_enabled.unwrap_or(false) {
+            return None;
+        }
+
+        // 如果没有 executor，返回 None
+        let executor = self.workflow_executor.as_ref()?;
+
+        // 遍历所有 workflow intents，找到最佳匹配
+        let mut best_match: Option<(usize, crate::dsl::intent::IntentMatch)> = None;
+        let mut best_confidence = 0.0;
+
+        for (idx, workflow_intent) in self.workflow_intents.iter().enumerate() {
+            // 为每个 workflow 创建临时 matcher 并匹配
+            let mut temp_matcher = IntentMatcher::new();
+            temp_matcher.register(workflow_intent.base_intent.clone());
+
+            if let Some(intent_match) = temp_matcher.best_match(text) {
+                if intent_match.confidence > best_confidence {
+                    best_confidence = intent_match.confidence;
+                    best_match = Some((idx, intent_match));
+                }
+            }
+        }
+
+        // 如果没有找到匹配，返回 None
+        let (workflow_idx, intent_match) = best_match?;
+        let workflow = &self.workflow_intents[workflow_idx];
+
+        // 显示 workflow 匹配信息
+        Display::workflow_match(
+            self.config.display.mode,
+            &workflow.base_intent.name,
+            intent_match.confidence,
+        );
+
+        // 执行 workflow
+        match tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                executor.execute(workflow, &intent_match).await
+            })
+        }) {
+            Ok(result) => {
+                // 显示 workflow 执行统计（包含缓存状态）
+                let from_cache = result.duration_ms < 100; // 简单判断：< 100ms 可能是缓存
+                Display::workflow_stats(
+                    self.config.display.mode,
+                    result.duration_ms,
+                    result.llm_calls,
+                    result.tool_calls,
+                    from_cache,
+                );
+
+                // 返回执行结果
+                Some(result.output)
+            }
+            Err(e) => {
+                // Workflow 执行失败，返回 None 以回退到传统流程
+                eprintln!("{} {}", "⚠ Workflow 执行失败:".yellow(), e);
+                None
+            }
+        }
     }
 
     /// Phase 2: 尝试使用 LLM 补充提取实体
@@ -2213,5 +2331,107 @@ mod tests {
 
         // 应该有输出（可能被限制）
         assert!(!result.is_empty());
+    }
+
+    // ========== Phase 8: Workflow Intent 兼容性测试 ==========
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_disabled_by_default() {
+        // 验证默认配置下 workflow 是禁用的
+        let config = Config::default();
+        let registry = CommandRegistry::new();
+        let agent = Agent::new(config.clone(), registry);
+
+        // 验证配置默认值
+        assert_eq!(config.features.workflow_enabled, Some(false));
+
+        // 验证 workflow 相关字段为空
+        assert!(agent.workflow_intents.is_empty());
+        assert!(agent.workflow_executor.is_none());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_disabled_no_impact() {
+        // 验证 workflow 禁用时对现有功能无影响
+        let mut config = Config::default();
+        config.features.workflow_enabled = Some(false); // 显式禁用
+
+        let mut registry = CommandRegistry::new();
+        registry.register(Command::from_fn("test", "Test", |_| "test output".to_string()));
+
+        let agent = Agent::new(config, registry);
+
+        // 测试系统命令正常工作
+        let result = agent.handle("/test");
+        assert_eq!(result, "test output");
+
+        // 测试 handle_text 不会调用 workflow
+        // （由于没有 LLM 配置，会返回错误，但不应该因为 workflow 而崩溃）
+        let result = agent.handle("随机文本");
+        assert!(!result.is_empty()); // 应该有响应（即使是错误）
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_enabled_initializes_templates() {
+        // 验证启用 workflow 时正确初始化模板
+        let mut config = Config::default();
+        config.features.workflow_enabled = Some(true); // 启用
+
+        let registry = CommandRegistry::new();
+        let agent = Agent::new(config, registry);
+
+        // 验证 workflow 模板已加载
+        assert!(!agent.workflow_intents.is_empty());
+        assert!(agent.workflow_intents.len() >= 4); // 至少有 4 个内置模板
+
+        // 验证模板名称
+        let template_names: Vec<String> = agent.workflow_intents
+            .iter()
+            .map(|w| w.base_intent.name.clone())
+            .collect();
+
+        assert!(template_names.contains(&"crypto_analysis".to_string()));
+        assert!(template_names.contains(&"stock_analysis".to_string()));
+        assert!(template_names.contains(&"weather_analysis".to_string()));
+        assert!(template_names.contains(&"website_summary".to_string()));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_try_match_returns_none_when_disabled() {
+        // 验证 workflow 禁用时 try_match_workflow 返回 None
+        let mut config = Config::default();
+        config.features.workflow_enabled = Some(false);
+
+        let registry = CommandRegistry::new();
+        let agent = Agent::new(config, registry);
+
+        // 调用 try_match_workflow 应该立即返回 None
+        let result = agent.try_match_workflow("分析 BNB 的走势");
+        assert!(result.is_none());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_backward_compatible_config() {
+        // 测试旧配置文件（没有 workflow 字段）可以正常解析
+        let yaml = r#"
+prefix: "/"
+features:
+  shell_enabled: true
+  shell_timeout: 10
+"#;
+        let config: Config = serde_yaml::from_str(yaml).unwrap();
+
+        // 验证新字段有默认值
+        assert_eq!(config.features.workflow_enabled, Some(false));
+        assert_eq!(config.features.workflow_cache_enabled, Some(true));
+        assert_eq!(config.features.workflow_cache_ttl_default, Some(300));
+
+        // 创建 Agent 应该成功
+        let registry = CommandRegistry::new();
+        let agent = Agent::new(config, registry);
+
+        // workflow 应该是禁用状态
+        assert!(agent.workflow_intents.is_empty());
+        assert!(agent.workflow_executor.is_none());
     }
 }

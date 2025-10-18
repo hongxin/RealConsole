@@ -37,6 +37,7 @@ pub struct WizardConfig {
     pub shell_enabled: bool,
     pub tool_calling_enabled: bool,
     pub memory_enabled: bool,
+    pub workflow_enabled: bool,
 }
 
 /// 配置向导
@@ -74,12 +75,14 @@ impl ConfigWizard {
         let shell_enabled = self.prompt_shell_enabled()?;
         let tool_calling_enabled = self.prompt_tool_calling()?;
         let memory_enabled = self.prompt_memory()?;
+        let workflow_enabled = self.prompt_workflow()?;
 
         Ok(WizardConfig {
             llm_provider,
             shell_enabled,
             tool_calling_enabled,
             memory_enabled,
+            workflow_enabled,
         })
     }
 
@@ -346,12 +349,27 @@ impl ConfigWizard {
     /// 提示记忆系统配置
     fn prompt_memory(&self) -> Result<bool> {
         if self.mode == WizardMode::Quick {
-            println!("✓ 记忆系统: 已启用\n");
+            println!("✓ 记忆系统: 已启用");
             Ok(true)
         } else {
             Confirm::with_theme(&self.theme)
                 .with_prompt("启用记忆系统？")
                 .default(true)
+                .interact()
+                .context("用户取消")
+        }
+    }
+
+    /// 提示 Workflow Intent 系统配置
+    fn prompt_workflow(&self) -> Result<bool> {
+        if self.mode == WizardMode::Quick {
+            println!("✓ Workflow Intent: 已禁用（可在配置文件中启用）\n");
+            Ok(false)
+        } else {
+            println!("\n💡 Workflow Intent 系统可将常用任务模式固化为模板，提升 40-50% 性能");
+            Confirm::with_theme(&self.theme)
+                .with_prompt("启用 Workflow Intent 系统？（实验性功能）")
+                .default(false)
                 .interact()
                 .context("用户取消")
         }

@@ -120,6 +120,17 @@ impl Display {
         }
     }
 
+    /// 启动信息（Workflow Intent 系统）✨ Phase 8
+    pub fn startup_workflow(mode: DisplayMode, workflow_count: usize) {
+        if mode.show_startup() {
+            println!(
+                "{} {} 个工作流模板",
+                "✓ Workflow Intent 系统已启用".dimmed(),
+                workflow_count.to_string().dimmed()
+            );
+        }
+    }
+
     /// Intent 识别信息
     pub fn intent_match(mode: DisplayMode, intent_name: &str, confidence: f64) {
         if mode.show_intent() {
@@ -140,6 +151,52 @@ impl Display {
     pub fn llm_generation(mode: DisplayMode) {
         if mode.show_llm_hint() {
             println!("{}", "🤖 LLM 生成".dimmed());
+        }
+    }
+
+    /// Workflow 匹配信息 ✨ Phase 8
+    pub fn workflow_match(mode: DisplayMode, workflow_name: &str, confidence: f64) {
+        if mode.show_intent() {
+            if mode.show_debug() {
+                println!(
+                    "{} {} (置信度: {:.2})",
+                    "⚡ Workflow:".cyan(),
+                    workflow_name.cyan(),
+                    confidence
+                );
+            } else {
+                println!("{} {}", "⚡".cyan(), workflow_name.cyan());
+            }
+        }
+    }
+
+    /// Workflow 执行统计 ✨ Phase 8
+    pub fn workflow_stats(
+        mode: DisplayMode,
+        duration_ms: u64,
+        llm_calls: usize,
+        tool_calls: usize,
+        from_cache: bool,
+    ) {
+        if mode.show_timing() {
+            let duration_sec = duration_ms as f64 / 1000.0;
+            if mode.show_debug() {
+                println!(
+                    "{} {:.2}s | LLM: {} | 工具: {} | 缓存: {}",
+                    "ⓘ".dimmed(),
+                    duration_sec.to_string().dimmed(),
+                    llm_calls.to_string().dimmed(),
+                    tool_calls.to_string().dimmed(),
+                    if from_cache { "命中" } else { "未命中" }
+                );
+            } else {
+                // Standard 模式：简化显示
+                if from_cache {
+                    println!("{} {:.2}s (缓存)", "ⓘ".dimmed(), duration_sec.to_string().green().dimmed());
+                } else {
+                    println!("{} {:.2}s", "ⓘ".dimmed(), duration_sec.to_string().dimmed());
+                }
+            }
         }
     }
 

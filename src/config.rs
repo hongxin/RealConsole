@@ -90,6 +90,19 @@ pub struct FeaturesConfig {
     /// 每轮最多工具数（默认 3）
     #[serde(default = "default_max_tools_per_round")]
     pub max_tools_per_round: usize,
+
+    /// 是否启用 Workflow Intent 系统（Phase 8，默认 false）
+    /// 套路化复用，将成功的 LLM 调用模式固化为模板
+    #[serde(default = "default_workflow_enabled")]
+    pub workflow_enabled: Option<bool>,
+
+    /// 是否启用 Workflow 缓存（默认 true）
+    #[serde(default = "default_workflow_cache_enabled")]
+    pub workflow_cache_enabled: Option<bool>,
+
+    /// Workflow 缓存默认 TTL（秒，默认 300）
+    #[serde(default = "default_workflow_cache_ttl")]
+    pub workflow_cache_ttl_default: Option<u64>,
 }
 
 fn default_true() -> bool {
@@ -106,6 +119,18 @@ fn default_max_tool_iterations() -> usize {
 
 fn default_max_tools_per_round() -> usize {
     3
+}
+
+fn default_workflow_enabled() -> Option<bool> {
+    Some(false)
+}
+
+fn default_workflow_cache_enabled() -> Option<bool> {
+    Some(true)
+}
+
+fn default_workflow_cache_ttl() -> Option<u64> {
+    Some(300)
 }
 
 /// Intent DSL 配置
@@ -186,6 +211,9 @@ impl Default for FeaturesConfig {
             tool_calling_enabled: Some(false), // 默认关闭，保持向后兼容
             max_tool_iterations: 5,
             max_tools_per_round: 3,
+            workflow_enabled: Some(false), // Phase 8: 默认关闭，保持向后兼容
+            workflow_cache_enabled: Some(true), // 启用 Workflow 时默认开启缓存
+            workflow_cache_ttl_default: Some(300), // 默认缓存 5 分钟
         }
     }
 }
@@ -326,5 +354,49 @@ features:
         let config: Config = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(config.features.max_tool_iterations, 10);
         assert_eq!(config.features.max_tools_per_round, 5);
+    }
+
+    #[test]
+    fn test_backward_compatibility_without_workflow_fields() {
+        // 测试向后兼容：旧配置文件没有 workflow 字段也能正常解析
+        let yaml = r#"
+prefix: "/"
+features:
+  shell_enabled: true
+  shell_timeout: 10
+  tool_calling_enabled: false
+"#;
+        let config: Config = serde_yaml::from_str(yaml).unwrap();
+
+        // 验证旧字段正常工作
+        assert_eq!(config.prefix, "/");
+        assert!(config.features.shell_enabled);
+        assert_eq!(config.features.shell_timeout, 10);
+        assert_eq!(config.features.tool_calling_enabled, Some(false));
+
+        // 验证新字段使用默认值（关键：默认禁用以保持向后兼容）
+        assert_eq!(config.features.workflow_enabled, Some(false));
+        assert_eq!(config.features.workflow_cache_enabled, Some(true));
+        assert_eq!(config.features.workflow_cache_ttl_default, Some(300));
+    }
+
+    #[test]
+    fn test_workflow_config_explicit_enable() {
+        // 测试显式启用 Workflow 功能
+        let yaml = r#"
+prefix: "/"
+features:
+  shell_enabled: true
+  tool_calling_enabled: false
+  workflow_enabled: true
+  workflow_cache_enabled: true
+  workflow_cache_ttl_default: 600
+"#;
+        let config: Config = serde_yaml::from_str(yaml).unwrap();
+
+        // 验证 Workflow 配置正确解析
+        assert_eq!(config.features.workflow_enabled, Some(true));
+        assert_eq!(config.features.workflow_cache_enabled, Some(true));
+        assert_eq!(config.features.workflow_cache_ttl_default, Some(600));
     }
 }

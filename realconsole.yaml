@@ -28,7 +28,12 @@ features:
 
   # 工具调用迭代限制（可选）
   max_tool_iterations: 30      # 最多迭代轮数（默认 5）
-  max_tools_per_round: 5      # 每轮最多工具数（默认 3）
+  max_tools_per_round: 5       # 每轮最多工具数（默认 3）
+  
+# ✨ 新增：启用 Workflow Intent 系统
+  workflow_enabled: true
+  workflow_cache_enabled: true
+  workflow_cache_ttl_default: 300  # 缓存 5 分钟
 
 memory:
   capacity: 100
@@ -41,7 +46,7 @@ display:
   # minimal：只显示必要信息，无启动信息、无中间过程（默认）
   # standard：显示适中信息，有简化的启动和执行信息
   # debug：显示所有细节，包括配置路径、LLM 信息、完整命令等
-  mode: minimal
+  mode: debug 
 
 # Intent DSL 智能增强配置 (v0.5.2+)
 intent:

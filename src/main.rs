@@ -358,6 +358,9 @@ async fn main() {
     // ✨ Phase 7: 配置 LLM Pipeline 生成器（如果启用）
     agent.configure_llm_bridge();
 
+    // ✨ Phase 8 (Workflow): 配置 Workflow 执行器（如果启用）
+    agent.configure_workflow_executor();
+
     // 注册 LLM 命令（需要访问 agent 的 llm_manager）
     let llm_manager = agent.llm_manager();
     commands::register_llm_commands(&mut agent.registry, llm_manager);

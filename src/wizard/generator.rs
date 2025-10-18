@@ -80,6 +80,14 @@ impl ConfigGenerator {
             "# memory: (未启用)"
         };
 
+        let workflow_config = if config.workflow_enabled {
+            r#"  workflow_enabled: true
+  workflow_cache_enabled: true
+  workflow_cache_ttl_default: 300"#
+        } else {
+            r#"  # workflow_enabled: false  # 可启用 Workflow Intent 系统（实验性功能）"#
+        };
+
         let yaml = format!(
             r#"# RealConsole 配置文件
 # 由配置向导自动生成于 {}
@@ -97,6 +105,7 @@ features:
   tool_calling_enabled: {}
   max_tool_iterations: 5
   max_tools_per_round: 3
+{}
 
 # 记忆系统
 {}
@@ -112,6 +121,7 @@ intent:
             llm_config,
             config.shell_enabled,
             config.tool_calling_enabled,
+            workflow_config,
             memory_config
         );
 
@@ -197,6 +207,7 @@ mod tests {
             shell_enabled: true,
             tool_calling_enabled: true,
             memory_enabled: false,
+            workflow_enabled: false,
         };
 
         let yaml = ConfigGenerator::generate_yaml(&config).unwrap();
@@ -209,6 +220,7 @@ mod tests {
         assert!(yaml.contains("shell_enabled: true"));
         assert!(yaml.contains("tool_calling_enabled: true"));
         assert!(yaml.contains("# memory: (未启用)"));
+        assert!(yaml.contains("# workflow_enabled: false")); // Workflow 默认禁用
     }
 
     #[test]
@@ -221,6 +233,7 @@ mod tests {
             shell_enabled: true,
             tool_calling_enabled: true,
             memory_enabled: true,
+            workflow_enabled: false,
         };
 
         let yaml = ConfigGenerator::generate_yaml(&config).unwrap();
@@ -243,6 +256,7 @@ mod tests {
             shell_enabled: true,
             tool_calling_enabled: true,
             memory_enabled: false,
+            workflow_enabled: false,
         };
 
         let env = ConfigGenerator::generate_env(&config).unwrap();
@@ -261,6 +275,7 @@ mod tests {
             shell_enabled: true,
             tool_calling_enabled: true,
             memory_enabled: false,
+            workflow_enabled: false,
         };
 
         let env = ConfigGenerator::generate_env(&config).unwrap();
@@ -279,11 +294,34 @@ mod tests {
             shell_enabled: true,
             tool_calling_enabled: true,
             memory_enabled: false,
+            workflow_enabled: false,
         };
 
         let env = ConfigGenerator::generate_env(&config).unwrap();
 
         // 非默认 endpoint 应该写入 .env
         assert!(env.contains("OLLAMA_ENDPOINT=http://192.168.1.100:11434"));
+    }
+
+    #[test]
+    fn test_generate_yaml_workflow_enabled() {
+        let config = WizardConfig {
+            llm_provider: LlmProviderChoice::Deepseek {
+                api_key: "sk-test".to_string(),
+                model: "deepseek-chat".to_string(),
+                endpoint: "https://api.deepseek.com/v1".to_string(),
+            },
+            shell_enabled: true,
+            tool_calling_enabled: true,
+            memory_enabled: false,
+            workflow_enabled: true,
+        };
+
+        let yaml = ConfigGenerator::generate_yaml(&config).unwrap();
+
+        // 验证 workflow 配置正确生成
+        assert!(yaml.contains("workflow_enabled: true"));
+        assert!(yaml.contains("workflow_cache_enabled: true"));
+        assert!(yaml.contains("workflow_cache_ttl_default: 300"));
     }
 }

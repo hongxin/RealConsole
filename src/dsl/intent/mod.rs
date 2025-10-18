@@ -51,6 +51,8 @@ pub mod extractor;
 pub mod validator;  // Phase 3: LLM Command Validation
 pub mod pipeline_bridge;  // Phase 6.3: Intent → Pipeline Bridge
 pub mod llm_bridge;  // Phase 7: LLM → Pipeline Bridge
+pub mod workflow;  // ✨ Phase 8: Workflow Intent System (套路化复用)
+pub mod workflow_templates;  // ✨ Phase 8: Builtin Workflow Templates
 
 // Re-export commonly used types
 pub use types::{
@@ -63,3 +65,5 @@ pub use extractor::EntityExtractor;
 pub use validator::{CommandValidator, ValidationResult};
 pub use pipeline_bridge::IntentToPipeline;
 pub use llm_bridge::LlmToPipeline;
+pub use workflow::{WorkflowIntent, WorkflowStep, WorkflowExecutor, WorkflowResult, ExecutionContext};
+pub use workflow_templates::register_builtin_workflows;
