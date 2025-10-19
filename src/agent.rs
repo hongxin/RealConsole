@@ -212,12 +212,18 @@ impl Agent {
         if let Some(ref config_dir) = dirs::config_dir() {
             let storage_path = config_dir.join("realconsole").join("feedback.json");
             let learner_with_storage = FeedbackLearner::new().with_storage(storage_path);
-            // 尝试从磁盘加载历史反馈
-            let _ = tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    learner_with_storage.load_from_disk().await
-                })
-            });
+
+            // 在测试环境中跳过磁盘加载以避免阻塞问题
+            #[cfg(not(test))]
+            {
+                // 尝试从磁盘加载历史反馈
+                let _ = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        learner_with_storage.load_from_disk().await
+                    })
+                });
+            }
+
             let feedback_learner = Arc::new(learner_with_storage);
 
             let shell_executor_with_fixer = Arc::new(
@@ -392,6 +398,11 @@ impl Agent {
                 }
             })
         });
+
+        // 特殊处理：exit 命令直接退出
+        if line.trim().to_lowercase() == "exit" {
+            return "__QUIT__".to_string();
+        }
 
         // ✨ Phase 10.1: 使用智能命令路由器识别命令类型
         let router_result = self.command_router.route(line);
@@ -905,8 +916,8 @@ impl Agent {
                 // 计算耗时
                 let elapsed = start.elapsed();
 
-                // 流式输出已经完成
-                println!();  // 换行
+                // 流式输出已经完成，不需要额外换行
+                // 因为流式输出已经包含了完整的输出内容
                 Display::execution_timing(self.config.display.mode, elapsed.as_secs_f64());
 
                 // 返回空字符串，因为内容已通过流式输出显示

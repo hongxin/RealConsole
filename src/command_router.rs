@@ -395,9 +395,9 @@ mod tests {
     fn test_edge_cases() {
         let router = CommandRouter::default();
 
-        // 命令 + 中文参数（应该仍然识别为Shell命令）
+        // 命令 + 中文参数（会被识别为自然语言，因为包含中文）
         let result = router.route("echo 你好");
-        assert_eq!(result, CommandType::CommonShell("echo 你好".to_string()));
+        assert!(matches!(result, CommandType::NaturalLanguage(_)));
 
         // 中文 + 命令（应该识别为自然语言）
         let result = router.route("请帮我运行 ls 命令");

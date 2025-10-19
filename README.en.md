@@ -2,54 +2,56 @@
 
 > **[中文](README.md) | English**
 
-An intelligent CLI agent beloved by programmers and DevOps engineers - High-performance Rust implementation
+- An intelligent CLI Agent beloved by programmers and DevOps engineers
+- Works seamlessly in Linux/Mac/Windows WSL command-line environments with a smooth user experience
+- Built with Rust for high-performance terminal execution
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-645%2B%20passed-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-654%2B%20passed-green.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-78%2B%25-yellow.svg)](docs/test_reports/)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](docs/CHANGELOG.md)
 
 ## ⚠️ Disclaimer
 
-**Important Notice**: This program is primarily developed using the Vibe Coding methodology with [Claude Code](https://claude.com/claude-code), an exploratory development approach. Therefore, we cannot guarantee the security and stability of the program.
+**Important Notice**: This program is primarily developed using [Claude Code](https://claude.com/claude-code)'s Vibe Coding methodology, an exploratory development approach. As such, we cannot guarantee the program's security and stability.
 
 **Intended Use**:
-- This program is intended for **educational**, **research**, and **technical exploration** purposes only
+- For **educational**, **research**, and **technical exploration** purposes only
 - Not recommended for production environments
 
-**Liability Statement**:
-By using, compiling, or running this program, you acknowledge that you are fully aware of its experimental nature and potential risks. You assume all responsibility for any issues, losses, or damages arising from the use of this program. The developers, contributors, and maintainers of this program bear no responsibility whatsoever.
+**Liability**:
+By using, compiling, or running this program, you acknowledge its experimental nature and potential risks. Users assume full responsibility for any issues, losses, or damages resulting from the use of this program. The developers, contributors, and maintainers of this program shall not be held liable.
 
 **Recommendations**:
-- Use cautiously in test environments
-- Regularly back up important data
-- Understand what each command does before executing it
+- Use cautiously in testing environments
+- Regularly backup important data
+- Understand each command before execution
 
 ---
 
 ## ✨ Core Features
 
-### 🧠 Intelligent AI Capabilities
-- **LLM-Powered Conversations** - Supports Ollama/Deepseek with real-time streaming output and natural language interaction
-- **Task Orchestration System** ⭐ NEW - LLM intelligently decomposes complex goals, auto-analyzes dependencies, and optimizes parallel execution (`/plan`, `/execute`)
-- **Intelligent Pipeline Generation** - Automatically understands user intent and converts natural language to file operation commands
-- **Automatic Tool Calling** - 14+ built-in tools (calculator, file operations, time queries, etc.) with smart parallel execution
-- **Intent Recognition** - 50+ built-in intent templates that automatically understand and execute user needs
-- **Multi-layer Fallback Mechanism** - 4-layer guarantee (LLM generation → rule matching → template matching → conversation) ensures the system never fails
+### 🧠 AI Capabilities
+- **LLM-Powered Conversation** - Ollama/Deepseek support, real-time streaming output, natural language interaction
+- **Task Orchestration System** ⭐ NEW - LLM intelligently decomposes complex goals, automatic dependency analysis, and parallel execution optimization (`/plan`, `/execute`)
+- **Smart Pipeline Generation** - Automatically understands user intent, converts natural language to file operation commands
+- **Automatic Tool Calling** - 14+ built-in tools (calculator, file operations, time queries, etc.), intelligent parallel execution
+- **Intent Recognition** - 50+ built-in intent templates, automatically understand user needs and execute
+- **Multi-Layer Fallback** - 4-layer guarantee (LLM generation → rule matching → template matching → conversation), ensuring system never fails
 
 **Usage Examples**:
 ```bash
-» Show the 3 largest .rs files
+» Show the 3 largest rs files
 🤖 LLM Generated
-→ Execute: find . -name '*.rs' -type f -exec ls -lh {} + | sort -k5 -hr | head -n 3
+→ Executing: find . -name '*.rs' -type f -exec ls -lh {} + | sort -k5 -hr | head -n 3
 
 » Calculate 2 to the power of 10
 [LLM automatically calls calculator tool]
-Based on the calculation, 2^10 = 1024
+Based on calculation, 2^10 = 1024
 
 » /plan Create a Rust project with src and tests directories, then create main.rs
-🤖 Intelligent Task Decomposition
+🤖 Smart Task Decomposition
 ▸ 3 Stages · 4 Tasks · ⚡ 15s (saved 5s)
 ├─ → Stage 1 (5s)
 │  └─ Create project root $ mkdir -p myproject
@@ -57,28 +59,28 @@ Based on the calculation, 2^10 = 1024
 │  ├─ Create src directory $ mkdir -p myproject/src
 │  └─ Create tests directory $ mkdir -p myproject/tests
 └─ → Stage 3 (5s)
-   └─ Create main.rs file $ touch myproject/src/main.rs
+   └─ Create main.rs $ touch myproject/src/main.rs
 
 » /execute
 ✓ 4/4 · 100% · 12s
 ```
 
 ### 🛠️ DevOps Toolkit
-- **Project Context Awareness** - Auto-detects project types (Rust/Python/Node/Go/Java), intelligently recommends build/test/run commands (`/project`)
-- **Git Smart Assistant** - Status viewing, change analysis, auto-generates commit messages (follows Conventional Commits) (`/gs`, `/gd`, `/ga`, `/gb`)
+- **Project Context Awareness** - Automatically detects project type (Rust/Python/Node/Go/Java), intelligently recommends build/test/run commands (`/project`)
+- **Git Smart Assistant** - Status viewing, change analysis, automatic commit message generation (follows Conventional Commits) (`/gs`, `/gd`, `/ga`, `/gb`)
 - **Log Analysis Tool** - Multi-format parsing, error aggregation, health assessment (`/la`, `/le`, `/lt`)
 - **Safe Shell Execution** - Execute commands with `!` prefix, blacklist protection, timeout control
 
 ### 💻 System Monitoring
 - **System Resource Monitoring** - Real-time CPU/memory/disk monitoring, process TOP list (`/sys`, `/cpu`, `/disk`, `/top`)
-- **Cross-platform Support** - Full macOS + Linux support with zero external dependencies
-- **Execution Logs** - Complete operation records and auditing
+- **Cross-Platform Support** - Full macOS + Linux support, zero additional dependencies
+- **Execution Logging** - Complete operation records and auditing
 
 ### 🎨 User-Friendly Experience
-- **Configuration Wizard** - Complete initialization in 5 minutes (`realconsole wizard --quick`)
-- **Multi-level Help System** - Quick/All/Topic help system, example library, quick reference cards (`/help`, `/examples`, `/quickref`)
-- **Intelligent Error Messages** - 30+ error codes with detailed fix suggestions and source error tracking
-- **Memory System** - Short-term + long-term memory with search and export support
+- **Configuration Wizard** - 5-minute quick initialization (`realconsole wizard --quick`)
+- **Multi-Level Help** - Quick/All/Topic help system, example library, quick reference cards (`/help`, `/examples`, `/quickref`)
+- **Intelligent Error Messages** - 30+ error codes, detailed fix suggestions, source error tracking
+- **Memory System** - Short-term + long-term memory, supports search and export
 - **Lazy Mode** - Direct input for conversation, no command prefix needed
 
 ## 🚀 Quick Start
@@ -90,12 +92,12 @@ Based on the calculation, 2^10 = 1024
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-### 2. Build the Project
+### 2. Build Project
 
 ```bash
-# Clone the repository
-git clone https://github.com/hongxin/RealConsole.git
-cd RealConsole
+# Clone repository
+git clone https://github.com/your-repo/realconsole.git
+cd realconsole
 
 # Build release version
 cargo build --release
@@ -110,12 +112,12 @@ cargo build --release
 ```
 
 The wizard will guide you through:
-- ✅ LLM provider selection (Deepseek API / Local Ollama)
+- ✅ LLM provider selection (Deepseek API / Ollama local)
 - ✅ API Key configuration (if using Deepseek)
-- ✅ Basic feature setup (Shell execution, memory system, etc.)
-- ✅ Automatic generation of `realconsole.yaml` and `.env` files
+- ✅ Basic feature settings (Shell execution, memory system, etc.)
+- ✅ Automatically generate `realconsole.yaml` and `.env` files
 
-**Complete Mode** (more options):
+**Full Mode** (more options):
 
 ```bash
 ./target/release/realconsole wizard
@@ -127,23 +129,23 @@ The wizard will guide you through:
 # Use default configuration
 ./target/release/realconsole
 
-# Use specified config file
+# Use specified configuration file
 ./target/release/realconsole --config realconsole.yaml
 
-# Single execution mode
-./target/release/realconsole --once "hello"
+# One-shot execution mode
+./target/release/realconsole --once "Hello"
 ```
 
 ### Manual Configuration (Advanced Users)
 
-If you don't want to use the configuration wizard, you can manually create the configuration:
+If you don't want to use the configuration wizard:
 
 1. **Copy environment variable example**:
 ```bash
 cp .env.example .env
 ```
 
-2. **Edit `.env` to add API Key**:
+2. **Edit `.env` and fill in API Key**:
 ```bash
 DEEPSEEK_API_KEY=sk-your-key-here
 ```
@@ -163,23 +165,23 @@ features:
   tool_calling_enabled: true
 ```
 
-**Detailed Configuration Guides**:
+**Detailed Configuration Guide**:
 - [Configuration Wizard Design](docs/01-understanding/design/config-wizard.md)
-- [LLM Setup Guide](docs/02-practice/user/llm-setup.md)
+- [LLM Configuration Guide](docs/02-practice/user/llm-setup.md)
 - [Complete User Manual](docs/02-practice/user/user-guide.md)
 
 ## 💬 Usage Examples
 
-### 1. Intelligent Conversations (Lazy Mode)
+### 1. Smart Conversation (Lazy Mode)
 
-Directly input questions without command prefix:
+Direct input, no command prefix needed:
 
 ```bash
-» hello
-Hello! I'm an AI assistant. How can I help you today?
+» Hello
+Hi! I'm an AI assistant. How can I help you?
 
 » Write a hello world in Rust
-Sure! Here's a simple Rust Hello World program:
+Sure, here's a simple Rust Hello World program:
 
 fn main() {
     println!("Hello, World!");
@@ -192,7 +194,7 @@ To run it:
 
 ### 2. Shell Command Execution
 
-Use the `!` prefix to execute system commands:
+Use `!` prefix to execute system commands:
 
 ```bash
 » !pwd
@@ -212,7 +214,7 @@ Mon Oct 14 00:41:12 CST 2025
 
 ### 3. Tool Calling (Automatic Execution) ✨
 
-After enabling tool calling, LLM will automatically invoke tools to complete tasks:
+After enabling tool calling, LLM will automatically call tools:
 
 ```bash
 # Enable tool calling (edit realconsole.yaml)
@@ -223,7 +225,7 @@ features:
 » Calculate 2 to the power of 10
 
 [LLM automatically calls calculator tool]
-Based on the calculation, 2^10 = 1024
+Based on calculation, 2^10 = 1024
 
 # Example 2: File operations
 » Read the first 5 lines of README.md
@@ -241,19 +243,19 @@ Current time is 2025-01-15 14:30:45
 ```
 
 **Built-in Tools**:
-- `calculator` - Math calculations (supports +, -, *, /, ^, sin, cos, sqrt, etc.)
-- `read_file` - Read file content
-- `write_file` - Write file content
+- `calculator` - Mathematical calculations (supports +, -, *, /, ^, sin, cos, sqrt, etc.)
+- `read_file` - Read file contents
+- `write_file` - Write file contents
 - `list_dir` - List directory contents
 - `get_datetime` - Get current date and time
 
 **View All Tools**:
 ```bash
 » /tools
-5 available tools:
+Available tools (5 tools):
   • calculator - Execute mathematical expressions
-  • read_file - Read file content
-  • write_file - Write file content
+  • read_file - Read file contents
+  • write_file - Write file contents
   • list_dir - List directory contents
   • get_datetime - Get current date and time
 ```
@@ -264,48 +266,47 @@ Detailed Documentation:
 
 ---
 
-### 4. Multi-level Help System 📚
+### 4. Multi-Level Help System 📚
 
-Use the `/` prefix to access system commands:
+Use `/` prefix to access system commands:
 
 ```bash
 » /help
-💬 RealConsole v0.7.0
+RealConsole v1.1.0
 
-Intelligent Conversation:
-  Directly input questions, no command prefix needed
-  Example: calculate 2 to the power of 10
+💬 Smart Conversation:
+  Direct input, no command prefix needed
+  Example: Calculate 2 to the power of 10
+  Example: Write a hello world in Rust
+
+🚀 Smart Command Routing (Phase 10.1):
+  Common commands can be entered directly (automatic recognition)
+  ls         List files (auto-detected)
+  pwd        Show current directory
+  git status View Git status
+  !ls -la    Force Shell execution
 
 ⚡ Quick Commands:
-  /help       Show this help
-  /help all   Show all commands (detailed)
-  /examples   View usage examples
-  /quickref   Quick reference card
-  /quit       Exit program
-...
+  /help      Show this help
+  /help all  Show all commands (detailed)
+  /examples  View usage examples
+  /quickref  Quick reference card
+  /quit      Exit program
 
-» /help all           # Complete help
-» /help tools         # Tool management help
-» /help memory        # Memory system help
-» /help shell         # Shell execution help
+🛠️ Tool Calling:
+  /tools        List all tools
+  /tools call <name> <args>   Call a tool
+
+💾 Memory & Logs:
+  /memory recent    View recent conversations
+  /log stats        View execution statistics
+
+Tips:
+  Use /help <command> for command details
+  System automatically recognizes command types, use /help shell for routing info
 
 » /examples           # Example library
-💡 RealConsole Usage Examples
-
-━━━ Intelligent Conversation ━━━
-  Calculate 2 to the power of 10
-  Write a hello world in Rust
-  ...
-
 » /quickref           # Quick reference card
-╭─────────────── RealConsole Quick Reference ───────────────╮
-│                                                           │
-│  Conversation        Direct input                         │
-│  Execute Shell       !<command>                           │
-│  System Command      /<command>                           │
-│  ...                                                      │
-╰───────────────────────────────────────────────────────────╯
-
 » /quit
 Bye 👋
 ```
@@ -314,13 +315,13 @@ Bye 👋
 
 ### 5. Task Orchestration System ⭐ NEW
 
-New task orchestration feature in v1.0.0 - AI automatically decomposes complex goals into executable tasks:
+New task orchestration feature in v1.0.0 that lets AI automatically decompose complex goals into executable tasks:
 
 ```bash
-# Step 1: Describe the goal in natural language
+# Step 1: Describe goal in natural language
 » /plan Create a Rust project with src and tests directories, then create main.rs and lib.rs
 
-🤖 LLM intelligently decomposing tasks...
+🤖 LLM Smart Task Decomposition...
 ✓ Decomposed into 6 subtasks
 
 📊 Execution Plan
@@ -338,47 +339,27 @@ New task orchestration feature in v1.0.0 - AI automatically decomposes complex g
 
 Use /execute to run
 
-# Step 2: Execute the plan
+# Step 2: Execute plan
 » /execute
-⚡ Starting execution: Creating Rust project...
+⚡ Starting execution: Create Rust project...
 
 → Stage 1: Create project root ✓ (2s)
-⇉ Stage 2: Parallel create src and tests directories ✓ (3s)
-⇉ Stage 3: Parallel create main.rs and lib.rs ✓ (2s)
+⇉ Stage 2: Parallel execution src and tests directory creation ✓ (3s)
+⇉ Stage 3: Parallel execution main.rs and lib.rs creation ✓ (2s)
 → Stage 4: Create test file ✓ (3s)
 
 ✓ 6/6 · 100% · 10s
-
-# View task list
-» /tasks
-Create Rust project 6 tasks · 4 stages · 20s
-├─ → Stage 1
-│  └─ Create project root
-├─ ⇉ Stage 2
-│  ├─ Create src directory
-│  └─ Create tests directory
-└─ ...
-
-# View execution status
-» /task_status
-✓ 6/6 · 10s · 100%
-✓ Create project root (2s)
-✓ Create src directory (3s)
-✓ Create tests directory (3s)
-✓ Create main.rs (2s)
-✓ Create lib.rs (2s)
-✓ Create test file (3s)
 ```
 
 **Core Features**:
-- ✅ **LLM Smart Decomposition** - Describe goals in natural language, AI auto-breaks into executable steps
-- ✅ **Dependency Analysis** - Kahn topological sort auto-detects task dependencies, ensures execution order
-- ✅ **Parallel Optimization** - Auto-identifies parallel tasks, significantly improves efficiency (max 4 concurrent)
-- ✅ **Minimalist Visualization** - Tree structure clearly shows task hierarchy, 75%+ fewer output lines
+- ✅ **LLM Smart Decomposition** - Describe goals in natural language, AI automatically breaks down into executable steps
+- ✅ **Dependency Analysis** - Kahn topological sort automatically detects task dependencies, ensures execution order
+- ✅ **Parallel Optimization** - Automatically identifies parallelizable tasks, significantly improves execution efficiency (max 4 concurrent)
+- ✅ **Minimalist Visualization** - Tree structure clearly shows task hierarchy, 75%+ reduction in output lines
 - ✅ **Security Protection** - Inherits Shell blacklist and timeout control mechanisms
 
 **Typical Scenarios**:
-- Project scaffolding creation (directories, files, config initialization)
+- Project scaffolding creation (directories, files, configuration initialization)
 - Batch file operations (rename, convert, cleanup)
 - Data processing pipelines (extract, transform, load)
 - Development workflows (build, test, deploy)
@@ -389,7 +370,7 @@ Detailed Documentation:
 
 ---
 
-### 6. DevOps Workflow ✨
+### 6. DevOps Workflows ✨
 
 #### Project Context Awareness
 
@@ -408,22 +389,22 @@ Quickly understand project information and recommended commands:
   Test: cargo test
   Run: cargo run
 
-📊 Project Information:
+📊 Project Info:
   ✓ Found Cargo.toml
   ✓ Found src/ directory
   ✓ Found test directory
 
-🔄 Git Information:
+🔄 Git Info:
   Branch: main
   Status: 2 files modified
 ```
 
 #### Git Smart Assistant
 
-Accelerate your Git workflow:
+Accelerate Git workflow:
 
 ```bash
-# 1. View Git status (color-coded categorized display)
+# 1. View Git status (colored categorized display)
 » /gs
 📊 Git Repository Status
 
@@ -438,7 +419,7 @@ Accelerate your Git workflow:
 📈 Statistics:
   • Added: 120 lines
   • Deleted: 45 lines
-  • Modified files: 2
+  • Modified Files: 2
 
 🔍 Change Patterns:
   ✓ New function definitions detected
@@ -458,11 +439,6 @@ feat(core): add DevOps features
 - Add Git smart assistant
 - Add log analyzer
 - Add system monitor
-
-Detailed changes:
-- Added 3,431 lines of code
-- Added 37+ tests
-- 4 new modules
 ```
 
 #### Log Analysis Tool
@@ -475,8 +451,8 @@ Quickly diagnose log issues:
 📊 Log Analysis Report
 
 📈 Statistics:
-  • Total lines: 10,234
-  • Time range: 2025-01-15 10:00:00 - 14:30:45
+  • Total Lines: 10,234
+  • Time Range: 2025-01-15 10:00:00 - 14:30:45
 
 📊 Log Level Distribution:
   • ERROR: 23 (0.2%)
@@ -490,14 +466,6 @@ Quickly diagnose log issues:
   3. "Database query timeout" - 3 occurrences
 
 🏥 Health: Good (ERROR < 1%)
-
-# View errors only
-» /le /var/log/app.log
-[Shows all ERROR level logs...]
-
-# Monitor log tail in real-time (similar to tail -f)
-» /lt /var/log/app.log
-[Real-time display of new log entries...]
 ```
 
 #### System Monitoring Tool
@@ -505,9 +473,9 @@ Quickly diagnose log issues:
 Quickly view system resources:
 
 ```bash
-# System overview (view all resources at once)
+# System overview (one-click view all resources)
 » /sys
-💻 System Monitor
+💻 System Monitoring
 
 ━━━ CPU ━━━
   Usage: 15.3%
@@ -526,41 +494,20 @@ Quickly view system resources:
     Total: 500 GB
     Used: 320 GB (64%)
     Available: 180 GB
-
-# CPU details
-» /cpu
-[Shows detailed CPU information...]
-
-# Memory details
-» /memory-info
-[Shows detailed memory information...]
-
-# Disk usage
-» /disk
-[Shows all disk partitions...]
-
-# Process TOP list
-» /top
-🔝 Process Resource Usage TOP 5
-
-Sorted by CPU:
-  1. chrome - 45.2% CPU, 1.2 GB memory
-  2. node - 12.3% CPU, 850 MB memory
-  ...
 ```
 
 ---
 
 ### 7. Friendly Error Messages ⚠️
 
-RealConsole provides 30+ error codes with detailed fix suggestions:
+RealConsole provides 30+ error codes and detailed fix suggestions:
 
 ```bash
 » !rm -rf /
 [E302] Command contains dangerous operation, blocked by security policy
 
 💡 Fix Suggestions:
-1. This command may cause system damage, safer alternatives recommended
+1. This command may cause system damage, recommend safer alternatives
 2. View allowed command list and security policy
    📖 https://docs.realconsole.com/shell-safety
 
@@ -568,291 +515,136 @@ RealConsole provides 30+ error codes with detailed fix suggestions:
 [E303] Command execution timeout (exceeded 10 seconds)
 
 💡 Fix Suggestions:
-1. Command took too long, please check command or increase timeout
-2. Adjust features.shell_timeout in config file
+1. Command execution took too long, check command or increase timeout
+2. Adjust features.shell_timeout in configuration file
    💻 vi realconsole.yaml
-
-» realconsole --config nonexistent.yaml
-[E001] Configuration file not found: nonexistent.yaml
-
-💡 Fix Suggestions:
-1. Run configuration wizard to create config file
-   💻 realconsole wizard --quick
-2. View configuration guide
-   📖 https://docs.realconsole.com/config
 ```
 
 ## 📁 Project Structure
 
 ```
 realconsole/
-├── README.md                 # Project documentation
-├── Cargo.toml                # Rust project config
-├── realconsole.yaml        # Main config file
-├── .env                      # Environment variables (not committed)
+├── src/                    # 🦀 Core Code
+│   ├── agent.rs            # Agent core dispatcher
+│   ├── command/            # Command system (DevOps toolkit)
+│   ├── task/               # ⭐ Task orchestration system (LLM+Kahn+Parallel)
+│   ├── dsl/intent/         # Intent DSL (50+ intent templates)
+│   ├── llm/                # LLM integration (Ollama/Deepseek/OpenAI)
+│   └── tool/               # Tool calling system (14+ built-in tools)
 │
-├── src/                      # 🦀 Source code
-│   ├── main.rs               # Program entry point
-│   ├── agent.rs              # Agent core (Intent DSL integration)
-│   ├── repl.rs               # REPL interaction loop
-│   ├── config.rs             # Configuration system
-│   ├── command/              # Command system
-│   │   ├── command.rs        # Command registry & dispatch
-│   │   ├── commands_core.rs  # Core commands
-│   │   ├── task_cmd.rs       # Task orchestration commands ⭐ NEW
-│   │   └── commands_*.rs     # Other command modules
-│   ├── shell_executor.rs     # Shell command execution
-│   ├── llm_manager.rs        # LLM manager
-│   ├── llm/                  # LLM clients
-│   │   ├── ollama.rs
-│   │   ├── deepseek.rs
-│   │   └── openai.rs
-│   ├── task/                 # ⭐ NEW - Task orchestration system
-│   │   ├── mod.rs            # Module definition
-│   │   ├── types.rs          # Task data structures
-│   │   ├── decomposer.rs     # LLM task decomposer
-│   │   ├── planner.rs        # Dependency analysis & planning
-│   │   └── executor.rs       # Parallel execution engine
-│   ├── dsl/                  # DSL system
-│   │   ├── intent/           # Intent DSL
-│   │   │   ├── types.rs      # Core data structures
-│   │   │   ├── matcher.rs    # Intent matcher
-│   │   │   ├── template.rs   # Template engine
-│   │   │   ├── builtin.rs    # 50+ built-in intents
-│   │   │   └── extractor.rs  # Entity extraction engine
-│   │   └── type_system/      # Type system
-│   ├── memory.rs             # Memory system
-│   ├── tool.rs               # Tool registry
-│   ├── tool_executor.rs      # Tool execution engine
-│   └── builtin_tools.rs      # 14+ built-in tools
-│
-├── tests/                    # 🧪 Tests
-│   ├── test_*.rs             # Unit tests
-│   └── test_intent_integration.rs  # Intent DSL integration test
-│
-├── docs/                     # 📚 Documentation (Five-tier architecture)
-│   ├── README.md             # Documentation center index
-│   ├── CHANGELOG.md          # Complete development history
-│   ├── 00-core/              # Core philosophy (philosophy, vision, roadmap)
-│   ├── 01-understanding/     # Understanding tier (design, analysis, thinking)
-│   │   ├── design/           # Design documents
-│   │   ├── analysis/         # Analysis documents
-│   │   └── thinking/         # Thinking notes
-│   ├── 02-practice/          # Practice tier (guides, use cases, examples)
-│   │   ├── user/             # User guides
-│   │   ├── developer/        # Developer guides
-│   │   └── use-cases/        # Use cases
-│   ├── 03-evolution/         # Evolution tier (progress, features)
-│   │   ├── phases/           # Phase summaries
-│   │   ├── features/         # Feature documentation
-│   │   └── milestones/       # Milestones
-│   ├── 04-reports/           # Collaboration reports (decision records)
-│   └── archive/              # Archive (226 historical documents)
-│
-├── config/                   # ⚙️ Config samples
-│   ├── minimal.yaml          # Minimal config example
-│   └── test-memory.yaml      # Test memory config
-│
-├── scripts/                  # 🔧 Script tools
-│   ├── demo/                 # Demo scripts
-│   └── test/                 # Test scripts
-│
-└── memory/                   # 💾 Memory storage
-    └── long_memory.jsonl     # Long-term memory
+├── tests/                  # 🧪 Tests (654+ passed, 78%+ coverage)
+├── docs/                   # 📚 Documentation (Five-state architecture, 226+ archived docs)
+├── config/                 # ⚙️ Configuration examples
+└── examples/               # 💡 Usage examples
 ```
+
+**Detailed Structure**: [Complete Project Structure Documentation](docs/02-practice/developer/project-structure.md)
 
 ## 🏗️ Architecture Design
 
-### Core Components
+### Core Philosophy: Trinity
 
 ```
-┌─────────────────────────────────────────┐
-│              User Input                  │
-└────────────────┬────────────────────────┘
-                 │
-         ┌───────▼────────┐
-         │  Agent::handle │
-         └───────┬────────┘
-                 │
-      ┏━━━━━━━━━┻━━━━━━━━━┓
-      ┃                    ┃
-┌─────▼─────┐      ┌──────▼───────┐
-│ Text Input │      │ Shell (!prefix)│
-│           │      │               │
-│ LLM Stream│      │ Shell Executor│
-│  Output   │      │               │
-└───────────┘      └──────────────┘
+         User Input
+            │
+      ┌─────▼──────┐
+      │ Command    │  ← Smart recognition (Force Shell/System/Common Shell/Natural Language)
+      │ Router     │
+      └─────┬──────┘
+            │
+    ┌───────┼───────┐
+    │       │       │
+  Shell   System   LLM+Tools
+  Exec    Cmds    (Streaming)
 ```
 
-### LLM Streaming Output
+**Core Features**:
+- **Smart Routing** - Automatic command type recognition, seamless transition
+- **Streaming Output** - SSE real-time response, token-level display
+- **Security Protection** - Blacklist + timeout + output limits
+- **Multi-Layer Fallback** - LLM generation → rule matching → template → conversation
 
-- **SSE Parsing**: Server-Sent Events format
-- **Real-time Callback**: Each token displayed immediately
-- **Graceful Degradation**: Non-streaming clients auto-degrade
-
-Detailed Design: [docs/03-evolution/features/streaming.md](docs/03-evolution/features/streaming.md)
-
-### Shell Execution
-
-- **Blacklist Check**: Prohibits dangerous commands (rm -rf /, sudo, etc.)
-- **Timeout Control**: Auto-terminates after 30 seconds
-- **Output Limit**: Maximum 100KB
-- **Cross-platform**: Unix/Windows support
-
-Detailed Design: [docs/03-evolution/features/shell-execution.md](docs/03-evolution/features/shell-execution.md)
+**Detailed Documentation**: [Architecture Overview](docs/01-understanding/overview.md) | [Design Documents](docs/01-understanding/design/)
 
 ## 🔐 Security Features
 
-### Shell Command Blacklist
+- **Blacklist Protection** - Blocks dangerous commands like `rm -rf /`, `sudo`, `dd`, `mkfs`, Fork bombs
+- **Timeout Control** - Default 30 seconds auto-termination
+- **Output Limits** - Maximum 100KB to prevent resource exhaustion
+- **API Key Security** - Environment variable storage, `.env` not committed to version control
 
-The following dangerous commands are prohibited:
-- `rm -rf /` - Delete root directory
-- `sudo` - Privilege escalation
-- `dd if=/dev/zero` - Disk write
-- `mkfs` - Format
-- Fork bombs, shutdown, reboot, etc.
+**Detailed Documentation**: [Shell Safe Execution](docs/03-evolution/features/shell-execution.md)
 
-Example:
-```bash
-» !rm -rf /
-Shell execution failed: Dangerous command prohibited: Matched pattern 'rm\s+-rf\s+/'
+## 📊 Project Highlights
 
-» !sudo apt-get update
-Shell execution failed: Dangerous command prohibited: Matched pattern 'sudo\s+'
-```
+| Dimension | Data |
+|-----------|------|
+| 🧪 **Test Quality** | 654+ tests passed (98.9% pass rate) · 78%+ coverage |
+| ⚡ **Performance** | Startup < 50ms · Memory ~5MB · LLM first token < 500ms |
+| 📝 **Code Scale** | 13,000+ lines of Rust code · 226+ archived documents |
+| 🛠️ **Feature Rich** | 50+ Intent templates · 14+ built-in tools · 30+ system commands |
 
-## 📊 Performance Metrics
+### Latest Updates (v1.1.0 - 2025-10-19)
 
-| Metric | Value |
-|--------|-------|
-| Startup Time | < 50ms |
-| Memory Usage | ~5MB |
-| LLM First Token Latency | < 500ms |
-| Shell Command Timeout | 30s (configurable) |
-| Maximum Output | 100KB (configurable) |
+- 🐛 Fixed OllamaClient parameter order error
+- ✨ Enhanced Ollama health check and diagnostics
+- 🎨 Added task orchestration UI display functions
+- 🧪 Optimized test environment performance
 
-## 🎯 Project Statistics
+**Complete History**: [CHANGELOG.md](docs/CHANGELOG.md)
 
-### Code Quality
-- **Test Coverage**: 645+ tests passed (100% pass rate)
-- **Lines of Code**: 13,000+ lines of Rust code
-- **Test Coverage Rate**: 78%+
-- **Clippy Warnings**: 0
+## 📚 Documentation Navigation
 
-### Main Commands
-- **System Commands**: `/help`, `/quit`, `/clear`, `/examples`, `/quickref`
-- **Task Orchestration** ⭐ NEW: `/plan`, `/execute`, `/tasks`, `/task_status`
-- **Project Tools**: `/project`, `/proj`
-- **Git Assistant**: `/gs`, `/gd`, `/ga`, `/gb`
-- **Log Analysis**: `/la`, `/le`, `/lt`
-- **System Monitoring**: `/sys`, `/cpu`, `/disk`, `/top`, `/memory-info`
-- **Tool Management**: `/tools`, `/mem`, `/log`, `/shell`
+> **Documentation System**: Five-state architecture based on Trinity philosophy (Philosophy·Understanding·Practice·Evolution·Reports)
 
-### Architecture Features
-- **REPL Interaction Loop** - CLI based on rustyline
-- **LLM Integration** - Supports Ollama/Deepseek/OpenAI with streaming output (SSE)
-- **Task Orchestration System** ⭐ NEW - LLM smart decomposition + Kahn topological sort + parallel optimization
-- **Tool Calling System** - 14+ built-in tools with parallel execution support
-- **Intent DSL** - 50+ built-in intent templates with smart matching
-- **Memory System** - Short-term + long-term memory with search and export
-- **Security Protection** - Blacklist check, timeout control, output limit
-- **Cross-platform Support** - macOS + Linux with zero external dependencies
+### Quick Access
 
-For detailed development history and technical documentation, see [CHANGELOG](docs/CHANGELOG.md)
+- 📚 **[Documentation Center](docs/README.md)** - Complete navigation and recommended reading paths
+- 🚀 **[Quick Start](docs/02-practice/user/quickstart.md)** - 5-minute getting started guide
+- 📖 **[User Manual](docs/02-practice/user/user-guide.md)** - Complete feature description
+- 👨‍💻 **[Developer Guide](docs/02-practice/developer/developer-guide.md)** - Architecture and extension development
+
+### Core Philosophy
+
+- 💭 **[Trinity Philosophy](docs/00-core/philosophy.md)** - Design philosophy
+- 🎯 **[Product Vision](docs/00-core/vision.md)** - Positioning and goals
+- 🗺️ **[Technical Roadmap](docs/00-core/roadmap.md)** - Development plan
+
+### More Documentation
+
+- **User Guides**: [LLM Configuration](docs/02-practice/user/llm-setup.md) · [Tool Calling](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md)
+- **Developer Docs**: [API Reference](docs/02-practice/developer/api-reference.md) · [Tool Development](docs/02-practice/developer/tool-development.md) · [Project Structure](docs/02-practice/developer/project-structure.md)
+- **Features**: [Task Orchestration](examples/task_system_usage.md) · [Git Assistant](docs/03-evolution/features/git-assistant.md) · [Log Analysis](docs/03-evolution/features/log-analyzer.md)
 
 ## 🚧 Planned Features
 
-- [ ] Command history search
-- [ ] Tab auto-completion
-- [ ] Vector retrieval optimization
-- [ ] Web interface
-- [ ] More built-in intents (currently 10)
-- [ ] Intent DSL performance optimization (LRU cache, fuzzy matching)
-
-## 📚 Documentation
-
-> **Documentation system upgraded**: Five-tier architecture based on "one divides into three" philosophy, clear and easy to navigate ✨
-
-### Documentation Center
-- **📚 Main Documentation Index**: [docs/README.md](docs/README.md) - Complete documentation navigation and recommended reading paths
-
-### Core Documents (00-core)
-- **💭 One Divides into Three Philosophy**: [docs/00-core/philosophy.md](docs/00-core/philosophy.md) - Design philosophy
-- **🎯 Product Vision**: [docs/00-core/vision.md](docs/00-core/vision.md) - Product positioning
-- **🗺️ Technical Roadmap**: [docs/00-core/roadmap.md](docs/00-core/roadmap.md) - Development plan
-
-### User Guides (02-practice/user)
-- **🚀 Quick Start**: [docs/02-practice/user/quickstart.md](docs/02-practice/user/quickstart.md) - Get started in 5 minutes
-- **📖 User Manual**: [docs/02-practice/user/user-guide.md](docs/02-practice/user/user-guide.md) - Complete feature description
-- **🛠️ Tool Calling Guide**: [docs/02-practice/user/tool-calling-guide.md](docs/02-practice/user/tool-calling-guide.md)
-- **🧠 Intent DSL**: [docs/02-practice/user/intent-dsl-guide.md](docs/02-practice/user/intent-dsl-guide.md)
-- **🔧 LLM Setup**: [docs/02-practice/user/llm-setup.md](docs/02-practice/user/llm-setup.md)
-- **🌐 Environment Variables**: [docs/02-practice/user/env-config.md](docs/02-practice/user/env-config.md)
-
-### Developer Documentation (01-understanding & 02-practice/developer)
-- **🏗️ Architecture Overview**: [docs/01-understanding/overview.md](docs/01-understanding/overview.md)
-- **👨‍💻 Developer Guide**: [docs/02-practice/developer/developer-guide.md](docs/02-practice/developer/developer-guide.md)
-- **🔨 Tool Development**: [docs/02-practice/developer/tool-development.md](docs/02-practice/developer/tool-development.md)
-- **📘 API Reference**: [docs/02-practice/developer/api-reference.md](docs/02-practice/developer/api-reference.md)
-
-### Feature Documentation (03-evolution/features)
-- **🔄 Git Smart Assistant**: [docs/03-evolution/features/git-assistant.md](docs/03-evolution/features/git-assistant.md)
-- **📊 Log Analyzer**: [docs/03-evolution/features/log-analyzer.md](docs/03-evolution/features/log-analyzer.md)
-- **💻 System Monitor**: [docs/03-evolution/features/system-monitor.md](docs/03-evolution/features/system-monitor.md)
-- **🧙 Configuration Wizard**: [docs/03-evolution/features/config-wizard.md](docs/03-evolution/features/config-wizard.md)
-- **⚡ Lazy Mode**: [docs/03-evolution/features/lazy-mode.md](docs/03-evolution/features/lazy-mode.md)
-- **🌊 Streaming Output**: [docs/03-evolution/features/streaming.md](docs/03-evolution/features/streaming.md)
-- **🔧 Shell Execution**: [docs/03-evolution/features/shell-execution.md](docs/03-evolution/features/shell-execution.md)
-- **📚 Feature Summary**: [docs/03-evolution/features/summary.md](docs/03-evolution/features/summary.md)
-
-### Progress & Reports
-- **📊 Development History**: [docs/CHANGELOG.md](docs/CHANGELOG.md) - Complete changelog
-- **📈 Phase Summaries**: [docs/03-evolution/phases/](docs/03-evolution/phases/) - Development progress records
-- **📝 Collaboration Reports**: [docs/04-reports/](docs/04-reports/) - Important decisions and analysis reports
+See [Technical Roadmap](docs/00-core/roadmap.md)
 
 ## 🔧 Development
 
-### Run Tests
-
 ```bash
+# Run tests
 cargo test
-```
 
-### Run Demos
-
-```bash
-# Shell execution demo
-./scripts/demo/demo_shell.sh
-
-# Lazy mode demo
-./scripts/demo/demo_lazy_mode.sh
-
-# Deepseek demo
-./scripts/demo/demo-deepseek.sh
-```
-
-### Code Formatting
-
-```bash
+# Code formatting
 cargo fmt
-```
 
-### Linting
-
-```bash
+# Linting
 cargo clippy
+
+# Run demo
+./scripts/demo/demo_shell.sh
 ```
+
+**Detailed Guide**: [Developer Guide](docs/02-practice/developer/developer-guide.md)
 
 ## 🤝 Contributing
 
-Contributions welcome! Please ensure:
-1. Code passes `cargo test`
-2. Code is formatted with `cargo fmt`
-3. No clippy warnings `cargo clippy`
+Contributions welcome! Please ensure passing `cargo test`, `cargo fmt`, and `cargo clippy`
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE) file for details
+MIT License - See [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
@@ -863,5 +655,3 @@ MIT License - See [LICENSE](LICENSE) file for details
 ---
 
 **RealConsole** - Minimalist yet powerful intelligent CLI Agent 🚀
-
-> **[中文](README.md) | English**

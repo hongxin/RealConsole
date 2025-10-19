@@ -266,6 +266,110 @@ impl Display {
             println!("{} {}", "✓ 已加载 .env:".dimmed(), path.dimmed());
         }
     }
+
+    /// 任务编排启动信息
+    pub fn task_execution_start(mode: DisplayMode, goal: &str, total_stages: usize, total_tasks: usize) {
+        if mode.show_startup() {
+            println!(
+                "{} {} · {} 阶段 · {} 任务",
+                "🚀 开始执行:".cyan(),
+                goal.bold(),
+                total_stages.to_string().cyan(),
+                total_tasks.to_string().cyan()
+            );
+        }
+    }
+
+    /// 阶段执行信息
+    pub fn stage_execution(mode: DisplayMode, stage_num: usize, total_stages: usize, execution_mode: &str) {
+        if mode.show_intent() {
+            let mode_icon = match execution_mode {
+                "Sequential" => "→",
+                "Parallel" => "⇉",
+                _ => "•",
+            };
+            println!(
+                "{} {} {} ({}/{})",
+                "▸".dimmed(),
+                mode_icon.cyan(),
+                format!("阶段 {}", stage_num + 1).dimmed(),
+                stage_num + 1,
+                total_stages
+            );
+        }
+    }
+
+    /// 任务执行信息
+    pub fn task_execution(mode: DisplayMode, task_name: &str, task_idx: usize, total_tasks: usize) {
+        if mode.show_command() {
+            let percentage = if total_tasks > 0 {
+                format!("({:.0}%)", (task_idx as f64 / total_tasks as f64) * 100.0)
+            } else {
+                String::new()
+            };
+            println!(
+                "{} {} {}",
+                "→".dimmed(),
+                task_name,
+                percentage.dimmed()
+            );
+        }
+    }
+
+    /// 任务完成状态
+    pub fn task_completion(mode: DisplayMode, task_name: &str, status: &str, duration: u32) {
+        if mode.show_timing() {
+            let (icon, color) = match status {
+                "Success" => ("✓", "green"),
+                "Failed" => ("✗", "red"),
+                "Skipped" => ("⊘", "yellow"),
+                _ => ("•", "dimmed"),
+            };
+
+            let colored_icon = match color {
+                "green" => icon.green(),
+                "red" => icon.red(),
+                "yellow" => icon.yellow(),
+                _ => icon.dimmed(),
+            };
+
+            println!(
+                "{} {} ({})",
+                colored_icon,
+                task_name.dimmed(),
+                format!("{}s", duration).dimmed()
+            );
+        }
+    }
+
+    /// 进度条显示
+    pub fn progress_bar(mode: DisplayMode, completed: usize, total: usize, elapsed: u32, remaining: u32) {
+        if mode.show_timing() && total > 0 {
+            let percentage = (completed as f64 / total as f64) * 100.0;
+            let bar_width = 20;
+            let filled = (percentage / 100.0 * bar_width as f64).round() as usize;
+            let empty = bar_width - filled;
+
+            let bar = format!(
+                "[{}{}]",
+                "█".repeat(filled).green(),
+                "░".repeat(empty).dimmed()
+            );
+
+            let time_info = if remaining > 0 {
+                format!("({}s/{}s)", elapsed, remaining)
+            } else {
+                format!("({}s)", elapsed)
+            };
+
+            println!(
+                "{} {:.1}% {}",
+                bar,
+                percentage,
+                time_info.dimmed()
+            );
+        }
+    }
 }
 
 #[cfg(test)]

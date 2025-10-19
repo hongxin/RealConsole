@@ -419,7 +419,55 @@ cargo test --doc
 
 # 只运行集成测试
 cargo test --test integration_test
+
+# 只运行库测试（不包括集成测试）
+cargo test --lib
 ```
+
+#### 测试最佳实践 (更新于 2025-10-19)
+
+1. **测试环境优化**
+
+   使用 `#[cfg(not(test))]` 跳过测试环境中可能导致阻塞的操作：
+   ```rust
+   // 在测试环境中跳过磁盘加载以避免阻塞问题
+   #[cfg(not(test))]
+   {
+       // 磁盘 I/O 操作
+       let _ = load_from_disk().await;
+   }
+   ```
+
+2. **Mock 测试激活**
+
+   项目中的 Mock 测试应当默认激活，只在特殊情况下使用 `#[ignore]`：
+   - ❌ **不要**: 过度使用 `#[ignore]` 标记
+   - ✅ **要**: 确保 Mock 测试的断言与实现匹配
+   - ✅ **要**: 定期审查被忽略的测试
+
+3. **测试隔离**
+
+   确保测试之间相互独立：
+   ```rust
+   #[tokio::test]
+   async fn test_feature() {
+       // 使用临时资源
+       let temp_dir = tempfile::tempdir().unwrap();
+       // 测试逻辑
+       // 自动清理
+   }
+   ```
+
+4. **异步测试**
+
+   使用 `tokio::test` 进行异步测试：
+   ```rust
+   #[tokio::test]
+   async fn test_async_operation() {
+       let result = async_function().await;
+       assert!(result.is_ok());
+   }
+   ```
 
 ### 测试覆盖率
 

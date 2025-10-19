@@ -195,7 +195,7 @@ impl OllamaClient {
     }
 
     /// 过滤 <think> 标签
-    fn strip_think_tags(text: &str) -> String {
+    pub fn strip_think_tags(text: &str) -> String {
         let re = Regex::new(r"<think>[\s\S]*?</think>").unwrap();
         re.replace_all(text, "").to_string()
     }
@@ -214,7 +214,8 @@ impl OllamaClient {
                 return Ok(Self::strip_think_tags(&response));
             }
             Err(_) => {
-                // 降级到 Native API
+                // OpenAI API 失败，降级到 Native API
+                // 不记录详细错误以避免依赖 log crate
             }
         }
 
@@ -225,7 +226,13 @@ impl OllamaClient {
                 let msgs = messages.to_vec();
                 async move { self.chat_native(&msgs).await }
             })
-            .await?;
+            .await
+            .map_err(|e| {
+                LlmError::Network(format!(
+                    "Ollama connection failed for model {} at {}: {}",
+                    self.model, self.base.endpoint, e
+                ))
+            })?;
 
         Ok(Self::strip_think_tags(&result))
     }
@@ -269,12 +276,27 @@ impl LlmClient for OllamaClient {
                 if !models.is_empty() {
                     lines.push(format!("模型: {}", models.join(", ")));
                 }
+
+                // 检查目标模型是否在可用列表中
+                if models.contains(&self.model.to_string()) {
+                    lines.push(format!("✓ 目标模型 '{}' 可用", self.model));
+                } else {
+                    lines.push(format!("⚠ 目标模型 '{}' 不在可用列表中", self.model));
+                    lines.push("建议: 运行 'ollama pull {}" .replace("{}", &self.model));
+                }
             }
             Err(e) => {
                 lines.push(format!("✗ 连接失败: {}", e));
                 lines.push("建议: 确认 'ollama serve' 运行中".to_string());
+                lines.push(format!("检查: curl {}/api/tags", self.base.endpoint));
             }
         }
+
+        // 添加统计信息
+        let stats = self.stats();
+        lines.push(format!("总调用: {}", stats.total_calls()));
+        lines.push(format!("成功: {}", stats.total_success()));
+        lines.push(format!("错误: {}", stats.total_errors()));
 
         lines.join("\n")
     }
@@ -313,13 +335,15 @@ mod tests {
     // ========== Mock 测试 ==========
 
     #[tokio::test]
-    #[ignore] // TODO: Mock server 配置问题，待修复
+    #[ignore] // TODO: Mock 测试需要进一步调试 - 将在后续 PR 中修复
     async fn test_chat_openai_success() {
         let mut server = mockito::Server::new_async().await;
 
-        let _mock = server
+        let mock = server
             .mock("POST", "/v1/chat/completions")
+            .match_header("content-type", mockito::Matcher::Any)
             .with_status(200)
+            .with_header("content-type", "application/json")
             .with_body(r#"{
                 "choices": [{
                     "message": {
@@ -333,24 +357,25 @@ mod tests {
         let client = OllamaClient::new("test-model", server.url()).unwrap();
         let result = client.chat(vec![Message::user("Hi")]).await;
 
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Chat should succeed: {:?}", result.err());
         assert!(result.unwrap().contains("Hello from Ollama"));
+        drop(mock); // mock 在测试结束时drop
     }
 
     #[tokio::test]
-    #[ignore] // TODO: Mock server 配置问题，待修复
+    #[ignore] // TODO: Mock 测试需要进一步调试 - 将在后续 PR 中修复
     async fn test_chat_native_fallback() {
         let mut server = mockito::Server::new_async().await;
 
         // OpenAI API 返回错误
-        let _mock_openai = server
+        let mock_openai = server
             .mock("POST", "/v1/chat/completions")
             .with_status(404)
             .create_async()
             .await;
 
         // Native API 成功
-        let _mock_native = server
+        let mock_native = server
             .mock("POST", "/api/chat")
             .with_status(200)
             .with_body(r#"{
@@ -364,16 +389,18 @@ mod tests {
         let client = OllamaClient::new("test-model", server.url()).unwrap();
         let result = client.chat(vec![Message::user("Hi")]).await;
 
+        drop(mock_openai);
+        drop(mock_native);
         assert!(result.is_ok());
         assert!(result.unwrap().contains("Native API"));
     }
 
     #[tokio::test]
-    #[ignore] // TODO: Mock server 配置问题，待修复
+    #[ignore] // TODO: Mock 测试需要进一步调试 - 将在后续 PR 中修复
     async fn test_chat_with_think_tags_filtering() {
         let mut server = mockito::Server::new_async().await;
 
-        let _mock = server
+        let mock = server
             .mock("POST", "/v1/chat/completions")
             .with_status(200)
             .with_body(r#"{
@@ -389,6 +416,7 @@ mod tests {
         let client = OllamaClient::new("test-model", server.url()).unwrap();
         let result = client.chat(vec![Message::user("Hi")]).await;
 
+        drop(mock); // 确保 mock 在断言前不被丢弃
         assert!(result.is_ok());
         let response = result.unwrap();
         // Should not contain <think> tags
@@ -398,11 +426,11 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // TODO: Mock server 配置问题，待修复
+    #[ignore] // TODO: Mock 测试需要进一步调试 - 将在后续 PR 中修复
     async fn test_list_models_native() {
         let mut server = mockito::Server::new_async().await;
 
-        let _mock = server
+        let mock = server
             .mock("GET", "/api/tags")
             .with_status(200)
             .with_body(r#"{
@@ -411,12 +439,14 @@ mod tests {
                     {"name": "llama3:8b"}
                 ]
             }"#)
+            .expect(1)
             .create_async()
             .await;
 
         let client = OllamaClient::new("test-model", server.url()).unwrap();
         let models = client.list_models().await;
 
+        mock.assert_async().await;
         assert!(models.is_ok());
         let models = models.unwrap();
         assert_eq!(models.len(), 2);
@@ -424,19 +454,19 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // TODO: Mock server 配置问题，待修复
+    #[ignore] // TODO: Mock 测试需要进一步调试 - 将在后续 PR 中修复
     async fn test_list_models_openai_fallback() {
         let mut server = mockito::Server::new_async().await;
 
         // Native API fails
-        let _mock_native = server
+        let mock_native = server
             .mock("GET", "/api/tags")
             .with_status(404)
             .create_async()
             .await;
 
         // OpenAI API succeeds
-        let _mock_openai = server
+        let mock_openai = server
             .mock("GET", "/v1/models")
             .with_status(200)
             .with_body(r#"{
@@ -451,6 +481,8 @@ mod tests {
         let client = OllamaClient::new("test-model", server.url()).unwrap();
         let models = client.list_models().await;
 
+        drop(mock_native);
+        drop(mock_openai);
         assert!(models.is_ok());
         let models = models.unwrap();
         assert_eq!(models.len(), 2);
@@ -480,11 +512,11 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // TODO: Mock server 配置问题，待修复
+    #[ignore] // TODO: Mock 测试需要进一步调试 - 将在后续 PR 中修复
     async fn test_stats_tracking() {
         let mut server = mockito::Server::new_async().await;
 
-        let _mock = server
+        let mock = server
             .mock("POST", "/v1/chat/completions")
             .with_status(200)
             .with_body(r#"{
@@ -500,6 +532,7 @@ mod tests {
 
         let _ = client.chat(vec![Message::user("Hi")]).await;
 
+        drop(mock); // 确保 mock 在断言前不被丢弃
         let stats_after = client.stats();
         assert_eq!(stats_after.total_calls(), 1);
         assert_eq!(stats_after.total_success(), 1);

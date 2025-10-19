@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_analyzer_creation() {
-        let analyzer = ParameterAnalyzer::new();
+        let _analyzer = ParameterAnalyzer::new();
         assert!(true); // 只是测试能够创建
     }
 

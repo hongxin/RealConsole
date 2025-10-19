@@ -102,7 +102,7 @@ fn create_llm_client(
                 .as_deref()
                 .unwrap_or("http://localhost:11434");
 
-            llm::OllamaClient::new(endpoint, model)
+            llm::OllamaClient::new(model, endpoint)
                 .map(|client| Arc::new(client) as Arc<dyn llm::LlmClient>)
                 .map_err(|e| format!("{}: {}", i18n::t_with_args("llm.client_failed", &[("provider", "Ollama")]), e))
         }

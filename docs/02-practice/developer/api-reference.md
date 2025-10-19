@@ -1,7 +1,7 @@
 # RealConsole API 文档
 
-**版本**: v0.5.0
-**更新日期**: 2025-10-15
+**版本**: v1.1.0
+**更新日期**: 2025-10-19
 **适用对象**: RealConsole 扩展开发者
 
 ---
@@ -520,6 +520,99 @@ impl LlmClient for MyLlmClient {
     }
 }
 ```
+
+#### 内置 LLM 客户端实现
+
+RealConsole 内置了两个 LLM 客户端实现：
+
+##### OllamaClient
+
+**模块路径**: `realconsole::llm::OllamaClient`
+
+**构造函数**:
+```rust
+pub fn new(model: impl Into<String>, endpoint: impl Into<String>) -> Result<Self, LlmError>
+```
+
+**参数**:
+- `model: impl Into<String>` - 模型名称（如 "qwen3:30b"）
+- `endpoint: impl Into<String>` - Ollama 服务端点（如 "http://localhost:11434"）
+
+**返回**:
+- `Ok(OllamaClient)` - 成功创建
+- `Err(LlmError)` - 配置错误
+
+**示例**:
+```rust
+use realconsole::llm::OllamaClient;
+
+let client = OllamaClient::new("qwen3:30b", "http://localhost:11434")?;
+```
+
+**公共方法**:
+
+1. **strip_think_tags** (v1.1.0+)
+   ```rust
+   pub fn strip_think_tags(text: &str) -> String
+   ```
+   过滤文本中的 `<think>...</think>` 标签。
+
+   **示例**:
+   ```rust
+   let text = "Hello <think>内部思考</think> World";
+   let clean = OllamaClient::strip_think_tags(text);
+   assert_eq!(clean, "Hello  World");
+   ```
+
+2. **diagnose** (继承自 LlmClient trait)
+   ```rust
+   async fn diagnose(&self) -> String
+   ```
+   健康检查，返回详细诊断信息：
+   - 连接状态
+   - 可用模型列表
+   - 目标模型可用性检查
+   - `ollama pull` 命令建议（如果模型不可用）
+   - curl 诊断命令
+   - 调用统计信息（总调用、成功、错误）
+
+**特性**:
+- ✅ OpenAI Compatible API 优先，Native API 降级
+- ✅ 自动重试机制
+- ✅ 自动过滤 `<think>` 标签
+- ✅ 详细的错误信息（包含模型和端点）
+- ✅ 健康检查和诊断
+
+---
+
+##### DeepseekClient
+
+**模块路径**: `realconsole::llm::DeepseekClient`
+
+**构造函数**:
+```rust
+pub fn new(api_key: impl Into<String>) -> Result<Self, LlmError>
+```
+
+**参数**:
+- `api_key: impl Into<String>` - Deepseek API 密钥
+
+**返回**:
+- `Ok(DeepseekClient)` - 成功创建
+- `Err(LlmError)` - 配置错误
+
+**示例**:
+```rust
+use realconsole::llm::DeepseekClient;
+
+let client = DeepseekClient::new("sk-xxx")?;
+```
+
+**特性**:
+- ✅ 支持流式输出
+- ✅ Function Calling
+- ✅ 自动重试机制
+- ✅ 统计信息跟踪
 
 ---
 

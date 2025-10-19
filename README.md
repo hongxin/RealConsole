@@ -2,13 +2,15 @@
 
 > **中文 | [English](README.en.md)**
 
-程序员和运维工程师都非常喜欢用的智能 CLI Agent - 基于 Rust 的高性能实现
+- 程序员和运维工程师都非常喜欢用的智能 CLI Agent 
+- 在Linux/Mac/Windows WSL 命令行环境中顺畅使用，具有丝滑的用户体验
+- 基于 Rust 的高性能终端环境实现
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-645%2B%20passed-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-654%2B%20passed-green.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-78%2B%25-yellow.svg)](docs/test_reports/)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](docs/CHANGELOG.md)
 
 ## ⚠️ 免责声明
 
@@ -640,269 +642,122 @@ RealConsole 提供 30+ 错误代码和详细的修复建议：
 
 ```
 realconsole/
-├── README.md                 # 项目主文档
-├── Cargo.toml                # Rust 项目配置
-├── realconsole.yaml        # 主配置文件
-├── .env                      # 环境变量（不提交）
+├── src/                    # 🦀 核心代码
+│   ├── agent.rs            # Agent 核心调度器
+│   ├── command/            # 命令系统（DevOps工具集）
+│   ├── task/               # ⭐ 任务编排系统（LLM+Kahn+并行）
+│   ├── dsl/intent/         # Intent DSL（50+ 意图模板）
+│   ├── llm/                # LLM 集成（Ollama/Deepseek/OpenAI）
+│   └── tool/               # 工具调用系统（14+ 内置工具）
 │
-├── src/                      # 🦀 源代码
-│   ├── main.rs               # 程序入口
-│   ├── agent.rs              # Agent 核心（Intent DSL 集成）
-│   ├── repl.rs               # REPL 交互循环
-│   ├── config.rs             # 配置系统
-│   ├── command/              # 命令系统
-│   │   ├── command.rs        # 命令注册与分发
-│   │   ├── commands_core.rs  # 核心命令
-│   │   ├── task_cmd.rs       # 任务编排命令 ⭐ NEW
-│   │   └── commands_*.rs     # 其他命令模块
-│   ├── shell_executor.rs     # Shell 命令执行
-│   ├── llm_manager.rs        # LLM 管理器
-│   ├── llm/                  # LLM 客户端
-│   │   ├── ollama.rs
-│   │   ├── deepseek.rs
-│   │   └── openai.rs
-│   ├── task/                 # ⭐ NEW - 任务编排系统
-│   │   ├── mod.rs            # 模块定义
-│   │   ├── types.rs          # 任务数据结构
-│   │   ├── decomposer.rs     # LLM任务分解器
-│   │   ├── planner.rs        # 依赖分析与规划
-│   │   └── executor.rs       # 并行执行引擎
-│   ├── dsl/                  # DSL 系统
-│   │   ├── intent/           # Intent DSL
-│   │   │   ├── types.rs      # 核心数据结构
-│   │   │   ├── matcher.rs    # 意图匹配器
-│   │   │   ├── template.rs   # 模板引擎
-│   │   │   ├── builtin.rs    # 50+ 内置意图
-│   │   │   └── extractor.rs  # 实体提取引擎
-│   │   └── type_system/      # 类型系统
-│   ├── memory.rs             # 记忆系统
-│   ├── tool.rs               # 工具注册
-│   ├── tool_executor.rs      # 工具执行引擎
-│   └── builtin_tools.rs      # 14+ 内置工具
-│
-├── tests/                    # 🧪 测试
-│   ├── test_*.rs             # 单元测试
-│   └── test_intent_integration.rs  # Intent DSL 集成测试
-│
-├── docs/                     # 📚 文档（五态架构）
-│   ├── README.md             # 文档中心索引
-│   ├── CHANGELOG.md          # 完整开发历史
-│   ├── 00-core/              # 核心理念（哲学、愿景、路线图）
-│   ├── 01-understanding/     # 理解态（设计、分析、思考）
-│   │   ├── design/           # 设计文档集
-│   │   ├── analysis/         # 分析文档
-│   │   └── thinking/         # 思考笔记
-│   ├── 02-practice/          # 实践态（指南、用例、示例）
-│   │   ├── user/             # 用户指南
-│   │   ├── developer/        # 开发者指南
-│   │   └── use-cases/        # 使用场景
-│   ├── 03-evolution/         # 演化态（进展、特性）
-│   │   ├── phases/           # 阶段总结
-│   │   ├── features/         # 功能实现文档
-│   │   └── milestones/       # 里程碑
-│   ├── 04-reports/           # 协同报告（决策记录）
-│   └── archive/              # 归档（226个历史文档）
-│
-├── config/                   # ⚙️ 配置样例
-│   ├── minimal.yaml          # 最小配置示例
-│   └── test-memory.yaml      # 测试记忆配置
-│
-├── scripts/                  # 🔧 脚本工具
-│   ├── demo/                 # 演示脚本
-│   └── test/                 # 测试脚本
-│
-└── memory/                   # 💾 记忆存储
-    └── long_memory.jsonl     # 长期记忆
+├── tests/                  # 🧪 测试（654+ 通过，覆盖率 78%+）
+├── docs/                   # 📚 文档（五态架构，226+ 归档文档）
+├── config/                 # ⚙️ 配置样例
+└── examples/               # 💡 使用示例
 ```
+
+**详细结构**: [完整项目结构文档](docs/02-practice/developer/project-structure.md)
 
 ## 🏗️ 架构设计
 
-### 核心组件
+### 核心理念：一分为三
 
 ```
-┌─────────────────────────────────────────┐
-│              用户输入                    │
-└────────────────┬────────────────────────┘
-                 │
-         ┌───────▼────────┐
-         │  Agent::handle │
-         └───────┬────────┘
-                 │
-      ┏━━━━━━━━━┻━━━━━━━━━┓
-      ┃                    ┃
-┌─────▼─────┐      ┌──────▼───────┐
-│ 文本输入   │      │ Shell (!前缀) │
-│           │      │               │
-│ LLM 流式  │      │ Shell 执行器  │
-│  输出     │      │               │
-└───────────┘      └──────────────┘
+         用户输入
+            │
+      ┌─────▼──────┐
+      │ 命令路由器  │  ← 智能识别（强制Shell/系统命令/常见Shell/自然语言）
+      └─────┬──────┘
+            │
+    ┌───────┼───────┐
+    │       │       │
+  Shell   系统    LLM+工具
+  执行    命令    (流式输出)
 ```
 
-### LLM 流式输出
+**核心特性**：
+- **智能路由** - 自动识别命令类型，无感过渡
+- **流式输出** - SSE 实时响应，token 级别显示
+- **安全防护** - 黑名单 + 超时 + 输出限制
+- **多层 Fallback** - LLM 生成 → 规则匹配 → 模板 → 对话
 
-- **SSE 解析**：Server-Sent Events 格式
-- **实时回调**：每个 token 立即显示
-- **优雅降级**：非流式客户端自动降级
-
-详细设计：[docs/03-evolution/features/streaming.md](docs/03-evolution/features/streaming.md)
-
-### Shell 执行
-
-- **黑名单检查**：禁止危险命令（rm -rf /、sudo 等）
-- **超时控制**：30 秒自动终止
-- **输出限制**：最大 100KB
-- **跨平台**：Unix/Windows 支持
-
-详细设计：[docs/03-evolution/features/shell-execution.md](docs/03-evolution/features/shell-execution.md)
+**详细文档**: [架构总览](docs/01-understanding/overview.md) | [设计文档集](docs/01-understanding/design/)
 
 ## 🔐 安全特性
 
-### Shell 命令黑名单
+- **黑名单保护** - 禁止 `rm -rf /`、`sudo`、`dd`、`mkfs`、Fork 炸弹等危险命令
+- **超时控制** - 默认 30 秒自动终止
+- **输出限制** - 最大 100KB 防止资源耗尽
+- **API Key 安全** - 环境变量存储，`.env` 不提交版本控制
 
-以下危险命令被禁止执行：
-- `rm -rf /` - 删除根目录
-- `sudo` - 权限提升
-- `dd if=/dev/zero` - 磁盘写入
-- `mkfs` - 格式化
-- Fork 炸弹、shutdown、reboot 等
+**详细文档**: [Shell 安全执行](docs/03-evolution/features/shell-execution.md)
 
-示例：
-```bash
-» !rm -rf /
-Shell 执行失败: 禁止执行危险命令: 匹配模式 'rm\s+-rf\s+/'
+## 📊 项目亮点
 
-» !sudo apt-get update
-Shell 执行失败: 禁止执行危险命令: 匹配模式 'sudo\s+'
-```
-
-## 📊 性能指标
-
-| 指标 | 数值 |
+| 维度 | 数据 |
 |------|------|
-| 启动时间 | < 50ms |
-| 内存占用 | ~5MB |
-| LLM 首 token 延迟 | < 500ms |
-| Shell 命令超时 | 30s（可配置） |
-| 最大输出 | 100KB（可配置） |
+| 🧪 **测试质量** | 654+ 测试通过（98.9% 通过率）· 覆盖率 78%+ |
+| ⚡ **性能** | 启动 < 50ms · 内存 ~5MB · LLM 首 token < 500ms |
+| 📝 **代码规模** | 13,000+ 行 Rust 代码 · 226+ 归档文档 |
+| 🛠️ **功能丰富** | 50+ Intent 模板 · 14+ 内置工具 · 30+ 系统命令 |
 
-## 🎯 项目统计
+### 最新更新 (v1.1.0 - 2025-10-19)
 
-### 代码质量
-- **测试覆盖**: 645+ 测试通过（100% 通过率）
-- **代码行数**: 13,000+ 行 Rust 代码
-- **测试覆盖率**: 78%+
-- **Clippy 警告**: 0
+- 🐛 修复 OllamaClient 参数顺序错误
+- ✨ 增强 Ollama 健康检查和诊断
+- 🎨 新增任务编排 UI 显示函数
+- 🧪 优化测试环境性能
 
-### 主要命令
-- **系统命令**: `/help`, `/quit`, `/clear`, `/examples`, `/quickref`
-- **任务编排** ⭐ NEW: `/plan`, `/execute`, `/tasks`, `/task_status`
-- **项目工具**: `/project`, `/proj`
-- **Git 助手**: `/gs`, `/gd`, `/ga`, `/gb`
-- **日志分析**: `/la`, `/le`, `/lt`
-- **系统监控**: `/sys`, `/cpu`, `/disk`, `/top`, `/memory-info`
-- **工具管理**: `/tools`, `/mem`, `/log`, `/shell`
+**完整历史**: [CHANGELOG.md](docs/CHANGELOG.md)
 
-### 架构特点
-- **REPL 交互循环** - 基于 rustyline 的命令行界面
-- **LLM 集成** - 支持 Ollama/Deepseek/OpenAI，流式输出（SSE）
-- **任务编排系统** ⭐ NEW - LLM智能分解 + Kahn拓扑排序 + 并行优化执行
-- **工具调用系统** - 14+ 内置工具，支持并行执行
-- **Intent DSL** - 50+ 内置意图模板，智能匹配
-- **记忆系统** - 短期+长期记忆，支持搜索和导出
-- **安全防护** - 黑名单检查、超时控制、输出限制
-- **跨平台支持** - macOS + Linux，零额外依赖
+## 📚 文档导航
 
-详细开发历史和技术文档请参考 [CHANGELOG](docs/CHANGELOG.md)
+> **文档系统**: 基于"一分为三"哲学的五态架构（理念·理解·实践·演化·报告）
+
+### 快速入口
+
+- 📚 **[文档中心](docs/README.md)** - 完整导航和推荐阅读路径
+- 🚀 **[快速开始](docs/02-practice/user/quickstart.md)** - 5 分钟上手指南
+- 📖 **[用户手册](docs/02-practice/user/user-guide.md)** - 完整功能说明
+- 👨‍💻 **[开发者指南](docs/02-practice/developer/developer-guide.md)** - 架构与扩展开发
+
+### 核心理念
+
+- 💭 **[一分为三哲学](docs/00-core/philosophy.md)** - 设计思想
+- 🎯 **[产品愿景](docs/00-core/vision.md)** - 定位与目标
+- 🗺️ **[技术路线图](docs/00-core/roadmap.md)** - 发展规划
+
+### 更多文档
+
+- **用户指南**: [LLM 配置](docs/02-practice/user/llm-setup.md) · [工具调用](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md)
+- **开发文档**: [API 参考](docs/02-practice/developer/api-reference.md) · [工具开发](docs/02-practice/developer/tool-development.md) · [项目结构](docs/02-practice/developer/project-structure.md)
+- **功能特性**: [任务编排](examples/task_system_usage.md) · [Git 助手](docs/03-evolution/features/git-assistant.md) · [日志分析](docs/03-evolution/features/log-analyzer.md)
 
 ## 🚧 计划功能
 
-- [ ] 命令历史搜索
-- [ ] Tab 自动补全
-- [ ] 向量检索优化
-- [ ] Web 界面
-- [ ] 更多内置意图（当前 10 个）
-- [ ] Intent DSL 性能优化（LRU 缓存、模糊匹配）
-
-## 📚 文档
-
-> **文档系统已升级**: 基于"一分为三"哲学的五态架构，清晰易导航 ✨
-
-### 文档中心
-- **📚 文档主索引**：[docs/README.md](docs/README.md) - 完整文档导航和推荐阅读路径
-
-### 核心文档（00-core）
-- **💭 一分为三哲学**：[docs/00-core/philosophy.md](docs/00-core/philosophy.md) - 设计理念
-- **🎯 产品愿景**：[docs/00-core/vision.md](docs/00-core/vision.md) - 产品定位
-- **🗺️ 技术路线图**：[docs/00-core/roadmap.md](docs/00-core/roadmap.md) - 发展规划
-
-### 用户指南（02-practice/user）
-- **🚀 快速开始**：[docs/02-practice/user/quickstart.md](docs/02-practice/user/quickstart.md) - 5分钟上手
-- **📖 用户手册**：[docs/02-practice/user/user-guide.md](docs/02-practice/user/user-guide.md) - 完整功能说明
-- **🛠️ 工具调用指南**：[docs/02-practice/user/tool-calling-guide.md](docs/02-practice/user/tool-calling-guide.md)
-- **🧠 Intent DSL**：[docs/02-practice/user/intent-dsl-guide.md](docs/02-practice/user/intent-dsl-guide.md)
-- **🔧 LLM 配置**：[docs/02-practice/user/llm-setup.md](docs/02-practice/user/llm-setup.md)
-- **🌐 环境变量**：[docs/02-practice/user/env-config.md](docs/02-practice/user/env-config.md)
-
-### 开发者文档（01-understanding & 02-practice/developer）
-- **🏗️ 架构总览**：[docs/01-understanding/overview.md](docs/01-understanding/overview.md)
-- **👨‍💻 开发者指南**：[docs/02-practice/developer/developer-guide.md](docs/02-practice/developer/developer-guide.md)
-- **🔨 工具开发**：[docs/02-practice/developer/tool-development.md](docs/02-practice/developer/tool-development.md)
-- **📘 API 参考**：[docs/02-practice/developer/api-reference.md](docs/02-practice/developer/api-reference.md)
-
-### 功能文档（03-evolution/features）
-- **🔄 Git 智能助手**：[docs/03-evolution/features/git-assistant.md](docs/03-evolution/features/git-assistant.md)
-- **📊 日志分析器**：[docs/03-evolution/features/log-analyzer.md](docs/03-evolution/features/log-analyzer.md)
-- **💻 系统监控**：[docs/03-evolution/features/system-monitor.md](docs/03-evolution/features/system-monitor.md)
-- **🧙 配置向导**：[docs/03-evolution/features/config-wizard.md](docs/03-evolution/features/config-wizard.md)
-- **⚡ 懒人模式**：[docs/03-evolution/features/lazy-mode.md](docs/03-evolution/features/lazy-mode.md)
-- **🌊 流式输出**：[docs/03-evolution/features/streaming.md](docs/03-evolution/features/streaming.md)
-- **🔧 Shell 执行**：[docs/03-evolution/features/shell-execution.md](docs/03-evolution/features/shell-execution.md)
-- **📚 功能总览**：[docs/03-evolution/features/summary.md](docs/03-evolution/features/summary.md)
-
-### 进度与报告
-- **📊 开发历史**：[docs/CHANGELOG.md](docs/CHANGELOG.md) - 完整变更日志
-- **📈 阶段总结**：[docs/03-evolution/phases/](docs/03-evolution/phases/) - 开发历程记录
-- **📝 协同报告**：[docs/04-reports/](docs/04-reports/) - 重要决策和分析报告
+详见 [技术路线图](docs/00-core/roadmap.md)
 
 ## 🔧 开发
 
-### 运行测试
-
 ```bash
+# 运行测试
 cargo test
-```
 
-### 运行演示
-
-```bash
-# Shell 执行演示
-./scripts/demo/demo_shell.sh
-
-# 懒人模式演示
-./scripts/demo/demo_lazy_mode.sh
-
-# Deepseek 演示
-./scripts/demo/demo-deepseek.sh
-```
-
-### 代码格式化
-
-```bash
+# 代码格式化
 cargo fmt
-```
 
-### Linting
-
-```bash
+# Linting
 cargo clippy
+
+# 运行演示
+./scripts/demo/demo_shell.sh
 ```
+
+**详细指南**: [开发者指南](docs/02-practice/developer/developer-guide.md)
 
 ## 🤝 贡献
 
-欢迎贡献！请确保：
-1. 代码通过 `cargo test`
-2. 代码格式化 `cargo fmt`
-3. 无 clippy 警告 `cargo clippy`
+欢迎贡献！请确保通过 `cargo test`、`cargo fmt` 和 `cargo clippy`
 
 ## 📄 License
 

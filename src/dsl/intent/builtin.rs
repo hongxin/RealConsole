@@ -1337,7 +1337,7 @@ mod tests {
 
         let builtin = BuiltinIntents::new();
         let matcher = builtin.create_matcher();
-        let engine = builtin.create_engine();
+        let _engine = builtin.create_engine();
         let extractor = EntityExtractor::new();
 
         // 最大文件

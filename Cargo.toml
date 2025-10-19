@@ -54,7 +54,7 @@ uuid = { version = "1.10", features = ["v4", "serde"] }  # UUID generation for c
 
 [dev-dependencies]
 tokio-test = "0.4"
-mockito = "1.7"  # Mock HTTP server for testing LLM clients
+mockito = "1.7.0"  # Mock HTTP server for testing LLM clients
 assert_cmd = "2.0"  # CLI testing
 predicates = "3.0"  # Assertions for CLI output
 tempfile = "3.8"  # Temporary files for testing

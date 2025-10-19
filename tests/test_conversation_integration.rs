@@ -4,6 +4,7 @@
 
 use realconsole::conversation::{
     ConversationManager, ParameterSpec, ParameterType, ParameterValue, Response,
+    state::{ConversationState, StateEvent},
 };
 
 /// 测试完整的日志分析对话流程
@@ -257,7 +258,7 @@ async fn test_conversation_timeout() {
     let context = manager.get_context(&conversation_id).unwrap();
     assert_eq!(
         context.state,
-        realconsole::conversation::ConversationState::Timeout
+        ConversationState::Timeout
     );
 }
 
@@ -297,7 +298,7 @@ async fn test_multiple_conversations() {
     // 完成其中一个对话
     {
         let context = manager.get_context_mut(&id1).unwrap();
-        context.state = realconsole::conversation::ConversationState::Completed {
+        context.state = ConversationState::Completed {
             success: true,
             message: "完成".to_string(),
         };
