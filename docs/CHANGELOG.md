@@ -963,11 +963,11 @@ BaseOperation::ListFiles { path, field, direction, count }
 
 **使用示例**:
 ```bash
-» 显示最大的3个rs文件
+% 显示最大的3个rs文件
 🤖 LLM 生成
 → 执行: find . -name '*.rs' -type f -exec ls -lh {} + | sort -k5 -hr | head -n 3
 
-» 找出所有yaml文件，按修改时间排序
+% 找出所有yaml文件，按修改时间排序
 🤖 LLM 生成
 → 执行: find . -name '*.yaml' -type f -exec ls -lh {} + | sort -k6 -hr
 ```

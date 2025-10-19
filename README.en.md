@@ -42,15 +42,15 @@ By using, compiling, or running this program, you acknowledge its experimental n
 
 **Usage Examples**:
 ```bash
-» Show the 3 largest rs files
+% Show the 3 largest rs files
 🤖 LLM Generated
 → Executing: find . -name '*.rs' -type f -exec ls -lh {} + | sort -k5 -hr | head -n 3
 
-» Calculate 2 to the power of 10
+% Calculate 2 to the power of 10
 [LLM automatically calls calculator tool]
 Based on calculation, 2^10 = 1024
 
-» /plan Create a Rust project with src and tests directories, then create main.rs
+% /plan Create a Rust project with src and tests directories, then create main.rs
 🤖 Smart Task Decomposition
 ▸ 3 Stages · 4 Tasks · ⚡ 15s (saved 5s)
 ├─ → Stage 1 (5s)
@@ -61,7 +61,7 @@ Based on calculation, 2^10 = 1024
 └─ → Stage 3 (5s)
    └─ Create main.rs $ touch myproject/src/main.rs
 
-» /execute
+% /execute
 ✓ 4/4 · 100% · 12s
 ```
 
@@ -177,10 +177,10 @@ features:
 Direct input, no command prefix needed:
 
 ```bash
-» Hello
+% Hello
 Hi! I'm an AI assistant. How can I help you?
 
-» Write a hello world in Rust
+% Write a hello world in Rust
 Sure, here's a simple Rust Hello World program:
 
 fn main() {
@@ -197,18 +197,18 @@ To run it:
 Use `!` prefix to execute system commands:
 
 ```bash
-» !pwd
+% !pwd
 /Users/user/project/realconsole
 
-» !ls -la
+% !ls -la
 total 96
 drwxr-xr-x  10 user  staff   320 Oct 14 10:30 .
 ...
 
-» !echo "Hello from shell"
+% !echo "Hello from shell"
 Hello from shell
 
-» !date
+% !date
 Mon Oct 14 00:41:12 CST 2025
 ```
 
@@ -222,13 +222,13 @@ features:
   tool_calling_enabled: true
 
 # Example 1: Automatic calculation
-» Calculate 2 to the power of 10
+% Calculate 2 to the power of 10
 
 [LLM automatically calls calculator tool]
 Based on calculation, 2^10 = 1024
 
 # Example 2: File operations
-» Read the first 5 lines of README.md
+% Read the first 5 lines of README.md
 
 [LLM automatically calls read_file tool]
 File content:
@@ -236,7 +236,7 @@ File content:
 Minimalist intelligent CLI Agent...
 
 # Example 3: Get time
-» What time is it now?
+% What time is it now?
 
 [LLM automatically calls get_datetime tool]
 Current time is 2025-01-15 14:30:45
@@ -251,7 +251,7 @@ Current time is 2025-01-15 14:30:45
 
 **View All Tools**:
 ```bash
-» /tools
+% /tools
 Available tools (5 tools):
   • calculator - Execute mathematical expressions
   • read_file - Read file contents
@@ -271,7 +271,7 @@ Detailed Documentation:
 Use `/` prefix to access system commands:
 
 ```bash
-» /help
+% /help
 RealConsole v1.1.0
 
 💬 Smart Conversation:
@@ -305,9 +305,9 @@ Tips:
   Use /help <command> for command details
   System automatically recognizes command types, use /help shell for routing info
 
-» /examples           # Example library
-» /quickref           # Quick reference card
-» /quit
+% /examples           # Example library
+% /quickref           # Quick reference card
+% /quit
 Bye 👋
 ```
 
@@ -319,7 +319,7 @@ New task orchestration feature in v1.0.0 that lets AI automatically decompose co
 
 ```bash
 # Step 1: Describe goal in natural language
-» /plan Create a Rust project with src and tests directories, then create main.rs and lib.rs
+% /plan Create a Rust project with src and tests directories, then create main.rs and lib.rs
 
 🤖 LLM Smart Task Decomposition...
 ✓ Decomposed into 6 subtasks
@@ -340,7 +340,7 @@ New task orchestration feature in v1.0.0 that lets AI automatically decompose co
 Use /execute to run
 
 # Step 2: Execute plan
-» /execute
+% /execute
 ⚡ Starting execution: Create Rust project...
 
 → Stage 1: Create project root ✓ (2s)
@@ -377,7 +377,7 @@ Detailed Documentation:
 Quickly understand project information and recommended commands:
 
 ```bash
-» /project
+% /project
 📦 Project Context
 
   Project Name: realconsole
@@ -405,7 +405,7 @@ Accelerate Git workflow:
 
 ```bash
 # 1. View Git status (colored categorized display)
-» /gs
+% /gs
 📊 Git Repository Status
 
 📁 Modified Files (2):
@@ -413,7 +413,7 @@ Accelerate Git workflow:
   • Cargo.toml
 
 # 2. View diff analysis
-» /gd
+% /gd
 📊 Code Change Analysis
 
 📈 Statistics:
@@ -426,7 +426,7 @@ Accelerate Git workflow:
   ✓ New test cases detected
 
 # 3. Auto-generate commit message (follows Conventional Commits)
-» /ga
+% /ga
 📝 Change Analysis & Commit Suggestion
 
 🎯 Change Type: feat (new feature)
@@ -447,7 +447,7 @@ Quickly diagnose log issues:
 
 ```bash
 # Analyze log file
-» /la /var/log/app.log
+% /la /var/log/app.log
 📊 Log Analysis Report
 
 📈 Statistics:
@@ -474,7 +474,7 @@ Quickly view system resources:
 
 ```bash
 # System overview (one-click view all resources)
-» /sys
+% /sys
 💻 System Monitoring
 
 ━━━ CPU ━━━
@@ -503,7 +503,7 @@ Quickly view system resources:
 RealConsole provides 30+ error codes and detailed fix suggestions:
 
 ```bash
-» !rm -rf /
+% !rm -rf /
 [E302] Command contains dangerous operation, blocked by security policy
 
 💡 Fix Suggestions:
@@ -511,7 +511,7 @@ RealConsole provides 30+ error codes and detailed fix suggestions:
 2. View allowed command list and security policy
    📖 https://docs.realconsole.com/shell-safety
 
-» !sleep 20
+% !sleep 20
 [E303] Command execution timeout (exceeded 10 seconds)
 
 💡 Fix Suggestions:

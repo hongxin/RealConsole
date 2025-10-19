@@ -80,7 +80,7 @@ LLM 提供商:
   /examples   查看使用示例
   Ctrl-D      退出程序
 
-»
+%
 ```
 
 ---
@@ -92,11 +92,11 @@ LLM 提供商:
 直接输入问题，无需命令前缀：
 
 ```bash
-» 计算 2 的 10 次方
+% 计算 2 的 10 次方
 🤖 AI: 2^10 = 1024
 ⓘ 0.8s
 
-» 用 Rust 写一个 hello world
+% 用 Rust 写一个 hello world
 🤖 AI: 这是一个简单的 Rust Hello World 程序：
 
 fn main() {
@@ -117,14 +117,14 @@ fn main() {
 使用 `!` 前缀执行系统命令：
 
 ```bash
-» !ls -la
+% !ls -la
 total 128
 drwxr-xr-x  15 user  staff   480 Oct 15 10:00 .
 drwxr-xr-x   8 user  staff   256 Oct 14 18:30 ..
 -rw-r--r--   1 user  staff  1234 Oct 15 09:45 README.md
 ...
 
-» !pwd
+% !pwd
 /Users/user/realconsole
 ```
 
@@ -135,7 +135,7 @@ drwxr-xr-x   8 user  staff   256 Oct 14 18:30 ..
 
 **示例**：
 ```bash
-» !rm -rf /
+% !rm -rf /
 [E302] 命令包含危险操作，已被安全策略阻止
 
 💡 修复建议:
@@ -149,7 +149,7 @@ drwxr-xr-x   8 user  staff   256 Oct 14 18:30 ..
 RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任务：
 
 ```bash
-» /tools list
+% /tools list
 📦 已注册工具 (14):
   1. calculator - 数学计算器
   2. datetime - 时间日期工具
@@ -162,18 +162,18 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 
 **手动调用工具**：
 ```bash
-» /tools call calculator {"expression": "sqrt(144)"}
+% /tools call calculator {"expression": "sqrt(144)"}
 ✓ 工具调用成功
 结果: 12
 
-» /tools call datetime {"format": "RFC3339"}
+% /tools call datetime {"format": "RFC3339"}
 ✓ 工具调用成功
 当前时间: 2025-10-15T10:30:00+08:00
 ```
 
 **AI 自动调用**：
 ```bash
-» 帮我计算 125 的立方根
+% 帮我计算 125 的立方根
 🤖 AI: [调用工具: calculator]
 参数: {"expression": "125^(1/3)"}
 结果: 5
@@ -187,18 +187,18 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 RealConsole 提供了丰富的帮助信息：
 
 ```bash
-» /help           # 快速帮助（一屏内容）
-» /help all       # 完整帮助（所有命令）
-» /help tools     # 工具管理帮助
-» /help memory    # 记忆系统帮助
-» /help shell     # Shell 执行帮助
-» /examples       # 使用示例库
-» /quickref       # 快速参考卡片
+% /help           # 快速帮助（一屏内容）
+% /help all       # 完整帮助（所有命令）
+% /help tools     # 工具管理帮助
+% /help memory    # 记忆系统帮助
+% /help shell     # Shell 执行帮助
+% /examples       # 使用示例库
+% /quickref       # 快速参考卡片
 ```
 
 **示例**：
 ```bash
-» /examples
+% /examples
 💡 RealConsole 使用示例
 
 ━━━ 智能对话 ━━━
@@ -362,7 +362,7 @@ features:
 **解决方案**：
 查看可用工具列表：
 ```bash
-» /tools list
+% /tools list
 ```
 
 #### 5. 记忆系统错误
@@ -452,10 +452,10 @@ impl Tool for MyTool {
 
 **A**: 是的！RealConsole 内置记忆系统，自动记录对话上下文：
 ```bash
-» 我的名字是小明
+% 我的名字是小明
 🤖 AI: 你好，小明！
 
-» 你还记得我叫什么吗？
+% 你还记得我叫什么吗？
 🤖 AI: 当然记得，你叫小明。
 ```
 
@@ -490,22 +490,22 @@ impl Tool for MyTool {
 
 **数据分析**：
 ```bash
-» 读取 data.csv 文件，计算平均值
-» 使用工具分析文件内容并生成报告
+% 读取 data.csv 文件，计算平均值
+% 使用工具分析文件内容并生成报告
 ```
 
 **系统管理**：
 ```bash
-» !df -h
-» !ps aux | grep python
-» 查看系统磁盘使用情况
+% !df -h
+% !ps aux | grep python
+% 查看系统磁盘使用情况
 ```
 
 **编程助手**：
 ```bash
-» 用 Rust 写一个 HTTP 服务器
-» 解释这段代码的作用: [粘贴代码]
-» 如何优化这个算法？
+% 用 Rust 写一个 HTTP 服务器
+% 解释这段代码的作用: [粘贴代码]
+% 如何优化这个算法？
 ```
 
 ---

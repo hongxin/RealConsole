@@ -42,15 +42,15 @@
 
 **使用示例**:
 ```bash
-» 显示最大的3个rs文件
+% 显示最大的3个rs文件
 🤖 LLM 生成
 → 执行: find . -name '*.rs' -type f -exec ls -lh {} + | sort -k5 -hr | head -n 3
 
-» 帮我计算 2 的 10 次方
+% 帮我计算 2 的 10 次方
 [LLM 自动调用 calculator 工具]
 根据计算结果，2^10 = 1024
 
-» /plan 创建一个Rust项目，包含src目录和测试目录，然后创建main.rs
+% /plan 创建一个Rust项目，包含src目录和测试目录，然后创建main.rs
 🤖 智能任务分解
 ▸ 3 阶段 · 4 任务 · ⚡ 15秒 (节省 5秒)
 ├─ → Stage 1 (5s)
@@ -61,7 +61,7 @@
 └─ → Stage 3 (5s)
    └─ 创建main.rs文件 $ touch myproject/src/main.rs
 
-» /execute
+% /execute
 ✓ 4/4 · 100% · 12秒
 ```
 
@@ -177,10 +177,10 @@ features:
 直接输入问题，无需命令前缀：
 
 ```bash
-» 你好
+% 你好
 你好！我是 AI 助手，有什么可以帮助你的吗？
 
-» 用 Rust 写一个 hello world
+% 用 Rust 写一个 hello world
 好的，这是一个简单的 Rust Hello World 程序：
 
 fn main() {
@@ -197,18 +197,18 @@ fn main() {
 使用 `!` 前缀执行系统命令：
 
 ```bash
-» !pwd
+% !pwd
 /Users/user/project/realconsole
 
-» !ls -la
+% !ls -la
 total 96
 drwxr-xr-x  10 user  staff   320 Oct 14 10:30 .
 ...
 
-» !echo "Hello from shell"
+% !echo "Hello from shell"
 Hello from shell
 
-» !date
+% !date
 2025年10月14日 星期二 00时41分12秒 CST
 ```
 
@@ -222,13 +222,13 @@ features:
   tool_calling_enabled: true
 
 # 示例 1: 自动计算
-» 帮我计算 2 的 10 次方
+% 帮我计算 2 的 10 次方
 
 [LLM 自动调用 calculator 工具]
 根据计算结果，2^10 = 1024
 
 # 示例 2: 文件操作
-» 读取 README.md 的前 5 行
+% 读取 README.md 的前 5 行
 
 [LLM 自动调用 read_file 工具]
 文件内容：
@@ -236,7 +236,7 @@ features:
 极简版智能 CLI Agent...
 
 # 示例 3: 获取时间
-» 现在几点了？
+% 现在几点了？
 
 [LLM 自动调用 get_datetime 工具]
 当前时间是 2025-01-15 14:30:45
@@ -251,7 +251,7 @@ features:
 
 **查看所有工具**:
 ```bash
-» /tools
+% /tools
 可用工具 5 个工具:
   • calculator - 执行数学计算表达式
   • read_file - 读取文件内容
@@ -271,7 +271,7 @@ features:
 使用 `/` 前缀访问系统命令：
 
 ```bash
-» /help
+% /help
 RealConsole v1.0.0
 
 💬 智能对话:
@@ -305,12 +305,12 @@ RealConsole v1.0.0
   使用 /help <命令> 查看命令详情
   系统自动识别命令类型，使用 /help shell 查看路由说明
 
-» /help all           # 完整帮助
-» /help tools         # 工具管理帮助
-» /help memory        # 记忆系统帮助
-» /help shell         # Shell 执行帮助
+% /help all           # 完整帮助
+% /help tools         # 工具管理帮助
+% /help memory        # 记忆系统帮助
+% /help shell         # Shell 执行帮助
 
-» /examples           # 使用示例库
+% /examples           # 使用示例库
 💡 RealConsole 使用示例
 
 智能对话
@@ -340,7 +340,7 @@ RealConsole v1.0.0
   /log stats
   /log failed
 
-» /quickref           # 快速参考卡片
+% /quickref           # 快速参考卡片
 RealConsole 快速参考
 
 基本用法
@@ -362,7 +362,7 @@ RealConsole 快速参考
 
 更多: /help all | /examples
 
-» /quit
+% /quit
 Bye 👋
 ```
 
@@ -374,7 +374,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
 
 ```bash
 # 步骤 1: 用自然语言描述目标
-» /plan 创建一个Rust项目，包含src目录和tests目录，然后创建main.rs和lib.rs
+% /plan 创建一个Rust项目，包含src目录和tests目录，然后创建main.rs和lib.rs
 
 🤖 LLM 智能分解任务...
 ✓ 已分解为 6 个子任务
@@ -395,7 +395,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
 使用 /execute 执行
 
 # 步骤 2: 执行计划
-» /execute
+% /execute
 ⚡ 开始执行: 创建Rust项目...
 
 → Stage 1: 创建项目根目录 ✓ (2s)
@@ -406,7 +406,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
 ✓ 6/6 · 100% · 10秒
 
 # 查看任务列表
-» /tasks
+% /tasks
 创建Rust项目 6 任务 · 4 阶段 · 20秒
 ├─ → Stage 1
 │  └─ 创建项目根目录
@@ -416,7 +416,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
 └─ ...
 
 # 查看执行状态
-» /task_status
+% /task_status
 ✓ 6/6 · 10秒 · 100%
 ✓ 创建项目根目录 (2s)
 ✓ 创建src目录 (3s)
@@ -452,7 +452,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
 快速了解项目信息和推荐命令：
 
 ```bash
-» /project
+% /project
 📦 项目上下文
 
   项目名称: realconsole
@@ -480,7 +480,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
 
 ```bash
 # 1. 查看 Git 状态（彩色分类显示）
-» /gs
+% /gs
 📊 Git 仓库状态
 
 📁 已修改文件 (2):
@@ -488,7 +488,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
   • Cargo.toml
 
 # 2. 查看差异分析
-» /gd
+% /gd
 📊 代码变更分析
 
 📈 统计信息:
@@ -501,7 +501,7 @@ v1.0.0 新增的任务编排功能，让 AI 自动分解复杂目标为可执行
   ✓ 发现新测试用例
 
 # 3. 自动生成提交消息（遵循 Conventional Commits）
-» /ga
+% /ga
 📝 变更分析与提交建议
 
 🎯 变更类型: feat (新功能)
@@ -527,7 +527,7 @@ feat(core): add DevOps features
 
 ```bash
 # 分析日志文件
-» /la /var/log/app.log
+% /la /var/log/app.log
 📊 日志分析报告
 
 📈 统计信息:
@@ -548,11 +548,11 @@ feat(core): add DevOps features
 🏥 健康度: 良好 (ERROR < 1%)
 
 # 只查看错误
-» /le /var/log/app.log
+% /le /var/log/app.log
 [显示所有 ERROR 级别日志...]
 
 # 实时监控日志尾部（类似 tail -f）
-» /lt /var/log/app.log
+% /lt /var/log/app.log
 [实时显示新增日志...]
 ```
 
@@ -562,7 +562,7 @@ feat(core): add DevOps features
 
 ```bash
 # 系统概览（一键查看所有资源）
-» /sys
+% /sys
 💻 系统监控
 
 ━━━ CPU ━━━
@@ -584,19 +584,19 @@ feat(core): add DevOps features
     可用: 180 GB
 
 # CPU 详情
-» /cpu
+% /cpu
 [显示 CPU 详细信息...]
 
 # 内存详情
-» /memory-info
+% /memory-info
 [显示内存详细信息...]
 
 # 磁盘使用
-» /disk
+% /disk
 [显示所有磁盘分区...]
 
 # 进程 TOP 列表
-» /top
+% /top
 🔝 进程资源使用 TOP 5
 
 按 CPU 排序:
@@ -612,7 +612,7 @@ feat(core): add DevOps features
 RealConsole 提供 30+ 错误代码和详细的修复建议：
 
 ```bash
-» !rm -rf /
+% !rm -rf /
 [E302] 命令包含危险操作，已被安全策略阻止
 
 💡 修复建议:
@@ -620,7 +620,7 @@ RealConsole 提供 30+ 错误代码和详细的修复建议：
 2. 查看允许的命令列表和安全策略
    📖 https://docs.realconsole.com/shell-safety
 
-» !sleep 20
+% !sleep 20
 [E303] 命令执行超时（超过 10 秒）
 
 💡 修复建议:
@@ -628,7 +628,7 @@ RealConsole 提供 30+ 错误代码和详细的修复建议：
 2. 在配置文件中调整 features.shell_timeout
    💻 vi realconsole.yaml
 
-» realconsole --config nonexistent.yaml
+% realconsole --config nonexistent.yaml
 [E001] 配置文件不存在: nonexistent.yaml
 
 💡 修复建议:

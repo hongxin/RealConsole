@@ -298,7 +298,7 @@ realconsole --once "你好"
   /examples   查看使用示例
   Ctrl-D      退出程序
 
-»
+%
 ```
 
 ### 三种输入模式
@@ -316,11 +316,11 @@ RealConsole 支持三种输入模式，根据前缀自动识别：
 直接输入问题，无需前缀：
 
 ```bash
-» 你好
+% 你好
 🤖 AI: 你好！我是 RealConsole AI 助手，有什么可以帮助你的吗？
 ⓘ 0.5s
 
-» 计算 2 的 10 次方
+% 计算 2 的 10 次方
 🤖 AI: [调用工具: calculator]
 参数: {"expression": "2^10"}
 结果: 1024
@@ -328,7 +328,7 @@ RealConsole 支持三种输入模式，根据前缀自动识别：
 2 的 10 次方等于 1024。
 ⓘ 0.8s
 
-» 用 Rust 写一个 hello world
+% 用 Rust 写一个 hello world
 🤖 AI: 这是一个简单的 Rust Hello World 程序：
 
 ```rust
@@ -356,7 +356,7 @@ fn main() {
 使用 `/` 前缀执行 RealConsole 内置命令：
 
 ```bash
-» /help
+% /help
 💬 RealConsole v0.5.0
 
 智能对话:
@@ -371,7 +371,7 @@ fn main() {
   /quit       退出程序
 ...
 
-» /version
+% /version
 RealConsole v0.5.0
 ```
 
@@ -394,17 +394,17 @@ RealConsole v0.5.0
 使用 `!` 前缀执行系统命令：
 
 ```bash
-» !ls -la
+% !ls -la
 total 128
 drwxr-xr-x  15 user  staff   480 Oct 15 10:00 .
 drwxr-xr-x   8 user  staff   256 Oct 14 18:30 ..
 -rw-r--r--   1 user  staff  1234 Oct 15 09:45 README.md
 ...
 
-» !pwd
+% !pwd
 /Users/user/realconsole
 
-» !echo "Hello from shell"
+% !echo "Hello from shell"
 Hello from shell
 ```
 
@@ -419,7 +419,7 @@ RealConsole 内置多重安全保护：
 **危险命令示例**：
 
 ```bash
-» !rm -rf /
+% !rm -rf /
 [E302] 命令包含危险操作，已被安全策略阻止
 
 💡 修复建议:
@@ -427,7 +427,7 @@ RealConsole 内置多重安全保护：
 2. 查看允许的命令列表和安全策略
    📖 https://docs.realconsole.com/shell-safety
 
-» !dd if=/dev/zero of=/dev/sda
+% !dd if=/dev/zero of=/dev/sda
 [E302] 命令包含危险操作，已被安全策略阻止
 ...
 ```
@@ -435,7 +435,7 @@ RealConsole 内置多重安全保护：
 **超时示例**：
 
 ```bash
-» !sleep 20
+% !sleep 20
 [E303] 命令执行超时（超过 10 秒）
 
 💡 修复建议:
@@ -455,7 +455,7 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 #### 查看可用工具
 
 ```bash
-» /tools list
+% /tools list
 📦 已注册工具 (14):
   1. calculator - 数学计算器（支持四则运算、幂、根号等）
   2. datetime - 时间日期工具（当前时间、格式化、时区转换）
@@ -480,11 +480,11 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 **示例 1: 计算器**
 
 ```bash
-» /tools call calculator {"expression": "sqrt(144) + 2^3"}
+% /tools call calculator {"expression": "sqrt(144) + 2^3"}
 ✓ 工具调用成功
 结果: 20
 
-» /tools call calculator {"expression": "sin(3.14159/2)"}
+% /tools call calculator {"expression": "sin(3.14159/2)"}
 ✓ 工具调用成功
 结果: 0.9999999999964793
 ```
@@ -492,11 +492,11 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 **示例 2: 时间工具**
 
 ```bash
-» /tools call datetime {"format": "RFC3339"}
+% /tools call datetime {"format": "RFC3339"}
 ✓ 工具调用成功
 当前时间: 2025-10-15T10:30:00+08:00
 
-» /tools call datetime {"format": "timestamp"}
+% /tools call datetime {"format": "timestamp"}
 ✓ 工具调用成功
 当前时间: 1729045800
 ```
@@ -504,15 +504,15 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 **示例 3: 文件操作**
 
 ```bash
-» /tools call file_write {"path": "test.txt", "content": "Hello RealConsole"}
+% /tools call file_write {"path": "test.txt", "content": "Hello RealConsole"}
 ✓ 工具调用成功
 已写入 test.txt
 
-» /tools call file_read {"path": "test.txt"}
+% /tools call file_read {"path": "test.txt"}
 ✓ 工具调用成功
 内容: Hello RealConsole
 
-» /tools call file_list {"path": "."}
+% /tools call file_list {"path": "."}
 ✓ 工具调用成功
 文件列表:
   test.txt
@@ -523,15 +523,15 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 **示例 4: 编解码工具**
 
 ```bash
-» /tools call base64_encode {"text": "Hello World"}
+% /tools call base64_encode {"text": "Hello World"}
 ✓ 工具调用成功
 结果: SGVsbG8gV29ybGQ=
 
-» /tools call base64_decode {"encoded": "SGVsbG8gV29ybGQ="}
+% /tools call base64_decode {"encoded": "SGVsbG8gV29ybGQ="}
 ✓ 工具调用成功
 结果: Hello World
 
-» /tools call hash {"text": "password123", "algorithm": "SHA256"}
+% /tools call hash {"text": "password123", "algorithm": "SHA256"}
 ✓ 工具调用成功
 结果: ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f
 ```
@@ -541,7 +541,7 @@ RealConsole 内置了 14 个实用工具，AI 可以自动调用它们完成任�
 AI 会根据你的问题自动选择并调用合适的工具：
 
 ```bash
-» 帮我计算 125 的立方根
+% 帮我计算 125 的立方根
 🤖 AI: [调用工具: calculator]
 参数: {"expression": "125^(1/3)"}
 结果: 5
@@ -549,7 +549,7 @@ AI 会根据你的问题自动选择并调用合适的工具：
 125 的立方根是 5。
 ⓘ 1.1s
 
-» 现在几点了？
+% 现在几点了？
 🤖 AI: [调用工具: datetime]
 参数: {"format": "RFC3339"}
 结果: 2025-10-15T10:30:00+08:00
@@ -557,7 +557,7 @@ AI 会根据你的问题自动选择并调用合适的工具：
 现在是 2025 年 10 月 15 日，上午 10:30。
 ⓘ 0.7s
 
-» 帮我生成一个 UUID
+% 帮我生成一个 UUID
 🤖 AI: [调用工具: uuid]
 参数: {}
 结果: 550e8400-e29b-41d4-a716-446655440000
@@ -571,7 +571,7 @@ AI 会根据你的问题自动选择并调用合适的工具：
 RealConsole 支持同时调用多个工具（最多 3 个并行）：
 
 ```bash
-» 帮我计算 2+2，并告诉我现在几点
+% 帮我计算 2+2，并告诉我现在几点
 🤖 AI: [并行调用工具]
   1. calculator: {"expression": "2+2"}
   2. datetime: {"format": "RFC3339"}
@@ -589,7 +589,7 @@ RealConsole 支持同时调用多个工具（最多 3 个并行）：
 查看工具的完整参数定义：
 
 ```bash
-» /tools schema calculator
+% /tools schema calculator
 {
   "type": "object",
   "properties": {
@@ -620,18 +620,18 @@ Intent（意图）代表用户想要完成的任务或获取的信息。RealCons
 #### Intent 匹配示例
 
 ```bash
-» 计算 2 的 10 次方
+% 计算 2 的 10 次方
 [Intent匹配] calculate_power
   关键词: ["计算", "次方"]
   实体提取: {base: 2, exponent: 10}
 🤖 AI: 2^10 = 1024
 
-» 现在几点了
+% 现在几点了
 [Intent匹配] query_time
   关键词: ["现在", "几点"]
 🤖 AI: 现在是 2025-10-15 10:30:00
 
-» 北京天气怎么样
+% 北京天气怎么样
 [Intent匹配] query_weather
   关键词: ["天气"]
   实体提取: {city: "北京"}
@@ -665,19 +665,19 @@ RealConsole 内置短期+长期记忆系统，让 AI 能够记住对话上下文
 #### 基础用法
 
 ```bash
-» 我的名字是小明
+% 我的名字是小明
 🤖 AI: 你好，小明！很高兴认识你。
 ⓘ 0.5s
 
-» 你还记得我叫什么吗？
+% 你还记得我叫什么吗？
 🤖 AI: 当然记得，你叫小明。
 ⓘ 0.6s
 
-» 我喜欢编程语言 Rust
+% 我喜欢编程语言 Rust
 🤖 AI: 很棒！Rust 是一门优秀的系统编程语言，具有内存安全和高性能的特点。
 ⓘ 0.7s
 
-» 我喜欢什么编程语言？
+% 我喜欢什么编程语言？
 🤖 AI: 你喜欢 Rust 编程语言。
 ⓘ 0.5s
 ```
@@ -687,7 +687,7 @@ RealConsole 内置短期+长期记忆系统，让 AI 能够记住对话上下文
 **查看所有记忆**：
 
 ```bash
-» /memory list
+% /memory list
 📝 记忆列表 (5 条):
   1. [2025-10-15 10:00] 用户: 我的名字是小明
   2. [2025-10-15 10:00] AI: 你好，小明！很高兴认识你。
@@ -699,7 +699,7 @@ RealConsole 内置短期+长期记忆系统，让 AI 能够记住对话上下文
 **搜索记忆**：
 
 ```bash
-» /memory search "Rust"
+% /memory search "Rust"
 🔍 搜索结果 (2 条):
   1. [2025-10-15 10:02] 用户: 我喜欢编程语言 Rust
   2. [2025-10-15 10:02] AI: 很棒！Rust 是一门优秀的系统编程语言...
@@ -708,14 +708,14 @@ RealConsole 内置短期+长期记忆系统，让 AI 能够记住对话上下文
 **导出记忆**：
 
 ```bash
-» /memory export
+% /memory export
 ✓ 记忆已导出到: memory_export_20251015_103000.json
 ```
 
 **清空记忆**：
 
 ```bash
-» /memory clear
+% /memory clear
 ⚠️  确认清空所有记忆吗？此操作不可恢复 (y/n): y
 ✓ 已清空所有记忆
 ```
@@ -739,7 +739,7 @@ RealConsole 会记录所有执行的命令和操作，用于审计和回溯。
 #### 查看日志
 
 ```bash
-» /log show
+% /log show
 📋 执行日志（最近 10 条）:
   1. [2025-10-15 10:00:15] CHAT   "计算 2+2"
   2. [2025-10-15 10:00:16] TOOL   calculator {"expression": "2+2"}
@@ -753,14 +753,14 @@ RealConsole 会记录所有执行的命令和操作，用于审计和回溯。
 #### 导出日志
 
 ```bash
-» /log export
+% /log export
 ✓ 日志已导出到: execution_log_20251015_103000.json
 ```
 
 #### 清空日志
 
 ```bash
-» /log clear
+% /log clear
 ⚠️  确认清空所有日志吗？此操作不可恢复 (y/n): y
 ✓ 已清空所有日志
 ```
@@ -1151,20 +1151,20 @@ features:
 
 1. **明确上下文**：
    ```bash
-   » 我正在开发一个 Rust Web 服务器项目
-   » 使用 Actix-Web 框架
-   » 现在遇到了路由配置问题
-   » 如何配置嵌套路由？
+   % 我正在开发一个 Rust Web 服务器项目
+   % 使用 Actix-Web 框架
+   % 现在遇到了路由配置问题
+   % 如何配置嵌套路由？
    ```
 
 2. **引用之前的对话**：
    ```bash
-   » 你刚才提到的 `HttpServer::new`，能详细解释一下吗？
+   % 你刚才提到的 `HttpServer::new`，能详细解释一下吗？
    ```
 
 3. **使用记忆搜索**：
    ```bash
-   » /memory search "Actix"  # 查找之前关于 Actix 的讨论
+   % /memory search "Actix"  # 查找之前关于 Actix 的讨论
    ```
 
 ---

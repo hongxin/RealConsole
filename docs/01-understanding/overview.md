@@ -47,9 +47,9 @@ cargo run --release
 RealConsole v0.1.0
 极简版智能 CLI Agent
 
-» /help
-» /version
-» /quit
+% /help
+% /version
+% /quit
 ```
 
 ---
@@ -203,9 +203,9 @@ endpoint: ${API_ENDPOINT:-https://api.deepseek.com/v1}
 
 ### 2. 命令别名
 ```bash
-» /help    # 或 /h 或 /?
-» /quit    # 或 /q 或 /exit
-» /version # 或 /v
+% /help    # 或 /h 或 /?
+% /quit    # 或 /q 或 /exit
+% /version # 或 /v
 ```
 
 ### 3. 类型安全

@@ -284,7 +284,7 @@ RealConsole v0.1.0
 
 提示: /help 查看帮助 | Ctrl-D 退出
 
-» /help
+% /help
 RealConsole
 极简版智能 CLI Agent
 
@@ -302,12 +302,12 @@ Shell 执行:
   - 别名: /h, /?, /q, /exit, /v
   - 使用 /commands 查看完整命令列表
 
-» /version
+% /version
 RealConsole 0.1.0
 极简版智能 CLI Agent (Rust 实现)
 Phase 1: 最小内核 ✓
 
-» /quit
+% /quit
 Bye 👋
 ```
 

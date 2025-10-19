@@ -567,7 +567,7 @@ Error: LLM API call failed: Connection refused (os error 111)
 
 **当前 `/help`**：
 ```bash
-» /help
+% /help
 
 💬 智能对话模式:
    直接输入问题即可
@@ -589,7 +589,7 @@ Error: LLM API call failed: Connection refused (os error 111)
 
 **改进方案**：
 ```bash
-» /help
+% /help
 
 RealConsole 帮助系统
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

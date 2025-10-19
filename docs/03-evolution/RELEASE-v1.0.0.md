@@ -55,7 +55,7 @@ RealConsole 融合**东方哲学智慧**（易经变化、一分为三）与现�
 
 ```bash
 # 步骤 1: 用自然语言描述目标
-» /plan 创建一个Rust项目，包含src目录和tests目录，然后创建main.rs
+% /plan 创建一个Rust项目，包含src目录和tests目录，然后创建main.rs
 
 🤖 LLM 智能分解任务...
 ✓ 已分解为 4 个子任务
@@ -73,7 +73,7 @@ RealConsole 融合**东方哲学智慧**（易经变化、一分为三）与现�
 使用 /execute 执行
 
 # 步骤 2: 一键执行
-» /execute
+% /execute
 ⚡ 开始执行: 创建Rust项目...
 ✓ 4/4 · 100% · 12秒
 ```
