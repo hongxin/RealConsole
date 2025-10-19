@@ -46,7 +46,8 @@ display:
   # minimal：只显示必要信息，无启动信息、无中间过程（默认）
   # standard：显示适中信息，有简化的启动和执行信息
   # debug：显示所有细节，包括配置路径、LLM 信息、完整命令等
-  mode: debug 
+  # mode: debug 
+  mode: standard
 
 # Intent DSL 智能增强配置 (v0.5.2+)
 intent:

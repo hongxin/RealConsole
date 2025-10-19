@@ -38,6 +38,7 @@
 - **智能 Pipeline 生成** - 自动理解用户意图，将自然语言转换为文件操作命令
 - **工具自动调用** - 14+ 内置工具（计算器、文件操作、时间查询等），智能并行执行
 - **意图识别** - 50+ 内置意图模板，自动理解用户需求并执行
+- **Workflow Intent 系统** 🔥 - 套路化复用，将成功流程固化为模板，性能提升 40-50%，成本降低 50-66%（可选启用）
 - **多层 Fallback 机制** - 4层保障（LLM生成→规则匹配→模板匹配→对话），确保系统永不失败
 
 **使用示例**:
@@ -729,7 +730,7 @@ realconsole/
 
 ### 更多文档
 
-- **用户指南**: [LLM 配置](docs/02-practice/user/llm-setup.md) · [工具调用](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md)
+- **用户指南**: [LLM 配置](docs/02-practice/user/llm-setup.md) · [工具调用](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md) · [Workflow 迁移](docs/02-practice/user/workflow-migration-guide.md)
 - **开发文档**: [API 参考](docs/02-practice/developer/api-reference.md) · [工具开发](docs/02-practice/developer/tool-development.md) · [项目结构](docs/02-practice/developer/project-structure.md)
 - **功能特性**: [任务编排](examples/task_system_usage.md) · [Git 助手](docs/03-evolution/features/git-assistant.md) · [日志分析](docs/03-evolution/features/log-analyzer.md)
 

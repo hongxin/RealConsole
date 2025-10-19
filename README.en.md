@@ -35,6 +35,7 @@ By using, compiling, or running this program, you acknowledge its experimental n
 ### 🧠 AI Capabilities
 - **LLM-Powered Conversation** - Ollama/Deepseek support, real-time streaming output, natural language interaction
 - **Task Orchestration System** ⭐ NEW - LLM intelligently decomposes complex goals, automatic dependency analysis, and parallel execution optimization (`/plan`, `/execute`)
+- **Workflow Intent System** 🔥 - Pattern reuse, converts successful flows to templates, 40-50% performance boost, 50-66% cost reduction (optional)
 - **Smart Pipeline Generation** - Automatically understands user intent, converts natural language to file operation commands
 - **Automatic Tool Calling** - 14+ built-in tools (calculator, file operations, time queries, etc.), intelligent parallel execution
 - **Intent Recognition** - 50+ built-in intent templates, automatically understand user needs and execute
@@ -612,7 +613,7 @@ realconsole/
 
 ### More Documentation
 
-- **User Guides**: [LLM Configuration](docs/02-practice/user/llm-setup.md) · [Tool Calling](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md)
+- **User Guides**: [LLM Configuration](docs/02-practice/user/llm-setup.md) · [Tool Calling](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md) · [Workflow Migration](docs/02-practice/user/workflow-migration-guide.md)
 - **Developer Docs**: [API Reference](docs/02-practice/developer/api-reference.md) · [Tool Development](docs/02-practice/developer/tool-development.md) · [Project Structure](docs/02-practice/developer/project-structure.md)
 - **Features**: [Task Orchestration](examples/task_system_usage.md) · [Git Assistant](docs/03-evolution/features/git-assistant.md) · [Log Analysis](docs/03-evolution/features/log-analyzer.md)
 
