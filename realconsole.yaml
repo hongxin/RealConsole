@@ -14,7 +14,6 @@ llm:
     api_key: ${DEEPSEEK_API_KEY}
 
   # Fallback LLM（通常是本地 Ollama，快速响应）
-  # 注：目前 Ollama 与 Rust reqwest 存在兼容性问题，暂时禁用
   # fallback:
     # provider: ollama
     # model: qwen3:4b
@@ -46,8 +45,6 @@ display:
   # minimal：只显示必要信息，无启动信息、无中间过程（默认）
   # standard：显示适中信息，有简化的启动和执行信息
   # debug：显示所有细节，包括配置路径、LLM 信息、完整命令等
-  # mode: debug
-  # mode: standard
   mode: minimal
 
   # 是否显示对话轮次详情（仅在 debug 模式下生效，默认 true）
@@ -78,6 +75,24 @@ intent:
 
   # LLM 生成失败时是否降级到规则匹配（默认 true）
   llm_generation_fallback: true
+
+# 对话上下文：自动模式
+conversation:
+  mode: auto  # 智能识别需要上下文的场景
+  # 保留最近 9 轮对话（适合短对话）
+  max_turns: 9
+  # 最大上下文长度 8K 字符（约 2K tokens）
+  max_context_length: 8000
+  # 自动清除策略
+  auto_clear:
+    enabled: true
+    idle_timeout: 300      # 5 分钟空闲后清除
+    on_task_complete: true # 任务完成后清除
+  # 包含工具调用和错误信息
+  include:
+    tool_calls: true
+    shell_output: false
+    errors: true
 
 # ============================================================================
 # 配置说明

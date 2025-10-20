@@ -254,10 +254,14 @@ RealConsole 支持**可选的对话上下文模式**，适应不同使用场景�
 **Manual（手动）**：
 ```bash
 % /context start      # 开始记录上下文
-[上下文: 已启用]
+✓ 上下文已启动
+
+(RealConsole v1) user RealConsole % # 提示符保持原样（无轮次时）
 
 % 分析 error.log 中的错误
 🤖 AI: 发现 3 种错误类型...
+
+(RealConsole v1) user RealConsole [上下文: 1轮] % # ✨ 实时显示轮次（绿色）
 
 % 统计每种错误的数量    # 自动使用上下文，记住上一轮对话
 🤖 AI: 根据刚才分析的 error.log...
@@ -265,21 +269,48 @@ RealConsole 支持**可选的对话上下文模式**，适应不同使用场景�
 - ValueError: 8 次
 - RuntimeError: 2 次
 
-% /context show       # 查看状态
-当前轮次: 2/10
-上下文长度: 847/8000 字符
+(RealConsole v1) user RealConsole [上下文: 2轮] % # 轮次增加
+
+% /context status     # 查看详细状态
+上下文状态
+
+模式: Manual
+状态: 🟢 激活
+轮次: 2 / 10
+长度: 847 / 8000 字符
+最后活动: 刚刚
 
 % /context stop       # 停止并清除
+✓ 上下文已停止
+统计: 已清除 2 轮对话（847 字符）
+
+(RealConsole v1) user RealConsole % # 恢复原样
 ```
 
 **Auto（自动）**：
 ```bash
+(RealConsole v1) user RealConsole % # 初始状态
+
 % 列出当前目录的文件
 🤖 AI: 当前目录有 12 个文件...
 
+(RealConsole v1) user RealConsole % # 普通命令，不触发上下文
+
 % 显示它们的大小          # 检测到"它们"，自动启用上下文
-[上下文: 自动启用]
 🤖 AI: 这些文件的大小分别是...
+
+(RealConsole v1) user RealConsole [上下文: 1轮] % # ✨ 自动激活并显示（绿色）
+
+% 为什么 README.md 这么大？  # 后续对话自动使用上下文
+🤖 AI: 根据刚才的文件列表，README.md 约 45KB...
+
+(RealConsole v1) user RealConsole [上下文: 2轮] % # 持续使用
+
+# 空闲 2 分钟后...
+(RealConsole v1) user RealConsole [上下文: 2轮 | 2分钟前] % # 空闲提示（灰色）
+
+# 接近超时（5分钟）...
+(RealConsole v1) user RealConsole [上下文: 2轮 | 4分钟前] % # 超时警告（黄色）
 ```
 
 #### 配置示例
@@ -288,15 +319,36 @@ RealConsole 支持**可选的对话上下文模式**，适应不同使用场景�
 
 ```yaml
 conversation:
-  mode: manual  # disabled, manual, auto
-  max_turns: 10
-  max_context_length: 8000
+  mode: manual              # disabled（默认）, manual, auto
+  max_turns: 20            # 最多保留 20 轮对话
+  max_context_length: 8000 # 最大 8000 字符
   auto_clear:
-    enabled: true
-    idle_timeout: 600  # 10 分钟
+    enabled: true          # 启用自动清理
+    idle_timeout: 300      # 5 分钟未活动后清除
+    on_task_complete: false # 任务完成后不自动清除
+  include:
+    tool_calls: true       # 包含工具调用历史
+    shell_output: false    # 不包含 Shell 输出
+    errors: true           # 包含错误信息
 ```
 
+**三种模式说明**：
+- `disabled` - 默认，无上下文，最快速度
+- `manual` - 手动控制，使用 `/context start/stop`
+- `auto` - 智能检测，自动启用（推荐多轮对话场景）
+
 详见：`config/conversation-*.yaml` 示例配置
+
+#### REPL 提示符说明
+
+上下文激活时，提示符会实时显示状态：
+
+| 显示 | 含义 | 颜色 |
+|------|------|------|
+| `[上下文: 3轮]` | 正常激活，3 轮对话 | 绿色 |
+| `[上下文: 5轮 \| 2分钟前]` | 空闲 2 分钟 | 灰色 |
+| `[上下文: 8轮 \| 4分钟前]` | 即将超时警告 | 黄色 |
+| 无显示 | 未激活或无轮次 | - |
 
 ### 6. 单次执行模式
 

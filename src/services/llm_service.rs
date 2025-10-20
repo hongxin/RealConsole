@@ -42,6 +42,9 @@ pub struct LlmRequest {
     /// 注意：因为闭包不能 Clone，这里使用 Option
     #[allow(dead_code)]
     pub stream_callback: Option<String>, // 占位符，实际使用时传递函数指针
+    /// 历史对话消息（用于上下文支持）
+    /// 如果为 None，则只使用 text 字段
+    pub messages: Option<Vec<crate::llm::Message>>,
 }
 
 impl LlmRequest {
@@ -51,6 +54,7 @@ impl LlmRequest {
             text,
             mode: LlmMode::Normal,
             stream_callback: None,
+            messages: None,
         }
     }
 
@@ -60,6 +64,7 @@ impl LlmRequest {
             text,
             mode: LlmMode::Streaming,
             stream_callback: None,
+            messages: None,
         }
     }
 
@@ -69,6 +74,23 @@ impl LlmRequest {
             text,
             mode: LlmMode::WithTools,
             stream_callback: None,
+            messages: None,
+        }
+    }
+
+    /// 创建带上下文的工具调用模式请求
+    pub fn with_tools_and_context(messages: Vec<crate::llm::Message>) -> Self {
+        // 从 messages 中提取最后一条用户消息的文本（用于兼容性）
+        let text = messages
+            .last()
+            .and_then(|m| m.content.clone())
+            .unwrap_or_default();
+
+        Self {
+            text,
+            mode: LlmMode::WithTools,
+            stream_callback: None,
+            messages: Some(messages),
         }
     }
 }
@@ -206,7 +228,11 @@ impl LlmService {
     }
 
     /// 工具调用模式 - Function Calling
-    async fn process_with_tools(&self, text: &str) -> Result<LlmResponse, LlmError> {
+    async fn process_with_tools(
+        &self,
+        text: &str,
+        messages: Option<Vec<crate::llm::Message>>,
+    ) -> Result<LlmResponse, LlmError> {
         let start = std::time::Instant::now();
         let (llm_client, used_fallback) = self.get_llm_client().await?;
 
@@ -223,10 +249,13 @@ impl LlmService {
             return self.process_normal(text).await;
         }
 
+        // 构建消息列表（如果有历史上下文则使用，否则创建新的）
+        let msgs = messages.unwrap_or_else(|| vec![crate::llm::Message::user(text)]);
+
         // 使用工具执行引擎
         let response = self
             .tool_executor
-            .execute_iterative(llm_client.as_ref(), text, tool_schemas)
+            .execute_iterative(llm_client.as_ref(), msgs, tool_schemas)
             .await
             .map_err(|e| LlmError::ToolCallFailed(e))?;
 
@@ -259,7 +288,7 @@ impl Service for LlmService {
                 })
                 .await
             }
-            LlmMode::WithTools => self.process_with_tools(&request.text).await,
+            LlmMode::WithTools => self.process_with_tools(&request.text, request.messages).await,
         }
     }
 

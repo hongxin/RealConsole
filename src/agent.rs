@@ -1057,7 +1057,28 @@ impl Agent {
 
     /// 使用工具调用处理文本
     fn handle_text_with_tools(&self, text: &str) -> String {
+        // ✨ Phase 3: 集成对话上下文支持（与 handle_text_streaming 对齐）
         // ✨ Phase 2.2 (v1.3.0): 使用 LlmService 处理
+
+        // ✨ Phase 3: 检查是否应该使用上下文
+        let (should_use_context, messages) = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let ctx_arc = self.state_manager().conversation_context();
+                let mut ctx_manager = ctx_arc.write().await;
+
+                // 检查是否应该使用上下文
+                let should_use = ctx_manager.should_use_context(text);
+
+                // 如果使用上下文，构建消息列表
+                let msgs = if should_use {
+                    Some(ctx_manager.build_messages(text))
+                } else {
+                    None
+                };
+
+                (should_use, msgs)
+            })
+        });
 
         // 先获取模型名称（用于 spinner）
         let model_name = tokio::task::block_in_place(|| {
@@ -1075,8 +1096,12 @@ impl Agent {
         use crate::spinner::simplify_model_name;
         let spinner = Spinner::with_label(&simplify_model_name(&model_name));
 
-        // 创建 LLM 请求
-        let request = LlmRequest::with_tools(text.to_string());
+        // 创建 LLM 请求（带上下文支持）
+        let request = if let Some(msgs) = messages {
+            LlmRequest::with_tools_and_context(msgs)
+        } else {
+            LlmRequest::with_tools(text.to_string())
+        };
 
         // 调用 LlmService
         let result = tokio::task::block_in_place(|| {
@@ -1129,16 +1154,19 @@ impl Agent {
                     response
                 };
 
-                // ✨ Phase 3: 记录轮次到 ContextManager
-                // 注意：工具模式暂不支持上下文输入，但仍记录对话用于未来使用
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let ctx_arc = self.state_manager().conversation_context();
-                        let mut ctx_manager = ctx_arc.write().await;
-                        let turn = Turn::new(text.to_string(), clean_response.clone());
-                        ctx_manager.add_turn(turn);
-                    })
-                });
+                // ✨ Phase 3: 添加轮次到 ContextManager（仅在使用上下文时）
+                if should_use_context {
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            let ctx_arc = self.state_manager().conversation_context();
+                            let mut ctx_manager = ctx_arc.write().await;
+
+                            // 创建新的轮次
+                            let turn = Turn::new(text.to_string(), clean_response.clone());
+                            ctx_manager.add_turn(turn);
+                        })
+                    });
+                }
 
                 clean_response
             }

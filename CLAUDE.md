@@ -18,7 +18,7 @@
 
 **语言与核心库**：
 - Rust 2021 (1.90+)，tokio 异步运行时
-- rustyline (REPL)，serde_yaml (配置)，colored (输出)
+- rustyline (REPL)，serde_yml (配置)，colored (输出)
 
 **架构核心**：
 - `Agent` 统一入口：自然语言 → LLM 流式，Shell（! 前缀），系统命令（/ 前缀）

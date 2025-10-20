@@ -244,13 +244,18 @@ impl ToolExecutor {
     /// 3. 将工具结果发送回 LLM
     /// 4. 重复步骤 2-3，最多 max_iterations 轮
     /// 5. 返回最终的文本响应
+    ///
+    /// # 参数
+    /// - `llm`: LLM 客户端
+    /// - `messages`: 包含历史对话的消息列表（支持多轮上下文）
+    /// - `tool_schemas`: 工具 schema 列表
     pub async fn execute_iterative(
         &self,
         llm: &dyn LlmClient,
-        initial_message: &str,
+        messages: Vec<Message>,
         tool_schemas: Vec<JsonValue>,
     ) -> Result<String, String> {
-        let mut messages = vec![Message::user(initial_message)];
+        let mut messages = messages;
         let mut iteration = 0;
         let mut conversation_rounds = Vec::new(); // ✨ 记录对话轮次（用于 debug）
 
@@ -330,7 +335,13 @@ impl ToolExecutor {
             conversation_rounds.push(ConversationRound {
                 round: iteration,
                 input_summary: if iteration == 1 {
-                    initial_message.to_string()
+                    // 提取最后一条用户消息的内容作为摘要
+                    messages
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == crate::llm::MessageRole::User)
+                        .and_then(|m| m.content.clone())
+                        .unwrap_or_else(|| "用户输入".to_string())
                 } else {
                     format!("{} 个工具结果", tool_results.len())
                 },

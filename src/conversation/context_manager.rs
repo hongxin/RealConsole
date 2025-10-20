@@ -88,7 +88,7 @@ impl ContextManager {
     /// 触发条件：
     /// - 检测到代词引用（它、这个、那个、this、that、it）
     /// - 检测到追问（为什么、继续、详细、why、continue、more、how）
-    /// - 检测到上下文依赖词（刚才、之前、上面、earlier、previous、above）
+    /// - 检测到上下文依赖词（刚才、之前、上面、现在、那么、earlier、previous、now、then）
     pub fn should_enable_context(&self, input: &str) -> bool {
         if self.config.mode != ContextMode::Auto {
             return false;
@@ -115,14 +115,10 @@ impl ContextManager {
 
         // 上下文依赖词（中英文）
         let context_refs = [
-            "刚才",
-            "之前",
-            "上面",
-            "前面",
-            "earlier",
-            "previous",
-            "above",
-            "before",
+            "刚才", "之前", "上面", "前面", // 回顾过去
+            "现在", "那么", "所以", "因此", "这样", "那", // 承接转折
+            "earlier", "previous", "above", "before", // 英文回顾
+            "now", "then", "so", "thus", "therefore", // 英文承接
         ];
         if context_refs.iter().any(|c| input_lower.contains(c)) {
             return true;
@@ -364,11 +360,18 @@ mod tests {
         let config = default_config();
         let manager = ContextManager::new(config);
 
-        // 上下文引用
+        // 回顾过去的上下文引用
         assert!(manager.should_enable_context("刚才说的是什么"));
         assert!(manager.should_enable_context("之前的结果"));
         assert!(manager.should_enable_context("上面提到的"));
         assert!(manager.should_enable_context("check the previous result"));
+
+        // 承接转折的上下文引用
+        assert!(manager.should_enable_context("现在你叫什么名字"));
+        assert!(manager.should_enable_context("那么现在怎么办"));
+        assert!(manager.should_enable_context("所以我们应该"));
+        assert!(manager.should_enable_context("what should we do now"));
+        assert!(manager.should_enable_context("then what happens"));
     }
 
     #[test]

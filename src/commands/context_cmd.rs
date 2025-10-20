@@ -185,6 +185,24 @@ async fn stop_context(context_manager: &Arc<RwLock<ContextManager>>) -> String {
     )
 }
 
+/// 安全地截取字符串，按字符数而非字节数
+///
+/// # 参数
+/// - `s`: 要截取的字符串
+/// - `max_chars`: 最大字符数
+///
+/// # 返回
+/// - 截取后的字符串，如果超过最大字符数则追加 "..."
+fn truncate_str(s: &str, max_chars: usize) -> String {
+    let char_count = s.chars().count();
+    if char_count > max_chars {
+        let truncated: String = s.chars().take(max_chars).collect();
+        format!("{}...", truncated)
+    } else {
+        s.to_string()
+    }
+}
+
 /// 显示上下文内容
 async fn show_context(context_manager: &Arc<RwLock<ContextManager>>) -> String {
     let manager = context_manager.read().await;
@@ -210,20 +228,12 @@ async fn show_context(context_manager: &Arc<RwLock<ContextManager>>) -> String {
             Local::now().format("%H:%M:%S").to_string().dimmed()
         ));
 
-        // 用户输入
-        let user_preview = if turn.user_input.len() > 60 {
-            format!("{}...", &turn.user_input[..60])
-        } else {
-            turn.user_input.clone()
-        };
+        // 用户输入 - 使用安全的字符截取
+        let user_preview = truncate_str(&turn.user_input, 60);
         output.push(format!("  {} {}", "👤".to_string(), user_preview.white()));
 
-        // AI 响应
-        let assistant_preview = if turn.assistant_response.len() > 60 {
-            format!("{}...", &turn.assistant_response[..60])
-        } else {
-            turn.assistant_response.clone()
-        };
+        // AI 响应 - 使用安全的字符截取
+        let assistant_preview = truncate_str(&turn.assistant_response, 60);
         output.push(format!(
             "  {} {}",
             "🤖".to_string(),
@@ -461,5 +471,59 @@ mod tests {
         assert!(result.contains("模式"));
         assert!(result.contains("状态"));
         assert!(result.contains("轮次"));
+    }
+
+    #[tokio::test]
+    async fn test_context_show_with_long_chinese_text() {
+        let manager = create_test_manager();
+
+        // 添加包含长中文文本的轮次（超过 60 个字符）
+        {
+            let mut mgr = manager.write().await;
+            mgr.start();
+
+            // 这个中文文本超过 60 个字符，会触发截断逻辑
+            let long_user_input = "我是DeepSeek助手，你可以叫我DeepSeek！我是由深度求索公司创造的AI助手，很高兴为你服务。有什么我可以帮助你的吗？".to_string();
+            let long_assistant_response = "好的！我现在是理想同学了！很高兴为您服务！有什么我可以帮助您的吗？无论是回答问题、处理文档、计算数据，还是其他任何需要，我都很乐意协助您！".to_string();
+
+            mgr.add_turn(Turn::new(long_user_input, long_assistant_response));
+        }
+
+        // 这里不应该 panic，而应该安全地截断文本
+        let result = show_context(&manager).await;
+
+        assert!(result.contains("当前上下文"));
+        assert!(result.contains("1 轮"));
+        assert!(result.contains("DeepSeek"));
+        assert!(result.contains("...")); // 应该包含省略号
+    }
+
+    #[test]
+    fn test_truncate_str_with_chinese() {
+        // 测试中文字符的截断 - 使用一个确实超过 60 个字符的文本
+        let chinese_text = "我是DeepSeek助手，你可以叫我DeepSeek！我是由深度求索公司创造的AI助手，很高兴为你服务。有什么我可以帮助你的吗？无论是编程、文档处理还是其他任何问题。";
+
+        // 验证文本确实超过 60 个字符
+        assert!(chinese_text.chars().count() > 60);
+
+        let result = truncate_str(chinese_text, 60);
+
+        // 应该正确截断，不会 panic
+        assert!(result.len() > 0);
+        assert!(result.contains("..."));
+
+        // 验证截断后的字符数（不包括 "..."）
+        let char_count = result.trim_end_matches("...").chars().count();
+        assert_eq!(char_count, 60);
+    }
+
+    #[test]
+    fn test_truncate_str_short_text() {
+        // 测试短文本不会被截断
+        let short_text = "Hello, World!";
+        let result = truncate_str(short_text, 60);
+
+        assert_eq!(result, short_text);
+        assert!(!result.contains("..."));
     }
 }
