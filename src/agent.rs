@@ -117,7 +117,7 @@ impl Agent {
         // 降级：如果无法获取主目录，尝试使用当前目录
         env::current_dir()
             .ok()
-            .and_then(|d| Some(d.join(path).display().to_string()))
+            .map(|d| d.join(path).display().to_string())
             .unwrap_or_else(|| path.to_string())
     }
 
@@ -1429,13 +1429,10 @@ impl Agent {
                         let llm_manager = self.llm_manager.read().await;
                         if let Some(llm) = llm_manager.primary().or(llm_manager.fallback()) {
                             let mut manager = self.conversation_manager.write().await;
-                            match manager
+                            manager
                                 .extract_parameters_with_llm(&conversation_id, text, llm.as_ref())
                                 .await
-                            {
-                                Ok(params) => params,
-                                Err(_) => Vec::new(),
-                            }
+                                .unwrap_or_default()
                         } else {
                             Vec::new()
                         }
@@ -2676,7 +2673,7 @@ features:
   shell_enabled: true
   shell_timeout: 10
 "#;
-        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        let config: Config = serde_yml::from_str(yaml).unwrap();
 
         // 验证新字段有默认值
         assert_eq!(config.features.workflow_enabled, Some(false));

@@ -126,8 +126,9 @@ pub fn register_task_commands(
                 let config = Arc::clone(&config);
 
                 tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(async { execute_tasks_command(&shell_executor, &manager, &config).await })
+                    tokio::runtime::Handle::current().block_on(async {
+                        execute_tasks_command(&shell_executor, &manager, &config).await
+                    })
                 })
             },
         ));

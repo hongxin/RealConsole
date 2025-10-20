@@ -73,7 +73,7 @@ async fn show_recent_history(history: &Arc<RwLock<HistoryManager>>, limit: usize
     output.push(format!(
         "{} {}",
         "最近的历史记录".bold().cyan(),
-        format!("(智能排序)").dimmed()
+        "(智能排序)".to_string().dimmed()
     ));
     output.push("".to_string());
 

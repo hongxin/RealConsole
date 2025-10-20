@@ -80,12 +80,9 @@ pub fn register_lunar_tool(registry: &mut ToolRegistry) {
 }
 
 /// 双向解析日期（公历或农历）
-fn parse_date_bidirectional(
-    date_str: &str,
-) -> Result<(NaiveDate, LunisolarDate, bool), String> {
-    if date_str.starts_with("lunar:") {
+fn parse_date_bidirectional(date_str: &str) -> Result<(NaiveDate, LunisolarDate, bool), String> {
+    if let Some(lunar_str) = date_str.strip_prefix("lunar:") {
         // 农历输入：lunar:YYYY-MM-DD 或 lunar:YYYY-闰MM-DD
-        let lunar_str = &date_str[6..];
         parse_lunar_date(lunar_str)
     } else {
         // 公历输入
@@ -186,9 +183,17 @@ fn format_standard(
     let parts: Vec<&str> = chinese_str.split('　').collect();
 
     let mut result = if is_lunar_input {
-        format!("📅 农历 {}\n公历 {}", chinese_str.replace('　', " "), solar.format("%Y年%m月%d日"))
+        format!(
+            "📅 农历 {}\n公历 {}",
+            chinese_str.replace('　', " "),
+            solar.format("%Y年%m月%d日")
+        )
     } else {
-        format!("📅 公历 {}\n农历 {}", solar.format("%Y年%m月%d日"), chinese_str.replace('　', " "))
+        format!(
+            "📅 公历 {}\n农历 {}",
+            solar.format("%Y年%m月%d日"),
+            chinese_str.replace('　', " ")
+        )
     };
 
     // 解析干支和生肖
@@ -198,7 +203,10 @@ fn format_standard(
             let zodiac_parts: Vec<&str> = zodiac_info.split('、').collect();
             if zodiac_parts.len() >= 2 {
                 result.push_str(&format!("\n干支: {}", zodiac_parts[0]));
-                result.push_str(&format!("\n生肖: {}", zodiac_parts[1].trim_end_matches('年')));
+                result.push_str(&format!(
+                    "\n生肖: {}",
+                    zodiac_parts[1].trim_end_matches('年')
+                ));
             }
         }
     }
@@ -293,10 +301,22 @@ fn format_bazi_full(lunar: &LunisolarDate, time: NaiveTime) -> Result<String, St
     let bazi = calculate_bazi(lunar, time)?;
 
     let mut result = String::from("🔮 八字（四柱）\n");
-    result.push_str(&format!("  年柱: {} （{}{}）\n", bazi.year, bazi.year_stem, bazi.year_branch));
-    result.push_str(&format!("  月柱: {} （{}{}）\n", bazi.month, bazi.month_stem, bazi.month_branch));
-    result.push_str(&format!("  日柱: {} （{}{}）\n", bazi.day, bazi.day_stem, bazi.day_branch));
-    result.push_str(&format!("  时柱: {} （{}{}）\n", bazi.hour, bazi.hour_stem, bazi.hour_branch));
+    result.push_str(&format!(
+        "  年柱: {} （{}{}）\n",
+        bazi.year, bazi.year_stem, bazi.year_branch
+    ));
+    result.push_str(&format!(
+        "  月柱: {} （{}{}）\n",
+        bazi.month, bazi.month_stem, bazi.month_branch
+    ));
+    result.push_str(&format!(
+        "  日柱: {} （{}{}）\n",
+        bazi.day, bazi.day_stem, bazi.day_branch
+    ));
+    result.push_str(&format!(
+        "  时柱: {} （{}{}）\n",
+        bazi.hour, bazi.hour_stem, bazi.hour_branch
+    ));
 
     // 八字重量（称骨算命）
     let weight = lunar.get_ba_zi_weight_by_time(time);
@@ -396,11 +416,11 @@ fn calculate_month_pillar(
     // 甲己之年丙作首，乙庚之岁戊为头，丙辛必定寻庚上，丁壬壬位顺行流，若问戊癸何方起，甲寅之上好追求
     let year_stem_index = year_stem as usize;
     let base_stem_index = match year_stem_index % 5 {
-        0 => 2,  // 甲、己年从丙开始
-        1 => 4,  // 乙、庚年从戊开始
-        2 => 6,  // 丙、辛年从庚开始
-        3 => 8,  // 丁、壬年从壬开始
-        4 => 0,  // 戊、癸年从甲开始
+        0 => 2, // 甲、己年从丙开始
+        1 => 4, // 乙、庚年从戊开始
+        2 => 6, // 丙、辛年从庚开始
+        3 => 8, // 丁、壬年从壬开始
+        4 => 0, // 戊、癸年从甲开始
         _ => unreachable!(),
     };
 
@@ -418,11 +438,11 @@ fn calculate_hour_stem(day_stem: HeavenlyStems, hour_branch: EarthlyBranch) -> H
     let hour_branch_index = hour_branch as usize;
 
     let base_stem_index = match day_stem_index % 5 {
-        0 => 0,  // 甲、己日从甲开始
-        1 => 2,  // 乙、庚日从丙开始
-        2 => 4,  // 丙、辛日从戊开始
-        3 => 6,  // 丁、壬日从庚开始
-        4 => 8,  // 戊、癸日从壬开始
+        0 => 0, // 甲、己日从甲开始
+        1 => 2, // 乙、庚日从丙开始
+        2 => 4, // 丙、辛日从戊开始
+        3 => 6, // 丁、壬日从庚开始
+        4 => 8, // 戊、癸日从壬开始
         _ => unreachable!(),
     };
 

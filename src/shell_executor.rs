@@ -64,7 +64,7 @@ fn is_safe_command(command: &str) -> Result<(), RealError> {
         if re.is_match(command) {
             return Err(RealError::new(
                 ErrorCode::ShellDangerousCommand,
-                format!("命令包含危险操作，已被安全策略阻止"),
+                "命令包含危险操作，已被安全策略阻止".to_string(),
             )
             .with_suggestion(FixSuggestion::new(
                 "此命令可能造成系统损坏，建议使用更安全的替代方案",

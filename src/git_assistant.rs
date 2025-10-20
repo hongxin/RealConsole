@@ -219,7 +219,7 @@ impl GitRepository {
         }
 
         let result = String::from_utf8_lossy(&output.stdout);
-        let parts: Vec<&str> = result.trim().split_whitespace().collect();
+        let parts: Vec<&str> = result.split_whitespace().collect();
 
         if parts.len() != 2 {
             return Ok((0, 0));

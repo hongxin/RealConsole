@@ -114,7 +114,7 @@ impl HttpClientBase {
             request = request.headers(headers);
         }
 
-        request.send().await.map_err(|e| LlmError::from(e))
+        request.send().await.map_err(LlmError::from)
     }
 
     /// 处理 HTTP 响应并提取 JSON

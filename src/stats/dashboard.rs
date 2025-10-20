@@ -312,7 +312,7 @@ impl Dashboard {
                 if chars.peek() == Some(&'[') {
                     chars.next(); // 跳过 '['
                                   // 跳过直到 'm' 或其他终止字符
-                    while let Some(c) = chars.next() {
+                    for c in chars.by_ref() {
                         if c == 'm' || c.is_ascii_alphabetic() {
                             break;
                         }

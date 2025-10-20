@@ -103,14 +103,14 @@ pub enum TaskType {
     UserInput,
 }
 
-impl ToString for TaskType {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for TaskType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TaskType::Shell => "Shell".to_string(),
-            TaskType::FileOperation => "FileOperation".to_string(),
-            TaskType::Network => "Network".to_string(),
-            TaskType::Validation => "Validation".to_string(),
-            TaskType::UserInput => "UserInput".to_string(),
+            TaskType::Shell => write!(f, "Shell"),
+            TaskType::FileOperation => write!(f, "FileOperation"),
+            TaskType::Network => write!(f, "Network"),
+            TaskType::Validation => write!(f, "Validation"),
+            TaskType::UserInput => write!(f, "UserInput"),
         }
     }
 }
@@ -451,7 +451,7 @@ impl DependencyGraph {
 
     /// 添加边（from 依赖 to）
     pub fn add_edge(&mut self, from: String, to: String) {
-        self.edges.entry(from).or_insert_with(Vec::new).push(to);
+        self.edges.entry(from).or_default().push(to);
     }
 
     /// 获取入度

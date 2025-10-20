@@ -62,10 +62,8 @@ impl ConfigWizard {
         self.print_welcome();
 
         // 检查现有配置
-        if Path::new("realconsole.yaml").exists() {
-            if !self.confirm_overwrite()? {
-                anyhow::bail!("用户取消");
-            }
+        if Path::new("realconsole.yaml").exists() && !self.confirm_overwrite()? {
+            anyhow::bail!("用户取消");
         }
 
         // 选择 LLM Provider

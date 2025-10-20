@@ -119,7 +119,7 @@ impl I18n {
         }
 
         match fs::read_to_string(&locale_file) {
-            Ok(content) => match serde_yaml::from_str::<HashMap<String, String>>(&content) {
+            Ok(content) => match serde_yml::from_str::<HashMap<String, String>>(&content) {
                 Ok(translations) => {
                     self.translations.insert(lang, translations);
                 }

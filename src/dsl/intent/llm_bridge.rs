@@ -325,13 +325,13 @@ impl ExecutionPlan {
         for op in &self.operations {
             match op {
                 BaseOperation::FindFiles { path, .. } => {
-                    validate_path(&path)?;
+                    validate_path(path)?;
                 }
                 BaseOperation::DiskUsage { path } => {
-                    validate_path(&path)?;
+                    validate_path(path)?;
                 }
                 BaseOperation::ListFiles { path } => {
-                    validate_path(&path)?;
+                    validate_path(path)?;
                 }
                 _ => {}
             }

@@ -321,7 +321,7 @@ fn register_code_stats(registry: &mut ToolRegistry) {
                     // 构建结果字符串
                     let mut result =
                         format!("统计结果 (目录: {}, 扩展名: .{})\n", directory, extension);
-                    result.push_str(&format!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
+                    result.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
                     result.push_str(&format!("文件总数: {} 个\n", file_count));
                     result.push_str(&format!("代码总行数: {} 行\n", total_lines));
 

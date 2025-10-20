@@ -18,6 +18,12 @@ pub struct Spinner {
     handle: Option<thread::JoinHandle<()>>,
 }
 
+impl Default for Spinner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Spinner {
     /// 创建并启动 spinner
     pub fn new() -> Self {

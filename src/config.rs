@@ -273,7 +273,7 @@ impl Config {
         let expanded = Self::expand_env_vars(&content);
 
         // 解析 YAML
-        let config: Config = serde_yaml::from_str(&expanded).map_err(|e| {
+        let config: Config = serde_yml::from_str(&expanded).map_err(|e| {
             RealError::new(
                 ErrorCode::ConfigParseError,
                 format!("配置文件解析失败: {}", path.display()),
@@ -361,7 +361,7 @@ features:
   max_tool_iterations: 10
   max_tools_per_round: 5
 "#;
-        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        let config: Config = serde_yml::from_str(yaml).unwrap();
         assert_eq!(config.features.max_tool_iterations, 10);
         assert_eq!(config.features.max_tools_per_round, 5);
     }
@@ -376,7 +376,7 @@ features:
   shell_timeout: 10
   tool_calling_enabled: false
 "#;
-        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        let config: Config = serde_yml::from_str(yaml).unwrap();
 
         // 验证旧字段正常工作
         assert_eq!(config.prefix, "/");
@@ -402,7 +402,7 @@ features:
   workflow_cache_enabled: true
   workflow_cache_ttl_default: 600
 "#;
-        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        let config: Config = serde_yml::from_str(yaml).unwrap();
 
         // 验证 Workflow 配置正确解析
         assert_eq!(config.features.workflow_enabled, Some(true));

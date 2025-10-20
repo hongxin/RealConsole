@@ -6,7 +6,7 @@ use std::cell::RefCell;
 
 thread_local! {
     /// 当前对话 ID（线程本地存储）
-    static CURRENT_CONVERSATION: RefCell<Option<String>> = RefCell::new(None);
+    static CURRENT_CONVERSATION: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 /// 获取当前对话 ID

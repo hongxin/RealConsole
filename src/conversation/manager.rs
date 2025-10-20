@@ -241,7 +241,7 @@ impl ConversationManager {
         self.analyzer
             .extract_parameters(user_input, &specs, llm)
             .await
-            .map_err(|e| ConversationError::ParameterError(e))
+            .map_err(ConversationError::ParameterError)
     }
 
     /// 生成智能提问
@@ -264,9 +264,9 @@ impl ConversationManager {
         let context_str = format!("用户意图：{}", context.intent);
 
         self.analyzer
-            .generate_question(&next_param, &context_str, llm)
+            .generate_question(next_param, &context_str, llm)
             .await
-            .map_err(|e| ConversationError::ParameterError(e))
+            .map_err(ConversationError::ParameterError)
     }
 
     /// 智能收集参数
@@ -288,7 +288,7 @@ impl ConversationManager {
         {
             self.analyzer
                 .validate_parameter(spec, &value)
-                .map_err(|e| ConversationError::ParameterError(e))?;
+                .map_err(ConversationError::ParameterError)?;
         }
 
         // 收集参数

@@ -298,6 +298,7 @@ impl BuiltinIntents {
     ///   - (查找|显示|列出).*(最近|最新)
     ///   - (最近|最新).*(修改|更新|变更).*文件
     ///   - 文件.*(最近|最新)
+    ///
     /// **实体**: path (路径), ext (文件类型), limit (显示数量)
     fn find_recent_files(&self) -> Intent {
         Intent::new(
