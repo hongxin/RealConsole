@@ -10,31 +10,32 @@ mod advanced_tools;
 mod agent;
 mod builtin_tools;
 mod command;
-mod command_router;  // ✨ Phase 10.1: 智能命令路由系统
+mod command_router; // ✨ Phase 10.1: 智能命令路由系统
 mod commands;
 mod config;
-mod conversation;  // ✨ Phase 8 Week 2: 多轮对话支持
+mod conversation; // ✨ Phase 8 Week 2: 多轮对话支持
 mod display;
 mod dsl;
 mod error;
-mod error_fixer;  // ✨ Phase 9.2: 错误自动修复
+mod error_fixer; // ✨ Phase 9.2: 错误自动修复
 mod execution_logger;
-mod git_assistant;  // ✨ Phase 6: Git 智能助手
-mod history;        // ✨ Phase 8: 命令历史记录管理
-mod i18n;           // ✨ Phase 11: 多语言支持
+mod git_assistant; // ✨ Phase 6: Git 智能助手
+mod history; // ✨ Phase 8: 命令历史记录管理
+mod i18n; // ✨ Phase 11: 多语言支持
 mod llm;
 mod llm_manager;
-mod log_analyzer;  // ✨ Phase 6: 日志分析工具
+mod log_analyzer; // ✨ Phase 6: 日志分析工具
+mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支生肖
 mod memory;
-mod project_context;  // ✨ Phase 6: 项目上下文感知
+mod project_context; // ✨ Phase 6: 项目上下文感知
 mod repl;
 mod shell_executor;
 mod spinner;
-mod stats;  // ✨ Phase 9: 统计与可视化
-mod system_monitor;  // ✨ Phase 6: 系统监控工具
-mod task;  // ✨ Phase 10: 任务分解与规划系统
+mod stats; // ✨ Phase 9: 统计与可视化
+mod system_monitor; // ✨ Phase 6: 系统监控工具
+mod task; // ✨ Phase 10: 任务分解与规划系统
 mod tool;
-mod tool_cache;  // ✨ Phase 5.3 Week 3 Day 2
+mod tool_cache; // ✨ Phase 5.3 Week 3 Day 2
 mod tool_executor;
 mod wizard;
 
@@ -93,10 +94,7 @@ fn create_llm_client(
 ) -> Result<Arc<dyn llm::LlmClient>, String> {
     match provider_config.provider.as_str() {
         "ollama" => {
-            let model = provider_config
-                .model
-                .as_deref()
-                .unwrap_or("qwen2.5:latest");
+            let model = provider_config.model.as_deref().unwrap_or("qwen2.5:latest");
             let endpoint = provider_config
                 .endpoint
                 .as_deref()
@@ -104,17 +102,19 @@ fn create_llm_client(
 
             llm::OllamaClient::new(model, endpoint)
                 .map(|client| Arc::new(client) as Arc<dyn llm::LlmClient>)
-                .map_err(|e| format!("{}: {}", i18n::t_with_args("llm.client_failed", &[("provider", "Ollama")]), e))
+                .map_err(|e| {
+                    format!(
+                        "{}: {}",
+                        i18n::t_with_args("llm.client_failed", &[("provider", "Ollama")]),
+                        e
+                    )
+                })
         }
         "deepseek" => {
-            let api_key = provider_config
-                .api_key
-                .as_ref()
-                .ok_or_else(|| i18n::t_with_args("llm.need_api_key", &[("provider", "Deepseek")]))?;
-            let model = provider_config
-                .model
-                .as_deref()
-                .unwrap_or("deepseek-chat");
+            let api_key = provider_config.api_key.as_ref().ok_or_else(|| {
+                i18n::t_with_args("llm.need_api_key", &[("provider", "Deepseek")])
+            })?;
+            let model = provider_config.model.as_deref().unwrap_or("deepseek-chat");
             let endpoint = provider_config
                 .endpoint
                 .as_deref()
@@ -122,7 +122,13 @@ fn create_llm_client(
 
             llm::DeepseekClient::new(api_key, model, endpoint)
                 .map(|client| Arc::new(client) as Arc<dyn llm::LlmClient>)
-                .map_err(|e| format!("{}: {}", i18n::t_with_args("llm.client_failed", &[("provider", "Deepseek")]), e))
+                .map_err(|e| {
+                    format!(
+                        "{}: {}",
+                        i18n::t_with_args("llm.client_failed", &[("provider", "Deepseek")]),
+                        e
+                    )
+                })
         }
         other => Err(format!("{} {}", i18n::t("llm.unknown_provider"), other)),
     }
@@ -162,8 +168,8 @@ async fn run_wizard(quick: bool) {
 fn show_config(config_path: &str, show_path: bool) {
     if show_path {
         // 显示配置文件路径
-        let abs_path = std::fs::canonicalize(config_path)
-            .unwrap_or_else(|_| PathBuf::from(config_path));
+        let abs_path =
+            std::fs::canonicalize(config_path).unwrap_or_else(|_| PathBuf::from(config_path));
         println!("{}", abs_path.display());
         return;
     }
@@ -177,7 +183,11 @@ fn show_config(config_path: &str, show_path: bool) {
 
     match std::fs::read_to_string(config_path) {
         Ok(content) => {
-            println!("\n{} {}\n", i18n::t("config.file_label").green().bold(), config_path);
+            println!(
+                "\n{} {}\n",
+                i18n::t("config.file_label").green().bold(),
+                config_path
+            );
             println!("{}", content);
         }
         Err(e) => {
@@ -202,7 +212,10 @@ fn load_env_file(config_path: &str) {
             Ok(_) => {
                 // 只在 RUST_LOG 环境变量存在时显示（相当于 debug 模式）
                 if std::env::var("RUST_LOG").is_ok() {
-                    Display::env_loaded(display::DisplayMode::Debug, &env_path.display().to_string());
+                    Display::env_loaded(
+                        display::DisplayMode::Debug,
+                        &env_path.display().to_string(),
+                    );
                 }
             }
             Err(e) => {
@@ -248,14 +261,25 @@ async fn main() {
     }
 
     // 首次运行检测：如果配置文件不存在，提示运行 wizard
-    if !std::path::Path::new(&args.config).exists()
-        && !std::path::Path::new(".env").exists() {
+    if !std::path::Path::new(&args.config).exists() && !std::path::Path::new(".env").exists() {
         println!("\n{}", i18n::t("first_run.welcome").green().bold());
         println!("\n{}", i18n::t("first_run.no_config").yellow());
         println!("\n{}\n", i18n::t("first_run.choose_one"));
-        println!("  1. {} {}", i18n::t("first_run.option1_cmd").cyan(), i18n::t("first_run.option1"));
-        println!("  2. {} {}", i18n::t("first_run.option2_cmd").cyan(), i18n::t("first_run.option2"));
-        println!("  3. {} {}\n", i18n::t("first_run.option3_hint").dimmed(), i18n::t("first_run.option3"));
+        println!(
+            "  1. {} {}",
+            i18n::t("first_run.option1_cmd").cyan(),
+            i18n::t("first_run.option1")
+        );
+        println!(
+            "  2. {} {}",
+            i18n::t("first_run.option2_cmd").cyan(),
+            i18n::t("first_run.option2")
+        );
+        println!(
+            "  3. {} {}\n",
+            i18n::t("first_run.option3_hint").dimmed(),
+            i18n::t("first_run.option3")
+        );
         println!("{}\n", i18n::t("first_run.hint").dimmed());
         process::exit(0);
     }
@@ -318,22 +342,35 @@ async fn main() {
             match create_llm_client(primary_cfg) {
                 Ok(client) => {
                     // 使用显示模式控制输出
-                    Display::startup_llm(config.display.mode, "Primary", client.model(), &primary_cfg.provider);
+                    Display::startup_llm(
+                        config.display.mode,
+                        "Primary",
+                        client.model(),
+                        &primary_cfg.provider,
+                    );
                     manager.set_primary(client.clone());
 
                     // 如果是 Deepseek，同时设置 deepseek_client 用于流式输出
                     if primary_cfg.provider == "deepseek" {
                         if let Some(api_key) = &primary_cfg.api_key {
                             let model = primary_cfg.model.as_deref().unwrap_or("deepseek-chat");
-                            let endpoint = primary_cfg.endpoint.as_deref().unwrap_or("https://api.deepseek.com/v1");
-                            if let Ok(deepseek_client) = llm::DeepseekClient::new(api_key, model, endpoint) {
+                            let endpoint = primary_cfg
+                                .endpoint
+                                .as_deref()
+                                .unwrap_or("https://api.deepseek.com/v1");
+                            if let Ok(deepseek_client) =
+                                llm::DeepseekClient::new(api_key, model, endpoint)
+                            {
                                 manager.set_deepseek(Arc::new(deepseek_client));
                             }
                         }
                     }
                 }
                 Err(e) => {
-                    let msg = i18n::t_with_args("llm.init_failed", &[("type", &i18n::t("llm.type_primary"))]);
+                    let msg = i18n::t_with_args(
+                        "llm.init_failed",
+                        &[("type", &i18n::t("llm.type_primary"))],
+                    );
                     eprintln!("{} {}", msg.yellow(), e);
                 }
             }
@@ -344,11 +381,19 @@ async fn main() {
             match create_llm_client(fallback_cfg) {
                 Ok(client) => {
                     // 使用显示模式控制输出
-                    Display::startup_llm(config.display.mode, "Fallback", client.model(), &fallback_cfg.provider);
+                    Display::startup_llm(
+                        config.display.mode,
+                        "Fallback",
+                        client.model(),
+                        &fallback_cfg.provider,
+                    );
                     manager.set_fallback(client);
                 }
                 Err(e) => {
-                    let msg = i18n::t_with_args("llm.init_failed", &[("type", &i18n::t("llm.type_fallback"))]);
+                    let msg = i18n::t_with_args(
+                        "llm.init_failed",
+                        &[("type", &i18n::t("llm.type_fallback"))],
+                    );
                     eprintln!("{} {}", msg.yellow(), e);
                 }
             }
@@ -384,7 +429,12 @@ async fn main() {
     // ✨ Phase 10: 注册任务分解与规划命令
     let llm_mgr_for_task = agent.llm_manager();
     let shell_exec_for_task = agent.shell_executor_with_fixer.clone();
-    commands::register_task_commands(&mut agent.registry, llm_mgr_for_task, shell_exec_for_task);
+    commands::register_task_commands(
+        &mut agent.registry,
+        llm_mgr_for_task,
+        shell_exec_for_task,
+        agent.config.clone(),
+    );
 
     // 运行模式
     if let Some(input) = args.once {

@@ -235,7 +235,8 @@ impl SystemMonitor {
             }
         }
 
-        let total_mb = (free_pages + active_pages + inactive_pages + wired_pages) * page_size / 1024 / 1024;
+        let total_mb =
+            (free_pages + active_pages + inactive_pages + wired_pages) * page_size / 1024 / 1024;
         let used_mb = (active_pages + wired_pages) * page_size / 1024 / 1024;
         let available_mb = (free_pages + inactive_pages) * page_size / 1024 / 1024;
         let usage_percent = if total_mb > 0 {

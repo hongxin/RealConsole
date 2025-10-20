@@ -15,7 +15,10 @@ pub mod state;
 
 // 导出核心类型
 pub use context::ParameterSpec;
-pub use current::{clear_current_conversation, get_current_conversation, has_active_conversation, set_current_conversation};
+pub use current::{
+    clear_current_conversation, get_current_conversation, has_active_conversation,
+    set_current_conversation,
+};
 pub use manager::{ConversationManager, Response};
 pub use parameter::{ParameterType, ParameterValue};
 
@@ -147,9 +150,9 @@ impl Task {
     /// 检查是否所有必需参数都已收集
     #[allow(dead_code)]
     pub fn has_all_required_params(&self) -> bool {
-        self.required_params.iter().all(|param| {
-            self.collected_params.contains_key(param)
-        })
+        self.required_params
+            .iter()
+            .all(|param| self.collected_params.contains_key(param))
     }
 
     /// 获取缺失的必需参数
@@ -219,10 +222,7 @@ mod tests {
 
     #[test]
     fn test_turn_creation() {
-        let turn = Turn::new(
-            "显示最大的文件".to_string(),
-            "在哪个目录？".to_string(),
-        );
+        let turn = Turn::new("显示最大的文件".to_string(), "在哪个目录？".to_string());
 
         assert_eq!(turn.user_input, "显示最大的文件");
         assert_eq!(turn.assistant_response, "在哪个目录？");
@@ -232,10 +232,7 @@ mod tests {
 
     #[test]
     fn test_task_parameter_tracking() {
-        let mut task = Task::new(
-            TaskType::FileOperation,
-            "查找最大文件".to_string(),
-        );
+        let mut task = Task::new(TaskType::FileOperation, "查找最大文件".to_string());
 
         task.add_required_param("directory".to_string());
         task.add_required_param("count".to_string());
@@ -255,10 +252,7 @@ mod tests {
         assert_eq!(task.missing_required_params().len(), 1);
 
         // 收集第二个参数
-        task.collect_param(
-            "count".to_string(),
-            ParameterValue::Integer(5),
-        );
+        task.collect_param("count".to_string(), ParameterValue::Integer(5));
 
         assert!(task.has_all_required_params());
         assert_eq!(task.missing_required_params().len(), 0);

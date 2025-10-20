@@ -147,10 +147,7 @@ impl Type {
 
     /// 创建结果类型
     pub fn result(ok_type: Type, err_type: Type) -> Self {
-        Type::Composite(CompositeType::Result(
-            Box::new(ok_type),
-            Box::new(err_type),
-        ))
+        Type::Composite(CompositeType::Result(Box::new(ok_type), Box::new(err_type)))
     }
 
     /// 创建文件路径类型
@@ -367,13 +364,7 @@ mod tests {
     fn test_type_equality() {
         assert_eq!(Type::string(), Type::string());
         assert_ne!(Type::string(), Type::integer());
-        assert_eq!(
-            Type::list(Type::string()),
-            Type::list(Type::string())
-        );
-        assert_ne!(
-            Type::list(Type::string()),
-            Type::list(Type::integer())
-        );
+        assert_eq!(Type::list(Type::string()), Type::list(Type::string()));
+        assert_ne!(Type::list(Type::string()), Type::list(Type::integer()));
     }
 }

@@ -68,7 +68,8 @@ fn handle_log_analyze(arg: &str) -> String {
     let file_path = args[0];
 
     // 解析参数
-    let max_lines = args.iter()
+    let max_lines = args
+        .iter()
         .position(|&x| x == "--max-lines")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<usize>().ok());
@@ -113,7 +114,8 @@ fn handle_log_tail(arg: &str) -> String {
     }
 
     let file_path = args[0];
-    let lines = args.get(1)
+    let lines = args
+        .get(1)
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(50);
 
@@ -123,9 +125,7 @@ fn handle_log_tail(arg: &str) -> String {
     }
 
     // 分析最近的日志（✨ Phase 7.2: 限制错误和警告数量）
-    let analyzer = LogAnalyzer::new()
-        .with_max_errors(50)
-        .with_max_warnings(50);
+    let analyzer = LogAnalyzer::new().with_max_errors(50).with_max_warnings(50);
 
     let analysis = match analyzer.analyze_tail(file_path, lines) {
         Ok(analysis) => analysis,
@@ -134,11 +134,18 @@ fn handle_log_tail(arg: &str) -> String {
 
     let mut output = vec![];
 
-    output.push(format!("\n{}", format!("最近 {} 行日志分析", lines).cyan().bold()));
+    output.push(format!(
+        "\n{}",
+        format!("最近 {} 行日志分析", lines).cyan().bold()
+    ));
     output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
     output.push(format!("\n  {}: {}", "文件".dimmed(), file_path.cyan()));
-    output.push(format!("  {}: {} 行", "分析行数".dimmed(), analysis.total_lines));
+    output.push(format!(
+        "  {}: {} 行",
+        "分析行数".dimmed(),
+        analysis.total_lines
+    ));
 
     // 级别统计
     output.push(String::new());
@@ -183,13 +190,20 @@ fn handle_log_tail(arg: &str) -> String {
         output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
         for (i, error) in analysis.errors.iter().rev().take(5).enumerate() {
-            output.push(format!("\n  {} {}", format!("#{}", i + 1).dimmed(), error.message.red()));
+            output.push(format!(
+                "\n  {} {}",
+                format!("#{}", i + 1).dimmed(),
+                error.message.red()
+            ));
         }
     }
 
     // 提示
     output.push(String::new());
-    output.push(format!("  💡 {}", format!("使用 /le {} 查看所有错误", file_path).dimmed()));
+    output.push(format!(
+        "  💡 {}",
+        format!("使用 /le {} 查看所有错误", file_path).dimmed()
+    ));
 
     output.push(String::new());
 
@@ -219,9 +233,7 @@ fn handle_log_errors(arg: &str) -> String {
     }
 
     // 只分析错误（✨ Phase 7.2: 限制最多保存 100 个错误，避免内存占用过大）
-    let analyzer = LogAnalyzer::new()
-        .errors_only()
-        .with_max_errors(100);
+    let analyzer = LogAnalyzer::new().errors_only().with_max_errors(100);
 
     let analysis = match analyzer.analyze_file(file_path) {
         Ok(analysis) => analysis,
@@ -234,7 +246,11 @@ fn handle_log_errors(arg: &str) -> String {
     output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
     output.push(format!("\n  {}: {}", "文件".dimmed(), file_path.cyan()));
-    output.push(format!("  {}: {} 个", "错误总数".dimmed(), analysis.errors.len().to_string().red()));
+    output.push(format!(
+        "  {}: {} 个",
+        "错误总数".dimmed(),
+        analysis.errors.len().to_string().red()
+    ));
 
     if analysis.errors.is_empty() {
         output.push(String::new());
@@ -298,7 +314,11 @@ fn format_analysis_result(analysis: &crate::log_analyzer::LogAnalysis, file_path
 
     // 基本信息
     output.push(format!("\n  {}: {}", "文件".dimmed(), file_path.cyan()));
-    output.push(format!("  {}: {} 行", "总行数".dimmed(), analysis.total_lines));
+    output.push(format!(
+        "  {}: {} 行",
+        "总行数".dimmed(),
+        analysis.total_lines
+    ));
 
     // 时间范围
     if let Some((start, end)) = analysis.time_range {
@@ -408,18 +428,10 @@ fn format_analysis_result(analysis: &crate::log_analyzer::LogAnalysis, file_path
         format!("({})", health_status.1).dimmed()
     ));
 
-    output.push(format!(
-        "  {}: {:.2}%",
-        "错误率".dimmed(),
-        error_rate
-    ));
+    output.push(format!("  {}: {:.2}%", "错误率".dimmed(), error_rate));
 
     if warn_rate > 0.0 {
-        output.push(format!(
-            "  {}: {:.2}%",
-            "警告率".dimmed(),
-            warn_rate
-        ));
+        output.push(format!("  {}: {:.2}%", "警告率".dimmed(), warn_rate));
     }
 
     // 建议
@@ -428,10 +440,16 @@ fn format_analysis_result(analysis: &crate::log_analyzer::LogAnalysis, file_path
     output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
     if analysis.error_count() > 0 {
-        output.push(format!("  {} 查看所有错误详情", format!("/le {}", file_path).cyan()));
+        output.push(format!(
+            "  {} 查看所有错误详情",
+            format!("/le {}", file_path).cyan()
+        ));
     }
 
-    output.push(format!("  {} 查看最近日志", format!("/lt {}", file_path).cyan()));
+    output.push(format!(
+        "  {} 查看最近日志",
+        format!("/lt {}", file_path).cyan()
+    ));
 
     output.push(String::new());
 
@@ -486,11 +504,14 @@ mod tests {
     #[test]
     fn test_handle_log_analyze_with_valid_file() {
         let test_file = "/tmp/realconsole_test_logs/test_app.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Application started
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Application started
 2025-10-16 10:00:02 ERROR Failed to connect
 2025-10-16 10:00:03 WARN Memory usage high
 2025-10-16 10:00:04 INFO Processing completed
-"#);
+"#,
+        );
 
         let result = handle_log_analyze(test_file);
 
@@ -502,12 +523,15 @@ mod tests {
     #[test]
     fn test_handle_log_analyze_with_max_lines() {
         let test_file = "/tmp/realconsole_test_logs/test_app_max.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Line 1
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Line 1
 2025-10-16 10:00:02 INFO Line 2
 2025-10-16 10:00:03 INFO Line 3
 2025-10-16 10:00:04 ERROR Line 4
 2025-10-16 10:00:05 INFO Line 5
-"#);
+"#,
+        );
 
         let result = handle_log_analyze(&format!("{} --max-lines 3", test_file));
 
@@ -518,16 +542,24 @@ mod tests {
     #[test]
     fn test_handle_log_analyze_clean_log() {
         let test_file = "/tmp/realconsole_test_logs/test_clean.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Application started
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Application started
 2025-10-16 10:00:02 INFO Processing data
 2025-10-16 10:00:03 INFO Completed successfully
-"#);
+"#,
+        );
 
         let result = handle_log_analyze(test_file);
 
         // 应该显示健康状态（分别检查避免ANSI码问题）
         assert!(result.contains("日志") || result.contains("分析"));
-        assert!(result.contains("健康") || result.contains("良好") || result.contains("正常") || result.contains("●"));
+        assert!(
+            result.contains("健康")
+                || result.contains("良好")
+                || result.contains("正常")
+                || result.contains("●")
+        );
     }
 
     // ========== handle_log_tail 测试 ==========
@@ -541,11 +573,14 @@ mod tests {
     #[test]
     fn test_handle_log_tail_with_valid_file() {
         let test_file = "/tmp/realconsole_test_logs/test_tail.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Line 1
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Line 1
 2025-10-16 10:00:02 ERROR Error occurred
 2025-10-16 10:00:03 WARN Warning message
 2025-10-16 10:00:04 INFO Line 4
-"#);
+"#,
+        );
 
         let result = handle_log_tail(test_file);
 
@@ -557,12 +592,15 @@ mod tests {
     #[test]
     fn test_handle_log_tail_with_custom_lines() {
         let test_file = "/tmp/realconsole_test_logs/test_tail_custom.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Line 1
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Line 1
 2025-10-16 10:00:02 INFO Line 2
 2025-10-16 10:00:03 INFO Line 3
 2025-10-16 10:00:04 INFO Line 4
 2025-10-16 10:00:05 INFO Line 5
-"#);
+"#,
+        );
 
         let result = handle_log_tail(&format!("{} 3", test_file));
 
@@ -573,11 +611,14 @@ mod tests {
     #[test]
     fn test_handle_log_tail_shows_errors() {
         let test_file = "/tmp/realconsole_test_logs/test_tail_errors.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Start
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Start
 2025-10-16 10:00:02 ERROR First error
 2025-10-16 10:00:03 ERROR Second error
 2025-10-16 10:00:04 INFO End
-"#);
+"#,
+        );
 
         let result = handle_log_tail(test_file);
 
@@ -597,12 +638,15 @@ mod tests {
     #[test]
     fn test_handle_log_errors_with_errors() {
         let test_file = "/tmp/realconsole_test_logs/test_errors.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Normal log
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Normal log
 2025-10-16 10:00:02 ERROR Connection failed
 2025-10-16 10:00:03 ERROR Database error
 2025-10-16 10:00:04 INFO Another normal log
 2025-10-16 10:00:05 ERROR Third error
-"#);
+"#,
+        );
 
         let result = handle_log_errors(test_file);
 
@@ -614,10 +658,13 @@ mod tests {
     #[test]
     fn test_handle_log_errors_no_errors() {
         let test_file = "/tmp/realconsole_test_logs/test_no_errors.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 INFO Line 1
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 INFO Line 1
 2025-10-16 10:00:02 INFO Line 2
 2025-10-16 10:00:03 INFO Line 3
-"#);
+"#,
+        );
 
         let result = handle_log_errors(test_file);
 
@@ -628,12 +675,15 @@ mod tests {
     #[test]
     fn test_handle_log_errors_shows_patterns() {
         let test_file = "/tmp/realconsole_test_logs/test_patterns.log";
-        create_test_log_file(test_file, r#"2025-10-16 10:00:01 ERROR Connection timeout
+        create_test_log_file(
+            test_file,
+            r#"2025-10-16 10:00:01 ERROR Connection timeout
 2025-10-16 10:00:02 ERROR Connection timeout
 2025-10-16 10:00:03 ERROR Connection timeout
 2025-10-16 10:00:04 ERROR Database error
 2025-10-16 10:00:05 ERROR Connection timeout
-"#);
+"#,
+        );
 
         let result = handle_log_errors(test_file);
 

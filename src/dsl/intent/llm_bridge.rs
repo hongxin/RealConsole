@@ -53,10 +53,7 @@ impl LlmToPipeline {
     /// 3. 检查是否适用（applicable）
     /// 4. 转换为 ExecutionPlan
     /// 5. 安全验证
-    pub async fn understand_and_generate(
-        &self,
-        user_input: &str,
-    ) -> Result<ExecutionPlan, String> {
+    pub async fn understand_and_generate(&self, user_input: &str) -> Result<ExecutionPlan, String> {
         // 1. 调用 LLM
         let llm_response = self.call_llm(user_input).await?;
 
@@ -108,8 +105,7 @@ impl LlmToPipeline {
         // 尝试从响应中提取 JSON（可能包含其他文本）
         let json_str = extract_json(response)?;
 
-        serde_json::from_str(&json_str)
-            .map_err(|e| format!("JSON 解析失败: {}", e))
+        serde_json::from_str(&json_str).map_err(|e| format!("JSON 解析失败: {}", e))
     }
 
     /// 转换为 ExecutionPlan
@@ -160,12 +156,7 @@ impl LlmToPipeline {
                     path: path.to_string(),
                 })
             }
-            _ => {
-                return Err(format!(
-                    "不支持的基础操作: {}",
-                    base_op.op_type
-                ))
-            }
+            _ => return Err(format!("不支持的基础操作: {}", base_op.op_type)),
         };
 
         // 添加修饰操作
@@ -354,13 +345,7 @@ impl ExecutionPlan {
         }
 
         // 黑名单检查
-        let dangerous_patterns = [
-            "rm -rf /",
-            ":(){ :|:& };:",
-            "> /dev/sda",
-            "mkfs",
-            "dd if=",
-        ];
+        let dangerous_patterns = ["rm -rf /", ":(){ :|:& };:", "> /dev/sda", "mkfs", "dd if="];
 
         for pattern in &dangerous_patterns {
             if command.contains(pattern) {

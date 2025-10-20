@@ -9,10 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// 注册记忆管理命令
-pub fn register_memory_commands(
-    registry: &mut CommandRegistry,
-    memory: Arc<RwLock<Memory>>,
-) {
+pub fn register_memory_commands(registry: &mut CommandRegistry, memory: Arc<RwLock<Memory>>) {
     // /memory 命令
     let memory_cmd = Command::from_fn(
         "memory",
@@ -43,7 +40,11 @@ fn handle_memory(arg: &str, memory: Arc<RwLock<Memory>>) -> String {
         "save" => handle_memory_save(&rest, memory),
         "type" | "t" => handle_memory_type(&rest, memory),
         "help" | "h" => memory_help(),
-        _ => format!("{} 未知子命令: {}\n使用 /memory help 查看帮助", "错误:".red(), subcommand),
+        _ => format!(
+            "{} 未知子命令: {}\n使用 /memory help 查看帮助",
+            "错误:".red(),
+            subcommand
+        ),
     }
 }
 
@@ -84,9 +85,11 @@ fn handle_memory_recent(arg: &str, memory: Arc<RwLock<Memory>>) -> String {
                 return format!("{}", "暂无记忆".dimmed());
             }
 
-            let mut lines = vec![
-                format!("{} {} 条记忆:", "最近".bold().cyan(), entries.len().to_string().green()),
-            ];
+            let mut lines = vec![format!(
+                "{} {} 条记忆:",
+                "最近".bold().cyan(),
+                entries.len().to_string().green()
+            )];
 
             for entry in entries {
                 lines.push(entry.format());
@@ -112,13 +115,12 @@ fn handle_memory_search(keyword: &str, memory: Arc<RwLock<Memory>>) -> String {
                 return format!("{} 未找到包含 {} 的记忆", "提示:".yellow(), keyword.cyan());
             }
 
-            let mut lines = vec![
-                format!("{} {} 条结果 (关键词: {}):",
-                    "找到".bold().green(),
-                    results.len().to_string().green(),
-                    keyword.cyan()
-                ),
-            ];
+            let mut lines = vec![format!(
+                "{} {} 条结果 (关键词: {}):",
+                "找到".bold().green(),
+                results.len().to_string().green(),
+                keyword.cyan()
+            )];
 
             for entry in results {
                 lines.push(entry.format());
@@ -136,7 +138,11 @@ fn handle_memory_clear(memory: Arc<RwLock<Memory>>) -> String {
             let mut mem = memory.write().await;
             let count = mem.len();
             mem.clear();
-            format!("{} 已清空 {} 条记忆", "✓".green(), count.to_string().dimmed())
+            format!(
+                "{} 已清空 {} 条记忆",
+                "✓".green(),
+                count.to_string().dimmed()
+            )
         })
     })
 }
@@ -152,9 +158,11 @@ fn handle_memory_dump(memory: Arc<RwLock<Memory>>) -> String {
                 return format!("{}", "暂无记忆".dimmed());
             }
 
-            let mut lines = vec![
-                format!("{} {} 条记忆:", "全部".bold().cyan(), entries.len().to_string().green()),
-            ];
+            let mut lines = vec![format!(
+                "{} {} 条记忆:",
+                "全部".bold().cyan(),
+                entries.len().to_string().green()
+            )];
 
             for entry in entries {
                 lines.push(entry.format());
@@ -178,7 +186,8 @@ fn handle_memory_save(path: &str, memory: Arc<RwLock<Memory>>) -> String {
             let mem = memory.read().await;
             match mem.save_to_file(path) {
                 Ok(count) => {
-                    format!("{} 已保存 {} 条记忆到 {}",
+                    format!(
+                        "{} 已保存 {} 条记忆到 {}",
                         "✓".green(),
                         count.to_string().green(),
                         path.cyan()
@@ -201,7 +210,8 @@ fn handle_memory_type(type_str: &str, memory: Arc<RwLock<Memory>>) -> String {
         "shell" | "sh" => EntryType::Shell,
         "tool" | "t" => EntryType::Tool,
         _ => {
-            return format!("{} 未知类型: {}\n支持的类型: user, assistant, system, shell, tool",
+            return format!(
+                "{} 未知类型: {}\n支持的类型: user, assistant, system, shell, tool",
                 "错误:".red(),
                 type_str
             );
@@ -217,13 +227,12 @@ fn handle_memory_type(type_str: &str, memory: Arc<RwLock<Memory>>) -> String {
                 return format!("{} 未找到类型为 {} 的记忆", "提示:".yellow(), entry_type);
             }
 
-            let mut lines = vec![
-                format!("{} {} 条 {} 记忆:",
-                    "找到".bold().green(),
-                    results.len().to_string().green(),
-                    entry_type
-                ),
-            ];
+            let mut lines = vec![format!(
+                "{} {} 条 {} 记忆:",
+                "找到".bold().green(),
+                results.len().to_string().green(),
+                entry_type
+            )];
 
             for entry in results {
                 lines.push(entry.format());

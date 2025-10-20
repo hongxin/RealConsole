@@ -46,8 +46,14 @@ display:
   # minimal：只显示必要信息，无启动信息、无中间过程（默认）
   # standard：显示适中信息，有简化的启动和执行信息
   # debug：显示所有细节，包括配置路径、LLM 信息、完整命令等
-  # mode: debug 
-  mode: standard
+  # mode: debug
+  # mode: standard
+  mode: minimal
+
+  # 是否显示对话轮次详情（仅在 debug 模式下生效，默认 true）
+  # 即使是正常成功的对话也会显示 LLM 多轮次来回的详细信息
+  # 便于分析上下文使用情况和 workflow 套路重用
+  show_conversation_rounds: true
 
 # Intent DSL 智能增强配置 (v0.5.2+)
 intent:

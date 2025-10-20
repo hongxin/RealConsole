@@ -86,7 +86,12 @@ impl MemoryEntry {
         } else {
             self.content.clone()
         };
-        format!("[{}] {}: {}", self.timestamp.format("%H:%M:%S"), self.entry_type, content)
+        format!(
+            "[{}] {}: {}",
+            self.timestamp.format("%H:%M:%S"),
+            self.entry_type,
+            content
+        )
     }
 }
 
@@ -224,8 +229,7 @@ impl Memory {
             return Ok(memory);
         }
 
-        let file = File::open(&path)
-            .map_err(|e| format!("无法打开文件: {}", e))?;
+        let file = File::open(&path).map_err(|e| format!("无法打开文件: {}", e))?;
 
         let reader = BufReader::new(file);
 
@@ -268,8 +272,7 @@ impl Memory {
         // 确保父目录存在
         if let Some(parent) = path.as_ref().parent() {
             if !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("创建目录失败: {}", e))?;
+                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
             }
         }
 
@@ -279,11 +282,9 @@ impl Memory {
             .open(&path)
             .map_err(|e| format!("打开文件失败: {}", e))?;
 
-        let json = serde_json::to_string(entry)
-            .map_err(|e| format!("序列化失败: {}", e))?;
+        let json = serde_json::to_string(entry).map_err(|e| format!("序列化失败: {}", e))?;
 
-        writeln!(file, "{}", json)
-            .map_err(|e| format!("写入文件失败: {}", e))?;
+        writeln!(file, "{}", json).map_err(|e| format!("写入文件失败: {}", e))?;
 
         Ok(())
     }
@@ -308,8 +309,7 @@ impl Memory {
         // 确保父目录存在
         if let Some(parent) = path.as_ref().parent() {
             if !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("创建目录失败: {}", e))?;
+                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
             }
         }
 
@@ -321,11 +321,9 @@ impl Memory {
 
         let mut count = 0;
         for entry in entries {
-            let json = serde_json::to_string(entry)
-                .map_err(|e| format!("序列化失败: {}", e))?;
+            let json = serde_json::to_string(entry).map_err(|e| format!("序列化失败: {}", e))?;
 
-            writeln!(file, "{}", json)
-                .map_err(|e| format!("写入文件失败: {}", e))?;
+            writeln!(file, "{}", json).map_err(|e| format!("写入文件失败: {}", e))?;
 
             count += 1;
         }
@@ -415,21 +413,17 @@ impl Memory {
         // 确保父目录存在
         if let Some(parent) = path.as_ref().parent() {
             if !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("创建目录失败: {}", e))?;
+                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
             }
         }
 
-        let mut file = File::create(&path)
-            .map_err(|e| format!("创建文件失败: {}", e))?;
+        let mut file = File::create(&path).map_err(|e| format!("创建文件失败: {}", e))?;
 
         let mut count = 0;
         for entry in &self.entries {
-            let json = serde_json::to_string(entry)
-                .map_err(|e| format!("序列化失败: {}", e))?;
+            let json = serde_json::to_string(entry).map_err(|e| format!("序列化失败: {}", e))?;
 
-            writeln!(file, "{}", json)
-                .map_err(|e| format!("写入文件失败: {}", e))?;
+            writeln!(file, "{}", json).map_err(|e| format!("写入文件失败: {}", e))?;
 
             count += 1;
         }

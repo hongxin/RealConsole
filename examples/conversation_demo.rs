@@ -52,14 +52,10 @@ async fn demo_log_analysis_scenario() {
         ParameterSpec::new("keyword", ParameterType::String, "搜索关键词")
             .with_hint("支持正则表达式")
             .with_example("ERROR|WARN"),
-        ParameterSpec::new(
-            "time_range",
-            ParameterType::String,
-            "时间范围（可选）",
-        )
-        .optional()
-        .with_hint("格式：YYYY-MM-DD 或 '最近24小时'")
-        .with_example("2025-01-15"),
+        ParameterSpec::new("time_range", ParameterType::String, "时间范围（可选）")
+            .optional()
+            .with_hint("格式：YYYY-MM-DD 或 '最近24小时'")
+            .with_example("2025-01-15"),
     ];
 
     println!("3️⃣ 添加参数规格：");
@@ -72,7 +68,11 @@ async fn demo_log_analysis_scenario() {
             i + 1,
             spec.name,
             spec.param_type,
-            if spec.is_optional { "[可选]" } else { "[必需]" }
+            if spec.is_optional {
+                "[可选]"
+            } else {
+                "[必需]"
+            }
         );
     }
     println!();
@@ -136,7 +136,8 @@ async fn demo_log_analysis_scenario() {
         // 10.1 转换到验证状态
         {
             let context = manager.get_context_mut(&conversation_id).unwrap();
-            context.state
+            context
+                .state
                 .transition(realconsole::conversation::StateEvent::AllParametersCollected)
                 .expect("转换到验证状态失败");
             println!("   ✓ 转换到验证状态");
@@ -145,7 +146,8 @@ async fn demo_log_analysis_scenario() {
         // 10.2 验证通过，转换到确认状态
         {
             let context = manager.get_context_mut(&conversation_id).unwrap();
-            context.state
+            context
+                .state
                 .transition(realconsole::conversation::StateEvent::ValidationPassed)
                 .expect("转换到确认状态失败");
             println!("   ✓ 验证通过，转换到确认状态");
@@ -159,9 +161,7 @@ async fn demo_log_analysis_scenario() {
         if matches!(result, realconsole::conversation::Response::ReadyToExecute) {
             println!("   ✓ 用户确认，开始执行");
 
-            let command = format!(
-                "grep -i 'ERROR' /var/log/app.log | tail -50"
-            );
+            let command = format!("grep -i 'ERROR' /var/log/app.log | tail -50");
             println!("   命令: {}", command);
             println!();
 

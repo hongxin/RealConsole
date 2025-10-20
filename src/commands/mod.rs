@@ -1,14 +1,14 @@
 pub mod core;
-pub mod git_cmd;      // ✨ Phase 6: Git 智能助手命令
-pub mod history_cmd;  // ✨ Phase 8: 命令历史记录命令
+pub mod git_cmd; // ✨ Phase 6: Git 智能助手命令
+pub mod history_cmd; // ✨ Phase 8: 命令历史记录命令
 pub mod llm;
 pub mod log;
-pub mod logfile_cmd;  // ✨ Phase 6: 日志文件分析命令
+pub mod logfile_cmd; // ✨ Phase 6: 日志文件分析命令
 pub mod memory;
-pub mod project_cmd;  // ✨ Phase 6: 项目上下文命令
-pub mod stats_cmd;    // ✨ Phase 9: 统计与可视化命令
-pub mod system_cmd;   // ✨ Phase 6: 系统监控命令
-pub mod task_cmd;     // ✨ Phase 10: 任务分解与规划命令
+pub mod project_cmd; // ✨ Phase 6: 项目上下文命令
+pub mod stats_cmd; // ✨ Phase 9: 统计与可视化命令
+pub mod system_cmd; // ✨ Phase 6: 系统监控命令
+pub mod task_cmd; // ✨ Phase 10: 任务分解与规划命令
 pub mod tool;
 
 pub use core::register_core_commands;

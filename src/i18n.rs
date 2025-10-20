@@ -235,7 +235,10 @@ fn builtin_translations_zh_cn() -> HashMap<String, String> {
     let mut map = HashMap::new();
 
     // 欢迎和提示
-    map.insert("welcome.version".to_string(), "RealConsole v{version}".to_string());
+    map.insert(
+        "welcome.version".to_string(),
+        "RealConsole v{version}".to_string(),
+    );
     map.insert("welcome.hint".to_string(), "直接输入问题或".to_string());
     map.insert("welcome.help".to_string(), "/help".to_string());
     map.insert("welcome.exit".to_string(), "Ctrl-D 退出".to_string());
@@ -246,35 +249,95 @@ fn builtin_translations_zh_cn() -> HashMap<String, String> {
     map.insert("command.error".to_string(), "错误:".to_string());
 
     // 配置相关
-    map.insert("config.wizard_title".to_string(), "=== RealConsole 配置向导 ===".to_string());
-    map.insert("config.mode_quick".to_string(), "模式: 快速配置（使用推荐默认值）".to_string());
-    map.insert("config.mode_complete".to_string(), "模式: 完整配置（可自定义所有选项）".to_string());
-    map.insert("config.save_failed".to_string(), "✗ 保存配置失败:".to_string());
-    map.insert("config.wizard_failed".to_string(), "✗ 配置向导失败:".to_string());
-    map.insert("config.not_found".to_string(), "配置文件不存在:".to_string());
-    map.insert("config.run_wizard".to_string(), "请运行 'realconsole wizard' 创建配置".to_string());
+    map.insert(
+        "config.wizard_title".to_string(),
+        "=== RealConsole 配置向导 ===".to_string(),
+    );
+    map.insert(
+        "config.mode_quick".to_string(),
+        "模式: 快速配置（使用推荐默认值）".to_string(),
+    );
+    map.insert(
+        "config.mode_complete".to_string(),
+        "模式: 完整配置（可自定义所有选项）".to_string(),
+    );
+    map.insert(
+        "config.save_failed".to_string(),
+        "✗ 保存配置失败:".to_string(),
+    );
+    map.insert(
+        "config.wizard_failed".to_string(),
+        "✗ 配置向导失败:".to_string(),
+    );
+    map.insert(
+        "config.not_found".to_string(),
+        "配置文件不存在:".to_string(),
+    );
+    map.insert(
+        "config.run_wizard".to_string(),
+        "请运行 'realconsole wizard' 创建配置".to_string(),
+    );
     map.insert("config.file_label".to_string(), "配置文件:".to_string());
-    map.insert("config.read_failed".to_string(), "读取配置文件失败:".to_string());
+    map.insert(
+        "config.read_failed".to_string(),
+        "读取配置文件失败:".to_string(),
+    );
 
     // 首次运行
-    map.insert("first_run.welcome".to_string(), "欢迎使用 RealConsole！".to_string());
-    map.insert("first_run.no_config".to_string(), "未检测到配置文件，首次使用需要进行配置。".to_string());
-    map.insert("first_run.choose_one".to_string(), "请选择以下方式之一：".to_string());
-    map.insert("first_run.option1".to_string(), "运行配置向导（推荐）".to_string());
+    map.insert(
+        "first_run.welcome".to_string(),
+        "欢迎使用 RealConsole！".to_string(),
+    );
+    map.insert(
+        "first_run.no_config".to_string(),
+        "未检测到配置文件，首次使用需要进行配置。".to_string(),
+    );
+    map.insert(
+        "first_run.choose_one".to_string(),
+        "请选择以下方式之一：".to_string(),
+    );
+    map.insert(
+        "first_run.option1".to_string(),
+        "运行配置向导（推荐）".to_string(),
+    );
     map.insert("first_run.option2".to_string(), "快速配置模式".to_string());
-    map.insert("first_run.option3".to_string(), "手动创建 realconsole.yaml 和 .env".to_string());
-    map.insert("first_run.hint".to_string(), "提示: 向导将帮助你在 2 分钟内完成配置".to_string());
+    map.insert(
+        "first_run.option3".to_string(),
+        "手动创建 realconsole.yaml 和 .env".to_string(),
+    );
+    map.insert(
+        "first_run.hint".to_string(),
+        "提示: 向导将帮助你在 2 分钟内完成配置".to_string(),
+    );
 
     // LLM 相关
-    map.insert("llm.init_failed".to_string(), "⚠ {type} LLM 初始化失败:".to_string());
-    map.insert("llm.client_failed".to_string(), "{provider} 客户端创建失败:".to_string());
-    map.insert("llm.unknown_provider".to_string(), "未知的 LLM provider:".to_string());
-    map.insert("llm.need_api_key".to_string(), "{provider} 需要 api_key".to_string());
+    map.insert(
+        "llm.init_failed".to_string(),
+        "⚠ {type} LLM 初始化失败:".to_string(),
+    );
+    map.insert(
+        "llm.client_failed".to_string(),
+        "{provider} 客户端创建失败:".to_string(),
+    );
+    map.insert(
+        "llm.unknown_provider".to_string(),
+        "未知的 LLM provider:".to_string(),
+    );
+    map.insert(
+        "llm.need_api_key".to_string(),
+        "{provider} 需要 api_key".to_string(),
+    );
 
     // 错误和警告
-    map.insert("error.env_load_failed".to_string(), "⚠ .env 加载失败:".to_string());
+    map.insert(
+        "error.env_load_failed".to_string(),
+        "⚠ .env 加载失败:".to_string(),
+    );
     map.insert("error.repl_error".to_string(), "REPL 错误:".to_string());
-    map.insert("error.use_default_config".to_string(), "使用默认配置继续运行...".to_string());
+    map.insert(
+        "error.use_default_config".to_string(),
+        "使用默认配置继续运行...".to_string(),
+    );
 
     map
 }
@@ -284,10 +347,19 @@ fn builtin_translations_en_us() -> HashMap<String, String> {
     let mut map = HashMap::new();
 
     // Welcome and hints
-    map.insert("welcome.version".to_string(), "RealConsole v{version}".to_string());
-    map.insert("welcome.hint".to_string(), "Enter your question or".to_string());
+    map.insert(
+        "welcome.version".to_string(),
+        "RealConsole v{version}".to_string(),
+    );
+    map.insert(
+        "welcome.hint".to_string(),
+        "Enter your question or".to_string(),
+    );
     map.insert("welcome.help".to_string(), "/help".to_string());
-    map.insert("welcome.exit".to_string(), "Press Ctrl-D to exit".to_string());
+    map.insert(
+        "welcome.exit".to_string(),
+        "Press Ctrl-D to exit".to_string(),
+    );
 
     // Commands and operations
     map.insert("command.interrupted".to_string(), "^C".to_string());
@@ -295,35 +367,101 @@ fn builtin_translations_en_us() -> HashMap<String, String> {
     map.insert("command.error".to_string(), "Error:".to_string());
 
     // Configuration
-    map.insert("config.wizard_title".to_string(), "=== RealConsole Configuration Wizard ===".to_string());
-    map.insert("config.mode_quick".to_string(), "Mode: Quick setup (using recommended defaults)".to_string());
-    map.insert("config.mode_complete".to_string(), "Mode: Complete setup (customize all options)".to_string());
-    map.insert("config.save_failed".to_string(), "✗ Failed to save configuration:".to_string());
-    map.insert("config.wizard_failed".to_string(), "✗ Configuration wizard failed:".to_string());
-    map.insert("config.not_found".to_string(), "Configuration file not found:".to_string());
-    map.insert("config.run_wizard".to_string(), "Please run 'realconsole wizard' to create configuration".to_string());
-    map.insert("config.file_label".to_string(), "Configuration file:".to_string());
-    map.insert("config.read_failed".to_string(), "Failed to read configuration file:".to_string());
+    map.insert(
+        "config.wizard_title".to_string(),
+        "=== RealConsole Configuration Wizard ===".to_string(),
+    );
+    map.insert(
+        "config.mode_quick".to_string(),
+        "Mode: Quick setup (using recommended defaults)".to_string(),
+    );
+    map.insert(
+        "config.mode_complete".to_string(),
+        "Mode: Complete setup (customize all options)".to_string(),
+    );
+    map.insert(
+        "config.save_failed".to_string(),
+        "✗ Failed to save configuration:".to_string(),
+    );
+    map.insert(
+        "config.wizard_failed".to_string(),
+        "✗ Configuration wizard failed:".to_string(),
+    );
+    map.insert(
+        "config.not_found".to_string(),
+        "Configuration file not found:".to_string(),
+    );
+    map.insert(
+        "config.run_wizard".to_string(),
+        "Please run 'realconsole wizard' to create configuration".to_string(),
+    );
+    map.insert(
+        "config.file_label".to_string(),
+        "Configuration file:".to_string(),
+    );
+    map.insert(
+        "config.read_failed".to_string(),
+        "Failed to read configuration file:".to_string(),
+    );
 
     // First run
-    map.insert("first_run.welcome".to_string(), "Welcome to RealConsole!".to_string());
-    map.insert("first_run.no_config".to_string(), "No configuration file detected. Initial setup required.".to_string());
-    map.insert("first_run.choose_one".to_string(), "Please choose one of the following:".to_string());
-    map.insert("first_run.option1".to_string(), "Run configuration wizard (recommended)".to_string());
-    map.insert("first_run.option2".to_string(), "Quick configuration mode".to_string());
-    map.insert("first_run.option3".to_string(), "Manually create realconsole.yaml and .env".to_string());
-    map.insert("first_run.hint".to_string(), "Tip: The wizard will help you complete setup in 2 minutes".to_string());
+    map.insert(
+        "first_run.welcome".to_string(),
+        "Welcome to RealConsole!".to_string(),
+    );
+    map.insert(
+        "first_run.no_config".to_string(),
+        "No configuration file detected. Initial setup required.".to_string(),
+    );
+    map.insert(
+        "first_run.choose_one".to_string(),
+        "Please choose one of the following:".to_string(),
+    );
+    map.insert(
+        "first_run.option1".to_string(),
+        "Run configuration wizard (recommended)".to_string(),
+    );
+    map.insert(
+        "first_run.option2".to_string(),
+        "Quick configuration mode".to_string(),
+    );
+    map.insert(
+        "first_run.option3".to_string(),
+        "Manually create realconsole.yaml and .env".to_string(),
+    );
+    map.insert(
+        "first_run.hint".to_string(),
+        "Tip: The wizard will help you complete setup in 2 minutes".to_string(),
+    );
 
     // LLM related
-    map.insert("llm.init_failed".to_string(), "⚠ {type} LLM initialization failed:".to_string());
-    map.insert("llm.client_failed".to_string(), "{provider} client creation failed:".to_string());
-    map.insert("llm.unknown_provider".to_string(), "Unknown LLM provider:".to_string());
-    map.insert("llm.need_api_key".to_string(), "{provider} requires api_key".to_string());
+    map.insert(
+        "llm.init_failed".to_string(),
+        "⚠ {type} LLM initialization failed:".to_string(),
+    );
+    map.insert(
+        "llm.client_failed".to_string(),
+        "{provider} client creation failed:".to_string(),
+    );
+    map.insert(
+        "llm.unknown_provider".to_string(),
+        "Unknown LLM provider:".to_string(),
+    );
+    map.insert(
+        "llm.need_api_key".to_string(),
+        "{provider} requires api_key".to_string(),
+    );
 
     // Errors and warnings
-    map.insert("error.env_load_failed".to_string(), "⚠ Failed to load .env:".to_string());
+    map.insert(
+        "error.env_load_failed".to_string(),
+        "⚠ Failed to load .env:".to_string(),
+    );
     map.insert("error.repl_error".to_string(), "REPL error:".to_string());
-    map.insert("error.use_default_config".to_string(), "Continuing with default configuration...".to_string());
+    map.insert(
+        "error.use_default_config".to_string(),
+        "Continuing with default configuration...".to_string(),
+    );
 
     map
 }

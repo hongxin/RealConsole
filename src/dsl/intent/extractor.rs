@@ -371,14 +371,32 @@ impl EntityExtractor {
 
         // 降序关键词 (Descending) - 用于"最大"、"大于"
         let descending_keywords = [
-            "最大", "大于", "大的", "largest", "bigger", "greater",
-            "top", "最多", "降序", "descending", "desc"
+            "最大",
+            "大于",
+            "大的",
+            "largest",
+            "bigger",
+            "greater",
+            "top",
+            "最多",
+            "降序",
+            "descending",
+            "desc",
         ];
 
         // 升序关键词 (Ascending) - 用于"最小"、"小于"
         let ascending_keywords = [
-            "最小", "小于", "小的", "smallest", "smaller", "less",
-            "bottom", "最少", "升序", "ascending", "asc"
+            "最小",
+            "小于",
+            "小的",
+            "smallest",
+            "smaller",
+            "less",
+            "bottom",
+            "最少",
+            "升序",
+            "ascending",
+            "asc",
         ];
 
         // 检查降序关键词
@@ -386,7 +404,7 @@ impl EntityExtractor {
             if input_lower.contains(keyword) {
                 return Some(EntityType::Custom(
                     "sort".to_string(),
-                    "-hr".to_string(),  // sort -k5 -hr (降序)
+                    "-hr".to_string(), // sort -k5 -hr (降序)
                 ));
             }
         }
@@ -396,16 +414,13 @@ impl EntityExtractor {
             if input_lower.contains(keyword) {
                 return Some(EntityType::Custom(
                     "sort".to_string(),
-                    "-h".to_string(),  // sort -k5 -h (升序)
+                    "-h".to_string(), // sort -k5 -h (升序)
                 ));
             }
         }
 
         // 默认：如果没有明确指定，返回降序（符合find_large_files的默认行为）
-        Some(EntityType::Custom(
-            "sort".to_string(),
-            "-hr".to_string(),
-        ))
+        Some(EntityType::Custom("sort".to_string(), "-hr".to_string()))
     }
 
     /// Extract all entities without type constraints
@@ -567,8 +582,8 @@ impl EntityExtractor {
         };
 
         // 解析 JSON
-        let parsed: serde_json::Value = serde_json::from_str(json_str)
-            .map_err(|e| format!("JSON 解析失败: {}", e))?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(json_str).map_err(|e| format!("JSON 解析失败: {}", e))?;
 
         let mut entities = HashMap::new();
 
@@ -629,7 +644,8 @@ mod tests {
     fn test_extract_file_type_python() {
         let extractor = EntityExtractor::new();
 
-        if let Some(EntityType::FileType(ft)) = extractor.extract_file_type("统计 Python 代码") {
+        if let Some(EntityType::FileType(ft)) = extractor.extract_file_type("统计 Python 代码")
+        {
             assert_eq!(ft, "py");
         } else {
             panic!("Expected FileType entity");
@@ -684,7 +700,8 @@ mod tests {
     fn test_extract_path_relative() {
         let extractor = EntityExtractor::new();
 
-        if let Some(EntityType::Path(path)) = extractor.extract_path("查找 ./src 目录下的文件") {
+        if let Some(EntityType::Path(path)) = extractor.extract_path("查找 ./src 目录下的文件")
+        {
             assert_eq!(path, "./src");
         } else {
             panic!("Expected Path entity");
@@ -695,7 +712,8 @@ mod tests {
     fn test_extract_path_absolute() {
         let extractor = EntityExtractor::new();
 
-        if let Some(EntityType::Path(path)) = extractor.extract_path("查找 /tmp 目录下的文件") {
+        if let Some(EntityType::Path(path)) = extractor.extract_path("查找 /tmp 目录下的文件")
+        {
             assert_eq!(path, "/tmp");
         } else {
             panic!("Expected Path entity");
@@ -706,7 +724,8 @@ mod tests {
     fn test_extract_path_current() {
         let extractor = EntityExtractor::new();
 
-        if let Some(EntityType::Path(path)) = extractor.extract_path("统计当前目录的文件") {
+        if let Some(EntityType::Path(path)) = extractor.extract_path("统计当前目录的文件")
+        {
             assert_eq!(path, ".");
         } else {
             panic!("Expected Path entity");
@@ -788,7 +807,8 @@ mod tests {
     fn test_extract_number_integer() {
         let extractor = EntityExtractor::new();
 
-        if let Some(EntityType::Number(n)) = extractor.extract_number("查找大于 100 MB 的文件") {
+        if let Some(EntityType::Number(n)) = extractor.extract_number("查找大于 100 MB 的文件")
+        {
             assert_eq!(n, 100.0);
         } else {
             panic!("Expected Number entity");
@@ -832,7 +852,8 @@ mod tests {
     fn test_extract_date_iso() {
         let extractor = EntityExtractor::new();
 
-        if let Some(EntityType::Date(d)) = extractor.extract_date("查找 2025-10-14 修改的文件") {
+        if let Some(EntityType::Date(d)) = extractor.extract_date("查找 2025-10-14 修改的文件")
+        {
             assert_eq!(d, "2025-10-14");
         } else {
             panic!("Expected Date entity");
@@ -844,10 +865,7 @@ mod tests {
         let extractor = EntityExtractor::new();
 
         let mut expected = HashMap::new();
-        expected.insert(
-            "file_type".to_string(),
-            EntityType::FileType(String::new()),
-        );
+        expected.insert("file_type".to_string(), EntityType::FileType(String::new()));
         expected.insert("path".to_string(), EntityType::Path(String::new()));
 
         let entities = extractor.extract("统计 Python 代码在 ./src 目录", &expected);
@@ -869,7 +887,8 @@ mod tests {
     fn test_extract_all() {
         let extractor = EntityExtractor::new();
 
-        let entities = extractor.extract_all("统计 Python 代码在 ./src 目录，查找大于 100 行的文件");
+        let entities =
+            extractor.extract_all("统计 Python 代码在 ./src 目录，查找大于 100 行的文件");
 
         assert!(entities.contains_key("file_type"));
         assert!(entities.contains_key("operation"));
@@ -882,10 +901,7 @@ mod tests {
         let extractor = EntityExtractor::new();
 
         let mut expected = HashMap::new();
-        expected.insert(
-            "file_type".to_string(),
-            EntityType::FileType(String::new()),
-        );
+        expected.insert("file_type".to_string(), EntityType::FileType(String::new()));
 
         let entities = extractor.extract("这是一段不包含任何实体的文本", &expected);
 
@@ -897,12 +913,14 @@ mod tests {
         let extractor = EntityExtractor::new();
 
         // Test uppercase
-        if let Some(EntityType::FileType(ft)) = extractor.extract_file_type("统计 PYTHON 代码") {
+        if let Some(EntityType::FileType(ft)) = extractor.extract_file_type("统计 PYTHON 代码")
+        {
             assert_eq!(ft, "py");
         }
 
         // Test mixed case
-        if let Some(EntityType::FileType(ft)) = extractor.extract_file_type("统计 PyThOn 代码") {
+        if let Some(EntityType::FileType(ft)) = extractor.extract_file_type("统计 PyThOn 代码")
+        {
             assert_eq!(ft, "py");
         }
     }
@@ -912,7 +930,8 @@ mod tests {
         let extractor = EntityExtractor::new();
 
         // Should extract the first number
-        if let Some(EntityType::Number(n)) = extractor.extract_number("查找 100 到 200 MB 的文件") {
+        if let Some(EntityType::Number(n)) = extractor.extract_number("查找 100 到 200 MB 的文件")
+        {
             assert_eq!(n, 100.0);
         } else {
             panic!("Expected Number entity");
@@ -923,7 +942,8 @@ mod tests {
     fn test_extract_operation_english() {
         let extractor = EntityExtractor::new();
 
-        if let Some(EntityType::Operation(op)) = extractor.extract_operation("count lines of code") {
+        if let Some(EntityType::Operation(op)) = extractor.extract_operation("count lines of code")
+        {
             assert_eq!(op, "count");
         } else {
             panic!("Expected Operation entity");

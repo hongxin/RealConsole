@@ -132,13 +132,8 @@ impl ErrorFixer {
             _ => {
                 // 通用策略：重试
                 strategies.push(
-                    FixStrategy::new(
-                        "重试命令",
-                        &analysis.command,
-                        "简单重试原命令",
-                        2,
-                    )
-                    .with_outcome("可能解决临时性问题"),
+                    FixStrategy::new("重试命令", &analysis.command, "简单重试原命令", 2)
+                        .with_outcome("可能解决临时性问题"),
                 );
             }
         }
@@ -182,9 +177,7 @@ impl ErrorFixer {
 3. 说明预期效果和风险
 
 只返回 JSON，不要其他解释。"#,
-            analysis.command,
-            analysis.raw_error,
-            analysis.category
+            analysis.command, analysis.raw_error, analysis.category
         );
 
         let messages = vec![Message::user(prompt)];
@@ -273,7 +266,10 @@ impl ErrorFixer {
             strategies.push(
                 FixStrategy::new(
                     "添加执行权限",
-                    format!("chmod +x {}", analysis.command.trim_start_matches("!").trim()),
+                    format!(
+                        "chmod +x {}",
+                        analysis.command.trim_start_matches("!").trim()
+                    ),
                     "为脚本添加可执行权限",
                     3,
                 )
@@ -336,7 +332,10 @@ impl ErrorFixer {
             strategies.push(
                 FixStrategy::new(
                     "使用国内镜像安装",
-                    format!("pip install -i https://pypi.tuna.tsinghua.edu.cn/simple {}", module),
+                    format!(
+                        "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple {}",
+                        module
+                    ),
                     "使用清华镜像加速安装",
                     4,
                 )
@@ -349,13 +348,8 @@ impl ErrorFixer {
 
     fn fix_npm_module_missing(_analysis: &ErrorAnalysis) -> Vec<FixStrategy> {
         vec![
-            FixStrategy::new(
-                "安装依赖",
-                "npm install",
-                "安装项目所有依赖",
-                3,
-            )
-            .with_outcome("所有依赖安装完成"),
+            FixStrategy::new("安装依赖", "npm install", "安装项目所有依赖", 3)
+                .with_outcome("所有依赖安装完成"),
         ]
     }
 

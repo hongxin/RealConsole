@@ -10,7 +10,7 @@
 
 use crate::llm::{LlmClient, LlmError, Message};
 use crate::tool::ToolRegistry;
-use crate::tool_cache::{ToolCache, CacheStats};
+use crate::tool_cache::{CacheStats, ToolCache};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
@@ -47,6 +47,38 @@ pub struct ToolCallResult {
 
     /// ✨ Phase 5.2: 执行耗时（毫秒）
     pub duration_ms: u64,
+}
+
+/// 对话轮次详情（用于 Debug 模式调试）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationRound {
+    /// 轮次编号（从 1 开始）
+    pub round: usize,
+
+    /// 用户消息（或上一轮的工具结果摘要）
+    pub input_summary: String,
+
+    /// LLM 响应内容
+    pub assistant_response: Option<String>,
+
+    /// 工具调用列表
+    pub tool_calls: Vec<ToolCallSummary>,
+
+    /// 工具执行结果
+    pub tool_results: Vec<String>,
+
+    /// 本轮消息数量（估算 tokens）
+    pub message_count: usize,
+
+    /// 本轮耗时（毫秒）
+    pub duration_ms: u64,
+}
+
+/// 工具调用摘要
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallSummary {
+    pub name: String,
+    pub arguments: String,
 }
 
 /// ✨ Phase 5.2: 工具执行模式
@@ -88,7 +120,7 @@ impl ToolExecutor {
             max_iterations,
             max_tools_per_round,
             execution_mode: ExecutionMode::Parallel, // 默认并行执行
-            cache: None, // 默认不启用缓存
+            cache: None,                             // 默认不启用缓存
         }
     }
 
@@ -125,10 +157,7 @@ impl ToolExecutor {
 
     /// 执行单个工具调用
     /// ✨ Phase 5.3 Week 3 Day 2: 支持缓存
-    pub async fn execute_tool_call(
-        &self,
-        call: &ToolCallRequest,
-    ) -> ToolCallResult {
+    pub async fn execute_tool_call(&self, call: &ToolCallRequest) -> ToolCallResult {
         let start = Instant::now();
 
         // ✨ 尝试从缓存获取
@@ -151,7 +180,9 @@ impl ToolExecutor {
             Ok(content) => {
                 // ✨ 成功时写入缓存
                 if let Some(cache) = &self.cache {
-                    cache.set(&call.name, &call.arguments, content.clone()).await;
+                    cache
+                        .set(&call.name, &call.arguments, content.clone())
+                        .await;
                 }
 
                 ToolCallResult {
@@ -161,7 +192,7 @@ impl ToolExecutor {
                     content,
                     duration_ms: start.elapsed().as_millis() as u64,
                 }
-            },
+            }
             Err(error) => ToolCallResult {
                 call_id: call.id.clone(),
                 tool_name: call.name.clone(),
@@ -176,10 +207,7 @@ impl ToolExecutor {
 
     /// 执行多个工具调用
     /// ✨ Phase 5.2: 支持并行执行
-    pub async fn execute_tool_calls(
-        &self,
-        calls: &[ToolCallRequest],
-    ) -> Vec<ToolCallResult> {
+    pub async fn execute_tool_calls(&self, calls: &[ToolCallRequest]) -> Vec<ToolCallResult> {
         // 限制单轮工具数量
         let limited_calls = if calls.len() > self.max_tools_per_round {
             &calls[..self.max_tools_per_round]
@@ -224,9 +252,11 @@ impl ToolExecutor {
     ) -> Result<String, String> {
         let mut messages = vec![Message::user(initial_message)];
         let mut iteration = 0;
+        let mut conversation_rounds = Vec::new(); // ✨ 记录对话轮次（用于 debug）
 
         loop {
             iteration += 1;
+            let round_start = Instant::now();
 
             // 检查迭代次数限制
             if iteration > self.max_iterations {
@@ -240,11 +270,20 @@ impl ToolExecutor {
             let response = llm
                 .chat_with_tools(messages.clone(), tool_schemas.clone())
                 .await
-                .map_err(|e: LlmError| format!("LLM 调用失败: {}", e))?;
+                .map_err(|e: LlmError| {
+                    // ✨ 在错误时，将对话轮次信息附加到错误消息中
+                    let error_msg = format!("LLM 调用失败: {}", e);
+                    let debug_info = Self::encode_debug_info(&conversation_rounds);
+                    format!("{}__DEBUG__{}", error_msg, debug_info)
+                })?;
 
             // 如果是最终响应（没有工具调用），返回结果
             if response.is_final {
-                return Ok(response.content.unwrap_or_default());
+                let final_response = response.content.unwrap_or_default();
+
+                // ✨ 在成功时也附加调试信息（用于 debug 模式显示）
+                let debug_info = Self::encode_debug_info(&conversation_rounds);
+                return Ok(format!("{}__DEBUG__{}", final_response, debug_info));
             }
 
             // 有工具调用，需要执行
@@ -276,14 +315,55 @@ impl ToolExecutor {
             let tool_results = self.execute_tool_calls(&tool_requests).await;
 
             // 将助手的工具调用添加到消息历史（只包含实际执行的工具调用）
-            messages.push(Message::assistant_with_tools(limited_tool_calls));
+            messages.push(Message::assistant_with_tools(limited_tool_calls.clone()));
 
             // 将工具结果添加到消息历史
-            for result in tool_results {
-                messages.push(Message::tool_result(result.call_id, result.content));
+            for result in &tool_results {
+                messages.push(Message::tool_result(
+                    result.call_id.clone(),
+                    result.content.clone(),
+                ));
             }
 
+            // ✨ 记录本轮对话信息（用于 debug）
+            let round_duration = round_start.elapsed().as_millis() as u64;
+            conversation_rounds.push(ConversationRound {
+                round: iteration,
+                input_summary: if iteration == 1 {
+                    initial_message.to_string()
+                } else {
+                    format!("{} 个工具结果", tool_results.len())
+                },
+                assistant_response: response.content.clone(),
+                tool_calls: limited_tool_calls
+                    .iter()
+                    .map(|tc| ToolCallSummary {
+                        name: tc.function.name.clone(),
+                        arguments: tc.function.arguments.clone(),
+                    })
+                    .collect(),
+                tool_results: tool_results.iter().map(|r| r.content.clone()).collect(),
+                message_count: messages.len(),
+                duration_ms: round_duration,
+            });
+
             // 继续下一轮迭代
+        }
+    }
+
+    /// 将对话轮次信息编码为字符串（用于错误传递）
+    fn encode_debug_info(rounds: &[ConversationRound]) -> String {
+        // 简单的 JSON 序列化
+        serde_json::to_string(rounds).unwrap_or_default()
+    }
+
+    /// 从错误消息中解析调试信息
+    pub fn decode_debug_info(error_msg: &str) -> Option<Vec<ConversationRound>> {
+        if let Some(pos) = error_msg.find("__DEBUG__") {
+            let debug_str = &error_msg[pos + 9..];
+            serde_json::from_str(debug_str).ok()
+        } else {
+            None
         }
     }
 }
@@ -439,8 +519,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_sequential_execution() {
         let registry = create_test_registry();
-        let executor = ToolExecutor::with_defaults(registry)
-            .with_execution_mode(ExecutionMode::Sequential);
+        let executor =
+            ToolExecutor::with_defaults(registry).with_execution_mode(ExecutionMode::Sequential);
 
         assert_eq!(executor.execution_mode(), ExecutionMode::Sequential);
 
@@ -486,7 +566,11 @@ mod tests {
         assert!(result.content.contains("300"));
 
         // 执行时间应该小于 1000ms（正常计算应该很快）
-        assert!(result.duration_ms < 1000, "执行时间异常: {} ms", result.duration_ms);
+        assert!(
+            result.duration_ms < 1000,
+            "执行时间异常: {} ms",
+            result.duration_ms
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -502,7 +586,10 @@ mod tests {
         // 创建串行执行器
         let sequential_executor = ToolExecutor::with_defaults(Arc::clone(&registry))
             .with_execution_mode(ExecutionMode::Sequential);
-        assert_eq!(sequential_executor.execution_mode(), ExecutionMode::Sequential);
+        assert_eq!(
+            sequential_executor.execution_mode(),
+            ExecutionMode::Sequential
+        );
 
         // 两种模式都应该能正确执行
         let calls = vec![

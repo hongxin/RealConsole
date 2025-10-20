@@ -7,8 +7,8 @@
 //! - 本地服务诊断
 //! - 无需认证（本地服务）
 
-use super::{async_trait, ClientStats, LlmClient, LlmError, Message};
 use super::http_base::HttpClientBase;
+use super::{async_trait, ClientStats, LlmClient, LlmError, Message};
 use regex::Regex;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -80,7 +80,10 @@ impl OllamaClient {
         {
             if resp.status().is_success() {
                 if let Ok(data) = resp.json::<Value>().await {
-                    if let Some(tags) = data["models"].as_array().or_else(|| data["tags"].as_array()) {
+                    if let Some(tags) = data["models"]
+                        .as_array()
+                        .or_else(|| data["tags"].as_array())
+                    {
                         for tag in tags {
                             if let Some(name) = tag["name"]
                                 .as_str()
@@ -282,7 +285,7 @@ impl LlmClient for OllamaClient {
                     lines.push(format!("✓ 目标模型 '{}' 可用", self.model));
                 } else {
                     lines.push(format!("⚠ 目标模型 '{}' 不在可用列表中", self.model));
-                    lines.push("建议: 运行 'ollama pull {}" .replace("{}", &self.model));
+                    lines.push("建议: 运行 'ollama pull {}".replace("{}", &self.model));
                 }
             }
             Err(e) => {
@@ -344,13 +347,15 @@ mod tests {
             .match_header("content-type", mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "choices": [{
                     "message": {
                         "content": "Hello from Ollama!"
                     }
                 }]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -378,11 +383,13 @@ mod tests {
         let mock_native = server
             .mock("POST", "/api/chat")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "message": {
                     "content": "Native API response"
                 }
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -403,13 +410,15 @@ mod tests {
         let mock = server
             .mock("POST", "/v1/chat/completions")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "choices": [{
                     "message": {
                         "content": "Hello <think>internal thoughts here</think> World!"
                     }
                 }]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -433,12 +442,14 @@ mod tests {
         let mock = server
             .mock("GET", "/api/tags")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "models": [
                     {"name": "qwen3:4b"},
                     {"name": "llama3:8b"}
                 ]
-            }"#)
+            }"#,
+            )
             .expect(1)
             .create_async()
             .await;
@@ -469,12 +480,14 @@ mod tests {
         let mock_openai = server
             .mock("GET", "/v1/models")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "data": [
                     {"id": "model1"},
                     {"id": "model2"}
                 ]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -519,9 +532,11 @@ mod tests {
         let mock = server
             .mock("POST", "/v1/chat/completions")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "choices": [{"message": {"content": "Response"}}]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 

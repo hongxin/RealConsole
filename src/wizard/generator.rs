@@ -16,8 +16,7 @@ impl ConfigGenerator {
     pub fn save_config(config: &WizardConfig) -> Result<()> {
         // 生成 YAML 配置
         let yaml_content = Self::generate_yaml(config)?;
-        fs::write("realconsole.yaml", yaml_content)
-            .context("无法写入 realconsole.yaml")?;
+        fs::write("realconsole.yaml", yaml_content).context("无法写入 realconsole.yaml")?;
 
         println!("✓ 已生成 realconsole.yaml");
 
@@ -142,7 +141,9 @@ intent:
         ];
 
         match &config.llm_provider {
-            LlmProviderChoice::Deepseek { api_key, endpoint, .. } => {
+            LlmProviderChoice::Deepseek {
+                api_key, endpoint, ..
+            } => {
                 lines.push("# Deepseek API 配置".to_string());
                 lines.push(format!("DEEPSEEK_API_KEY={}", api_key));
                 if endpoint != "https://api.deepseek.com/v1" {

@@ -70,7 +70,11 @@ async fn show_recent_history(history: &Arc<RwLock<HistoryManager>>, limit: usize
     }
 
     let mut output = Vec::new();
-    output.push(format!("{} {}", "最近的历史记录".bold().cyan(), format!("(智能排序)").dimmed()));
+    output.push(format!(
+        "{} {}",
+        "最近的历史记录".bold().cyan(),
+        format!("(智能排序)").dimmed()
+    ));
     output.push("".to_string());
 
     for (index, entry) in entries.iter().enumerate() {
@@ -164,13 +168,25 @@ async fn show_stats(history: &Arc<RwLock<HistoryManager>>) -> String {
     let mut output = Vec::new();
     output.push(format!("{}", "历史记录统计".bold().cyan()));
     output.push("".to_string());
-    output.push(format!("  总记录数:     {}", stats.total_entries.to_string().yellow()));
-    output.push(format!("  总执行次数:   {}", stats.total_executions.to_string().yellow()));
-    output.push(format!("  唯一命令数:   {}", stats.unique_commands.to_string().yellow()));
+    output.push(format!(
+        "  总记录数:     {}",
+        stats.total_entries.to_string().yellow()
+    ));
+    output.push(format!(
+        "  总执行次数:   {}",
+        stats.total_executions.to_string().yellow()
+    ));
+    output.push(format!(
+        "  唯一命令数:   {}",
+        stats.unique_commands.to_string().yellow()
+    ));
 
     if stats.total_entries > 0 {
         let avg_executions = stats.total_executions as f64 / stats.unique_commands as f64;
-        output.push(format!("  平均执行次数: {}", format!("{:.1}", avg_executions).yellow()));
+        output.push(format!(
+            "  平均执行次数: {}",
+            format!("{:.1}", avg_executions).yellow()
+        ));
     }
 
     output.join("\n")
@@ -206,7 +222,8 @@ mod tests {
     use tokio::sync::RwLock;
 
     fn create_test_history() -> Arc<RwLock<HistoryManager>> {
-        let temp_file = std::env::temp_dir().join(format!("test_history_{}.json", rand::random::<u32>()));
+        let temp_file =
+            std::env::temp_dir().join(format!("test_history_{}.json", rand::random::<u32>()));
         let mut manager = HistoryManager::new(temp_file, 100);
 
         manager.add("git status", true);

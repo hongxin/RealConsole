@@ -39,10 +39,10 @@ impl Field {
     /// ```
     pub fn to_sort_key(&self) -> Option<&'static str> {
         match self {
-            Field::Size => Some("5"),    // 第5列：大小
-            Field::Time => Some("6"),    // 第6列：时间（月份）
-            Field::Name => Some("9"),    // 第9列：文件名
-            Field::Default => None,      // 不指定列，默认第一列
+            Field::Size => Some("5"), // 第5列：大小
+            Field::Time => Some("6"), // 第6列：时间（月份）
+            Field::Name => Some("9"), // 第9列：文件名
+            Field::Default => None,   // 不指定列，默认第一列
         }
     }
 }
@@ -65,8 +65,8 @@ impl Direction {
     /// 转换为 sort 命令的参数
     pub fn to_sort_flag(&self) -> &'static str {
         match self {
-            Direction::Ascending => "-h",      // 升序：按人类可读格式排序
-            Direction::Descending => "-hr",    // 降序：-r = reverse
+            Direction::Ascending => "-h",   // 升序：按人类可读格式排序
+            Direction::Descending => "-hr", // 降序：-r = reverse
         }
     }
 }
@@ -84,18 +84,13 @@ pub enum BaseOperation {
     /// **参数**：
     /// - `path`: 搜索路径
     /// - `pattern`: 文件名模式（支持通配符）
-    FindFiles {
-        path: String,
-        pattern: String,
-    },
+    FindFiles { path: String, pattern: String },
 
     /// 列出文件（无过滤）
     ///
     /// **参数**：
     /// - `path`: 目录路径
-    ListFiles {
-        path: String,
-    },
+    ListFiles { path: String },
 
     /// 检查磁盘使用（Phase 6.3 Step 2）
     ///
@@ -103,9 +98,7 @@ pub enum BaseOperation {
     /// - `path`: 目录路径
     ///
     /// **输出格式**: `<size>\t<path>` (第一列是大小)
-    DiskUsage {
-        path: String,
-    },
+    DiskUsage { path: String },
 
     /// 排序文件
     ///
@@ -116,26 +109,19 @@ pub enum BaseOperation {
     /// **哲学体现**：
     /// - field 和 direction 是两个独立的"爻"
     /// - 它们的组合产生不同的"卦象"
-    SortFiles {
-        field: Field,
-        direction: Direction,
-    },
+    SortFiles { field: Field, direction: Direction },
 
     /// 限制输出数量
     ///
     /// **参数**：
     /// - `count`: 显示前 N 条结果
-    LimitFiles {
-        count: usize,
-    },
+    LimitFiles { count: usize },
 
     /// 过滤文件（按条件）
     ///
     /// **参数**：
     /// - `condition`: 过滤条件（未来扩展：大小、时间范围等）
-    FilterFiles {
-        condition: String,
-    },
+    FilterFiles { condition: String },
 }
 
 impl BaseOperation {
@@ -148,7 +134,10 @@ impl BaseOperation {
     pub fn to_shell_fragment(&self) -> String {
         match self {
             BaseOperation::FindFiles { path, pattern } => {
-                format!("find {} -name '{}' -type f -exec ls -lh {{}} +", path, pattern)
+                format!(
+                    "find {} -name '{}' -type f -exec ls -lh {{}} +",
+                    path, pattern
+                )
             }
 
             BaseOperation::ListFiles { path } => {

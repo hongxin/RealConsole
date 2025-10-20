@@ -20,7 +20,7 @@ use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 // LLM 增强功能
-use crate::llm::{LlmClient, Message, LlmError};
+use crate::llm::{LlmClient, LlmError, Message};
 use serde_json::Value as JsonValue;
 
 /// 实体类型
@@ -307,7 +307,10 @@ impl ContextTracker {
 
     /// 获取所有实体（按最近使用顺序）
     pub fn get_all_entities(&mut self) -> Vec<Entity> {
-        self.recent_entities.iter().map(|(_, e)| e.clone()).collect()
+        self.recent_entities
+            .iter()
+            .map(|(_, e)| e.clone())
+            .collect()
     }
 
     /// 清除所有实体
@@ -452,7 +455,13 @@ impl ContextTracker {
         let entities_list: Vec<String> = self
             .recent_entities
             .iter()
-            .map(|(_, e)| format!("- {} ({})", e.entity_type.display_name(), e.entity_type.type_name()))
+            .map(|(_, e)| {
+                format!(
+                    "- {} ({})",
+                    e.entity_type.display_name(),
+                    e.entity_type.type_name()
+                )
+            })
             .collect();
 
         let prompt = format!(
@@ -602,7 +611,8 @@ impl ContextTracker {
                 // 更新提及次数
                 let mut updated_entity = entity.clone();
                 updated_entity.update_mention(context.to_string());
-                self.recent_entities.put(refers_to.to_string(), updated_entity.clone());
+                self.recent_entities
+                    .put(refers_to.to_string(), updated_entity.clone());
 
                 return Ok(Some(updated_entity));
             }
@@ -655,7 +665,10 @@ impl EntityExtractor {
     fn new() -> Self {
         Self {
             // 匹配文件路径（绝对路径或相对路径，带扩展名）
-            file_regex: Regex::new(r"(?:^|[\s,;])((?:[./~])?(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)").unwrap(),
+            file_regex: Regex::new(
+                r"(?:^|[\s,;])((?:[./~])?(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)",
+            )
+            .unwrap(),
 
             // 匹配目录路径（以 / 结尾或常见目录名）
             dir_regex: Regex::new(r"(?:^|[\s,;])((?:[./~])?(?:[a-zA-Z0-9_-]+/)+)").unwrap(),
@@ -675,11 +688,7 @@ impl EntityExtractor {
         for cap in self.file_regex.captures_iter(text) {
             if let Some(path_str) = cap.get(1) {
                 let path = PathBuf::from(path_str.as_str());
-                entities.push(Entity::new(
-                    EntityType::File(path),
-                    text.to_string(),
-                    0.9,
-                ));
+                entities.push(Entity::new(EntityType::File(path), text.to_string(), 0.9));
             }
         }
 
@@ -688,7 +697,10 @@ impl EntityExtractor {
             if let Some(path_str) = cap.get(1) {
                 let path = PathBuf::from(path_str.as_str());
                 // 避免重复（文件路径可能包含目录）
-                if !entities.iter().any(|e| matches!(&e.entity_type, EntityType::File(p) if p.starts_with(&path))) {
+                if !entities
+                    .iter()
+                    .any(|e| matches!(&e.entity_type, EntityType::File(p) if p.starts_with(&path)))
+                {
                     entities.push(Entity::new(
                         EntityType::Directory(path),
                         text.to_string(),
@@ -710,11 +722,7 @@ impl EntityExtractor {
         // 提取数字（置信度较低）
         for cap in self.number_regex.captures_iter(text) {
             if let Ok(num) = cap.get(0).unwrap().as_str().parse::<f64>() {
-                entities.push(Entity::new(
-                    EntityType::Number(num),
-                    text.to_string(),
-                    0.6,
-                ));
+                entities.push(Entity::new(EntityType::Number(num), text.to_string(), 0.6));
             }
         }
 
@@ -851,7 +859,9 @@ mod tests {
         assert!(!entities.is_empty());
 
         // 检查是否有文件实体
-        let has_file = entities.iter().any(|e| matches!(&e.entity_type, EntityType::File(_)));
+        let has_file = entities
+            .iter()
+            .any(|e| matches!(&e.entity_type, EntityType::File(_)));
         assert!(has_file);
     }
 
@@ -862,7 +872,9 @@ mod tests {
         let text = "访问 https://example.com 获取更多信息";
         let entities = extractor.extract(text);
 
-        let has_url = entities.iter().any(|e| matches!(&e.entity_type, EntityType::Url(_)));
+        let has_url = entities
+            .iter()
+            .any(|e| matches!(&e.entity_type, EntityType::Url(_)));
         assert!(has_url);
     }
 
@@ -870,9 +882,9 @@ mod tests {
     fn test_working_context_update() {
         let mut tracker = ContextTracker::new();
 
-        tracker.update_working_context(WorkingContextUpdate::CurrentDirectory(
-            PathBuf::from("/home/user"),
-        ));
+        tracker.update_working_context(WorkingContextUpdate::CurrentDirectory(PathBuf::from(
+            "/home/user",
+        )));
 
         tracker.update_working_context(WorkingContextUpdate::Variable {
             name: "PATH".to_string(),

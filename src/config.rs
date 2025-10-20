@@ -53,7 +53,7 @@ pub struct LlmConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmProvider {
-    pub provider: String,  // "ollama", "deepseek", "openai"
+    pub provider: String, // "ollama", "deepseek", "openai"
     pub model: Option<String>,
     pub endpoint: Option<String>,
     pub api_key: Option<String>,
@@ -172,12 +172,12 @@ fn default_validation_threshold() -> f64 {
 impl Default for IntentConfig {
     fn default() -> Self {
         Self {
-            llm_extraction_enabled: false,  // 默认关闭，保持高性能
-            llm_validation_enabled: false,  // 默认关闭，保持高性能
+            llm_extraction_enabled: false, // 默认关闭，保持高性能
+            llm_validation_enabled: false, // 默认关闭，保持高性能
             validation_threshold: 0.7,
             require_confirmation: true,
-            llm_generation_enabled: Some(false),  // Phase 7: 默认关闭
-            llm_generation_fallback: Some(true),  // 默认开启降级
+            llm_generation_enabled: Some(false), // Phase 7: 默认关闭
+            llm_generation_fallback: Some(true), // 默认开启降级
         }
     }
 }
@@ -192,13 +192,23 @@ pub struct DisplayConfig {
     /// 界面语言（zh-CN, en-US）
     #[serde(default)]
     pub language: Option<String>,
+
+    /// 是否显示对话轮次详情（仅在 debug 模式下生效，默认 true）
+    /// 即使是正常成功的对话也会显示 LLM 多轮次来回的详细信息
+    #[serde(default = "default_show_conversation_rounds")]
+    pub show_conversation_rounds: bool,
+}
+
+fn default_show_conversation_rounds() -> bool {
+    true
 }
 
 impl Default for DisplayConfig {
     fn default() -> Self {
         Self {
-            mode: DisplayMode::Minimal,  // 默认极简模式
-            language: None,  // 未指定时从系统环境推断
+            mode: DisplayMode::Minimal,     // 默认极简模式
+            language: None,                 // 未指定时从系统环境推断
+            show_conversation_rounds: true, // debug 模式下默认显示对话轮次
         }
     }
 }
@@ -280,7 +290,7 @@ impl Config {
     }
 
     /// 尝试加载配置，失败则返回默认配置
-    #[allow(dead_code)]  // 备用 API，可能在库使用场景中需要
+    #[allow(dead_code)] // 备用 API，可能在库使用场景中需要
     pub fn load_or_default<P: AsRef<Path>>(path: P) -> Self {
         Self::from_file(path).unwrap_or_default()
     }

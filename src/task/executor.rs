@@ -132,12 +132,8 @@ impl TaskExecutor {
 
             // 根据执行模式执行任务
             let stage_results = match stage.execution_mode {
-                ExecutionMode::Sequential => {
-                    self.execute_sequential(stage).await?
-                }
-                ExecutionMode::Parallel => {
-                    self.execute_parallel(stage).await?
-                }
+                ExecutionMode::Sequential => self.execute_sequential(stage).await?,
+                ExecutionMode::Parallel => self.execute_parallel(stage).await?,
             };
 
             all_results.extend(stage_results);
@@ -146,9 +142,18 @@ impl TaskExecutor {
         let elapsed = start_time.elapsed().as_secs() as u32;
 
         // 统计结果
-        let completed = all_results.iter().filter(|r| r.status == TaskStatus::Success).count();
-        let failed = all_results.iter().filter(|r| r.status == TaskStatus::Failed).count();
-        let skipped = all_results.iter().filter(|r| r.status == TaskStatus::Skipped).count();
+        let completed = all_results
+            .iter()
+            .filter(|r| r.status == TaskStatus::Success)
+            .count();
+        let failed = all_results
+            .iter()
+            .filter(|r| r.status == TaskStatus::Failed)
+            .count();
+        let skipped = all_results
+            .iter()
+            .filter(|r| r.status == TaskStatus::Skipped)
+            .count();
         let total_tasks = plan.total_tasks();
 
         Ok(ExecutionResult {
@@ -163,10 +168,7 @@ impl TaskExecutor {
     }
 
     /// 串行执行阶段
-    async fn execute_sequential(
-        &self,
-        stage: &ExecutionStage,
-    ) -> TaskOpResult<Vec<TaskResult>> {
+    async fn execute_sequential(&self, stage: &ExecutionStage) -> TaskOpResult<Vec<TaskResult>> {
         let mut results = Vec::new();
 
         for task in &stage.tasks {
@@ -187,19 +189,14 @@ impl TaskExecutor {
     }
 
     /// 并行执行阶段
-    async fn execute_parallel(
-        &self,
-        stage: &ExecutionStage,
-    ) -> TaskOpResult<Vec<TaskResult>> {
+    async fn execute_parallel(&self, stage: &ExecutionStage) -> TaskOpResult<Vec<TaskResult>> {
         let mut handles = Vec::new();
 
         // 为每个任务创建并发任务
         for task in stage.tasks.clone() {
             let executor = self.clone_for_task();
 
-            let handle = tokio::spawn(async move {
-                executor.execute_task(&task).await
-            });
+            let handle = tokio::spawn(async move { executor.execute_task(&task).await });
 
             handles.push(handle);
         }
@@ -296,7 +293,11 @@ impl TaskExecutor {
             }
         }
 
-        (TaskStatus::Failed, String::new(), Some("重试次数用尽".to_string()))
+        (
+            TaskStatus::Failed,
+            String::new(),
+            Some("重试次数用尽".to_string()),
+        )
     }
 
     /// 预处理命令（修复常见问题）
@@ -326,7 +327,8 @@ impl TaskExecutor {
         if let Some(timeout) = self.timeout {
             match tokio::time::timeout(
                 Duration::from_secs(timeout),
-                self.shell_executor.execute_with_analysis(&processed_command),
+                self.shell_executor
+                    .execute_with_analysis(&processed_command),
             )
             .await
             {
@@ -334,7 +336,8 @@ impl TaskExecutor {
                     if exec_result.success {
                         Ok(exec_result.output.clone())
                     } else {
-                        let error_msg = exec_result.error_analysis
+                        let error_msg = exec_result
+                            .error_analysis
                             .as_ref()
                             .map(|a| a.raw_error.clone())
                             .unwrap_or_else(|| exec_result.output.clone());
@@ -347,11 +350,15 @@ impl TaskExecutor {
                 ))),
             }
         } else {
-            let exec_result = self.shell_executor.execute_with_analysis(&processed_command).await;
+            let exec_result = self
+                .shell_executor
+                .execute_with_analysis(&processed_command)
+                .await;
             if exec_result.success {
                 Ok(exec_result.output.clone())
             } else {
-                let error_msg = exec_result.error_analysis
+                let error_msg = exec_result
+                    .error_analysis
                     .as_ref()
                     .map(|a| a.raw_error.clone())
                     .unwrap_or_else(|| exec_result.output.clone());
@@ -365,7 +372,8 @@ impl TaskExecutor {
         if let Some(callback) = &self.progress_callback {
             let state = self.state.read().await;
 
-            let elapsed_time = state.start_time
+            let elapsed_time = state
+                .start_time
                 .map(|t| t.elapsed().as_secs() as u32)
                 .unwrap_or(0);
 
@@ -490,7 +498,10 @@ mod tests {
         let progress_log_clone = Arc::clone(&progress_log);
 
         let callback: ProgressCallback = Arc::new(move |progress| {
-            progress_log_clone.lock().unwrap().push(progress.current_task.clone());
+            progress_log_clone
+                .lock()
+                .unwrap()
+                .push(progress.current_task.clone());
         });
 
         let executor = executor.with_progress_callback(callback);
@@ -598,7 +609,11 @@ mod tests {
         // 创建包含独立 cd 命令的任务
         let tasks = vec![
             SubTask::new("t1", "Create dir", "mkdir -p /tmp/test_realconsole_cd"),
-            SubTask::new("t2", "Standalone cd (will warn)", "cd /tmp/test_realconsole_cd"),
+            SubTask::new(
+                "t2",
+                "Standalone cd (will warn)",
+                "cd /tmp/test_realconsole_cd",
+            ),
             SubTask::new("t3", "Try to create file", "touch test.txt"),
         ];
         let plan = create_test_plan(tasks);

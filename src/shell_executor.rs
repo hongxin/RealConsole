@@ -29,31 +29,30 @@ const COMMAND_TIMEOUT: u64 = 30;
 
 /// 危险命令模式（黑名单）
 const DANGEROUS_PATTERNS: &[&str] = &[
-    r"rm\s+-rf\s+/",           // 删除根目录
-    r"rm\s+-fr\s+/",           // 删除根目录（参数顺序）
-    r"dd\s+if=/dev/zero",      // 磁盘写入
-    r"dd\s+if=/dev/random",    // 磁盘写入
-    r"mkfs",                   // 格式化
-    r":\(\)\{.*\|.*&.*\};:",   // fork 炸弹
-    r"sudo\s+",                // 权限提升
-    r"shutdown",               // 系统关机
-    r"reboot",                 // 系统重启
-    r"halt",                   // 系统停止
-    r"poweroff",               // 电源关闭
-    r"init\s+0",               // 关机
-    r"init\s+6",               // 重启
-    r">\s*/dev/sd[a-z]",      // 直接写磁盘（允许空格）
+    r"rm\s+-rf\s+/",         // 删除根目录
+    r"rm\s+-fr\s+/",         // 删除根目录（参数顺序）
+    r"dd\s+if=/dev/zero",    // 磁盘写入
+    r"dd\s+if=/dev/random",  // 磁盘写入
+    r"mkfs",                 // 格式化
+    r":\(\)\{.*\|.*&.*\};:", // fork 炸弹
+    r"sudo\s+",              // 权限提升
+    r"shutdown",             // 系统关机
+    r"reboot",               // 系统重启
+    r"halt",                 // 系统停止
+    r"poweroff",             // 电源关闭
+    r"init\s+0",             // 关机
+    r"init\s+6",             // 重启
+    r">\s*/dev/sd[a-z]",     // 直接写磁盘（允许空格）
 ];
 
 /// 检查命令是否安全
 fn is_safe_command(command: &str) -> Result<(), RealError> {
     // 检查空命令
     if command.trim().is_empty() {
-        return Err(RealError::new(
-            ErrorCode::ShellCommandEmpty,
-            "Shell 命令不能为空",
-        )
-        .with_suggestion(FixSuggestion::new("输入有效的 shell 命令")));
+        return Err(
+            RealError::new(ErrorCode::ShellCommandEmpty, "Shell 命令不能为空")
+                .with_suggestion(FixSuggestion::new("输入有效的 shell 命令")),
+        );
     }
 
     // 检查危险模式
@@ -67,9 +66,9 @@ fn is_safe_command(command: &str) -> Result<(), RealError> {
                 ErrorCode::ShellDangerousCommand,
                 format!("命令包含危险操作，已被安全策略阻止"),
             )
-            .with_suggestion(
-                FixSuggestion::new("此命令可能造成系统损坏，建议使用更安全的替代方案"),
-            )
+            .with_suggestion(FixSuggestion::new(
+                "此命令可能造成系统损坏，建议使用更安全的替代方案",
+            ))
             .with_suggestion(
                 FixSuggestion::new("查看允许的命令列表和安全策略")
                     .with_doc("https://docs.realconsole.com/shell-safety"),
@@ -136,9 +135,9 @@ pub async fn execute_shell(command: &str) -> Result<String, RealError> {
                 ErrorCode::ShellTimeoutError,
                 format!("命令执行超时（超过 {} 秒）", COMMAND_TIMEOUT),
             )
-            .with_suggestion(
-                FixSuggestion::new("命令执行时间过长，请检查命令或增加超时时间"),
-            )
+            .with_suggestion(FixSuggestion::new(
+                "命令执行时间过长，请检查命令或增加超时时间",
+            ))
             .with_suggestion(
                 FixSuggestion::new("在配置文件中调整 features.shell_timeout")
                     .with_command("vi realconsole.yaml"),
@@ -176,14 +175,13 @@ pub async fn execute_shell(command: &str) -> Result<String, RealError> {
             result_text.clone()
         };
 
-        return Err(RealError::new(
-            ErrorCode::ShellExecutionError,
-            error_message,
-        )
-        .with_suggestion(FixSuggestion::new("检查命令语法和参数是否正确"))
-        .with_suggestion(
-            FixSuggestion::new("查看命令的帮助信息").with_command("man <command>"),
-        ));
+        return Err(
+            RealError::new(ErrorCode::ShellExecutionError, error_message)
+                .with_suggestion(FixSuggestion::new("检查命令语法和参数是否正确"))
+                .with_suggestion(
+                    FixSuggestion::new("查看命令的帮助信息").with_command("man <command>"),
+                ),
+        );
     }
 
     // 限制输出大小
@@ -194,7 +192,10 @@ pub async fn execute_shell(command: &str) -> Result<String, RealError> {
 
     // 如果没有输出，返回成功提示
     if result_text.is_empty() {
-        result_text = format!("✓ 命令执行成功 (exit code: {})", output.status.code().unwrap_or(0));
+        result_text = format!(
+            "✓ 命令执行成功 (exit code: {})",
+            output.status.code().unwrap_or(0)
+        );
     }
 
     Ok(result_text)
@@ -336,7 +337,11 @@ impl ShellExecutorWithFixer {
                 // LLM 增强分析（如果启用且可用）
                 if self.enable_llm_analysis {
                     if let Some(ref llm) = self.llm {
-                        if let Ok(enhanced) = self.analyzer.analyze_with_llm(analysis.clone(), llm.as_ref()).await {
+                        if let Ok(enhanced) = self
+                            .analyzer
+                            .analyze_with_llm(analysis.clone(), llm.as_ref())
+                            .await
+                        {
                             analysis = enhanced;
                         }
                     }
@@ -349,19 +354,25 @@ impl ShellExecutorWithFixer {
                 // LLM 增强修复策略（如果启用且可用）
                 if self.enable_llm_analysis {
                     if let Some(ref llm) = self.llm {
-                        if let Ok(llm_strategies) = ErrorFixer::generate_strategies_with_llm(&analysis, llm.as_ref()).await {
+                        if let Ok(llm_strategies) =
+                            ErrorFixer::generate_strategies_with_llm(&analysis, llm.as_ref()).await
+                        {
                             strategies.extend(llm_strategies);
                         }
                     }
                 }
 
                 // 过滤掉不安全的修复策略
-                let safe_strategies: Vec<_> = strategies.into_iter()
+                let safe_strategies: Vec<_> = strategies
+                    .into_iter()
                     .filter(|s| self.is_safe_fix_strategy(s))
                     .collect();
 
                 // 使用学习到的数据重新排序策略（Week 3）
-                let ranked_strategies = self.feedback_learner.rerank_strategies(safe_strategies).await;
+                let ranked_strategies = self
+                    .feedback_learner
+                    .rerank_strategies(safe_strategies)
+                    .await;
 
                 ExecutionResult::failure(error_output, Some(analysis), ranked_strategies)
             }
@@ -378,7 +389,11 @@ impl ShellExecutorWithFixer {
     ///
     /// # Returns
     /// * `ExecutionResult` - 最终结果
-    pub async fn execute_with_auto_fix(&self, command: &str, max_retries: usize) -> ExecutionResult {
+    pub async fn execute_with_auto_fix(
+        &self,
+        command: &str,
+        max_retries: usize,
+    ) -> ExecutionResult {
         let mut current_command = command.to_string();
         let mut attempt = 0;
 
@@ -392,12 +407,9 @@ impl ShellExecutorWithFixer {
             }
 
             // 查找可自动应用的低风险修复策略（带安全检查）
-            let auto_fix = result.fix_strategies.iter()
-                .find(|s| {
-                    s.risk_level < 5
-                    && !s.requires_confirmation
-                    && self.is_safe_fix_strategy(s)
-                });
+            let auto_fix = result.fix_strategies.iter().find(|s| {
+                s.risk_level < 5 && !s.requires_confirmation && self.is_safe_fix_strategy(s)
+            });
 
             if let Some(fix) = auto_fix {
                 // 应用修复并重试
@@ -520,7 +532,9 @@ mod tests {
         let result = execute_shell("yes 'test output line with some content' | head -n 5000").await;
 
         #[cfg(windows)]
-        let result = execute_shell("for /L %i in (1,1,5000) do @echo test output line with some content").await;
+        let result =
+            execute_shell("for /L %i in (1,1,5000) do @echo test output line with some content")
+                .await;
 
         assert!(result.is_ok());
         let output = result.unwrap();
@@ -558,7 +572,11 @@ mod tests {
 
         // 命令应该执行，但输出中应该包含 stderr
         if let Ok(output) = result {
-            assert!(output.contains("stderr") || output.contains("No such") || output.contains("cannot"));
+            assert!(
+                output.contains("stderr")
+                    || output.contains("No such")
+                    || output.contains("cannot")
+            );
         }
         // 某些系统可能返回错误，这也是可接受的
     }
@@ -591,7 +609,9 @@ mod tests {
     async fn test_executor_with_fixer_command_not_found() {
         // 测试命令不存在错误分析
         let executor = ShellExecutorWithFixer::new();
-        let result = executor.execute_with_analysis("nonexistent_command_12345").await;
+        let result = executor
+            .execute_with_analysis("nonexistent_command_12345")
+            .await;
 
         // 命令不存在通常会返回错误，但某些系统可能返回带 stderr 的成功输出
         // 如果返回失败，应该有错误分析
@@ -600,8 +620,8 @@ mod tests {
             if let Some(analysis) = &result.error_analysis {
                 // 错误类别应该是 Command 或 Unknown
                 match &analysis.category {
-                    crate::error_fixer::ErrorCategory::Command => {},
-                    crate::error_fixer::ErrorCategory::Unknown => {},
+                    crate::error_fixer::ErrorCategory::Command => {}
+                    crate::error_fixer::ErrorCategory::Unknown => {}
                     _ => panic!("Unexpected error category: {:?}", analysis.category),
                 }
             }
@@ -612,7 +632,9 @@ mod tests {
     async fn test_executor_with_fixer_file_not_found() {
         // 测试文件不存在错误分析
         let executor = ShellExecutorWithFixer::new();
-        let result = executor.execute_with_analysis("cat /nonexistent_file_12345.txt").await;
+        let result = executor
+            .execute_with_analysis("cat /nonexistent_file_12345.txt")
+            .await;
 
         // 根据系统不同，可能返回错误或包含 stderr 的成功输出
         if !result.success {
@@ -640,11 +662,8 @@ mod tests {
         let analysis = ErrorAnalysis::new("error".to_string(), "cmd".to_string());
         let strategy = FixStrategy::new("test", "fix", "description", 3);
 
-        let result = ExecutionResult::failure(
-            "error output".to_string(),
-            Some(analysis),
-            vec![strategy],
-        );
+        let result =
+            ExecutionResult::failure("error output".to_string(), Some(analysis), vec![strategy]);
 
         assert!(!result.success);
         assert_eq!(result.output, "error output");
@@ -677,7 +696,12 @@ mod tests {
         assert!(!executor.is_safe_fix_strategy(&dangerous_strategy));
 
         // 高风险但需要确认的策略 - 应该通过（使用非sudo的高风险命令）
-        let high_risk_with_confirmation = FixStrategy::new("risky", "curl -o /tmp/file http://example.com", "needs confirm", 8);
+        let high_risk_with_confirmation = FixStrategy::new(
+            "risky",
+            "curl -o /tmp/file http://example.com",
+            "needs confirm",
+            8,
+        );
         assert!(high_risk_with_confirmation.requires_confirmation); // 风险>=5 自动设置
         assert!(executor.is_safe_fix_strategy(&high_risk_with_confirmation));
 
@@ -692,7 +716,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_feedback_learning_integration() {
-        use crate::error_fixer::{ErrorAnalysis, FixStrategy, FeedbackType, FixOutcome};
+        use crate::error_fixer::{ErrorAnalysis, FeedbackType, FixOutcome, FixStrategy};
 
         let executor = ShellExecutorWithFixer::new();
 
@@ -703,9 +727,23 @@ mod tests {
 
         // 记录反馈：strategy1 成功，strategy2 失败
         for _ in 0..3 {
-            executor.record_feedback(&analysis, &strategy1, FeedbackType::Accepted, FixOutcome::Success).await;
+            executor
+                .record_feedback(
+                    &analysis,
+                    &strategy1,
+                    FeedbackType::Accepted,
+                    FixOutcome::Success,
+                )
+                .await;
         }
-        executor.record_feedback(&analysis, &strategy2, FeedbackType::Rejected, FixOutcome::Failure).await;
+        executor
+            .record_feedback(
+                &analysis,
+                &strategy2,
+                FeedbackType::Rejected,
+                FixOutcome::Failure,
+            )
+            .await;
 
         // 检查学习摘要
         let summary = executor.get_learning_summary().await;
@@ -719,7 +757,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_strategy_reranking() {
-        use crate::error_fixer::{ErrorAnalysis, FixStrategy, FeedbackType, FixOutcome};
+        use crate::error_fixer::{ErrorAnalysis, FeedbackType, FixOutcome, FixStrategy};
 
         let executor = ShellExecutorWithFixer::new();
 
@@ -730,9 +768,23 @@ mod tests {
         // 给strategy2更多正面反馈
         let analysis = ErrorAnalysis::new("error".to_string(), "cmd".to_string());
         for _ in 0..5 {
-            executor.record_feedback(&analysis, &strategy2, FeedbackType::Accepted, FixOutcome::Success).await;
+            executor
+                .record_feedback(
+                    &analysis,
+                    &strategy2,
+                    FeedbackType::Accepted,
+                    FixOutcome::Success,
+                )
+                .await;
         }
-        executor.record_feedback(&analysis, &strategy1, FeedbackType::Rejected, FixOutcome::Failure).await;
+        executor
+            .record_feedback(
+                &analysis,
+                &strategy1,
+                FeedbackType::Rejected,
+                FixOutcome::Failure,
+            )
+            .await;
 
         // 重新排序
         let learner = executor.feedback_learner();

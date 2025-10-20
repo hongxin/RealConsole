@@ -154,7 +154,7 @@ mod tests {
             })
             .with_operation(BaseOperation::SortFiles {
                 field: Field::Size,
-                direction: Direction::Ascending,  // 唯一的区别！
+                direction: Direction::Ascending, // 唯一的区别！
             })
             .with_operation(BaseOperation::LimitFiles { count: 1 });
 
@@ -174,7 +174,7 @@ mod tests {
                 pattern: "*".to_string(),
             })
             .with_operation(BaseOperation::SortFiles {
-                field: Field::Time,  // 改变字段
+                field: Field::Time, // 改变字段
                 direction: Direction::Descending,
             })
             .with_operation(BaseOperation::LimitFiles { count: 5 });
@@ -236,7 +236,7 @@ mod tests {
             })
             .with_operation(BaseOperation::SortFiles {
                 field: Field::Size,
-                direction: Direction::Descending,  // 爻1
+                direction: Direction::Descending, // 爻1
             })
             .with_operation(BaseOperation::LimitFiles { count: 3 });
 
@@ -248,7 +248,7 @@ mod tests {
             })
             .with_operation(BaseOperation::SortFiles {
                 field: Field::Size,
-                direction: Direction::Ascending,  // 爻1的变化
+                direction: Direction::Ascending, // 爻1的变化
             })
             .with_operation(BaseOperation::LimitFiles { count: 3 });
 
@@ -257,10 +257,7 @@ mod tests {
         assert_eq!(largest.len(), 3);
 
         // 但生成的命令不同
-        assert_ne!(
-            largest.to_shell_command(),
-            smallest.to_shell_command()
-        );
+        assert_ne!(largest.to_shell_command(), smallest.to_shell_command());
 
         println!("最大: {}", largest.to_shell_command());
         println!("最小: {}", smallest.to_shell_command());

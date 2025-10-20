@@ -5,6 +5,7 @@
 //! - Standard：标准模式，显示适中信息
 //! - Debug：调试模式，显示所有细节
 
+use crate::task::{ExecutionPlan, ExecutionResult, TaskStatus};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
@@ -97,7 +98,11 @@ impl Display {
     /// 启动信息（记忆加载）
     pub fn startup_memory(mode: DisplayMode, count: usize) {
         if mode.show_startup() {
-            println!("{} {} 条记忆 (最近)", "✓ 已加载".dimmed(), count.to_string().dimmed());
+            println!(
+                "{} {} 条记忆 (最近)",
+                "✓ 已加载".dimmed(),
+                count.to_string().dimmed()
+            );
         }
     }
 
@@ -192,7 +197,11 @@ impl Display {
             } else {
                 // Standard 模式：简化显示
                 if from_cache {
-                    println!("{} {:.2}s (缓存)", "ⓘ".dimmed(), duration_sec.to_string().green().dimmed());
+                    println!(
+                        "{} {:.2}s (缓存)",
+                        "ⓘ".dimmed(),
+                        duration_sec.to_string().green().dimmed()
+                    );
                 } else {
                     println!("{} {:.2}s", "ⓘ".dimmed(), duration_sec.to_string().dimmed());
                 }
@@ -221,7 +230,11 @@ impl Display {
     pub fn fallback_warning(mode: DisplayMode, reason: &str) {
         if mode.show_fallback() {
             if mode.show_debug() {
-                println!("{} {}", "⚠️  LLM 生成失败，降级到规则匹配:".yellow(), reason);
+                println!(
+                    "{} {}",
+                    "⚠️  LLM 生成失败，降级到规则匹配:".yellow(),
+                    reason
+                );
             } else {
                 // Standard 模式：简化信息
                 println!("{}", "⚠️  降级到规则匹配".yellow().dimmed());
@@ -268,7 +281,12 @@ impl Display {
     }
 
     /// 任务编排启动信息
-    pub fn task_execution_start(mode: DisplayMode, goal: &str, total_stages: usize, total_tasks: usize) {
+    pub fn task_execution_start(
+        mode: DisplayMode,
+        goal: &str,
+        total_stages: usize,
+        total_tasks: usize,
+    ) {
         if mode.show_startup() {
             println!(
                 "{} {} · {} 阶段 · {} 任务",
@@ -281,7 +299,12 @@ impl Display {
     }
 
     /// 阶段执行信息
-    pub fn stage_execution(mode: DisplayMode, stage_num: usize, total_stages: usize, execution_mode: &str) {
+    pub fn stage_execution(
+        mode: DisplayMode,
+        stage_num: usize,
+        total_stages: usize,
+        execution_mode: &str,
+    ) {
         if mode.show_intent() {
             let mode_icon = match execution_mode {
                 "Sequential" => "→",
@@ -307,12 +330,7 @@ impl Display {
             } else {
                 String::new()
             };
-            println!(
-                "{} {} {}",
-                "→".dimmed(),
-                task_name,
-                percentage.dimmed()
-            );
+            println!("{} {} {}", "→".dimmed(), task_name, percentage.dimmed());
         }
     }
 
@@ -343,7 +361,13 @@ impl Display {
     }
 
     /// 进度条显示
-    pub fn progress_bar(mode: DisplayMode, completed: usize, total: usize, elapsed: u32, remaining: u32) {
+    pub fn progress_bar(
+        mode: DisplayMode,
+        completed: usize,
+        total: usize,
+        elapsed: u32,
+        remaining: u32,
+    ) {
         if mode.show_timing() && total > 0 {
             let percentage = (completed as f64 / total as f64) * 100.0;
             let bar_width = 20;
@@ -362,14 +386,402 @@ impl Display {
                 format!("({}s)", elapsed)
             };
 
-            println!(
-                "{} {:.1}% {}",
-                bar,
-                percentage,
-                time_info.dimmed()
+            println!("{} {:.0}% {}", bar, percentage, time_info.dimmed());
+        }
+    }
+
+    /// 上下文溢出错误显示
+    pub fn context_overflow_error(mode: DisplayMode, requested: usize, limit: usize) {
+        eprintln!("{} 上下文长度超限", "❌".red());
+
+        if mode.show_debug() || mode.show_timing() {
+            eprintln!("  请求: {} tokens", requested.to_string().red());
+            eprintln!("  限制: {} tokens", limit.to_string().yellow());
+            eprintln!(
+                "  超出: {} tokens",
+                (requested.saturating_sub(limit)).to_string().red().bold()
+            );
+
+            eprintln!("\n{}", "💡 优化建议:".cyan());
+            eprintln!("  1. 减少记忆容量: /memory config --capacity 50");
+            eprintln!("  2. 清理历史记忆: /memory clear");
+            eprintln!("  3. 使用更简洁的提问");
+            eprintln!("  4. 减少工具数量（当前14+个工具）");
+        } else {
+            // Minimal 模式：只显示简要信息
+            eprintln!(
+                "  超出 {} tokens，使用 /help 查看优化建议",
+                (requested.saturating_sub(limit)).to_string().red()
             );
         }
     }
+
+    /// 上下文统计显示（仅 debug 模式）
+    pub fn context_stats(
+        mode: DisplayMode,
+        memory_tokens: usize,
+        tool_tokens: usize,
+        system_tokens: usize,
+        user_tokens: usize,
+        max_tokens: usize,
+    ) {
+        if mode.show_debug() {
+            let total = memory_tokens + tool_tokens + system_tokens + user_tokens;
+            let percentage = (total as f64 / max_tokens as f64) * 100.0;
+
+            println!("\n{}", "📊 上下文统计".cyan().bold());
+            println!("  Memory: {} tokens", memory_tokens.to_string().yellow());
+            println!("  Tools: {} tokens", tool_tokens.to_string().yellow());
+            println!("  System: {} tokens", system_tokens.to_string().dimmed());
+            println!("  User: {} tokens", user_tokens.to_string().dimmed());
+            println!(
+                "  Total: {}/{} tokens ({:.1}%)",
+                total.to_string().bold(),
+                max_tokens.to_string().dimmed(),
+                percentage
+            );
+
+            if percentage > 90.0 {
+                println!("\n{} 上下文使用率过高，建议清理", "⚠️".yellow());
+            }
+        }
+    }
+
+    /// 任务执行统计
+    pub fn task_statistics(
+        mode: DisplayMode,
+        completed: usize,
+        failed: usize,
+        skipped: usize,
+        total: usize,
+        total_time: u32,
+    ) {
+        if mode.show_timing() {
+            let success_rate = if total > 0 {
+                ((completed - failed) as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            let status = if failed == 0 {
+                "✓".green()
+            } else {
+                "⚠".yellow()
+            };
+
+            println!(
+                "{} {} · {} · {:.0}% · {}s",
+                status,
+                format!("{}/{}", completed, total).bold(),
+                format!("{}✓ {}✗ {}⊘", completed - failed, failed, skipped).dimmed(),
+                success_rate,
+                total_time
+            );
+        }
+    }
+
+    /// LLM 对话轮次调试信息（仅 debug 模式）
+    /// 用于分析上下文使用和 workflow 套路重用
+    pub fn conversation_rounds_debug(mode: DisplayMode, rounds: &[ConversationRoundInfo]) {
+        if !mode.show_debug() {
+            return;
+        }
+
+        println!("\n{}", "🔍 LLM 对话轮次详情".cyan().bold());
+        println!("{}", "━".repeat(60).dimmed());
+
+        for round in rounds {
+            println!(
+                "\n{} {} {} {}ms",
+                format!("第 {} 轮", round.round).cyan().bold(),
+                "│".dimmed(),
+                format!("{} 条消息", round.message_count).yellow(),
+                round.duration_ms.to_string().dimmed()
+            );
+
+            // 输入摘要
+            if !round.input_summary.is_empty() {
+                println!(
+                    "  {} {}",
+                    "输入:".dimmed(),
+                    Self::truncate(&round.input_summary, 80)
+                );
+            }
+
+            // LLM 响应
+            if let Some(ref response) = round.assistant_response {
+                println!("  {} {}", "响应:".green(), Self::truncate(response, 80));
+            }
+
+            // 工具调用
+            if !round.tool_calls.is_empty() {
+                println!("  {} {} 个工具", "工具:".yellow(), round.tool_calls.len());
+                for (idx, tool) in round.tool_calls.iter().enumerate() {
+                    println!(
+                        "    {}. {} {}",
+                        idx + 1,
+                        tool.name.cyan(),
+                        Self::truncate(&tool.arguments, 60).dimmed()
+                    );
+                }
+            }
+
+            // 工具结果
+            if !round.tool_results.is_empty() {
+                println!("  {} {} 个结果", "结果:".dimmed(), round.tool_results.len());
+                for (idx, result) in round.tool_results.iter().enumerate() {
+                    println!("    {}. {}", idx + 1, Self::truncate(result, 70).dimmed());
+                }
+            }
+        }
+
+        println!("\n{}", "━".repeat(60).dimmed());
+        println!(
+            "{} 总计 {} 轮对话，{} 条消息",
+            "📊".dimmed(),
+            rounds.len().to_string().cyan(),
+            rounds
+                .iter()
+                .map(|r| r.message_count)
+                .sum::<usize>()
+                .to_string()
+                .yellow()
+        );
+        println!("{} 便于分析和 workflow 套路重用", "💡".cyan());
+    }
+
+    /// 任务执行结果显示（/execute 命令）
+    ///
+    /// 根据 DisplayMode 显示不同详细程度的执行结果：
+    /// - Minimal: 一行摘要
+    /// - Standard: 摘要 + 失败任务列表
+    /// - Debug: 完整执行计划结构 + 所有任务详情 + 输出内容 + 时间统计
+    pub fn task_execution_result(
+        mode: DisplayMode,
+        result: &ExecutionResult,
+        plan: Option<&ExecutionPlan>,
+    ) {
+        // 状态图标
+        let status_icon = if result.is_success() {
+            "✓".green()
+        } else {
+            "✗".red()
+        };
+
+        // === Minimal 模式：仅一行摘要 ===
+        if !mode.show_timing() {
+            println!(
+                "{} {} · {:.0}%",
+                status_icon,
+                format!("{}/{}", result.completed_tasks, result.total_tasks).bold(),
+                result.success_rate() * 100.0
+            );
+
+            // 失败时显示失败任务名称
+            if result.failed_tasks > 0 {
+                for task_result in &result.task_results {
+                    if matches!(task_result.status, TaskStatus::Failed) {
+                        println!("  {} {}", "✗".red(), task_result.task.name);
+                    }
+                }
+            }
+            return;
+        }
+
+        // === Standard 模式：摘要 + 失败任务详情 ===
+        if !mode.show_debug() {
+            println!(
+                "\n{} {} · {} · {}秒",
+                status_icon,
+                format!("{}/{}", result.completed_tasks, result.total_tasks).bold(),
+                format!("{:.0}%", result.success_rate() * 100.0).dimmed(),
+                result.total_time
+            );
+
+            // 仅显示失败任务的详情
+            if result.failed_tasks > 0 {
+                for task_result in &result.task_results {
+                    if matches!(task_result.status, TaskStatus::Failed) {
+                        println!(
+                            "  {} {} {}",
+                            "✗".red(),
+                            task_result.task.name,
+                            format!("$ {}", task_result.task.command).dimmed()
+                        );
+                        if let Some(error) = &task_result.error {
+                            println!("    {}", error.red());
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // === Debug 模式：完整信息 ===
+        println!("\n{}", "═══ 任务执行结果 ═══".cyan().bold());
+
+        // 1. 执行计划概览
+        if let Some(plan) = plan {
+            println!("\n{}", "📋 执行计划".cyan().bold());
+            println!("  目标: {}", plan.goal.bold());
+            println!(
+                "  阶段: {} 个（{} 个并行）",
+                plan.stages.len(),
+                plan.parallel_stages
+            );
+            println!("  预估时间: {}秒", plan.total_estimated_time);
+
+            // 显示阶段结构
+            for (idx, stage) in plan.stages.iter().enumerate() {
+                let mode_icon = match stage.execution_mode {
+                    crate::task::ExecutionMode::Sequential => "→",
+                    crate::task::ExecutionMode::Parallel => "⇉",
+                };
+                println!(
+                    "    {} Stage {} {} {} 个任务 · {}秒",
+                    mode_icon,
+                    idx + 1,
+                    "│".dimmed(),
+                    stage.tasks.len(),
+                    stage.estimated_time
+                );
+            }
+        }
+
+        // 2. 执行摘要
+        println!("\n{}", "📊 执行摘要".cyan().bold());
+        println!(
+            "  {} {} · 成功率 {:.0}% · 总耗时 {}秒",
+            status_icon,
+            format!("{}/{}", result.completed_tasks, result.total_tasks).bold(),
+            result.success_rate() * 100.0,
+            result.total_time
+        );
+
+        if result.failed_tasks > 0 {
+            println!("  失败: {} 个任务", result.failed_tasks);
+        }
+        if result.skipped_tasks > 0 {
+            println!("  跳过: {} 个任务", result.skipped_tasks);
+        }
+
+        // 3. 所有任务的详细执行信息
+        println!("\n{}", "🔍 任务详情".cyan().bold());
+
+        for (idx, task_result) in result.task_results.iter().enumerate() {
+            // 状态图标
+            let task_icon = match task_result.status {
+                TaskStatus::Success => "✓".green(),
+                TaskStatus::Failed => "✗".red(),
+                TaskStatus::Skipped => "⊘".yellow(),
+                TaskStatus::Cancelled => "⊗".dimmed(),
+                _ => "•".dimmed(),
+            };
+
+            // 任务信息行
+            println!(
+                "\n  {} {} {}",
+                task_icon,
+                format!("[{}/{}]", idx + 1, result.total_tasks).dimmed(),
+                task_result.task.name.bold()
+            );
+
+            // 命令
+            println!(
+                "     {} {}",
+                "命令:".dimmed(),
+                task_result.task.command.dimmed()
+            );
+
+            // 时间对比
+            println!(
+                "     {} {}秒（预估 {}秒）",
+                "耗时:".dimmed(),
+                task_result.duration,
+                task_result.task.estimated_time
+            );
+
+            // 任务类型
+            if task_result.task.task_type != crate::task::TaskType::Shell {
+                println!(
+                    "     {} {}",
+                    "类型:".dimmed(),
+                    task_result.task.task_type.to_string().dimmed()
+                );
+            }
+
+            // 输出内容（关键！）
+            if !task_result.output.is_empty() {
+                println!("     {}", "输出:".bold());
+                for line in task_result.output.lines().take(20) {
+                    // 限制显示行数
+                    println!("       {}", line.dimmed());
+                }
+                if task_result.output.lines().count() > 20 {
+                    println!(
+                        "       {}",
+                        format!("... ({} 行被截断)", task_result.output.lines().count() - 20)
+                            .dimmed()
+                    );
+                }
+            }
+
+            // 错误信息
+            if let Some(error) = &task_result.error {
+                println!("     {}", "错误:".bold());
+                for line in error.lines() {
+                    println!("       {}", line.red());
+                }
+            }
+        }
+
+        // 4. 时间统计
+        if let Some(plan) = plan {
+            let time_saved = plan.total_estimated_time.saturating_sub(result.total_time);
+            println!("\n{}", "⏱️  时间统计".cyan().bold());
+            println!("  预估时间: {}秒", plan.total_estimated_time);
+            println!("  实际时间: {}秒", result.total_time);
+            if time_saved > 0 {
+                println!("  节省时间: {}秒 {}", time_saved, "✓".green());
+            } else if result.total_time > plan.total_estimated_time {
+                let overtime = result.total_time - plan.total_estimated_time;
+                println!("  超时: {}秒", overtime);
+            }
+        }
+
+        println!("\n{}", "═".repeat(30).dimmed());
+    }
+
+    /// 截断长文本（按字符数而非字节数）
+    fn truncate(text: &str, max_len: usize) -> String {
+        let char_count = text.chars().count();
+        if char_count <= max_len {
+            text.to_string()
+        } else {
+            // 使用 chars().take() 保证在字符边界截断
+            let truncated: String = text.chars().take(max_len.saturating_sub(3)).collect();
+            format!("{}...", truncated)
+        }
+    }
+}
+
+/// 对话轮次信息（用于 Display）
+#[derive(Debug, Clone)]
+pub struct ConversationRoundInfo {
+    pub round: usize,
+    pub input_summary: String,
+    pub assistant_response: Option<String>,
+    pub tool_calls: Vec<ToolCallInfo>,
+    pub tool_results: Vec<String>,
+    pub message_count: usize,
+    pub duration_ms: u64,
+}
+
+/// 工具调用信息（用于 Display）
+#[derive(Debug, Clone)]
+pub struct ToolCallInfo {
+    pub name: String,
+    pub arguments: String,
 }
 
 #[cfg(test)]
@@ -380,7 +792,10 @@ mod tests {
     fn test_display_mode_from_str() {
         assert_eq!(DisplayMode::from_str("minimal"), Some(DisplayMode::Minimal));
         assert_eq!(DisplayMode::from_str("min"), Some(DisplayMode::Minimal));
-        assert_eq!(DisplayMode::from_str("standard"), Some(DisplayMode::Standard));
+        assert_eq!(
+            DisplayMode::from_str("standard"),
+            Some(DisplayMode::Standard)
+        );
         assert_eq!(DisplayMode::from_str("std"), Some(DisplayMode::Standard));
         assert_eq!(DisplayMode::from_str("debug"), Some(DisplayMode::Debug));
         assert_eq!(DisplayMode::from_str("dbg"), Some(DisplayMode::Debug));
@@ -427,5 +842,25 @@ mod tests {
     fn test_default_mode() {
         let mode = DisplayMode::default();
         assert_eq!(mode, DisplayMode::Minimal);
+    }
+
+    #[test]
+    fn test_truncate_chinese_chars() {
+        // 测试中文字符截断（UTF-8边界问题）
+        let text = "📅 公历 2025年10月20日\n农历 二零二五 乙巳、蛇年 八月 廿九";
+        let result = Display::truncate(text, 80);
+        // 应该能正常截断，不会panic
+        assert!(result.len() > 0);
+
+        // 测试短文本
+        let short_text = "今天农历几号";
+        let result = Display::truncate(short_text, 80);
+        assert_eq!(result, short_text);
+
+        // 测试需要截断的情况
+        let long_text = "这是一个非常长的中文字符串，需要被截断处理";
+        let result = Display::truncate(long_text, 10);
+        assert!(result.ends_with("..."));
+        assert!(result.chars().count() <= 10);
     }
 }

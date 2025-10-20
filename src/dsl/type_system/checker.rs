@@ -3,7 +3,7 @@
 //! 实现类型兼容性检查、约束验证和错误报告
 
 use super::types::{
-    CompositeType, Constraint, ConstrainedType, ConstraintValue, PrimitiveType, Type,
+    CompositeType, ConstrainedType, Constraint, ConstraintValue, PrimitiveType, Type,
 };
 use std::collections::HashMap;
 
@@ -119,18 +119,14 @@ impl TypeChecker {
             if let Some(bound_type) = self.get_type_var(name) {
                 return self.check_assignable(bound_type, actual, context);
             }
-            return Err(TypeError::UndefinedTypeVar {
-                name: name.clone(),
-            });
+            return Err(TypeError::UndefinedTypeVar { name: name.clone() });
         }
 
         if let Type::TypeVar(name) = actual {
             if let Some(bound_type) = self.get_type_var(name) {
                 return self.check_assignable(expected, bound_type, context);
             }
-            return Err(TypeError::UndefinedTypeVar {
-                name: name.clone(),
-            });
+            return Err(TypeError::UndefinedTypeVar { name: name.clone() });
         }
 
         match (expected, actual) {
@@ -427,9 +423,7 @@ mod tests {
         let result2 = Type::result(Type::string(), Type::string());
         let result3 = Type::result(Type::integer(), Type::string());
 
-        assert!(checker
-            .check_assignable(&result1, &result2, "test")
-            .is_ok());
+        assert!(checker.check_assignable(&result1, &result2, "test").is_ok());
 
         assert!(checker
             .check_assignable(&result1, &result3, "test")

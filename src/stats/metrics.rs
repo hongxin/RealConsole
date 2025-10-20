@@ -122,7 +122,10 @@ impl ToolMetrics {
 
         // 更新成功次数
         if success {
-            *self.success_by_tool.entry(tool_name.to_string()).or_insert(0) += 1;
+            *self
+                .success_by_tool
+                .entry(tool_name.to_string())
+                .or_insert(0) += 1;
         }
 
         // 更新执行时间
@@ -157,7 +160,9 @@ impl ToolMetrics {
 
     /// 获取使用次数最多的工具（Top N）
     pub fn top_tools(&self, limit: usize) -> Vec<(String, u64)> {
-        let mut tools: Vec<_> = self.usage_by_tool.iter()
+        let mut tools: Vec<_> = self
+            .usage_by_tool
+            .iter()
             .map(|(name, count)| (name.clone(), *count))
             .collect();
 
@@ -238,7 +243,9 @@ impl CommandMetrics {
     /// 会话运行时长
     pub fn session_duration(&self) -> Duration {
         let now = Utc::now();
-        (now - self.session_start).to_std().unwrap_or(Duration::from_secs(0))
+        (now - self.session_start)
+            .to_std()
+            .unwrap_or(Duration::from_secs(0))
     }
 }
 
@@ -365,7 +372,7 @@ mod tests {
         assert_eq!(metrics.total_calls, 4);
         assert_eq!(metrics.usage_by_tool.get("calculator"), Some(&3));
         assert_eq!(metrics.success_by_tool.get("calculator"), Some(&2));
-        assert!((metrics.success_rate("calculator") - 2.0/3.0).abs() < 0.01);
+        assert!((metrics.success_rate("calculator") - 2.0 / 3.0).abs() < 0.01);
         assert_eq!(metrics.avg_time_ms("calculator"), 110); // (100+150+80)/3
 
         let top = metrics.top_tools(2);
@@ -384,7 +391,7 @@ mod tests {
         assert_eq!(metrics.total_commands, 3);
         assert_eq!(metrics.success_commands, 2);
         assert_eq!(metrics.failed_commands, 1);
-        assert!((metrics.success_rate() - 2.0/3.0).abs() < 0.01);
+        assert!((metrics.success_rate() - 2.0 / 3.0).abs() < 0.01);
         assert_eq!(metrics.avg_execution_time_ms(), 1166); // (1000+2000+500)/3
     }
 

@@ -161,9 +161,7 @@ impl TypeInference {
                     ty.clone()
                 }
             }
-            Type::Composite(composite) => {
-                Type::Composite(self.resolve_composite(composite))
-            }
+            Type::Composite(composite) => Type::Composite(self.resolve_composite(composite)),
             _ => ty.clone(),
         }
     }
@@ -171,28 +169,18 @@ impl TypeInference {
     /// 解析复合类型中的类型变量
     fn resolve_composite(&self, composite: &CompositeType) -> CompositeType {
         match composite {
-            CompositeType::List(t) => {
-                CompositeType::List(Box::new(self.resolve_type(t)))
-            }
-            CompositeType::Dict(k, v) => {
-                CompositeType::Dict(
-                    Box::new(self.resolve_type(k)),
-                    Box::new(self.resolve_type(v)),
-                )
-            }
-            CompositeType::Optional(t) => {
-                CompositeType::Optional(Box::new(self.resolve_type(t)))
-            }
-            CompositeType::Result(ok, err) => {
-                CompositeType::Result(
-                    Box::new(self.resolve_type(ok)),
-                    Box::new(self.resolve_type(err)),
-                )
-            }
+            CompositeType::List(t) => CompositeType::List(Box::new(self.resolve_type(t))),
+            CompositeType::Dict(k, v) => CompositeType::Dict(
+                Box::new(self.resolve_type(k)),
+                Box::new(self.resolve_type(v)),
+            ),
+            CompositeType::Optional(t) => CompositeType::Optional(Box::new(self.resolve_type(t))),
+            CompositeType::Result(ok, err) => CompositeType::Result(
+                Box::new(self.resolve_type(ok)),
+                Box::new(self.resolve_type(err)),
+            ),
             CompositeType::Tuple(types) => {
-                CompositeType::Tuple(
-                    types.iter().map(|t| self.resolve_type(t)).collect()
-                )
+                CompositeType::Tuple(types.iter().map(|t| self.resolve_type(t)).collect())
             }
         }
     }
@@ -204,9 +192,10 @@ impl TypeInference {
         substitutions: &HashMap<String, Type>,
     ) -> Type {
         match generic_type {
-            Type::TypeVar(name) => {
-                substitutions.get(name).cloned().unwrap_or_else(|| generic_type.clone())
-            }
+            Type::TypeVar(name) => substitutions
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| generic_type.clone()),
             Type::Composite(composite) => {
                 Type::Composite(self.instantiate_composite(composite, substitutions))
             }
@@ -224,26 +213,23 @@ impl TypeInference {
             CompositeType::List(t) => {
                 CompositeType::List(Box::new(self.instantiate(t, substitutions)))
             }
-            CompositeType::Dict(k, v) => {
-                CompositeType::Dict(
-                    Box::new(self.instantiate(k, substitutions)),
-                    Box::new(self.instantiate(v, substitutions)),
-                )
-            }
+            CompositeType::Dict(k, v) => CompositeType::Dict(
+                Box::new(self.instantiate(k, substitutions)),
+                Box::new(self.instantiate(v, substitutions)),
+            ),
             CompositeType::Optional(t) => {
                 CompositeType::Optional(Box::new(self.instantiate(t, substitutions)))
             }
-            CompositeType::Result(ok, err) => {
-                CompositeType::Result(
-                    Box::new(self.instantiate(ok, substitutions)),
-                    Box::new(self.instantiate(err, substitutions)),
-                )
-            }
-            CompositeType::Tuple(types) => {
-                CompositeType::Tuple(
-                    types.iter().map(|t| self.instantiate(t, substitutions)).collect()
-                )
-            }
+            CompositeType::Result(ok, err) => CompositeType::Result(
+                Box::new(self.instantiate(ok, substitutions)),
+                Box::new(self.instantiate(err, substitutions)),
+            ),
+            CompositeType::Tuple(types) => CompositeType::Tuple(
+                types
+                    .iter()
+                    .map(|t| self.instantiate(t, substitutions))
+                    .collect(),
+            ),
         }
     }
 
@@ -351,10 +337,7 @@ mod tests {
     fn test_unify_result_types() {
         let mut inference = TypeInference::new();
 
-        let result_t_e = Type::result(
-            inference.fresh_type_var(),
-            inference.fresh_type_var(),
-        );
+        let result_t_e = Type::result(inference.fresh_type_var(), inference.fresh_type_var());
         let result_string_string = Type::result(Type::string(), Type::string());
 
         let result = inference.unify(&result_t_e, &result_string_string);
@@ -373,10 +356,8 @@ mod tests {
             Type::integer(),
         ]));
 
-        let tuple_string_int = Type::Composite(CompositeType::Tuple(vec![
-            Type::string(),
-            Type::integer(),
-        ]));
+        let tuple_string_int =
+            Type::Composite(CompositeType::Tuple(vec![Type::string(), Type::integer()]));
 
         let result = inference.unify(&tuple_t, &tuple_string_int);
         assert!(result.is_ok());
@@ -407,16 +388,10 @@ mod tests {
 
         // 创建 Result<List<T>, String> 类型
         let t_var = inference.fresh_type_var();
-        let result_list_t = Type::result(
-            Type::list(t_var.clone()),
-            Type::string(),
-        );
+        let result_list_t = Type::result(Type::list(t_var.clone()), Type::string());
 
         // 统一为 Result<List<Integer>, String>
-        let result_list_int = Type::result(
-            Type::list(Type::integer()),
-            Type::string(),
-        );
+        let result_list_int = Type::result(Type::list(Type::integer()), Type::string());
 
         let unified = inference.unify(&result_list_t, &result_list_int);
         assert!(unified.is_ok());

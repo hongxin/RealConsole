@@ -32,9 +32,21 @@ fn handle_project(_arg: &str) -> String {
     output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
     // 基本信息
-    output.push(format!("  {}: {}", "项目名称".dimmed(), context.project_name().cyan()));
-    output.push(format!("  {}: {}", "项目类型".dimmed(), context.type_description().green()));
-    output.push(format!("  {}: {}", "根目录".dimmed(), context.root.display().to_string().dimmed()));
+    output.push(format!(
+        "  {}: {}",
+        "项目名称".dimmed(),
+        context.project_name().cyan()
+    ));
+    output.push(format!(
+        "  {}: {}",
+        "项目类型".dimmed(),
+        context.type_description().green()
+    ));
+    output.push(format!(
+        "  {}: {}",
+        "根目录".dimmed(),
+        context.root.display().to_string().dimmed()
+    ));
 
     // 项目类型详情
     output.push(String::new());
@@ -42,26 +54,101 @@ fn handle_project(_arg: &str) -> String {
     output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
     match &context.project_type {
-        crate::project_context::ProjectType::Rust { cargo_toml, has_src, has_tests } => {
+        crate::project_context::ProjectType::Rust {
+            cargo_toml,
+            has_src,
+            has_tests,
+        } => {
             output.push(format!("  {}: {}", "Cargo.toml".dimmed(), "✓".green()));
-            output.push(format!("  {}: {}", "src/ 目录".dimmed(), if *has_src { "✓".green() } else { "✗".red() }));
-            output.push(format!("  {}: {}", "tests/ 目录".dimmed(), if *has_tests { "✓".green() } else { "✗".red() }));
-            output.push(format!("  {}: {}", "配置文件".dimmed(), cargo_toml.display().to_string().dimmed()));
+            output.push(format!(
+                "  {}: {}",
+                "src/ 目录".dimmed(),
+                if *has_src { "✓".green() } else { "✗".red() }
+            ));
+            output.push(format!(
+                "  {}: {}",
+                "tests/ 目录".dimmed(),
+                if *has_tests {
+                    "✓".green()
+                } else {
+                    "✗".red()
+                }
+            ));
+            output.push(format!(
+                "  {}: {}",
+                "配置文件".dimmed(),
+                cargo_toml.display().to_string().dimmed()
+            ));
         }
-        crate::project_context::ProjectType::Python { requirements, pyproject, setup_py } => {
-            output.push(format!("  {}: {}", "requirements.txt".dimmed(), if requirements.is_some() { "✓".green() } else { "✗".dimmed() }));
-            output.push(format!("  {}: {}", "pyproject.toml".dimmed(), if pyproject.is_some() { "✓".green() } else { "✗".dimmed() }));
-            output.push(format!("  {}: {}", "setup.py".dimmed(), if setup_py.is_some() { "✓".green() } else { "✗".dimmed() }));
+        crate::project_context::ProjectType::Python {
+            requirements,
+            pyproject,
+            setup_py,
+        } => {
+            output.push(format!(
+                "  {}: {}",
+                "requirements.txt".dimmed(),
+                if requirements.is_some() {
+                    "✓".green()
+                } else {
+                    "✗".dimmed()
+                }
+            ));
+            output.push(format!(
+                "  {}: {}",
+                "pyproject.toml".dimmed(),
+                if pyproject.is_some() {
+                    "✓".green()
+                } else {
+                    "✗".dimmed()
+                }
+            ));
+            output.push(format!(
+                "  {}: {}",
+                "setup.py".dimmed(),
+                if setup_py.is_some() {
+                    "✓".green()
+                } else {
+                    "✗".dimmed()
+                }
+            ));
         }
-        crate::project_context::ProjectType::Node { package_json, has_node_modules } => {
+        crate::project_context::ProjectType::Node {
+            package_json,
+            has_node_modules,
+        } => {
             output.push(format!("  {}: {}", "package.json".dimmed(), "✓".green()));
-            output.push(format!("  {}: {}", "node_modules/".dimmed(), if *has_node_modules { "✓".green() } else { "✗".dimmed() }));
-            output.push(format!("  {}: {}", "配置文件".dimmed(), package_json.display().to_string().dimmed()));
+            output.push(format!(
+                "  {}: {}",
+                "node_modules/".dimmed(),
+                if *has_node_modules {
+                    "✓".green()
+                } else {
+                    "✗".dimmed()
+                }
+            ));
+            output.push(format!(
+                "  {}: {}",
+                "配置文件".dimmed(),
+                package_json.display().to_string().dimmed()
+            ));
         }
         crate::project_context::ProjectType::Go { go_mod, has_go_sum } => {
             output.push(format!("  {}: {}", "go.mod".dimmed(), "✓".green()));
-            output.push(format!("  {}: {}", "go.sum".dimmed(), if *has_go_sum { "✓".green() } else { "✗".dimmed() }));
-            output.push(format!("  {}: {}", "配置文件".dimmed(), go_mod.display().to_string().dimmed()));
+            output.push(format!(
+                "  {}: {}",
+                "go.sum".dimmed(),
+                if *has_go_sum {
+                    "✓".green()
+                } else {
+                    "✗".dimmed()
+                }
+            ));
+            output.push(format!(
+                "  {}: {}",
+                "配置文件".dimmed(),
+                go_mod.display().to_string().dimmed()
+            ));
         }
         crate::project_context::ProjectType::Java { build_file } => {
             use crate::project_context::JavaBuildFile;
@@ -69,12 +156,20 @@ fn handle_project(_arg: &str) -> String {
                 JavaBuildFile::Maven(path) => {
                     output.push(format!("  {}: Maven", "构建工具".dimmed()));
                     output.push(format!("  {}: {}", "pom.xml".dimmed(), "✓".green()));
-                    output.push(format!("  {}: {}", "配置文件".dimmed(), path.display().to_string().dimmed()));
+                    output.push(format!(
+                        "  {}: {}",
+                        "配置文件".dimmed(),
+                        path.display().to_string().dimmed()
+                    ));
                 }
                 JavaBuildFile::Gradle(path) | JavaBuildFile::GradleKts(path) => {
                     output.push(format!("  {}: Gradle", "构建工具".dimmed()));
                     output.push(format!("  {}: {}", "build.gradle".dimmed(), "✓".green()));
-                    output.push(format!("  {}: {}", "配置文件".dimmed(), path.display().to_string().dimmed()));
+                    output.push(format!(
+                        "  {}: {}",
+                        "配置文件".dimmed(),
+                        path.display().to_string().dimmed()
+                    ));
                 }
             }
         }
@@ -124,7 +219,10 @@ fn handle_project(_arg: &str) -> String {
         }
 
         output.push(String::new());
-        output.push(format!("  {}", "💡 提示：可以直接输入\"运行测试\"等自然语言".dimmed()));
+        output.push(format!(
+            "  {}",
+            "💡 提示：可以直接输入\"运行测试\"等自然语言".dimmed()
+        ));
     }
 
     output.push(String::new());

@@ -9,8 +9,8 @@
 //! - Go (go.mod)
 //! - Java (pom.xml, build.gradle)
 
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 /// 项目类型
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,14 +33,9 @@ pub enum ProjectType {
         has_node_modules: bool,
     },
     /// Go 项目
-    Go {
-        go_mod: PathBuf,
-        has_go_sum: bool,
-    },
+    Go { go_mod: PathBuf, has_go_sum: bool },
     /// Java 项目
-    Java {
-        build_file: JavaBuildFile,
-    },
+    Java { build_file: JavaBuildFile },
     /// 未知项目类型
     Unknown,
 }
@@ -48,9 +43,9 @@ pub enum ProjectType {
 /// Java 构建文件类型
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JavaBuildFile {
-    Maven(PathBuf),      // pom.xml
-    Gradle(PathBuf),     // build.gradle
-    GradleKts(PathBuf),  // build.gradle.kts
+    Maven(PathBuf),     // pom.xml
+    Gradle(PathBuf),    // build.gradle
+    GradleKts(PathBuf), // build.gradle.kts
 }
 
 /// Git 信息
@@ -201,9 +196,7 @@ impl ProjectContext {
             .ok()?;
 
         if output.status.success() {
-            let branch = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string();
+            let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
             Some(branch)
         } else {
             None
@@ -237,9 +230,7 @@ impl ProjectContext {
             .ok()?;
 
         if output.status.success() {
-            let url = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string();
+            let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
             Some(url)
         } else {
             None

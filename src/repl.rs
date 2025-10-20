@@ -21,9 +21,9 @@ pub fn run(agent: &Agent) -> RustyResult<()> {
     let mut rl = DefaultEditor::new()?;
 
     // ✨ Phase 8: 配置历史记录行为（使用 Configurer trait）
-    rl.set_max_history_size(1000)?;  // 与 HistoryManager 的容量保持一致
-    rl.set_history_ignore_dups(true)?;  // 忽略连续重复
-    rl.set_auto_add_history(true);  // 自动添加历史
+    rl.set_max_history_size(1000)?; // 与 HistoryManager 的容量保持一致
+    rl.set_history_ignore_dups(true)?; // 忽略连续重复
+    rl.set_auto_add_history(true); // 自动添加历史
 
     // ✨ Phase 8: 从 HistoryManager 加载历史到 rustyline
     // 注意：rustyline 已经内置了 Ctrl+R 反向搜索功能
@@ -82,7 +82,8 @@ pub fn run(agent: &Agent) -> RustyResult<()> {
 fn print_welcome() {
     let version = env!("CARGO_PKG_VERSION");
     // 极简单行显示：版本 | 用途 | 帮助 | 退出
-    println!(" {} {} {} {} {} {} {}",
+    println!(
+        " {} {} {} {} {} {} {}",
         i18n::t("welcome.app_name").bold().cyan(),
         i18n::t_with_args("welcome.version", &[("version", version)]).dimmed(),
         "|".dimmed(),
@@ -141,11 +142,12 @@ fn build_prompt() -> String {
 
     // 构建提示符：(RealConsole v1) Username Pathname %
     // 样式与欢迎信息保持一致：RealConsole 粗体青色，版本号灰色
-    format!("({} {}) {} {} % ",
-        "RealConsole".bold().cyan(),            // 粗体青色 RealConsole（与首行一致）
+    format!(
+        "({} {}) {} {} % ",
+        "RealConsole".bold().cyan(), // 粗体青色 RealConsole（与首行一致）
         format!("v{}", major_version).dimmed(), // 灰色版本号（与首行一致）
-        username.truecolor(255, 165, 0),        // 橙色用户名
-        current_dir.truecolor(255, 165, 0)      // 橙色目录名
+        username.truecolor(255, 165, 0), // 橙色用户名
+        current_dir.truecolor(255, 165, 0)  // 橙色目录名
     )
 }
 

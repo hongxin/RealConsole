@@ -7,8 +7,10 @@
 //! - 自动重试机制（通过 HttpClientBase）
 //! - 流式输出支持 (SSE)
 
-use super::{async_trait, ChatResponse, ClientStats, FunctionCall, LlmClient, LlmError, Message, ToolCall};
 use super::http_base::HttpClientBase;
+use super::{
+    async_trait, ChatResponse, ClientStats, FunctionCall, LlmClient, LlmError, Message, ToolCall,
+};
 use futures::StreamExt;
 use reqwest::header::HeaderMap;
 use serde_json::{json, Value};
@@ -93,7 +95,10 @@ impl DeepseekClient {
         });
 
         // 使用 HttpClientBase 发送 POST 请求
-        let resp = self.base.post_json(&url, payload, Some(self.auth_headers())).await?;
+        let resp = self
+            .base
+            .post_json(&url, payload, Some(self.auth_headers()))
+            .await?;
 
         // 使用 HttpClientBase 处理响应
         let data = HttpClientBase::handle_response(resp).await?;
@@ -122,7 +127,11 @@ impl DeepseekClient {
     /// # 返回
     /// - `Ok(String)`: 完整的响应内容
     /// - `Err(LlmError)`: 错误
-    pub async fn chat_stream<F>(&self, messages: &[Message], mut callback: F) -> Result<String, LlmError>
+    pub async fn chat_stream<F>(
+        &self,
+        messages: &[Message],
+        mut callback: F,
+    ) -> Result<String, LlmError>
     where
         F: FnMut(&str),
     {
@@ -135,7 +144,10 @@ impl DeepseekClient {
         });
 
         // 发送流式请求
-        let resp = self.base.post_json(&url, payload, Some(self.auth_headers())).await?;
+        let resp = self
+            .base
+            .post_json(&url, payload, Some(self.auth_headers()))
+            .await?;
 
         let status = resp.status();
         if !status.is_success() {
@@ -235,7 +247,10 @@ impl LlmClient for DeepseekClient {
                 }
 
                 // 发送请求
-                let resp = self.base.post_json(&url, payload, Some(self.auth_headers())).await?;
+                let resp = self
+                    .base
+                    .post_json(&url, payload, Some(self.auth_headers()))
+                    .await?;
 
                 // 处理响应
                 let data = HttpClientBase::handle_response(resp).await?;
@@ -252,10 +267,9 @@ impl LlmClient for DeepseekClient {
                                 let mut parsed_tool_calls = Vec::new();
 
                                 for tc in tool_calls {
-                                    if let (Some(id), Some(func)) = (
-                                        tc["id"].as_str(),
-                                        tc["function"].as_object(),
-                                    ) {
+                                    if let (Some(id), Some(func)) =
+                                        (tc["id"].as_str(), tc["function"].as_object())
+                                    {
                                         if let (Some(name), Some(args)) = (
                                             func.get("name").and_then(|v| v.as_str()),
                                             func.get("arguments").and_then(|v| v.as_str()),
@@ -327,7 +341,8 @@ mod tests {
 
     #[test]
     fn test_deepseek_creation() {
-        let client = DeepseekClient::new("test-key", "deepseek-chat", "https://api.deepseek.com/v1");
+        let client =
+            DeepseekClient::new("test-key", "deepseek-chat", "https://api.deepseek.com/v1");
         assert!(client.is_ok());
 
         let client = client.unwrap();
@@ -387,13 +402,15 @@ mod tests {
             .mock("POST", "/chat/completions")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "choices": [{
                     "message": {
                         "content": "Hello! How can I help you?"
                     }
                 }]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -453,7 +470,8 @@ mod tests {
         let _mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "choices": [{
                     "message": {
                         "tool_calls": [{
@@ -465,7 +483,8 @@ mod tests {
                         }]
                     }
                 }]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -478,7 +497,9 @@ mod tests {
             }
         })];
 
-        let result = client.chat_with_tools(vec![Message::user("Calculate 2+2")], tools).await;
+        let result = client
+            .chat_with_tools(vec![Message::user("Calculate 2+2")], tools)
+            .await;
 
         assert!(result.is_ok());
         let response = result.unwrap();
@@ -496,18 +517,22 @@ mod tests {
         let _mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "choices": [{
                     "message": {
                         "content": "I don't need tools for this."
                     }
                 }]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
         let client = DeepseekClient::new("test-key", "test-model", server.url()).unwrap();
-        let result = client.chat_with_tools(vec![Message::user("Hello")], vec![]).await;
+        let result = client
+            .chat_with_tools(vec![Message::user("Hello")], vec![])
+            .await;
 
         assert!(result.is_ok());
         let response = result.unwrap();
@@ -542,11 +567,13 @@ mod tests {
         let _mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "choices": [{
                     "message": {"content": "Response"}
                 }]
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 

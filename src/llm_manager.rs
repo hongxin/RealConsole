@@ -124,7 +124,11 @@ mod tests {
     #[async_trait]
     impl LlmClient for MockClient {
         async fn chat(&self, messages: Vec<Message>) -> Result<String, LlmError> {
-            Ok(format!("{}: received {} messages", self.name, messages.len()))
+            Ok(format!(
+                "{}: received {} messages",
+                self.name,
+                messages.len()
+            ))
         }
 
         fn model(&self) -> &str {

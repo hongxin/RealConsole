@@ -98,7 +98,11 @@ impl ExecutionLog {
 
     /// 详细输出
     pub fn format_detailed(&self) -> String {
-        let status = if self.success { "✓ 成功" } else { "✗ 失败" };
+        let status = if self.success {
+            "✓ 成功"
+        } else {
+            "✗ 失败"
+        };
         format!(
             "[{}] {} - {}\n  类型: {} | 耗时: {}ms\n  命令: {}\n  结果: {}",
             self.timestamp.format("%Y-%m-%d %H:%M:%S"),

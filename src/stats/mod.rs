@@ -11,5 +11,5 @@ pub mod collector;
 pub mod dashboard;
 pub mod metrics;
 
-pub use collector::{StatsCollector, StatEvent};
+pub use collector::{StatEvent, StatsCollector};
 pub use dashboard::Dashboard;

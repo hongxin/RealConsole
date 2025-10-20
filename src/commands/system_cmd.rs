@@ -16,11 +16,7 @@ pub fn register_system_commands(registry: &mut crate::command::CommandRegistry) 
     ));
 
     // CPU 信息
-    registry.register(Command::from_fn(
-        "cpu",
-        "显示 CPU 使用情况",
-        handle_cpu,
-    ));
+    registry.register(Command::from_fn("cpu", "显示 CPU 使用情况", handle_cpu));
 
     // 内存信息
     registry.register(Command::from_fn(
@@ -64,7 +60,11 @@ fn handle_sys_status(_arg: &str) -> String {
             output.push(format!("{}", "CPU".green().bold()));
             output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
-            output.push(format!("  {}: {} 核", "核心数".dimmed(), cpu.cores.to_string().cyan()));
+            output.push(format!(
+                "  {}: {} 核",
+                "核心数".dimmed(),
+                cpu.cores.to_string().cyan()
+            ));
 
             let total_usage = cpu.user_usage + cpu.system_usage;
             let usage_color = if total_usage > 80.0 {
@@ -180,7 +180,11 @@ fn handle_sys_status(_arg: &str) -> String {
             }
 
             if disks.len() > 3 {
-                output.push(format!("\n  {} 还有 {} 个磁盘", "...".dimmed(), disks.len() - 3));
+                output.push(format!(
+                    "\n  {} 还有 {} 个磁盘",
+                    "...".dimmed(),
+                    disks.len() - 3
+                ));
             }
         }
         Err(e) => {
@@ -211,7 +215,11 @@ fn handle_cpu(_arg: &str) -> String {
             output.push(format!("\n{}", "CPU 信息".cyan().bold()));
             output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
-            output.push(format!("\n  {}: {} 核", "CPU 核心数".dimmed(), cpu.cores.to_string().cyan().bold()));
+            output.push(format!(
+                "\n  {}: {} 核",
+                "CPU 核心数".dimmed(),
+                cpu.cores.to_string().cyan().bold()
+            ));
 
             let total_usage = cpu.user_usage + cpu.system_usage;
 
@@ -219,11 +227,7 @@ fn handle_cpu(_arg: &str) -> String {
             output.push(format!("{}", "使用率详情".green().bold()));
             output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
-            output.push(format!(
-                "  {}: {:.2}%",
-                "用户进程".dimmed(),
-                cpu.user_usage
-            ));
+            output.push(format!("  {}: {:.2}%", "用户进程".dimmed(), cpu.user_usage));
 
             output.push(format!(
                 "  {}: {:.2}%",
@@ -231,17 +235,9 @@ fn handle_cpu(_arg: &str) -> String {
                 cpu.system_usage
             ));
 
-            output.push(format!(
-                "  {}: {:.2}%",
-                "总使用率".dimmed(),
-                total_usage
-            ));
+            output.push(format!("  {}: {:.2}%", "总使用率".dimmed(), total_usage));
 
-            output.push(format!(
-                "  {}: {:.2}%",
-                "空闲".dimmed(),
-                cpu.idle
-            ));
+            output.push(format!("  {}: {:.2}%", "空闲".dimmed(), cpu.idle));
 
             // 可视化
             output.push(String::new());
@@ -356,11 +352,14 @@ fn handle_mem(_arg: &str) -> String {
             let used_filled = ((mem.usage_percent / 100.0) * bar_width as f64) as usize;
 
             let bar = if mem.usage_percent > 80.0 {
-                "█".repeat(used_filled).red().to_string() + &"░".repeat(bar_width - used_filled).dimmed().to_string()
+                "█".repeat(used_filled).red().to_string()
+                    + &"░".repeat(bar_width - used_filled).dimmed().to_string()
             } else if mem.usage_percent > 60.0 {
-                "█".repeat(used_filled).yellow().to_string() + &"░".repeat(bar_width - used_filled).dimmed().to_string()
+                "█".repeat(used_filled).yellow().to_string()
+                    + &"░".repeat(bar_width - used_filled).dimmed().to_string()
             } else {
-                "█".repeat(used_filled).green().to_string() + &"░".repeat(bar_width - used_filled).dimmed().to_string()
+                "█".repeat(used_filled).green().to_string()
+                    + &"░".repeat(bar_width - used_filled).dimmed().to_string()
             };
 
             output.push(format!("  {}", bar));
@@ -420,7 +419,11 @@ fn handle_disk(_arg: &str) -> String {
                     disk.mount_point.cyan().bold()
                 ));
 
-                output.push(format!("  {}: {}", "文件系统".dimmed(), disk.filesystem.dimmed()));
+                output.push(format!(
+                    "  {}: {}",
+                    "文件系统".dimmed(),
+                    disk.filesystem.dimmed()
+                ));
 
                 let usage_str = if disk.usage_percent > 90.0 {
                     format!("{:.1}%", disk.usage_percent).red()
@@ -489,7 +492,11 @@ fn handle_top(arg: &str) -> String {
                 "进程名".dimmed()
             ));
 
-            output.push("  ─────────────────────────────────────────".dimmed().to_string());
+            output.push(
+                "  ─────────────────────────────────────────"
+                    .dimmed()
+                    .to_string(),
+            );
 
             for proc in processes {
                 let cpu_str = if proc.cpu_percent > 50.0 {
@@ -510,10 +517,7 @@ fn handle_top(arg: &str) -> String {
 
                 output.push(format!(
                     "  {:<8} {} {} {}",
-                    proc.pid,
-                    cpu_str,
-                    mem_str,
-                    proc.name
+                    proc.pid, cpu_str, mem_str, proc.name
                 ));
             }
 

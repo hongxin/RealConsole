@@ -39,7 +39,9 @@ impl CommandValidator {
         let prompt = self.build_validation_prompt(user_input, plan, intent_name);
 
         let messages = vec![Message::user(prompt)];
-        let response = llm.chat(messages).await
+        let response = llm
+            .chat(messages)
+            .await
             .map_err(|e| format!("LLM 调用失败: {}", e))?;
 
         self.parse_validation_response(&response)
@@ -77,10 +79,7 @@ impl CommandValidator {
 - confidence 应该是 0.0 到 1.0 之间的数字
 - suggestions 是字符串数组，如果没有建议可以为空数组
 - reason 应该简洁说明判断依据"#,
-            user_input,
-            plan.command,
-            intent_name,
-            plan.template_name
+            user_input, plan.command, intent_name, plan.template_name
         )
     }
 
@@ -98,8 +97,8 @@ impl CommandValidator {
         };
 
         // 解析 JSON
-        let parsed: serde_json::Value = serde_json::from_str(json_str)
-            .map_err(|e| format!("JSON 解析失败: {}", e))?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(json_str).map_err(|e| format!("JSON 解析失败: {}", e))?;
 
         Ok(ValidationResult {
             is_valid: parsed["is_valid"].as_bool().unwrap_or(true),
@@ -239,7 +238,9 @@ mod tests {
         ```
         "#;
 
-        let result = validator.parse_validation_response(markdown_response).unwrap();
+        let result = validator
+            .parse_validation_response(markdown_response)
+            .unwrap();
         assert!(result.is_valid);
         assert_eq!(result.confidence, 0.88);
     }

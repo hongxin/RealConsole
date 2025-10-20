@@ -179,7 +179,11 @@ impl ParameterAnalyzer {
     }
 
     /// 构建参数提取提示词
-    fn build_extraction_prompt(&self, user_input: &str, parameter_specs: &[ParameterSpec]) -> String {
+    fn build_extraction_prompt(
+        &self,
+        user_input: &str,
+        parameter_specs: &[ParameterSpec],
+    ) -> String {
         let params_desc = parameter_specs
             .iter()
             .map(|spec| {
@@ -241,8 +245,8 @@ impl ParameterAnalyzer {
         };
 
         // 解析 JSON
-        let parsed: ExtractionResult = serde_json::from_str(json_str)
-            .map_err(|e| format!("JSON 解析失败: {}", e))?;
+        let parsed: ExtractionResult =
+            serde_json::from_str(json_str).map_err(|e| format!("JSON 解析失败: {}", e))?;
 
         // 转换为 ParameterValue
         let mut extracted = Vec::new();
@@ -431,7 +435,9 @@ mod tests {
 
         let response = r#"{"parameters": {"name": "Alice", "age": 30}}"#;
 
-        let result = analyzer.parse_extraction_response(response, &specs).unwrap();
+        let result = analyzer
+            .parse_extraction_response(response, &specs)
+            .unwrap();
 
         assert_eq!(result.len(), 2);
 

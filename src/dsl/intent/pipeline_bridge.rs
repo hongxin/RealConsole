@@ -142,7 +142,7 @@ impl IntentToPipeline {
         let plan = ExecutionPlan::new()
             .with_operation(BaseOperation::FindFiles { path, pattern })
             .with_operation(BaseOperation::SortFiles {
-                field: Field::Time,  // 关键区别：按时间排序
+                field: Field::Time, // 关键区别：按时间排序
                 direction,
             })
             .with_operation(BaseOperation::LimitFiles { count: limit });
@@ -351,13 +351,7 @@ mod tests {
     fn test_convert_unsupported_intent() {
         let converter = IntentToPipeline::new();
 
-        let intent = Intent::new(
-            "unknown_intent",
-            IntentDomain::FileOps,
-            vec![],
-            vec![],
-            0.5,
-        );
+        let intent = Intent::new("unknown_intent", IntentDomain::FileOps, vec![], vec![], 0.5);
 
         let intent_match = IntentMatch {
             intent,
@@ -390,10 +384,7 @@ mod tests {
         let converter = IntentToPipeline::new();
 
         let mut entities = HashMap::new();
-        entities.insert(
-            "path".to_string(),
-            EntityType::Path("./src".to_string()),
-        );
+        entities.insert("path".to_string(), EntityType::Path("./src".to_string()));
 
         let path = converter.extract_path(&entities);
         assert_eq!(path, Some("./src".to_string()));
@@ -710,7 +701,7 @@ mod tests {
 
         // 验证：排序列不同
         assert!(cmd_find.contains("sort -k5")); // FindFiles: 指定列
-        assert!(cmd_du.contains("sort -hr"));    // DiskUsage: 默认第一列
+        assert!(cmd_du.contains("sort -hr")); // DiskUsage: 默认第一列
         assert!(!cmd_du.contains("sort -k"));
 
         // 哲学体现：

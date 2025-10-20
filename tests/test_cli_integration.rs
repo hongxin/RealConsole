@@ -35,7 +35,8 @@ fn test_cli_version() {
 fn test_cli_once_mode_help() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once").arg("/help")
+    cmd.arg("--once")
+        .arg("/help")
         .assert()
         .success()
         .stdout(predicate::str::contains("SimpleConsole").or(predicate::str::contains("Console")))
@@ -47,10 +48,13 @@ fn test_cli_once_mode_help() {
 fn test_cli_once_mode_version() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once").arg("/version")
+    cmd.arg("--once")
+        .arg("/version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("SimpleConsole").or(predicate::str::contains("RealConsole")))
+        .stdout(
+            predicate::str::contains("SimpleConsole").or(predicate::str::contains("RealConsole")),
+        )
         .stdout(predicate::str::contains("Phase"));
 }
 
@@ -59,7 +63,8 @@ fn test_cli_once_mode_version() {
 fn test_cli_once_mode_tools() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once").arg("/tools")
+    cmd.arg("--once")
+        .arg("/tools")
         .assert()
         .success()
         .stdout(predicate::str::contains("可用工具"))
@@ -71,9 +76,7 @@ fn test_cli_once_mode_tools() {
 fn test_cli_once_mode_commands() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once").arg("/commands")
-        .assert()
-        .success(); // 只检查成功执行，输出可能因配置而异
+    cmd.arg("--once").arg("/commands").assert().success(); // 只检查成功执行，输出可能因配置而异
 }
 
 /// 测试配置文件加载（不存在时使用默认配置）
@@ -107,7 +110,9 @@ fn test_cli_with_empty_config() {
         .arg("/help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("SimpleConsole").or(predicate::str::contains("RealConsole")));
+        .stdout(
+            predicate::str::contains("SimpleConsole").or(predicate::str::contains("RealConsole")),
+        );
 }
 
 /// 测试最小配置文件
@@ -131,7 +136,9 @@ max_history: 10
         .arg("/version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("SimpleConsole").or(predicate::str::contains("RealConsole")));
+        .stdout(
+            predicate::str::contains("SimpleConsole").or(predicate::str::contains("RealConsole")),
+        );
 }
 
 /// 测试工具调用：calculator
@@ -176,10 +183,7 @@ fn test_cli_invalid_command() {
 fn test_cli_memory_recent() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once")
-        .arg("/memory recent")
-        .assert()
-        .success(); // 即使没有记忆也应该成功
+    cmd.arg("--once").arg("/memory recent").assert().success(); // 即使没有记忆也应该成功
 }
 
 /// 测试日志系统状态
@@ -228,9 +232,7 @@ fn test_cli_multiple_commands() {
 fn test_cli_config_wizard() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--wizard")
-        .assert()
-        .success();
+    cmd.arg("--wizard").assert().success();
 }
 
 /// 测试退出命令
@@ -238,10 +240,7 @@ fn test_cli_config_wizard() {
 fn test_cli_quit_command() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once")
-        .arg("/quit")
-        .assert()
-        .success();
+    cmd.arg("--once").arg("/quit").assert().success();
 }
 
 /// 测试别名命令
@@ -265,11 +264,8 @@ fn test_cli_command_aliases() {
 fn test_cli_commands_list_complete() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once")
-        .arg("/commands")
-        .assert()
-        .success(); // 只检查成功，不检查具体输出
-        // 命令列表的显示取决于运行时环境和配置
+    cmd.arg("--once").arg("/commands").assert().success(); // 只检查成功，不检查具体输出
+                                                           // 命令列表的显示取决于运行时环境和配置
 }
 
 /// 测试工具信息查询
@@ -300,8 +296,5 @@ fn test_cli_memory_search_empty() {
 fn test_cli_log_recent_empty() {
     let mut cmd = Command::cargo_bin("realconsole").unwrap();
 
-    cmd.arg("--once")
-        .arg("/log recent")
-        .assert()
-        .success(); // 即使没有日志也应该成功
+    cmd.arg("--once").arg("/log recent").assert().success(); // 即使没有日志也应该成功
 }

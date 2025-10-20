@@ -5,6 +5,9 @@
 //! 提供任务分解、规划和执行的命令接口
 
 use crate::command::{Command, CommandRegistry};
+use crate::config::Config;
+use crate::display::Display;
+use crate::spinner::Spinner;
 use crate::task::{
     ExecutionContext, ExecutionPlan, ExecutionResult, TaskDecomposer, TaskExecutor, TaskPlanner,
 };
@@ -75,9 +78,11 @@ pub fn register_task_commands(
     registry: &mut CommandRegistry,
     llm_manager: Arc<tokio::sync::RwLock<crate::llm_manager::LlmManager>>,
     shell_executor: Arc<crate::shell_executor::ShellExecutorWithFixer>,
+    config: Config,
 ) {
-    // 创建共享的任务管理器
+    // 创建共享的任务管理器和配置
     let task_manager = Arc::new(RwLock::new(TaskManager::new()));
+    let config = Arc::new(config);
 
     // /plan 命令 - 分解和规划任务
     {
@@ -89,10 +94,7 @@ pub fn register_task_commands(
             "分解和规划任务",
             move |goal: &str| {
                 if goal.trim().is_empty() {
-                    return format!(
-                        "{}\n使用方式: /plan <目标描述>",
-                        "❌ 请提供任务目标".red()
-                    );
+                    return format!("{}\n使用方式: /plan <目标描述>", "❌ 请提供任务目标".red());
                 }
 
                 let llm_manager = Arc::clone(&llm_manager);
@@ -113,6 +115,7 @@ pub fn register_task_commands(
     {
         let shell_executor = Arc::clone(&shell_executor);
         let manager = Arc::clone(&task_manager);
+        let config = Arc::clone(&config);
 
         registry.register(Command::from_fn(
             "execute",
@@ -120,11 +123,11 @@ pub fn register_task_commands(
             move |_arg: &str| {
                 let shell_executor = Arc::clone(&shell_executor);
                 let manager = Arc::clone(&manager);
+                let config = Arc::clone(&config);
 
                 tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        execute_tasks_command(&shell_executor, &manager).await
-                    })
+                    tokio::runtime::Handle::current()
+                        .block_on(async { execute_tasks_command(&shell_executor, &manager, &config).await })
                 })
             },
         ));
@@ -141,9 +144,8 @@ pub fn register_task_commands(
                 let manager = Arc::clone(&manager);
 
                 tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        view_tasks_command(&manager).await
-                    })
+                    tokio::runtime::Handle::current()
+                        .block_on(async { view_tasks_command(&manager).await })
                 })
             },
         ));
@@ -160,9 +162,8 @@ pub fn register_task_commands(
                 let manager = Arc::clone(&manager);
 
                 tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        view_task_status_command(&manager).await
-                    })
+                    tokio::runtime::Handle::current()
+                        .block_on(async { view_task_status_command(&manager).await })
                 })
             },
         ));
@@ -186,16 +187,24 @@ async fn execute_plan_command(
         match mgr.primary().or(mgr.fallback()) {
             Some(llm) => llm.clone(),
             None => {
-                return format!("❌ 未配置 LLM 客户端\n{}", "提示: 需要 LLM 来智能分解任务".dimmed());
+                return format!(
+                    "❌ 未配置 LLM 客户端\n{}",
+                    "提示: 需要 LLM 来智能分解任务".dimmed()
+                );
             }
         }
     };
 
-    // 3. 分解任务
+    // 3. 分解任务（显示 spinner）
+    let spinner = Spinner::new();
     let decomposer = TaskDecomposer::new(llm);
     let subtasks = match decomposer.decompose(goal, &context).await {
-        Ok(tasks) => tasks,
+        Ok(tasks) => {
+            spinner.stop();
+            tasks
+        }
         Err(e) => {
+            spinner.stop();
             return format!("❌ 任务分解失败: {}", e);
         }
     };
@@ -221,7 +230,11 @@ async fn execute_plan_command(
         "▸".dimmed(),
         analysis.total_stages,
         analysis.total_tasks,
-        if analysis.parallel_stages > 0 { "⚡ " } else { "" },
+        if analysis.parallel_stages > 0 {
+            "⚡ "
+        } else {
+            ""
+        },
         analysis.parallel_time
     );
 
@@ -249,7 +262,7 @@ async fn execute_plan_command(
         output.push_str(&format!(
             "{} {} {} {}\n",
             branch.dimmed(),
-            mode_icon.cyan(),
+            mode_icon,
             format!("Stage {}", idx + 1).dimmed(),
             format!("({}s)", stage.estimated_time).dimmed()
         ));
@@ -274,7 +287,10 @@ async fn execute_plan_command(
         mgr.save_plan(plan);
     }
 
-    output.push_str(&format!("\n{}\n", format!("使用 {} 执行", "/execute".cyan()).dimmed()));
+    output.push_str(&format!(
+        "\n{}\n",
+        format!("使用 {} 执行", "/execute".cyan()).dimmed()
+    ));
 
     output
 }
@@ -283,6 +299,7 @@ async fn execute_plan_command(
 async fn execute_tasks_command(
     shell_executor: &Arc<crate::shell_executor::ShellExecutorWithFixer>,
     manager: &Arc<RwLock<TaskManager>>,
+    config: &Arc<Config>,
 ) -> String {
     // 1. 获取当前计划
     let plan = {
@@ -295,11 +312,8 @@ async fn execute_tasks_command(
         }
     };
 
-    let mut output = String::new();
-
     // 2. 创建执行器
-    let executor = TaskExecutor::new(Arc::clone(shell_executor))
-        .with_timeout(300);
+    let executor = TaskExecutor::new(Arc::clone(shell_executor)).with_timeout(300);
 
     // 3. 执行计划
     let result = match executor.execute(plan.clone()).await {
@@ -315,39 +329,11 @@ async fn execute_tasks_command(
         mgr.save_result(result.clone());
     }
 
-    // 5. 紧凑的结果显示
-    let status = if result.is_success() {
-        "✓".green()
-    } else {
-        "✗".red()
-    };
+    // 5. 使用统一的显示方法（根据 DisplayMode 显示不同详细程度）
+    Display::task_execution_result(config.display.mode, &result, Some(&plan));
 
-    output.push_str(&format!(
-        "\n{} {} · {} · {}秒\n",
-        status,
-        format!("{}/{}", result.completed_tasks, result.total_tasks).bold(),
-        format!("{:.0}%", result.success_rate() * 100.0).dimmed(),
-        result.total_time
-    ));
-
-    // 6. 仅在有失败时显示详情
-    if result.failed_tasks > 0 {
-        for task_result in &result.task_results {
-            if matches!(task_result.status, crate::task::TaskStatus::Failed) {
-                output.push_str(&format!(
-                    "  {} {} {}\n",
-                    "✗".red(),
-                    task_result.task.name,
-                    format!("$ {}", task_result.task.command).dimmed()
-                ));
-                if let Some(error) = &task_result.error {
-                    output.push_str(&format!("    {}\n", error.red()));
-                }
-            }
-        }
-    }
-
-    output
+    // 返回空字符串（显示已经通过 Display 完成）
+    String::new()
 }
 
 /// 执行 /tasks 命令
@@ -381,7 +367,7 @@ async fn view_tasks_command(manager: &Arc<RwLock<TaskManager>>) -> String {
                 output.push_str(&format!(
                     "{} {} {}\n",
                     branch.dimmed(),
-                    mode.cyan(),
+                    mode,
                     format!("Stage {}", idx + 1).dimmed()
                 ));
 
@@ -398,7 +384,10 @@ async fn view_tasks_command(manager: &Arc<RwLock<TaskManager>>) -> String {
                 }
             }
 
-            output.push_str(&format!("\n{}\n", format!("使用 {} 执行", "/execute".cyan()).dimmed()));
+            output.push_str(&format!(
+                "\n{}\n",
+                format!("使用 {} 执行", "/execute".cyan()).dimmed()
+            ));
 
             output
         }
@@ -474,10 +463,7 @@ mod tests {
     fn test_task_manager_save_plan() {
         let mut manager = TaskManager::new();
 
-        let plan = ExecutionPlan::new(
-            "test goal",
-            vec![]
-        );
+        let plan = ExecutionPlan::new("test goal", vec![]);
 
         manager.save_plan(plan);
         assert!(manager.current_plan.is_some());

@@ -295,7 +295,8 @@ fn test_entity_extraction_with_template_generation() {
     let engine = builtin.create_engine();
 
     // 匹配意图并提取实体
-    if let Some(intent_match) = matcher.best_match("统计 ./build 目录下有多少个 py 文件") {
+    if let Some(intent_match) = matcher.best_match("统计 ./build 目录下有多少个 py 文件")
+    {
         println!("匹配到意图: {}", intent_match.intent.name);
         println!("提取的实体: {:?}", intent_match.extracted_entities);
 

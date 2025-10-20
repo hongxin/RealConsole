@@ -102,7 +102,12 @@ fn handle_git_status(_arg: &str) -> String {
         "工作区干净".green()
     };
 
-    output.push(format!("  {}: {} {}", "状态".dimmed(), status_icon, status_text));
+    output.push(format!(
+        "  {}: {} {}",
+        "状态".dimmed(),
+        status_icon,
+        status_text
+    ));
 
     // 文件统计
     if status.has_changes {
@@ -246,13 +251,25 @@ fn handle_git_diff(arg: &str) -> String {
             ));
 
             if analysis.rust_files > 0 {
-                output.push(format!("  {}: {} 个", "Rust 文件".dimmed(), analysis.rust_files));
+                output.push(format!(
+                    "  {}: {} 个",
+                    "Rust 文件".dimmed(),
+                    analysis.rust_files
+                ));
             }
             if analysis.doc_files > 0 {
-                output.push(format!("  {}: {} 个", "文档文件".dimmed(), analysis.doc_files));
+                output.push(format!(
+                    "  {}: {} 个",
+                    "文档文件".dimmed(),
+                    analysis.doc_files
+                ));
             }
             if analysis.config_files > 0 {
-                output.push(format!("  {}: {} 个", "配置文件".dimmed(), analysis.config_files));
+                output.push(format!(
+                    "  {}: {} 个",
+                    "配置文件".dimmed(),
+                    analysis.config_files
+                ));
             }
 
             output.push(String::new());
@@ -312,7 +329,11 @@ fn handle_git_branch(_arg: &str) -> String {
     output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
 
     if let Some(current) = &current_branch {
-        output.push(format!("\n  {}: {}", "当前分支".dimmed(), current.green().bold()));
+        output.push(format!(
+            "\n  {}: {}",
+            "当前分支".dimmed(),
+            current.green().bold()
+        ));
     }
 
     output.push(String::new());
@@ -334,7 +355,10 @@ fn handle_git_branch(_arg: &str) -> String {
     if !local_branches.is_empty() {
         output.push(format!("\n  {}", "本地分支:".cyan()));
         for branch in local_branches {
-            let is_current = current_branch.as_ref().map(|c| branch.contains(c)).unwrap_or(false);
+            let is_current = current_branch
+                .as_ref()
+                .map(|c| branch.contains(c))
+                .unwrap_or(false);
             if is_current {
                 output.push(format!("    {} {}", "●".green(), branch.green().bold()));
             } else {
@@ -350,7 +374,11 @@ fn handle_git_branch(_arg: &str) -> String {
             output.push(format!("    {} {}", "○".dimmed(), branch.dimmed()));
         }
         if remote_branches.len() > 5 {
-            output.push(format!("    {} 还有 {} 个远程分支", "...".dimmed(), remote_branches.len() - 5));
+            output.push(format!(
+                "    {} 还有 {} 个远程分支",
+                "...".dimmed(),
+                remote_branches.len() - 5
+            ));
         }
     }
 
@@ -417,7 +445,11 @@ fn handle_git_analyze(_arg: &str) -> String {
     }
 
     if !file_types.is_empty() {
-        output.push(format!("  {}: {}", "文件类型".dimmed(), file_types.join(", ")));
+        output.push(format!(
+            "  {}: {}",
+            "文件类型".dimmed(),
+            file_types.join(", ")
+        ));
     }
 
     // 特征标记
@@ -433,7 +465,11 @@ fn handle_git_analyze(_arg: &str) -> String {
     }
 
     if !features.is_empty() {
-        output.push(format!("  {}: {}", "代码特征".dimmed(), features.join(", ")));
+        output.push(format!(
+            "  {}: {}",
+            "代码特征".dimmed(),
+            features.join(", ")
+        ));
     }
 
     // 建议的提交信息
@@ -462,12 +498,23 @@ fn handle_git_analyze(_arg: &str) -> String {
     output.push(String::new());
     output.push(format!("{}", "提示".yellow().bold()));
     output.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed().to_string());
-    output.push(format!("\n  {} {}", "1.".dimmed(), "复制上面的提交信息模板"));
+    output.push(format!(
+        "\n  {} {}",
+        "1.".dimmed(),
+        "复制上面的提交信息模板"
+    ));
     output.push(format!("  {} {}", "2.".dimmed(), "根据实际情况修改和完善"));
-    output.push(format!("  {} {}", "3.".dimmed(), "使用 'git commit -m \"...\"' 提交"));
+    output.push(format!(
+        "  {} {}",
+        "3.".dimmed(),
+        "使用 'git commit -m \"...\"' 提交"
+    ));
 
     output.push(String::new());
-    output.push(format!("  💡 {}", "未来版本将支持 LLM 自动生成详细提交信息".dimmed()));
+    output.push(format!(
+        "  💡 {}",
+        "未来版本将支持 LLM 自动生成详细提交信息".dimmed()
+    ));
 
     output.push(String::new());
 

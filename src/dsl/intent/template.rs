@@ -467,23 +467,15 @@ mod tests {
 
     #[test]
     fn test_template_with_description() {
-        let template = Template::new(
-            "test",
-            "echo {msg}",
-            vec!["msg".to_string()],
-        )
-        .with_description("Test template");
+        let template = Template::new("test", "echo {msg}", vec!["msg".to_string()])
+            .with_description("Test template");
 
         assert_eq!(template.description, "Test template");
     }
 
     #[test]
     fn test_template_has_variable() {
-        let template = Template::new(
-            "test",
-            "echo {msg}",
-            vec!["msg".to_string()],
-        );
+        let template = Template::new("test", "echo {msg}", vec!["msg".to_string()]);
 
         assert!(template.has_variable("msg"));
         assert!(!template.has_variable("other"));
@@ -491,11 +483,7 @@ mod tests {
 
     #[test]
     fn test_template_extract_placeholders() {
-        let template = Template::new(
-            "test",
-            "find {path} -name '*.{ext}' -type {type}",
-            vec![],
-        );
+        let template = Template::new("test", "find {path} -name '*.{ext}' -type {type}", vec![]);
 
         let placeholders = template.extract_placeholders();
         assert_eq!(placeholders.len(), 3);
@@ -515,11 +503,7 @@ mod tests {
     fn test_engine_register() {
         let mut engine = TemplateEngine::new();
 
-        let template = Template::new(
-            "test",
-            "echo {msg}",
-            vec!["msg".to_string()],
-        );
+        let template = Template::new("test", "echo {msg}", vec!["msg".to_string()]);
 
         engine.register(template);
 
@@ -543,10 +527,7 @@ mod tests {
         bindings.insert("path".to_string(), ".".to_string());
         bindings.insert("ext".to_string(), "py".to_string());
 
-        let result = TemplateEngine::substitute(
-            "find {path} -name '*.{ext}'",
-            &bindings,
-        );
+        let result = TemplateEngine::substitute("find {path} -name '*.{ext}'", &bindings);
         assert_eq!(result, "find . -name '*.py'");
     }
 
@@ -561,11 +542,7 @@ mod tests {
     fn test_generate_success() {
         let mut engine = TemplateEngine::new();
 
-        let template = Template::new(
-            "count_lines",
-            "wc -l {file}",
-            vec!["file".to_string()],
-        );
+        let template = Template::new("count_lines", "wc -l {file}", vec!["file".to_string()]);
         engine.register(template);
 
         let mut bindings = HashMap::new();
@@ -590,11 +567,7 @@ mod tests {
     fn test_generate_missing_variable() {
         let mut engine = TemplateEngine::new();
 
-        let template = Template::new(
-            "test",
-            "echo {msg}",
-            vec!["msg".to_string()],
-        );
+        let template = Template::new("test", "echo {msg}", vec!["msg".to_string()]);
         engine.register(template);
 
         let bindings = HashMap::new(); // 没有提供 msg
@@ -613,11 +586,7 @@ mod tests {
         let template = Template::new(
             "complex",
             "find {path} -name '*.{ext}' -mtime {days}",
-            vec![
-                "path".to_string(),
-                "ext".to_string(),
-                "days".to_string(),
-            ],
+            vec!["path".to_string(), "ext".to_string(), "days".to_string()],
         );
         engine.register(template);
 
@@ -627,10 +596,7 @@ mod tests {
         bindings.insert("days".to_string(), "-7".to_string());
 
         let plan = engine.generate("complex", bindings).unwrap();
-        assert_eq!(
-            plan.command,
-            "find /tmp -name '*.log' -mtime -7"
-        );
+        assert_eq!(plan.command, "find /tmp -name '*.log' -mtime -7");
     }
 
     #[test]

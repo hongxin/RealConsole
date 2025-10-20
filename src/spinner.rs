@@ -27,8 +27,7 @@ impl Spinner {
         let handle = thread::spawn(move || {
             let mut frame_idx = 0;
 
-            // 打印初始换行，让 spinner 在新行显示
-            print!("\n");
+            // 不需要初始换行，让 spinner 紧接在用户输入后显示（极简主义）
             let _ = io::stdout().flush();
 
             while running_clone.load(Ordering::Relaxed) {

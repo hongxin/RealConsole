@@ -168,7 +168,8 @@ impl ToolRegistry {
 
     /// 获取所有工具的 Function Schema（用于 LLM）
     pub fn get_function_schemas(&self) -> Vec<JsonValue> {
-        self.tools.values()
+        self.tools
+            .values()
             .map(|tool| tool.to_function_schema())
             .collect()
     }
@@ -306,15 +307,13 @@ mod tests {
         let tool = Tool::new(
             "calculator",
             "简单计算器",
-            vec![
-                Parameter {
-                    name: "a".to_string(),
-                    param_type: ParameterType::Number,
-                    description: "第一个数".to_string(),
-                    required: true,
-                    default: None,
-                },
-            ],
+            vec![Parameter {
+                name: "a".to_string(),
+                param_type: ParameterType::Number,
+                description: "第一个数".to_string(),
+                required: true,
+                default: None,
+            }],
             test_calculator_handler,
         );
 
@@ -372,12 +371,7 @@ mod tests {
     fn test_registry() {
         let mut registry = ToolRegistry::new();
 
-        let tool = Tool::new(
-            "calculator",
-            "简单计算器",
-            vec![],
-            test_calculator_handler,
-        );
+        let tool = Tool::new("calculator", "简单计算器", vec![], test_calculator_handler);
 
         registry.register(tool);
 

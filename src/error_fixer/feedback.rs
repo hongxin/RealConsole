@@ -126,10 +126,7 @@ impl FeedbackRecord {
         matches!(
             self.feedback,
             FeedbackType::Accepted | FeedbackType::Modified
-        ) && matches!(
-            self.outcome,
-            FixOutcome::Success | FixOutcome::Partial
-        )
+        ) && matches!(self.outcome, FixOutcome::Success | FixOutcome::Partial)
     }
 }
 
@@ -371,13 +368,11 @@ impl FeedbackLearner {
 
         let successful = pattern_records.iter().filter(|r| r.is_positive()).count();
 
-        let strategy_distribution: HashMap<String, u32> = pattern_records.iter().fold(
-            HashMap::new(),
-            |mut acc, r| {
+        let strategy_distribution: HashMap<String, u32> =
+            pattern_records.iter().fold(HashMap::new(), |mut acc, r| {
                 *acc.entry(r.strategy_name.clone()).or_insert(0) += 1;
                 acc
-            },
-        );
+            });
 
         PatternStats {
             total_occurrences: total,
@@ -523,7 +518,12 @@ mod tests {
         let analysis = ErrorAnalysis::new("error".to_string(), "cmd".to_string());
         let strategy = FixStrategy::new("test", "fix", "desc", 3);
 
-        let record = FeedbackRecord::new(&analysis, &strategy, FeedbackType::Accepted, FixOutcome::Success);
+        let record = FeedbackRecord::new(
+            &analysis,
+            &strategy,
+            FeedbackType::Accepted,
+            FixOutcome::Success,
+        );
 
         assert_eq!(record.strategy_name, "test");
         assert_eq!(record.feedback, FeedbackType::Accepted);
@@ -536,7 +536,12 @@ mod tests {
         let analysis = ErrorAnalysis::new("error".to_string(), "cmd".to_string());
         let strategy = FixStrategy::new("test", "fix", "desc", 3);
 
-        let record = FeedbackRecord::new(&analysis, &strategy, FeedbackType::Rejected, FixOutcome::Failure);
+        let record = FeedbackRecord::new(
+            &analysis,
+            &strategy,
+            FeedbackType::Rejected,
+            FixOutcome::Failure,
+        );
 
         assert!(!record.is_positive());
     }
@@ -548,7 +553,12 @@ mod tests {
         let strategy = FixStrategy::new("test", "fix", "desc", 3);
 
         // 第一次：接受并成功
-        let record1 = FeedbackRecord::new(&analysis, &strategy, FeedbackType::Accepted, FixOutcome::Success);
+        let record1 = FeedbackRecord::new(
+            &analysis,
+            &strategy,
+            FeedbackType::Accepted,
+            FixOutcome::Success,
+        );
         stats.update(&record1);
 
         assert_eq!(stats.total_uses, 1);
@@ -558,7 +568,12 @@ mod tests {
         assert_eq!(stats.success_rate, 1.0);
 
         // 第二次：拒绝并失败
-        let record2 = FeedbackRecord::new(&analysis, &strategy, FeedbackType::Rejected, FixOutcome::Failure);
+        let record2 = FeedbackRecord::new(
+            &analysis,
+            &strategy,
+            FeedbackType::Rejected,
+            FixOutcome::Failure,
+        );
         stats.update(&record2);
 
         assert_eq!(stats.total_uses, 2);
@@ -574,7 +589,12 @@ mod tests {
 
         let analysis = ErrorAnalysis::new("error".to_string(), "cmd".to_string());
         let strategy = FixStrategy::new("test_strategy", "fix", "desc", 3);
-        let record = FeedbackRecord::new(&analysis, &strategy, FeedbackType::Accepted, FixOutcome::Success);
+        let record = FeedbackRecord::new(
+            &analysis,
+            &strategy,
+            FeedbackType::Accepted,
+            FixOutcome::Success,
+        );
 
         learner.record_feedback(record).await;
 
@@ -598,11 +618,21 @@ mod tests {
         let analysis = ErrorAnalysis::new("error".to_string(), "cmd".to_string());
 
         for _ in 0..3 {
-            let record = FeedbackRecord::new(&analysis, &strategy2, FeedbackType::Accepted, FixOutcome::Success);
+            let record = FeedbackRecord::new(
+                &analysis,
+                &strategy2,
+                FeedbackType::Accepted,
+                FixOutcome::Success,
+            );
             learner.record_feedback(record).await;
         }
 
-        let record = FeedbackRecord::new(&analysis, &strategy1, FeedbackType::Rejected, FixOutcome::Failure);
+        let record = FeedbackRecord::new(
+            &analysis,
+            &strategy1,
+            FeedbackType::Rejected,
+            FixOutcome::Failure,
+        );
         learner.record_feedback(record).await;
 
         // 重新排序

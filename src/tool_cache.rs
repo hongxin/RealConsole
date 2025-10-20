@@ -96,9 +96,9 @@ pub struct CacheConfig {
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            capacity: 100,                           // 默认缓存 100 条
-            default_ttl: Duration::from_secs(300),   // 默认 5 分钟过期
-            enabled_tools: None,                      // 默认全部启用
+            capacity: 100,                         // 默认缓存 100 条
+            default_ttl: Duration::from_secs(300), // 默认 5 分钟过期
+            enabled_tools: None,                   // 默认全部启用
         }
     }
 }
@@ -118,7 +118,8 @@ pub struct ToolCache {
 impl ToolCache {
     /// 创建新的工具缓存
     pub fn new(config: CacheConfig) -> Self {
-        let capacity = NonZeroUsize::new(config.capacity).unwrap_or(NonZeroUsize::new(100).unwrap());
+        let capacity =
+            NonZeroUsize::new(config.capacity).unwrap_or(NonZeroUsize::new(100).unwrap());
 
         Self {
             cache: Arc::new(RwLock::new(LruCache::new(capacity))),
@@ -299,8 +300,12 @@ mod tests {
         let tool_name = "calculator";
 
         // 设置两个不同参数的缓存
-        cache.set(tool_name, &json!({"a": 1}), "result1".to_string()).await;
-        cache.set(tool_name, &json!({"a": 2}), "result2".to_string()).await;
+        cache
+            .set(tool_name, &json!({"a": 1}), "result1".to_string())
+            .await;
+        cache
+            .set(tool_name, &json!({"a": 2}), "result2".to_string())
+            .await;
 
         // 应该能正确区分
         assert_eq!(
@@ -323,15 +328,22 @@ mod tests {
         let cache = ToolCache::new(config);
 
         // 启用缓存的工具
-        cache.set("calculator", &json!({"a": 1}), "result1".to_string()).await;
+        cache
+            .set("calculator", &json!({"a": 1}), "result1".to_string())
+            .await;
         assert_eq!(
             cache.get("calculator", &json!({"a": 1})).await,
             Some("result1".to_string())
         );
 
         // 未启用缓存的工具
-        cache.set("file_read", &json!({"path": "/tmp"}), "result2".to_string()).await;
-        assert!(cache.get("file_read", &json!({"path": "/tmp"})).await.is_none());
+        cache
+            .set("file_read", &json!({"path": "/tmp"}), "result2".to_string())
+            .await;
+        assert!(cache
+            .get("file_read", &json!({"path": "/tmp"}))
+            .await
+            .is_none());
     }
 
     #[tokio::test]
@@ -344,9 +356,15 @@ mod tests {
         let cache = ToolCache::new(config);
 
         // 添加 3 条缓存
-        cache.set("tool", &json!({"a": 1}), "result1".to_string()).await;
-        cache.set("tool", &json!({"a": 2}), "result2".to_string()).await;
-        cache.set("tool", &json!({"a": 3}), "result3".to_string()).await; // 应该淘汰第一条
+        cache
+            .set("tool", &json!({"a": 1}), "result1".to_string())
+            .await;
+        cache
+            .set("tool", &json!({"a": 2}), "result2".to_string())
+            .await;
+        cache
+            .set("tool", &json!({"a": 3}), "result3".to_string())
+            .await; // 应该淘汰第一条
 
         // 第一条应该被淘汰
         assert!(cache.get("tool", &json!({"a": 1})).await.is_none());
@@ -366,8 +384,12 @@ mod tests {
     async fn test_cache_clear() {
         let cache = ToolCache::with_defaults();
 
-        cache.set("tool", &json!({"a": 1}), "result1".to_string()).await;
-        cache.set("tool", &json!({"a": 2}), "result2".to_string()).await;
+        cache
+            .set("tool", &json!({"a": 1}), "result1".to_string())
+            .await;
+        cache
+            .set("tool", &json!({"a": 2}), "result2".to_string())
+            .await;
 
         assert_eq!(cache.size().await, 2);
 

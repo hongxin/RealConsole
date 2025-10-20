@@ -30,22 +30,23 @@ use tokio::sync::RwLock;
 
 // ✨ Phase 8 Week 2: 多轮对话支持
 use crate::conversation::{
-    ConversationManager, Response, ParameterSpec, ParameterType, ParameterValue,
-    has_active_conversation, get_current_conversation, set_current_conversation, clear_current_conversation,
+    clear_current_conversation, get_current_conversation, has_active_conversation,
+    set_current_conversation, ConversationManager, ParameterSpec, ParameterType, ParameterValue,
+    Response,
 };
 
 // ✨ Phase 9: 统计与可视化支持
-use crate::stats::{StatsCollector, StatEvent};
+use crate::stats::{StatEvent, StatsCollector};
 
 // ✨ Phase 9.1: 上下文追踪支持
 use crate::memory::ContextTracker;
 
 // ✨ Phase 9.2: 错误自动修复支持
-use crate::shell_executor::ShellExecutorWithFixer;
 use crate::error_fixer::{FeedbackLearner, FeedbackRecord, FeedbackType, FixOutcome};
+use crate::shell_executor::ShellExecutorWithFixer;
 
 // ✨ Phase 8 (Workflow): Workflow Intent 支持
-use crate::dsl::intent::{WorkflowIntent, WorkflowExecutor};
+use crate::dsl::intent::{WorkflowExecutor, WorkflowIntent};
 
 /// Agent 核心
 pub struct Agent {
@@ -125,16 +126,19 @@ impl Agent {
         let command_router = CommandRouter::new(config.prefix.clone());
 
         // ✨ Phase 8 (Workflow): 初始化 Workflow Intent 系统
-        let (workflow_intents, workflow_executor) = if config.features.workflow_enabled.unwrap_or(false) {
-            use crate::dsl::intent::register_builtin_workflows;
-            let intents = register_builtin_workflows();
-            (intents, None) // executor 在配置 LLM 后再初始化
-        } else {
-            (Vec::new(), None)
-        };
+        let (workflow_intents, workflow_executor) =
+            if config.features.workflow_enabled.unwrap_or(false) {
+                use crate::dsl::intent::register_builtin_workflows;
+                let intents = register_builtin_workflows();
+                (intents, None) // executor 在配置 LLM 后再初始化
+            } else {
+                (Vec::new(), None)
+            };
 
         // 初始化记忆系统
-        let memory_capacity = config.memory.as_ref()
+        let memory_capacity = config
+            .memory
+            .as_ref()
             .and_then(|m| m.capacity)
             .unwrap_or(100);
 
@@ -218,18 +222,15 @@ impl Agent {
             {
                 // 尝试从磁盘加载历史反馈
                 let _ = tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        learner_with_storage.load_from_disk().await
-                    })
+                    tokio::runtime::Handle::current()
+                        .block_on(async { learner_with_storage.load_from_disk().await })
                 });
             }
 
             let feedback_learner = Arc::new(learner_with_storage);
 
-            let shell_executor_with_fixer = Arc::new(
-                ShellExecutorWithFixer::new()
-                    .with_feedback_learner(feedback_learner)
-            );
+            let shell_executor_with_fixer =
+                Arc::new(ShellExecutorWithFixer::new().with_feedback_learner(feedback_learner));
 
             let last_failed_command = Arc::new(RwLock::new(None));
 
@@ -258,10 +259,8 @@ impl Agent {
         }
 
         // Fallback: 无持久化
-        let shell_executor_with_fixer = Arc::new(
-            ShellExecutorWithFixer::new()
-                .with_feedback_learner(feedback_learner)
-        );
+        let shell_executor_with_fixer =
+            Arc::new(ShellExecutorWithFixer::new().with_feedback_learner(feedback_learner));
         let last_failed_command = Arc::new(RwLock::new(None));
 
         Self {
@@ -447,13 +446,7 @@ impl Agent {
                     // 记录到执行日志
                     {
                         let mut logger = self.exec_logger.write().await;
-                        logger.log(
-                            line.to_string(),
-                            command_type,
-                            success,
-                            duration,
-                            &response,
-                        );
+                        logger.log(line.to_string(), command_type, success, duration, &response);
                     }
 
                     // ✨ Phase 8: 记录到命令历史
@@ -512,13 +505,13 @@ impl Agent {
                         // 更新当前目录
                         if let Ok(current_dir) = std::env::current_dir() {
                             tracker.update_working_context(WorkingContextUpdate::CurrentDirectory(
-                                current_dir
+                                current_dir,
                             ));
                         }
 
                         // 更新最后执行的命令
                         tracker.update_working_context(WorkingContextUpdate::LastCommand(
-                            line.to_string()
+                            line.to_string(),
                         ));
                     }
                 })
@@ -544,7 +537,9 @@ impl Agent {
         // ✨ Phase 9.2: 使用 ShellExecutorWithFixer 执行命令（带错误分析）
         let execution_result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                self.shell_executor_with_fixer.execute_with_analysis(cmd).await
+                self.shell_executor_with_fixer
+                    .execute_with_analysis(cmd)
+                    .await
             })
         });
 
@@ -613,12 +608,20 @@ impl Agent {
         let mut output = String::new();
 
         // 1. 显示原始错误输出
-        output.push_str(&format!("\n{}\n{}\n", "❌ 命令执行失败".red().bold(), result.output));
+        output.push_str(&format!(
+            "\n{}\n{}\n",
+            "❌ 命令执行失败".red().bold(),
+            result.output
+        ));
 
         // 2. 显示错误分析（如果有）
         if let Some(analysis) = &result.error_analysis {
             output.push_str(&format!("\n{}\n", "🔍 错误分析".cyan().bold()));
-            output.push_str(&format!("  {}: {}\n", "类别".dimmed(), analysis.category.to_string().yellow()));
+            output.push_str(&format!(
+                "  {}: {}\n",
+                "类别".dimmed(),
+                analysis.category.to_string().yellow()
+            ));
 
             // 显示严重程度
             let severity_str = match analysis.severity {
@@ -627,7 +630,11 @@ impl Agent {
                 crate::error_fixer::ErrorSeverity::High => "高",
                 crate::error_fixer::ErrorSeverity::Critical => "严重",
             };
-            output.push_str(&format!("  {}: {}\n", "严重程度".dimmed(), severity_str.red()));
+            output.push_str(&format!(
+                "  {}: {}\n",
+                "严重程度".dimmed(),
+                severity_str.red()
+            ));
 
             if !analysis.possible_causes.is_empty() {
                 output.push_str(&format!("\n  {}:\n", "可能原因".dimmed()));
@@ -650,7 +657,10 @@ impl Agent {
             return output;
         }
 
-        output.push_str(&format!("\n{}\n", "💡 修复策略 (按推荐度排序)".green().bold()));
+        output.push_str(&format!(
+            "\n{}\n",
+            "💡 修复策略 (按推荐度排序)".green().bold()
+        ));
 
         for (i, strategy) in result.fix_strategies.iter().enumerate() {
             // 风险指示器: 🟢 低 < 5, 🟡 中 5-7, 🔴 高 >= 8
@@ -669,9 +679,21 @@ impl Agent {
             ));
 
             // 显示策略名称和命令
-            output.push_str(&format!("     {}: {}\n", "策略".dimmed(), strategy.name.cyan()));
-            output.push_str(&format!("     {}: {}\n", "修复命令".dimmed(), strategy.command.green()));
-            output.push_str(&format!("     {}: {}\n", "预期效果".dimmed(), strategy.expected_outcome.dimmed()));
+            output.push_str(&format!(
+                "     {}: {}\n",
+                "策略".dimmed(),
+                strategy.name.cyan()
+            ));
+            output.push_str(&format!(
+                "     {}: {}\n",
+                "修复命令".dimmed(),
+                strategy.command.green()
+            ));
+            output.push_str(&format!(
+                "     {}: {}\n",
+                "预期效果".dimmed(),
+                strategy.expected_outcome.dimmed()
+            ));
         }
 
         // 4. 提示用户选择
@@ -711,7 +733,11 @@ impl Agent {
         let selected_strategy = &result.fix_strategies[selected_index];
 
         // 7. 执行选中的修复策略
-        output.push_str(&format!("\n{} {}\n", "🔧 执行修复:".cyan().bold(), selected_strategy.command.green()));
+        output.push_str(&format!(
+            "\n{} {}\n",
+            "🔧 执行修复:".cyan().bold(),
+            selected_strategy.command.green()
+        ));
 
         let fix_result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
@@ -724,7 +750,15 @@ impl Agent {
             Err(e) => (false, e.format_user_friendly()),
         };
 
-        output.push_str(&format!("\n{}\n{}\n", if success { "✓ 修复执行成功".green().bold() } else { "✗ 修复执行失败".red().bold() }, fix_output));
+        output.push_str(&format!(
+            "\n{}\n{}\n",
+            if success {
+                "✓ 修复执行成功".green().bold()
+            } else {
+                "✗ 修复执行失败".red().bold()
+            },
+            fix_output
+        ));
 
         // 8. 记录反馈
         self.record_fix_feedback(result, selected_index, success);
@@ -733,20 +767,34 @@ impl Agent {
     }
 
     /// 记录修复反馈（用于学习）
-    fn record_fix_feedback(&self, result: &crate::shell_executor::ExecutionResult, strategy_index: usize, success: bool) {
+    fn record_fix_feedback(
+        &self,
+        result: &crate::shell_executor::ExecutionResult,
+        strategy_index: usize,
+        success: bool,
+    ) {
         if let Some(error_analysis) = &result.error_analysis {
             if strategy_index < result.fix_strategies.len() {
                 let strategy = &result.fix_strategies[strategy_index];
 
-                let feedback_type = if success { FeedbackType::Accepted } else { FeedbackType::Rejected };
-                let outcome = if success { FixOutcome::Success } else { FixOutcome::Failure };
+                let feedback_type = if success {
+                    FeedbackType::Accepted
+                } else {
+                    FeedbackType::Rejected
+                };
+                let outcome = if success {
+                    FixOutcome::Success
+                } else {
+                    FixOutcome::Failure
+                };
 
                 // 创建反馈记录
                 let record = FeedbackRecord::new(error_analysis, strategy, feedback_type, outcome);
 
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async {
-                        let _ = self.shell_executor_with_fixer
+                        let _ = self
+                            .shell_executor_with_fixer
                             .feedback_learner()
                             .record_feedback(record)
                             .await;
@@ -789,7 +837,8 @@ impl Agent {
                 self.handle_shell(&cmd)
             }
             None => {
-                format!("{}\n{}",
+                format!(
+                    "{}\n{}",
                     "❌ 没有可重试的失败命令".red(),
                     "提示: 执行一个失败的命令后再使用 /fix".dimmed()
                 )
@@ -854,10 +903,8 @@ impl Agent {
 
                 // 如果没有工具，回退到普通对话
                 if tool_schemas.is_empty() {
-                    let response: Result<String, String> = manager
-                        .chat(text)
-                        .await
-                        .map_err(|e| e.to_string());
+                    let response: Result<String, String> =
+                        manager.chat(text).await.map_err(|e| e.to_string());
                     return response;
                 }
 
@@ -870,16 +917,96 @@ impl Agent {
             Ok(response) => {
                 // 停止 spinner
                 spinner.stop();
-                // 返回响应，让 REPL 统一处理打印
-                response
+
+                // ✨ 解析并显示对话轮次调试信息（成功时，仅当配置启用且为 debug 模式）
+                if self.config.display.show_conversation_rounds
+                    && self.config.display.mode.show_debug()
+                {
+                    if let Some(rounds) =
+                        crate::tool_executor::ToolExecutor::decode_debug_info(&response)
+                    {
+                        let round_infos: Vec<crate::display::ConversationRoundInfo> = rounds
+                            .iter()
+                            .map(|r| crate::display::ConversationRoundInfo {
+                                round: r.round,
+                                input_summary: r.input_summary.clone(),
+                                assistant_response: r.assistant_response.clone(),
+                                tool_calls: r
+                                    .tool_calls
+                                    .iter()
+                                    .map(|tc| crate::display::ToolCallInfo {
+                                        name: tc.name.clone(),
+                                        arguments: tc.arguments.clone(),
+                                    })
+                                    .collect(),
+                                tool_results: r.tool_results.clone(),
+                                message_count: r.message_count,
+                                duration_ms: r.duration_ms,
+                            })
+                            .collect();
+
+                        Display::conversation_rounds_debug(self.config.display.mode, &round_infos);
+                    }
+                }
+
+                // 提取实际响应内容（移除调试信息）
+                if let Some(pos) = response.find("__DEBUG__") {
+                    response[..pos].to_string()
+                } else {
+                    response
+                }
             }
             Err(e) => {
                 // 停止 spinner
                 spinner.stop();
+
+                // ✨ 解析并显示对话轮次调试信息（仅 debug 模式）
+                if let Some(rounds) = crate::tool_executor::ToolExecutor::decode_debug_info(&e) {
+                    let round_infos: Vec<crate::display::ConversationRoundInfo> = rounds
+                        .iter()
+                        .map(|r| crate::display::ConversationRoundInfo {
+                            round: r.round,
+                            input_summary: r.input_summary.clone(),
+                            assistant_response: r.assistant_response.clone(),
+                            tool_calls: r
+                                .tool_calls
+                                .iter()
+                                .map(|tc| crate::display::ToolCallInfo {
+                                    name: tc.name.clone(),
+                                    arguments: tc.arguments.clone(),
+                                })
+                                .collect(),
+                            tool_results: r.tool_results.clone(),
+                            message_count: r.message_count,
+                            duration_ms: r.duration_ms,
+                        })
+                        .collect();
+
+                    Display::conversation_rounds_debug(self.config.display.mode, &round_infos);
+                }
+
+                // 提取错误主消息（移除调试信息）
+                let error_msg = if let Some(pos) = e.find("__DEBUG__") {
+                    &e[..pos]
+                } else {
+                    &e
+                };
+
+                // 解析上下文长度错误
+                if let Some((requested, limit)) = parse_context_length_error(error_msg) {
+                    Display::context_overflow_error(self.config.display.mode, requested, limit);
+                    return format!(
+                        "\n{} 使用 {}help 查看帮助",
+                        "提示:".dimmed(),
+                        self.config.prefix.dimmed()
+                    );
+                }
+
+                // 其他错误
                 format!(
                     "{} {}\n{} {}help",
                     "处理失败:".red(),
-                    e,
+                    error_msg,
                     "提示: 使用".dimmed(),
                     self.config.prefix.dimmed()
                 )
@@ -903,10 +1030,12 @@ impl Agent {
             tokio::runtime::Handle::current().block_on(async {
                 let manager = self.llm_manager.read().await;
                 // 使用流式输出，实时显示每个 token
-                manager.chat_stream(text, |token| {
-                    print!("{}", token);
-                    let _ = io::stdout().flush();
-                }).await
+                manager
+                    .chat_stream(text, |token| {
+                        print!("{}", token);
+                        let _ = io::stdout().flush();
+                    })
+                    .await
             })
         }) {
             Ok(_response) => {
@@ -966,9 +1095,8 @@ impl Agent {
         if self.config.intent.llm_generation_enabled.unwrap_or(false) {
             if let Some(llm_bridge) = &self.llm_bridge {
                 match tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        llm_bridge.understand_and_generate(text).await
-                    })
+                    tokio::runtime::Handle::current()
+                        .block_on(async { llm_bridge.understand_and_generate(text).await })
                 }) {
                     Ok(pipeline_plan) => {
                         // LLM 成功生成 ExecutionPlan
@@ -987,7 +1115,10 @@ impl Agent {
                         if self.config.intent.llm_generation_fallback.unwrap_or(true) {
                             Display::fallback_warning(self.config.display.mode, &e);
                         } else {
-                            Display::error(self.config.display.mode, &format!("LLM 生成失败: {}", e));
+                            Display::error(
+                                self.config.display.mode,
+                                &format!("LLM 生成失败: {}", e),
+                            );
                             return None;
                         }
                     }
@@ -1001,17 +1132,16 @@ impl Agent {
         // 2. Phase 2: 使用 LLM 智能补充参数提取（如果启用）
         if self.config.intent.llm_extraction_enabled {
             intent_match = tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    self.try_llm_extraction(text, intent_match).await
-                })
+                tokio::runtime::Handle::current()
+                    .block_on(async { self.try_llm_extraction(text, intent_match).await })
             });
         }
 
         // 3. Phase 6.3: 优先尝试使用 Pipeline DSL 生成执行计划
-        let plan = if let Some(pipeline_plan) = self.pipeline_converter.convert(
-            &intent_match,
-            &intent_match.extracted_entities,
-        ) {
+        let plan = if let Some(pipeline_plan) = self
+            .pipeline_converter
+            .convert(&intent_match, &intent_match.extracted_entities)
+        {
             // Pipeline DSL 成功生成 ExecutionPlan
             // 将 Pipeline ExecutionPlan 转换为 Template ExecutionPlan
             let command = pipeline_plan.to_shell_command();
@@ -1058,9 +1188,8 @@ impl Agent {
         if self.config.intent.llm_validation_enabled {
             let intent_name = intent_match.intent.name.clone();
             let validation = tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    self.try_llm_validation(text, &plan, &intent_name).await
-                })
+                tokio::runtime::Handle::current()
+                    .block_on(async { self.try_llm_validation(text, &plan, &intent_name).await })
             });
 
             // 如果验证失败或置信度低，警告用户
@@ -1069,10 +1198,9 @@ impl Agent {
                     self.display_validation_warning(&validation);
 
                     // 如果需要用户确认
-                    if self.config.intent.require_confirmation
-                        && !self.ask_user_confirmation() {
-                            return None; // 用户拒绝执行
-                        }
+                    if self.config.intent.require_confirmation && !self.ask_user_confirmation() {
+                        return None; // 用户拒绝执行
+                    }
                 }
             }
         }
@@ -1126,9 +1254,8 @@ impl Agent {
 
         // 执行 workflow
         match tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                executor.execute(workflow, &intent_match).await
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { executor.execute(workflow, &intent_match).await })
         }) {
             Ok(result) => {
                 // 显示 workflow 执行统计（包含缓存状态）
@@ -1193,7 +1320,10 @@ impl Agent {
         let manager = self.llm_manager.read().await;
         if let Some(llm) = manager.primary().or(manager.fallback()) {
             let validator = CommandValidator::new();
-            match validator.validate(text, plan, intent_name, llm.as_ref()).await {
+            match validator
+                .validate(text, plan, intent_name, llm.as_ref())
+                .await
+            {
                 Ok(result) => Some(result),
                 Err(e) => {
                     eprintln!("{} {}", "⚠ LLM 验证失败:".yellow(), e);
@@ -1248,9 +1378,8 @@ impl Agent {
 
         // 使用 shell_executor 执行命令
         match tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                crate::shell_executor::execute_shell(&plan.command).await
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { crate::shell_executor::execute_shell(&plan.command).await })
         }) {
             Ok(output) => output,
             Err(e) => {
@@ -1300,9 +1429,12 @@ impl Agent {
                         let llm_manager = self.llm_manager.read().await;
                         if let Some(llm) = llm_manager.primary().or(llm_manager.fallback()) {
                             let mut manager = self.conversation_manager.write().await;
-                            match manager.extract_parameters_with_llm(&conversation_id, text, llm.as_ref()).await {
+                            match manager
+                                .extract_parameters_with_llm(&conversation_id, text, llm.as_ref())
+                                .await
+                            {
                                 Ok(params) => params,
-                                Err(_) => Vec::new()
+                                Err(_) => Vec::new(),
                             }
                         } else {
                             Vec::new()
@@ -1340,9 +1472,13 @@ impl Agent {
                         let smart_question = tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(async {
                                 let llm_manager = self.llm_manager.read().await;
-                                if let Some(llm) = llm_manager.primary().or(llm_manager.fallback()) {
+                                if let Some(llm) = llm_manager.primary().or(llm_manager.fallback())
+                                {
                                     let manager = self.conversation_manager.read().await;
-                                    manager.generate_smart_question(&conversation_id, llm.as_ref()).await.ok()
+                                    manager
+                                        .generate_smart_question(&conversation_id, llm.as_ref())
+                                        .await
+                                        .ok()
                                 } else {
                                     None
                                 }
@@ -1350,23 +1486,31 @@ impl Agent {
                         });
 
                         if let Some(question) = smart_question {
-                            response.push_str(&format!("\n\n{} {}", "❓".yellow(), question));
+                            response.push_str(&format!("\n{} {}", "❓".yellow(), question));
                         } else {
                             // 回退到标准提问
                             let next_param = &missing[0];
                             response.push_str(&format!(
-                                "\n\n{} {}\n  {}\n{}\n{}",
+                                "\n{} {}\n  {}\n{}\n{}",
                                 "●".yellow(),
                                 next_param.name.bold(),
                                 next_param.description.dimmed(),
-                                next_param.hint.as_ref().map(|h| format!("  💡 {}", h.dimmed())).unwrap_or_default(),
-                                next_param.example.as_ref().map(|e| format!("  📝 例如: {}", e.cyan())).unwrap_or_default(),
+                                next_param
+                                    .hint
+                                    .as_ref()
+                                    .map(|h| format!("  💡 {}", h.dimmed()))
+                                    .unwrap_or_default(),
+                                next_param
+                                    .example
+                                    .as_ref()
+                                    .map(|e| format!("  📝 例如: {}", e.cyan()))
+                                    .unwrap_or_default(),
                             ));
                         }
                     }
                     _ => {
                         // 没有缺失参数，准备执行
-                        response.push_str("\n\n所有参数已收集完成，准备执行...");
+                        response.push_str("\n所有参数已收集完成，准备执行...");
                     }
                 }
 
@@ -1388,7 +1532,9 @@ impl Agent {
         }
 
         // 文件操作意图
-        if (text_lower.contains("删除") || text_lower.contains("移动") || text_lower.contains("复制"))
+        if (text_lower.contains("删除")
+            || text_lower.contains("移动")
+            || text_lower.contains("复制"))
             && (text_lower.contains("文件") || text_lower.contains("目录"))
         {
             return Some("file_operation".to_string());
@@ -1418,9 +1564,13 @@ impl Agent {
                     .with_example("delete"),
                 ParameterSpec::new("source", ParameterType::Path, "源文件/目录路径")
                     .with_example("/path/to/file.txt"),
-                ParameterSpec::new("destination", ParameterType::Path, "目标路径（移动/复制时需要）")
-                    .optional()
-                    .with_example("/path/to/dest/"),
+                ParameterSpec::new(
+                    "destination",
+                    ParameterType::Path,
+                    "目标路径（移动/复制时需要）",
+                )
+                .optional()
+                .with_example("/path/to/dest/"),
             ],
             _ => vec![],
         }
@@ -1481,7 +1631,14 @@ impl Agent {
                     let llm_manager = self.llm_manager.read().await;
                     if let Some(llm) = llm_manager.primary().or(llm_manager.fallback()) {
                         let mut manager = self.conversation_manager.write().await;
-                        manager.collect_parameter_smart(&conversation_id, &param_name, param_value, llm.as_ref()).await
+                        manager
+                            .collect_parameter_smart(
+                                &conversation_id,
+                                &param_name,
+                                param_value,
+                                llm.as_ref(),
+                            )
+                            .await
                     } else {
                         // 回退到普通收集
                         let mut manager = self.conversation_manager.write().await;
@@ -1489,14 +1646,13 @@ impl Agent {
                     }
                 })
             }) {
-                Ok(Response::AskForParameter { name: _, description, .. }) => {
+                Ok(Response::AskForParameter {
+                    name: _,
+                    description,
+                    ..
+                }) => {
                     // 继续询问下一个参数（description 已包含 LLM 生成的智能提问）
-                    format!(
-                        "{} 已记录\n\n{} {}",
-                        "✓".green(),
-                        "❓".yellow(),
-                        description
-                    )
+                    format!("{} 已记录\n{} {}", "✓".green(), "❓".yellow(), description)
                 }
                 Ok(Response::AllParametersCollected) => {
                     // 所有参数收集完成，询问确认
@@ -1517,9 +1673,9 @@ impl Agent {
                     });
 
                     if success {
-                        format!("{}\n\n{}", "✓ 执行成功".green().bold(), output)
+                        format!("{}\n{}", "✓ 执行成功".green().bold(), output)
                     } else {
-                        format!("{}\n\n{}", "✗ 执行失败".red().bold(), output)
+                        format!("{}\n{}", "✗ 执行失败".red().bold(), output)
                     }
                 }
                 Ok(Response::Cancelled) => {
@@ -1536,16 +1692,24 @@ impl Agent {
                     manager.collect_parameter(&conversation_id, &param_name, param_value)
                 })
             }) {
-                Ok(Response::AskForParameter { name, description, hint, default }) => {
+                Ok(Response::AskForParameter {
+                    name,
+                    description,
+                    hint,
+                    default,
+                }) => {
                     // 继续询问下一个参数
                     format!(
-                        "{} 已记录\n\n{} {}\n  {}\n{}\n{}",
+                        "{} 已记录\n{} {}\n  {}\n{}\n{}",
                         "✓".green(),
                         "●".yellow(),
                         name.bold(),
                         description.dimmed(),
-                        hint.map(|h| format!("  💡 {}", h.dimmed())).unwrap_or_default(),
-                        default.map(|d| format!("  🔹 默认值: {:?}", d)).unwrap_or_default(),
+                        hint.map(|h| format!("  💡 {}", h.dimmed()))
+                            .unwrap_or_default(),
+                        default
+                            .map(|d| format!("  🔹 默认值: {:?}", d))
+                            .unwrap_or_default(),
                     )
                 }
                 Ok(Response::AllParametersCollected) => {
@@ -1567,9 +1731,9 @@ impl Agent {
                     });
 
                     if success {
-                        format!("{}\n\n{}", "✓ 执行成功".green().bold(), output)
+                        format!("{}\n{}", "✓ 执行成功".green().bold(), output)
                     } else {
-                        format!("{}\n\n{}", "✗ 执行失败".red().bold(), output)
+                        format!("{}\n{}", "✗ 执行失败".red().bold(), output)
                     }
                 }
                 Ok(Response::Cancelled) => {
@@ -1625,7 +1789,7 @@ impl Agent {
         }
 
         format!(
-            "{}\n\n{}\n{}",
+            "{}\n{}\n{}",
             summary,
             "确认执行？[y/N]:".yellow().bold(),
             "输入 y 确认，其他键取消".dimmed()
@@ -1635,25 +1799,25 @@ impl Agent {
     /// 执行对话
     fn execute_conversation(&self, conversation_id: &str) -> String {
         // 获取意图和参数
-        let (intent, params): (String, std::collections::HashMap<String, ParameterValue>) = match tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let manager = self.conversation_manager.read().await;
-                let context = manager.get_context(conversation_id).ok()?;
-                Some((context.intent.clone(), context.parameters.clone()))
-            })
-        }) {
-            Some(data) => data,
-            None => return "无法获取对话上下文".red().to_string(),
-        };
+        let (intent, params): (String, std::collections::HashMap<String, ParameterValue>) =
+            match tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let manager = self.conversation_manager.read().await;
+                    let context = manager.get_context(conversation_id).ok()?;
+                    Some((context.intent.clone(), context.parameters.clone()))
+                })
+            }) {
+                Some(data) => data,
+                None => return "无法获取对话上下文".red().to_string(),
+            };
 
         // 根据意图构建命令
         let command = self.build_command_from_conversation(&intent, &params);
 
         // 执行命令
         let result = match tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                crate::shell_executor::execute_shell(&command).await
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { crate::shell_executor::execute_shell(&command).await })
         }) {
             Ok(output) => (true, output),
             Err(e) => (false, e.format_user_friendly()),
@@ -1668,9 +1832,9 @@ impl Agent {
         });
 
         if result.0 {
-            format!("{}\n\n{}", "✓ 执行成功".green().bold(), result.1)
+            format!("{}\n{}", "✓ 执行成功".green().bold(), result.1)
         } else {
-            format!("{}\n\n{}", "✗ 执行失败".red().bold(), result.1)
+            format!("{}\n{}", "✗ 执行失败".red().bold(), result.1)
         }
     }
 
@@ -1682,34 +1846,76 @@ impl Agent {
     ) -> String {
         match intent {
             "analyze_logs" => {
-                let file_path = params.get("file_path")
-                    .and_then(|v| if let ParameterValue::String(s) = v { Some(s.as_str()) } else { None })
+                let file_path = params
+                    .get("file_path")
+                    .and_then(|v| {
+                        if let ParameterValue::String(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or("");
-                let keyword = params.get("keyword")
-                    .and_then(|v| if let ParameterValue::String(s) = v { Some(s.as_str()) } else { None })
+                let keyword = params
+                    .get("keyword")
+                    .and_then(|v| {
+                        if let ParameterValue::String(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or("");
 
                 format!("grep -i '{}' {} | tail -50", keyword, file_path)
             }
             "file_operation" => {
-                let operation = params.get("operation")
-                    .and_then(|v| if let ParameterValue::String(s) = v { Some(s.as_str()) } else { None })
+                let operation = params
+                    .get("operation")
+                    .and_then(|v| {
+                        if let ParameterValue::String(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or("ls");
-                let source = params.get("source")
-                    .and_then(|v| if let ParameterValue::String(s) = v { Some(s.as_str()) } else { None })
+                let source = params
+                    .get("source")
+                    .and_then(|v| {
+                        if let ParameterValue::String(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or("");
 
                 match operation {
                     "delete" => format!("rm -i {}", source),
                     "move" => {
-                        let dest = params.get("destination")
-                            .and_then(|v| if let ParameterValue::String(s) = v { Some(s.as_str()) } else { None })
+                        let dest = params
+                            .get("destination")
+                            .and_then(|v| {
+                                if let ParameterValue::String(s) = v {
+                                    Some(s.as_str())
+                                } else {
+                                    None
+                                }
+                            })
                             .unwrap_or("");
                         format!("mv {} {}", source, dest)
                     }
                     "copy" => {
-                        let dest = params.get("destination")
-                            .and_then(|v| if let ParameterValue::String(s) = v { Some(s.as_str()) } else { None })
+                        let dest = params
+                            .get("destination")
+                            .and_then(|v| {
+                                if let ParameterValue::String(s) = v {
+                                    Some(s.as_str())
+                                } else {
+                                    None
+                                }
+                            })
                             .unwrap_or("");
                         format!("cp {} {}", source, dest)
                     }
@@ -1738,10 +1944,43 @@ impl Agent {
     }
 }
 
+/// 解析上下文长度错误，提取请求的 tokens 和限制
+///
+/// 示例错误信息：
+/// "This model's maximum context length is 131072 tokens. However, you requested 133770 tokens"
+fn parse_context_length_error(error_msg: &str) -> Option<(usize, usize)> {
+    // 尝试匹配 "requested X tokens" 和 "maximum context length is Y tokens"
+    let requested_pattern = regex::Regex::new(r"requested (\d+) tokens").ok()?;
+    let limit_pattern = regex::Regex::new(r"maximum context length is (\d+) tokens").ok()?;
+
+    let requested = requested_pattern
+        .captures(error_msg)
+        .and_then(|caps| caps.get(1))
+        .and_then(|m| m.as_str().parse::<usize>().ok())?;
+
+    let limit = limit_pattern
+        .captures(error_msg)
+        .and_then(|caps| caps.get(1))
+        .and_then(|m| m.as_str().parse::<usize>().ok())?;
+
+    Some((requested, limit))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::command::Command;
+
+    #[test]
+    fn test_parse_context_length_error() {
+        let error_msg = "This model's maximum context length is 131072 tokens. However, you requested 133770 tokens (133770 in the messages, 0 in the completion).";
+        let result = parse_context_length_error(error_msg);
+        assert_eq!(result, Some((133770, 131072)));
+
+        let invalid_msg = "Some other error";
+        let result = parse_context_length_error(invalid_msg);
+        assert_eq!(result, None);
+    }
 
     fn test_handler(_arg: &str) -> String {
         "test output".to_string()
@@ -2074,8 +2313,12 @@ mod tests {
     async fn test_multiple_commands_execution() {
         let config = Config::default();
         let mut registry = CommandRegistry::new();
-        registry.register(Command::from_fn("test1", "Test 1", |_| "output1".to_string()));
-        registry.register(Command::from_fn("test2", "Test 2", |_| "output2".to_string()));
+        registry.register(Command::from_fn("test1", "Test 1", |_| {
+            "output1".to_string()
+        }));
+        registry.register(Command::from_fn("test2", "Test 2", |_| {
+            "output2".to_string()
+        }));
 
         let agent = Agent::new(config, registry);
 
@@ -2368,7 +2611,9 @@ mod tests {
         config.features.workflow_enabled = Some(false); // 显式禁用
 
         let mut registry = CommandRegistry::new();
-        registry.register(Command::from_fn("test", "Test", |_| "test output".to_string()));
+        registry.register(Command::from_fn("test", "Test", |_| {
+            "test output".to_string()
+        }));
 
         let agent = Agent::new(config, registry);
 
@@ -2396,7 +2641,8 @@ mod tests {
         assert!(agent.workflow_intents.len() >= 4); // 至少有 4 个内置模板
 
         // 验证模板名称
-        let template_names: Vec<String> = agent.workflow_intents
+        let template_names: Vec<String> = agent
+            .workflow_intents
             .iter()
             .map(|w| w.base_intent.name.clone())
             .collect();

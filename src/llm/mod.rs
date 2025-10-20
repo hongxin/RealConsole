@@ -11,12 +11,12 @@
 //! - Deepseek (远程 API)
 //! - OpenAI (兼容 API)
 
-mod ollama;
 mod deepseek;
 pub mod http_base;
+mod ollama;
 
-pub use ollama::OllamaClient;
 pub use deepseek::DeepseekClient;
+pub use ollama::OllamaClient;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -376,14 +376,17 @@ impl RetryPolicy {
             LlmError::Network(_)
                 | LlmError::Timeout
                 | LlmError::RateLimit
-                | LlmError::Http { status: 500..=599, .. }
+                | LlmError::Http {
+                    status: 500..=599,
+                    ..
+                }
         )
     }
 
     /// 计算退避时间（含抖动）
     pub fn backoff_duration(&self, attempt: u32) -> std::time::Duration {
-        let base = self.initial_backoff_ms as f64
-            * self.backoff_multiplier.powi((attempt - 1) as i32);
+        let base =
+            self.initial_backoff_ms as f64 * self.backoff_multiplier.powi((attempt - 1) as i32);
         let backoff_ms = base.min(self.max_backoff_ms as f64) as u64;
 
         // 添加 10% 抖动

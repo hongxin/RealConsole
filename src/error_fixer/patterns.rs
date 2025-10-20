@@ -134,7 +134,8 @@ impl BuiltinPatterns {
             8,
             "使用 chmod/sudo 或检查文件权限",
             true,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn file_not_found() -> ErrorPattern {
@@ -156,7 +157,8 @@ impl BuiltinPatterns {
             6,
             "检查目录路径是否存在，或使用 mkdir 创建",
             true,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn syntax_error() -> ErrorPattern {
@@ -167,7 +169,8 @@ impl BuiltinPatterns {
             5,
             "检查命令语法，参考帮助文档",
             false,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn port_in_use() -> ErrorPattern {
@@ -189,7 +192,8 @@ impl BuiltinPatterns {
             9,
             "清理磁盘空间或扩展存储",
             false,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn connection_refused() -> ErrorPattern {
@@ -200,7 +204,8 @@ impl BuiltinPatterns {
             6,
             "检查网络连接和服务状态",
             false,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn python_module_not_found() -> ErrorPattern {
@@ -211,7 +216,8 @@ impl BuiltinPatterns {
             6,
             "使用 pip install 安装缺失的模块",
             true,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn npm_module_not_found() -> ErrorPattern {
@@ -222,7 +228,8 @@ impl BuiltinPatterns {
             6,
             "运行 npm install 安装依赖",
             true,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn git_error() -> ErrorPattern {
@@ -233,7 +240,8 @@ impl BuiltinPatterns {
             5,
             "检查 Git 仓库状态，可能需要 pull/commit",
             true,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn rust_compile_error() -> ErrorPattern {
@@ -244,7 +252,8 @@ impl BuiltinPatterns {
             6,
             "检查导入和依赖，运行 cargo check",
             false,
-        ).unwrap()
+        )
+        .unwrap()
     }
 }
 

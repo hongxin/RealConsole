@@ -31,8 +31,8 @@ pub fn register_core_commands(registry: &mut CommandRegistry) {
     registry.register(version_cmd);
 
     // /commands 命令（列出所有命令）
-    let commands_cmd = Command::from_fn("commands", "列出所有可用命令", cmd_commands)
-        .with_group("core");
+    let commands_cmd =
+        Command::from_fn("commands", "列出所有可用命令", cmd_commands).with_group("core");
     registry.register(commands_cmd);
 
     // /examples 命令（使用示例）
@@ -105,7 +105,11 @@ fn cmd_help_quick() -> String {
   使用 {} 查看命令详情
   系统自动识别命令类型，使用 {} 查看路由说明
 "#,
-        format!(" {} {}", "RealConsole".bold().cyan(), format!("v{}", VERSION).dimmed()),
+        format!(
+            " {} {}",
+            "RealConsole".bold().cyan(),
+            format!("v{}", VERSION).dimmed()
+        ),
         "💬 智能对话:".bold(),
         "示例:".dimmed(),
         "示例:".dimmed(),

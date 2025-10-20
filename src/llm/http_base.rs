@@ -12,7 +12,7 @@
 //! - 连接层（reqwest）
 
 use super::{ClientStats, LlmError, RetryPolicy};
-use reqwest::{Client, header::HeaderMap, Response};
+use reqwest::{header::HeaderMap, Client, Response};
 use serde_json::Value;
 use std::future::Future;
 use std::time::Duration;
@@ -114,10 +114,7 @@ impl HttpClientBase {
             request = request.headers(headers);
         }
 
-        request
-            .send()
-            .await
-            .map_err(|e| LlmError::from(e))
+        request.send().await.map_err(|e| LlmError::from(e))
     }
 
     /// 处理 HTTP 响应并提取 JSON
@@ -137,7 +134,10 @@ impl HttpClientBase {
 
         // 检查 HTTP 状态码
         if !status.is_success() {
-            let error_text = resp.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = resp
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(LlmError::Http {
                 status: status.as_u16(),
                 message: error_text,
@@ -191,7 +191,9 @@ impl HttpClientBase {
                     last_error = Some(e.clone());
 
                     // 判断是否应该重试
-                    if attempt < self.retry_policy.max_attempts && self.retry_policy.is_retryable(&e) {
+                    if attempt < self.retry_policy.max_attempts
+                        && self.retry_policy.is_retryable(&e)
+                    {
                         // 计算退避时间并等待
                         let backoff = self.retry_policy.backoff_duration(attempt);
                         tokio::time::sleep(backoff).await;
@@ -310,12 +312,9 @@ mod tests {
             backoff_multiplier: 2.0,
         };
 
-        let base = HttpClientBase::with_retry_policy(
-            "https://api.example.com",
-            60,
-            custom_policy.clone(),
-        )
-        .unwrap();
+        let base =
+            HttpClientBase::with_retry_policy("https://api.example.com", 60, custom_policy.clone())
+                .unwrap();
 
         assert_eq!(base.retry_policy.max_attempts, 5);
         assert_eq!(base.retry_policy.initial_backoff_ms, 1000);
@@ -323,8 +322,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_retry_success_first_attempt() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         let base = HttpClientBase::new("https://api.example.com", 60).unwrap();
 
@@ -348,8 +347,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_retry_success_after_failures() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         let base = HttpClientBase::new("https://api.example.com", 60).unwrap();
 
@@ -377,8 +376,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_retry_max_attempts_reached() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         let base = HttpClientBase::new("https://api.example.com", 60).unwrap();
 
@@ -396,13 +395,16 @@ mod tests {
             .await;
 
         assert!(result.is_err());
-        assert_eq!(call_count.load(Ordering::SeqCst), base.retry_policy.max_attempts as usize);
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            base.retry_policy.max_attempts as usize
+        );
     }
 
     #[tokio::test]
     async fn test_with_retry_non_retryable_error() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         let base = HttpClientBase::new("https://api.example.com", 60).unwrap();
 
@@ -460,8 +462,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_retry_and_stats() {
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         let base = HttpClientBase::new("https://api.example.com", 60).unwrap();
 

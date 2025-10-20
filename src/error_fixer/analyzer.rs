@@ -349,7 +349,10 @@ mod tests {
     #[test]
     fn test_analyzer_permission_denied() {
         let analyzer = ErrorAnalyzer::new();
-        let analysis = analyzer.analyze("rm file.txt", "rm: cannot remove 'file.txt': Permission denied");
+        let analysis = analyzer.analyze(
+            "rm file.txt",
+            "rm: cannot remove 'file.txt': Permission denied",
+        );
 
         assert_eq!(analysis.category, ErrorCategory::Permission);
         assert!(analysis.severity >= ErrorSeverity::High);

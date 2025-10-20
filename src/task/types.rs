@@ -323,8 +323,7 @@ pub struct ExecutionResult {
 impl ExecutionResult {
     /// 是否全部成功
     pub fn is_success(&self) -> bool {
-        self.failed_tasks == 0
-            && self.completed_tasks == self.total_tasks
+        self.failed_tasks == 0 && self.completed_tasks == self.total_tasks
     }
 
     /// 成功率

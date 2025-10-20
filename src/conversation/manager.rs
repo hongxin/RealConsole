@@ -34,11 +34,16 @@ impl ConversationManager {
     }
 
     /// 启动新对话
-    pub fn start_conversation(&mut self, intent: impl Into<String>) -> Result<String, ConversationError> {
+    pub fn start_conversation(
+        &mut self,
+        intent: impl Into<String>,
+    ) -> Result<String, ConversationError> {
         let mut context = ConversationContext::new(intent, self.default_timeout);
 
         // 转换到初始化状态
-        context.state.transition(StateEvent::IntentRecognized)
+        context
+            .state
+            .transition(StateEvent::IntentRecognized)
             .map_err(|e| ConversationError::StateTransition(e.to_string()))?;
 
         let id = context.id.clone();
@@ -48,14 +53,20 @@ impl ConversationManager {
     }
 
     /// 获取对话上下文
-    pub fn get_context(&self, conversation_id: &str) -> Result<&ConversationContext, ConversationError> {
+    pub fn get_context(
+        &self,
+        conversation_id: &str,
+    ) -> Result<&ConversationContext, ConversationError> {
         self.active_conversations
             .get(conversation_id)
             .ok_or(ConversationError::NotFound)
     }
 
     /// 获取可变的对话上下文
-    pub fn get_context_mut(&mut self, conversation_id: &str) -> Result<&mut ConversationContext, ConversationError> {
+    pub fn get_context_mut(
+        &mut self,
+        conversation_id: &str,
+    ) -> Result<&mut ConversationContext, ConversationError> {
         self.active_conversations
             .get_mut(conversation_id)
             .ok_or(ConversationError::NotFound)
@@ -86,18 +97,21 @@ impl ConversationManager {
         context.mark_parameter_collected(param_name);
 
         // 检查是否还有待收集的参数
-        let next_param_info = context.next_pending_parameter().map(|p| (
-            p.name.clone(),
-            p.description.clone(),
-            p.hint.clone(),
-            p.default.clone(),
-        ));
+        let next_param_info = context.next_pending_parameter().map(|p| {
+            (
+                p.name.clone(),
+                p.description.clone(),
+                p.hint.clone(),
+                p.default.clone(),
+            )
+        });
 
         if let Some((name, description, hint, default)) = next_param_info {
             // 转换状态
-            context.state.transition(StateEvent::ParameterProvided {
-                name: name.clone(),
-            }).map_err(|e| ConversationError::StateTransition(e.to_string()))?;
+            context
+                .state
+                .transition(StateEvent::ParameterProvided { name: name.clone() })
+                .map_err(|e| ConversationError::StateTransition(e.to_string()))?;
 
             Ok(Response::AskForParameter {
                 name,
@@ -107,7 +121,9 @@ impl ConversationManager {
             })
         } else {
             // 所有参数已收集
-            context.state.transition(StateEvent::AllParametersCollected)
+            context
+                .state
+                .transition(StateEvent::AllParametersCollected)
                 .map_err(|e| ConversationError::StateTransition(e.to_string()))?;
 
             Ok(Response::AllParametersCollected)
@@ -123,11 +139,15 @@ impl ConversationManager {
         let context = self.get_context_mut(conversation_id)?;
 
         if confirmed {
-            context.state.transition(StateEvent::UserConfirmed)
+            context
+                .state
+                .transition(StateEvent::UserConfirmed)
                 .map_err(|e| ConversationError::StateTransition(e.to_string()))?;
             Ok(Response::ReadyToExecute)
         } else {
-            context.state.transition(StateEvent::UserRejected)
+            context
+                .state
+                .transition(StateEvent::UserRejected)
                 .map_err(|e| ConversationError::StateTransition(e.to_string()))?;
             Ok(Response::Cancelled)
         }
@@ -142,12 +162,18 @@ impl ConversationManager {
     ) -> Result<Response, ConversationError> {
         let context = self.get_context_mut(conversation_id)?;
 
-        context.state.transition(StateEvent::ExecutionCompleted {
-            success,
-            message: message.clone(),
-        }).map_err(|e| ConversationError::StateTransition(e.to_string()))?;
+        context
+            .state
+            .transition(StateEvent::ExecutionCompleted {
+                success,
+                message: message.clone(),
+            })
+            .map_err(|e| ConversationError::StateTransition(e.to_string()))?;
 
-        Ok(Response::ExecutionResult { success, output: message })
+        Ok(Response::ExecutionResult {
+            success,
+            output: message,
+        })
     }
 
     /// 取消对话
@@ -158,9 +184,12 @@ impl ConversationManager {
     ) -> Result<(), ConversationError> {
         let context = self.get_context_mut(conversation_id)?;
 
-        context.state.transition(StateEvent::UserCancelled {
-            reason: reason.into(),
-        }).map_err(|e| ConversationError::StateTransition(e.to_string()))?;
+        context
+            .state
+            .transition(StateEvent::UserCancelled {
+                reason: reason.into(),
+            })
+            .map_err(|e| ConversationError::StateTransition(e.to_string()))?;
 
         Ok(())
     }
@@ -181,7 +210,8 @@ impl ConversationManager {
 
     /// 清理已完成的对话
     pub fn cleanup_completed(&mut self) {
-        self.active_conversations.retain(|_, ctx| !ctx.state.is_terminal());
+        self.active_conversations
+            .retain(|_, ctx| !ctx.state.is_terminal());
     }
 
     /// 获取活跃对话数量
@@ -224,11 +254,12 @@ impl ConversationManager {
     ) -> Result<String, ConversationError> {
         let context = self.get_context(conversation_id)?;
 
-        let next_param = context
-            .next_pending_parameter()
-            .ok_or(ConversationError::ParameterError(
-                "没有待收集的参数".to_string(),
-            ))?;
+        let next_param =
+            context
+                .next_pending_parameter()
+                .ok_or(ConversationError::ParameterError(
+                    "没有待收集的参数".to_string(),
+                ))?;
 
         let context_str = format!("用户意图：{}", context.intent);
 
@@ -315,10 +346,7 @@ pub enum Response {
     ReadyToExecute,
 
     /// 执行结果
-    ExecutionResult {
-        success: bool,
-        output: String,
-    },
+    ExecutionResult { success: bool, output: String },
 
     /// 已取消
     Cancelled,
@@ -355,9 +383,9 @@ impl std::error::Error for ConversationError {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::context::{ParameterType, ParameterValue};
     use super::super::state::ConversationState;
+    use super::*;
 
     #[test]
     fn test_start_conversation() {
@@ -383,31 +411,31 @@ mod tests {
         let id = manager.start_conversation("test").unwrap();
 
         // 添加参数规格
-        manager.add_parameter_spec(
-            &id,
-            ParameterSpec::new("param1", ParameterType::String, "First parameter")
-        ).unwrap();
+        manager
+            .add_parameter_spec(
+                &id,
+                ParameterSpec::new("param1", ParameterType::String, "First parameter"),
+            )
+            .unwrap();
 
-        manager.add_parameter_spec(
-            &id,
-            ParameterSpec::new("param2", ParameterType::String, "Second parameter")
-        ).unwrap();
+        manager
+            .add_parameter_spec(
+                &id,
+                ParameterSpec::new("param2", ParameterType::String, "Second parameter"),
+            )
+            .unwrap();
 
         // 收集第一个参数
-        let response = manager.collect_parameter(
-            &id,
-            "param1",
-            ParameterValue::String("value1".to_string())
-        ).unwrap();
+        let response = manager
+            .collect_parameter(&id, "param1", ParameterValue::String("value1".to_string()))
+            .unwrap();
 
         assert!(matches!(response, Response::AskForParameter { .. }));
 
         // 收集第二个参数
-        let response = manager.collect_parameter(
-            &id,
-            "param2",
-            ParameterValue::String("value2".to_string())
-        ).unwrap();
+        let response = manager
+            .collect_parameter(&id, "param2", ParameterValue::String("value2".to_string()))
+            .unwrap();
 
         assert_eq!(response, Response::AllParametersCollected);
 

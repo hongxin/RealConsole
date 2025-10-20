@@ -75,8 +75,8 @@ pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 
             curr_row[j] = min(
                 min(
-                    curr_row[j - 1] + 1,  // 插入
-                    prev_row[j] + 1,      // 删除
+                    curr_row[j - 1] + 1, // 插入
+                    prev_row[j] + 1,     // 删除
                 ),
                 prev_row[j - 1] + cost, // 替换
             );
@@ -276,7 +276,8 @@ impl IntentMatcher {
     /// let matcher = IntentMatcher::with_config(100, fuzzy_config);
     /// ```
     pub fn with_config(cache_capacity: usize, fuzzy_config: FuzzyConfig) -> Self {
-        let cache_capacity = NonZeroUsize::new(cache_capacity).unwrap_or(NonZeroUsize::new(100).unwrap());
+        let cache_capacity =
+            NonZeroUsize::new(cache_capacity).unwrap_or(NonZeroUsize::new(100).unwrap());
 
         Self {
             intents: Vec::new(),
@@ -847,7 +848,7 @@ mod tests {
             IntentDomain::FileOps,
             vec!["python".to_string(), "行数".to_string()],
             vec![r"(?i)统计.*python.*行数".to_string()], // 使用 (?i) 使正则表达式不区分大小写
-            0.7, // 较高的阈值
+            0.7,                                         // 较高的阈值
         );
 
         matcher.register(intent);
@@ -1000,7 +1001,7 @@ mod tests {
             IntentDomain::FileOps,
             vec!["test".to_string()],
             vec!["[invalid(".to_string()], // 无效的正则
-            0.3, // 降低阈值以匹配单个关键词
+            0.3,                           // 降低阈值以匹配单个关键词
         );
 
         // 应该不会 panic，只是不会匹配模式
@@ -1279,10 +1280,7 @@ mod tests {
         if !matches1.is_empty() {
             assert_eq!(matches1[0].intent.name, matches2[0].intent.name);
             assert_eq!(matches1[0].confidence, matches2[0].confidence);
-            assert_eq!(
-                matches1[0].matched_keywords,
-                matches2[0].matched_keywords
-            );
+            assert_eq!(matches1[0].matched_keywords, matches2[0].matched_keywords);
         }
     }
 
@@ -1308,9 +1306,10 @@ mod tests {
         let matches = matcher.match_intent("统记");
         if matches.is_empty() {
             eprintln!("Failed to match '统记' with fuzzy matching");
-            eprintln!("Config: threshold={}, weight={}",
-                      matcher.fuzzy_config.similarity_threshold,
-                      matcher.fuzzy_config.fuzzy_weight);
+            eprintln!(
+                "Config: threshold={}, weight={}",
+                matcher.fuzzy_config.similarity_threshold, matcher.fuzzy_config.fuzzy_weight
+            );
 
             // 计算期望的相似度和分数
             let sim = string_similarity("统记", "统计");
@@ -1318,7 +1317,10 @@ mod tests {
             eprintln!("Similarity: {}, Expected score: {}", sim, expected_score);
         }
 
-        assert!(!matches.is_empty(), "Should match '统记' with fuzzy matching");
+        assert!(
+            !matches.is_empty(),
+            "Should match '统记' with fuzzy matching"
+        );
     }
 
     #[test]
@@ -1406,13 +1408,19 @@ mod tests {
         // "统记" 与 "统计" 相似度 = 1 - 1/2 = 0.5（Levenshtein 距离为 1，最大长度为 2）
         // 分数 = 0.3 * 0.7 * 0.5 = 0.105
         let matches = matcher.match_intent("统记");
-        assert!(!matches.is_empty(), "Should match '统记' with fuzzy matching");
+        assert!(
+            !matches.is_empty(),
+            "Should match '统记' with fuzzy matching"
+        );
         assert_eq!(matches[0].intent.name, "count_files");
         assert!(matches[0].matched_keywords.iter().any(|k| k.contains('~')));
 
         // 测试2：包含模糊匹配词的句子
         let matches = matcher.match_intent("统记 python 文件");
-        assert!(!matches.is_empty(), "Should match '统记 python 文件' with fuzzy matching");
+        assert!(
+            !matches.is_empty(),
+            "Should match '统记 python 文件' with fuzzy matching"
+        );
         assert!(matches[0].matched_keywords.iter().any(|k| k.contains('~')));
     }
 
@@ -1467,8 +1475,16 @@ mod tests {
         assert!(!fuzzy_matches.is_empty());
         let fuzzy_score = fuzzy_matches[0].confidence;
         // 模糊匹配分数应该低于精确匹配
-        assert!(fuzzy_score < 0.3, "Fuzzy score {} should be less than 0.3", fuzzy_score);
-        assert!(fuzzy_score > 0.05, "Fuzzy score {} should be greater than 0.05", fuzzy_score);
+        assert!(
+            fuzzy_score < 0.3,
+            "Fuzzy score {} should be less than 0.3",
+            fuzzy_score
+        );
+        assert!(
+            fuzzy_score > 0.05,
+            "Fuzzy score {} should be greater than 0.05",
+            fuzzy_score
+        );
     }
 
     #[test]
@@ -1521,10 +1537,7 @@ mod tests {
         assert_eq!(matches[0].confidence, 0.3); // 精确匹配的分数
 
         // matched_keywords 不应该包含模糊匹配标记
-        assert!(!matches[0]
-            .matched_keywords
-            .iter()
-            .any(|k| k.contains('~')));
+        assert!(!matches[0].matched_keywords.iter().any(|k| k.contains('~')));
     }
 
     #[test]

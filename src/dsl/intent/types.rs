@@ -302,13 +302,7 @@ mod tests {
 
     #[test]
     fn test_confidence_threshold() {
-        let intent = Intent::new(
-            "test",
-            IntentDomain::FileOps,
-            Vec::new(),
-            Vec::new(),
-            0.7,
-        );
+        let intent = Intent::new("test", IntentDomain::FileOps, Vec::new(), Vec::new(), 0.7);
 
         assert!(intent.meets_threshold(0.7));
         assert!(intent.meets_threshold(0.8));
@@ -317,13 +311,7 @@ mod tests {
 
     #[test]
     fn test_intent_match_threshold() {
-        let intent = Intent::new(
-            "test",
-            IntentDomain::FileOps,
-            Vec::new(),
-            Vec::new(),
-            0.7,
-        );
+        let intent = Intent::new("test", IntentDomain::FileOps, Vec::new(), Vec::new(), 0.7);
 
         let match_high = IntentMatch::new(intent.clone(), 0.9);
         let match_low = IntentMatch::new(intent, 0.5);

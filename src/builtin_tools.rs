@@ -4,7 +4,9 @@
 //! - Calculator: 数学计算
 //! - FileOps: 文件操作（读/写/列表）
 //! - DateTime: 日期时间查询
+//! - Lunar: 农历查询（公历/农历转换、节气、干支生肖）
 
+use crate::lunar_tool;
 use crate::tool::{Parameter, ParameterType, Tool, ToolRegistry};
 use chrono::Local;
 use serde_json::{json, Value as JsonValue};
@@ -17,7 +19,8 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry) {
     register_file_ops(registry);
     register_datetime(registry);
     register_code_stats(registry);
-    register_shell_execute(registry);  // ✨ Phase 8: Shell 执行工具
+    register_shell_execute(registry); // ✨ Phase 8: Shell 执行工具
+    lunar_tool::register_lunar_tool(registry); // ✨ 农历工具
 }
 
 /// 注册计算器工具
@@ -178,9 +181,7 @@ fn register_file_ops(registry: &mut ToolRegistry) {
             let content = args["content"].as_str().ok_or("content 必须是字符串")?;
 
             // 安全检查：禁止写入系统目录
-            if path.starts_with("/etc/")
-                || path.starts_with("/sys/")
-                || path.starts_with("/proc/")
+            if path.starts_with("/etc/") || path.starts_with("/sys/") || path.starts_with("/proc/")
             {
                 return Err(format!("禁止写入系统目录: {}", path));
             }
@@ -247,7 +248,8 @@ fn register_datetime(registry: &mut ToolRegistry) {
         vec![Parameter {
             name: "format".to_string(),
             param_type: ParameterType::String,
-            description: "格式类型: full (完整), date (仅日期), time (仅时间), timestamp (时间戳)".to_string(),
+            description: "格式类型: full (完整), date (仅日期), time (仅时间), timestamp (时间戳)"
+                .to_string(),
             required: false,
             default: Some(json!("full")),
         }],
@@ -317,13 +319,11 @@ fn register_code_stats(registry: &mut ToolRegistry) {
                     }
 
                     // 构建结果字符串
-                    let mut result = format!(
-                        "统计结果 (目录: {}, 扩展名: .{})\n",
-                        directory, extension
-                    );
+                    let mut result =
+                        format!("统计结果 (目录: {}, 扩展名: .{})\n", directory, extension);
                     result.push_str(&format!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"));
                     result.push_str(&format!("文件总数: {} 个\n", file_count));
-                    result.push_str(&format!("代码总行数: {} 行\n\n", total_lines));
+                    result.push_str(&format!("代码总行数: {} 行\n", total_lines));
 
                     // 显示前10个最大的文件
                     result.push_str("最大的10个文件:\n");
@@ -347,10 +347,7 @@ fn register_code_stats(registry: &mut ToolRegistry) {
 }
 
 /// 递归统计目录下指定扩展名的文件行数
-fn count_lines_recursive(
-    dir: &Path,
-    extension: &str,
-) -> Result<Vec<(String, usize)>, String> {
+fn count_lines_recursive(dir: &Path, extension: &str) -> Result<Vec<(String, usize)>, String> {
     let mut results = Vec::new();
 
     let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))?;
@@ -453,7 +450,7 @@ fn register_shell_execute(registry: &mut ToolRegistry) {
 
                             // ✨ 用户安全建议：明确显示执行的命令
                             Ok(format!(
-                                "📌 执行命令: {}\n\n{}\n",
+                                "📌 执行命令: {}\n{}\n",
                                 command,
                                 result
                             ))

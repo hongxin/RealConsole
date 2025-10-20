@@ -3,10 +3,12 @@
 //! 测试从 LLM 调用到工具执行再到结果反馈的完整流程
 
 use async_trait::async_trait;
-use serde_json::Value as JsonValue;
-use realconsole::llm::{ChatResponse, ClientStats, FunctionCall, LlmClient, LlmError, Message, ToolCall};
+use realconsole::llm::{
+    ChatResponse, ClientStats, FunctionCall, LlmClient, LlmError, Message, ToolCall,
+};
 use realconsole::tool::{Parameter, ParameterType, Tool, ToolRegistry};
 use realconsole::tool_executor::ToolExecutor;
+use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -233,17 +235,15 @@ async fn test_e2e_multi_round_tool_calls() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_e2e_no_tools_fallback() {
     // 创建一个没有工具的场景
-    let mock_llm = MockLlmWithTools::new(vec![
-        ChatResponse::text("这是一个普通的对话响应".to_string()),
-    ]);
+    let mock_llm = MockLlmWithTools::new(vec![ChatResponse::text(
+        "这是一个普通的对话响应".to_string(),
+    )]);
 
     let registry = create_test_tool_registry();
     let executor = ToolExecutor::with_defaults(registry);
 
     // 执行时不提供工具 schemas（空列表）
-    let result = executor
-        .execute_iterative(&mock_llm, "你好", vec![])
-        .await;
+    let result = executor.execute_iterative(&mock_llm, "你好", vec![]).await;
 
     // 应该返回普通对话
     assert!(result.is_ok());

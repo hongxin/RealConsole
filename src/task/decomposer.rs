@@ -288,10 +288,7 @@ impl TaskDecomposer {
         let mut ids = std::collections::HashSet::new();
         for task in &tasks {
             if !ids.insert(task.id.clone()) {
-                return Err(TaskError::ParseError(format!(
-                    "任务 ID 重复: {}",
-                    task.id
-                )));
+                return Err(TaskError::ParseError(format!("任务 ID 重复: {}", task.id)));
             }
         }
 
@@ -410,10 +407,7 @@ mod tests {
         let decomposer = TaskDecomposer::new(llm);
         let context = ExecutionContext::current();
 
-        let tasks = decomposer
-            .decompose("run tests", &context)
-            .await
-            .unwrap();
+        let tasks = decomposer.decompose("run tests", &context).await.unwrap();
 
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].id, "task1");

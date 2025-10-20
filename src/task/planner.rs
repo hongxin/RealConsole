@@ -192,10 +192,8 @@ impl TaskPlanner {
             }
 
             // 限制并行度
-            let tasks_in_stage: Vec<SubTask> = ready_tasks
-                .into_iter()
-                .take(self.max_parallelism)
-                .collect();
+            let tasks_in_stage: Vec<SubTask> =
+                ready_tasks.into_iter().take(self.max_parallelism).collect();
 
             // 确定执行模式
             let execution_mode = if tasks_in_stage.len() > 1 {
@@ -230,9 +228,7 @@ impl TaskPlanner {
         sorted_tasks
             .iter()
             .enumerate()
-            .map(|(i, task)| {
-                ExecutionStage::new(i, vec![task.clone()], ExecutionMode::Sequential)
-            })
+            .map(|(i, task)| ExecutionStage::new(i, vec![task.clone()], ExecutionMode::Sequential))
             .collect()
     }
 

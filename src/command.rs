@@ -17,7 +17,7 @@ pub type CommandHandler = Arc<dyn Fn(&str) -> String + Send + Sync>;
 #[derive(Clone)]
 pub struct Command {
     pub name: String,
-    #[allow(dead_code)]  // Phase 2 将用于增强的帮助信息
+    #[allow(dead_code)] // Phase 2 将用于增强的帮助信息
     pub desc: String,
     pub handler: CommandHandler,
     pub aliases: Vec<String>,
@@ -88,7 +88,7 @@ impl CommandRegistry {
     }
 
     /// 列出所有命令（按名称排序）
-    #[allow(dead_code)]  // Phase 2 将用于 /commands 命令
+    #[allow(dead_code)] // Phase 2 将用于 /commands 命令
     pub fn list(&self) -> Vec<&Command> {
         let mut cmds: Vec<&Command> = self.commands.values().collect();
         cmds.sort_by(|a, b| a.name.cmp(&b.name));
@@ -96,15 +96,13 @@ impl CommandRegistry {
     }
 
     /// 按分组列出命令
-    #[allow(dead_code)]  // Phase 2 将用于分组显示帮助
+    #[allow(dead_code)] // Phase 2 将用于分组显示帮助
     pub fn list_by_group(&self) -> HashMap<String, Vec<&Command>> {
         let mut grouped: HashMap<String, Vec<&Command>> = HashMap::new();
 
         for cmd in self.commands.values() {
             let group = cmd.group.as_deref().unwrap_or("core");
-            grouped.entry(group.to_string())
-                .or_default()
-                .push(cmd);
+            grouped.entry(group.to_string()).or_default().push(cmd);
         }
 
         // 对每组内的命令排序

@@ -92,11 +92,7 @@ fn handle_log_search(keyword: &str, logger: Arc<RwLock<ExecutionLogger>>) -> Str
             let results = log.search(keyword);
 
             if results.is_empty() {
-                return format!(
-                    "{} 未找到包含 {} 的日志",
-                    "提示:".yellow(),
-                    keyword.cyan()
-                );
+                return format!("{} 未找到包含 {} 的日志", "提示:".yellow(), keyword.cyan());
             }
 
             let mut lines = vec![format!(
@@ -180,11 +176,7 @@ fn handle_log_type(type_str: &str, logger: Arc<RwLock<ExecutionLogger>>) -> Stri
             let results = log.filter_by_type(command_type);
 
             if results.is_empty() {
-                return format!(
-                    "{} 未找到类型为 {} 的日志",
-                    "提示:".yellow(),
-                    command_type
-                );
+                return format!("{} 未找到类型为 {} 的日志", "提示:".yellow(), command_type);
             }
 
             let mut lines = vec![format!(
@@ -262,7 +254,11 @@ fn handle_log_clear(logger: Arc<RwLock<ExecutionLogger>>) -> String {
             let mut log = logger.write().await;
             let count = log.len();
             log.clear();
-            format!("{} 已清空 {} 条执行日志", "✓".green(), count.to_string().dimmed())
+            format!(
+                "{} 已清空 {} 条执行日志",
+                "✓".green(),
+                count.to_string().dimmed()
+            )
         })
     })
 }

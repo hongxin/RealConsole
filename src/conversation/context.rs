@@ -183,9 +183,9 @@ mod tests {
 
     #[test]
     fn test_timeout_detection() {
-        let ctx = ConversationContext::new("test", 1);  // 1秒超时
+        let ctx = ConversationContext::new("test", 1); // 1秒超时
 
-        assert!(!ctx.is_timeout());  // 刚创建不应该超时
+        assert!(!ctx.is_timeout()); // 刚创建不应该超时
     }
 
     #[test]

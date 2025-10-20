@@ -10,8 +10,8 @@
 //! - 常见命令零延迟
 //! - 智能功能逐步引导
 
-use std::collections::HashSet;
 use once_cell::sync::Lazy;
+use std::collections::HashSet;
 
 /// 常见Shell命令列表
 ///
@@ -19,48 +19,122 @@ use once_cell::sync::Lazy;
 static COMMON_SHELL_COMMANDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     [
         // 文件导航
-        "ls", "ll", "cd", "pwd", "tree",
-
+        "ls",
+        "ll",
+        "cd",
+        "pwd",
+        "tree",
         // 文件操作
-        "cat", "less", "more", "head", "tail", "touch", "mkdir", "rm", "rmdir",
-        "cp", "mv", "ln", "chmod", "chown",
-
+        "cat",
+        "less",
+        "more",
+        "head",
+        "tail",
+        "touch",
+        "mkdir",
+        "rm",
+        "rmdir",
+        "cp",
+        "mv",
+        "ln",
+        "chmod",
+        "chown",
         // 文件搜索
-        "find", "locate", "which", "whereis",
-
+        "find",
+        "locate",
+        "which",
+        "whereis",
         // 文本处理
-        "grep", "egrep", "fgrep", "sed", "awk", "cut", "sort", "uniq", "wc",
-
+        "grep",
+        "egrep",
+        "fgrep",
+        "sed",
+        "awk",
+        "cut",
+        "sort",
+        "uniq",
+        "wc",
         // 进程管理
-        "ps", "top", "htop", "kill", "killall", "pkill", "pgrep",
-
+        "ps",
+        "top",
+        "htop",
+        "kill",
+        "killall",
+        "pkill",
+        "pgrep",
         // 网络工具
-        "ping", "curl", "wget", "netstat", "ss", "ip", "ifconfig",
-
+        "ping",
+        "curl",
+        "wget",
+        "netstat",
+        "ss",
+        "ip",
+        "ifconfig",
         // 系统信息
-        "uname", "hostname", "whoami", "who", "w", "uptime", "free", "df", "du",
-
+        "uname",
+        "hostname",
+        "whoami",
+        "who",
+        "w",
+        "uptime",
+        "free",
+        "df",
+        "du",
         // 压缩解压
-        "tar", "gzip", "gunzip", "zip", "unzip", "bzip2", "bunzip2",
-
+        "tar",
+        "gzip",
+        "gunzip",
+        "zip",
+        "unzip",
+        "bzip2",
+        "bunzip2",
         // Git命令
-        "git", "gitk",
-
+        "git",
+        "gitk",
         // 编辑器
-        "vi", "vim", "nano", "emacs",
-
+        "vi",
+        "vim",
+        "nano",
+        "emacs",
         // 其他常用
-        "echo", "date", "cal", "bc", "man", "info", "history", "clear", "exit",
-
+        "echo",
+        "date",
+        "cal",
+        "bc",
+        "man",
+        "info",
+        "history",
+        "clear",
+        "exit",
         // 开发工具
-        "make", "cmake", "gcc", "g++", "clang", "rustc", "cargo", "npm", "yarn",
-        "python", "python3", "node", "java", "javac", "ruby", "perl", "go",
-
+        "make",
+        "cmake",
+        "gcc",
+        "g++",
+        "clang",
+        "rustc",
+        "cargo",
+        "npm",
+        "yarn",
+        "python",
+        "python3",
+        "node",
+        "java",
+        "javac",
+        "ruby",
+        "perl",
+        "go",
         // Docker & 容器
-        "docker", "docker-compose", "kubectl", "podman",
-
+        "docker",
+        "docker-compose",
+        "kubectl",
+        "podman",
         // 数据库
-        "mysql", "psql", "sqlite3", "redis-cli", "mongo",
+        "mysql",
+        "psql",
+        "sqlite3",
+        "redis-cli",
+        "mongo",
     ]
     .iter()
     .copied()
@@ -77,7 +151,7 @@ pub enum CommandType {
     ForcedShell(String),
 
     /// 系统命令（使用/前缀）
-    SystemCommand(String, String),  // (命令名, 参数)
+    SystemCommand(String, String), // (命令名, 参数)
 
     /// 自然语言（需要LLM处理）
     NaturalLanguage(String),
@@ -176,8 +250,11 @@ impl CommandRouter {
     /// - 包含长句子（超过5个单词且有中文）
     fn looks_like_natural_language(&self, input: &str) -> bool {
         // 检查中文疑问词
-        if input.contains('吗') || input.contains('呢')
-            || input.contains('吧') || input.contains('嘛') {
+        if input.contains('吗')
+            || input.contains('呢')
+            || input.contains('吧')
+            || input.contains('嘛')
+        {
             return true;
         }
 
@@ -188,9 +265,7 @@ impl CommandRouter {
         }
 
         // 检查是否包含中文且单词数量较多（可能是问句）
-        let has_chinese = input.chars().any(|c| {
-            matches!(c, '\u{4e00}'..='\u{9fff}')
-        });
+        let has_chinese = input.chars().any(|c| matches!(c, '\u{4e00}'..='\u{9fff}'));
 
         if has_chinese {
             let word_count = input.split_whitespace().count();
@@ -227,14 +302,14 @@ impl CommandRouter {
 
 智能提示：系统会自动识别命令类型，无需手动添加前缀。
 "#,
-            "\x1b[32m",  // green
-            "\x1b[0m",   // reset
+            "\x1b[32m", // green
+            "\x1b[0m",  // reset
             "\x1b[32m",
             "\x1b[0m",
             "\x1b[32m",
             "\x1b[0m",
             prefix,
-            "\x1b[36m",  // cyan
+            "\x1b[36m", // cyan
             prefix,
             "\x1b[0m",
             "\x1b[36m",
@@ -243,9 +318,9 @@ impl CommandRouter {
             "\x1b[36m",
             prefix,
             "\x1b[0m",
-            "\x1b[33m",  // yellow
+            "\x1b[33m", // yellow
             "\x1b[0m",
-            "\x1b[35m",  // magenta
+            "\x1b[35m", // magenta
             "\x1b[0m",
             "\x1b[35m",
             "\x1b[0m",
@@ -279,10 +354,16 @@ mod tests {
         let router = CommandRouter::default();
 
         let result = router.route("/help");
-        assert_eq!(result, CommandType::SystemCommand("help".to_string(), "".to_string()));
+        assert_eq!(
+            result,
+            CommandType::SystemCommand("help".to_string(), "".to_string())
+        );
 
         let result = router.route("/plan 创建项目");
-        assert_eq!(result, CommandType::SystemCommand("plan".to_string(), "创建项目".to_string()));
+        assert_eq!(
+            result,
+            CommandType::SystemCommand("plan".to_string(), "创建项目".to_string())
+        );
     }
 
     #[test]
@@ -337,8 +418,8 @@ mod tests {
 
         // 测试常见命令列表
         let common_cmds = vec![
-            "ls", "cd", "pwd", "cat", "grep", "find", "ps", "top",
-            "git", "docker", "npm", "cargo", "python", "make",
+            "ls", "cd", "pwd", "cat", "grep", "find", "ps", "top", "git", "docker", "npm", "cargo",
+            "python", "make",
         ];
 
         for cmd in common_cmds {
@@ -383,11 +464,11 @@ mod tests {
         let router = CommandRouter::default();
 
         // 强制Shell优先级最高
-        let result = router.route("!ls");  // 不是 "ls"
+        let result = router.route("!ls"); // 不是 "ls"
         assert!(matches!(result, CommandType::ForcedShell(_)));
 
         // 系统命令次优先级
-        let result = router.route("/ls");  // 即使ls是常见命令
+        let result = router.route("/ls"); // 即使ls是常见命令
         assert!(matches!(result, CommandType::SystemCommand(_, _)));
     }
 

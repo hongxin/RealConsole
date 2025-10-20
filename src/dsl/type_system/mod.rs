@@ -29,10 +29,10 @@ pub mod types;
 
 // 重新导出常用类型（暂未使用）
 #[allow(unused_imports)]
-pub use checker::{TypeError, TypeChecker};
+pub use checker::{TypeChecker, TypeError};
 #[allow(unused_imports)]
 pub use inference::TypeInference;
 #[allow(unused_imports)]
 pub use types::{
-    CompositeType, Constraint, ConstrainedType, ConstraintValue, DomainType, PrimitiveType, Type,
+    CompositeType, ConstrainedType, Constraint, ConstraintValue, DomainType, PrimitiveType, Type,
 };

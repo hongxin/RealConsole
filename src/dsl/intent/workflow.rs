@@ -163,10 +163,7 @@ pub struct WorkflowExecutor {
 
 impl WorkflowIntent {
     /// 创建一个新的工作流意图
-    pub fn new(
-        base_intent: Intent,
-        workflow_steps: Vec<WorkflowStep>,
-    ) -> Self {
+    pub fn new(base_intent: Intent, workflow_steps: Vec<WorkflowStep>) -> Self {
         Self {
             base_intent,
             workflow_steps,
@@ -301,38 +298,40 @@ impl WorkflowExecutor {
 
         for step in &workflow_intent.workflow_steps {
             match step {
-                WorkflowStep::ToolCall { tool_name, args_template, result_key } => {
+                WorkflowStep::ToolCall {
+                    tool_name,
+                    args_template,
+                    result_key,
+                } => {
                     // 执行工具调用
-                    let result = self.execute_tool_call(
-                        tool_name,
-                        args_template,
-                        &context,
-                    ).await?;
+                    let result = self
+                        .execute_tool_call(tool_name, args_template, &context)
+                        .await?;
 
                     context.set_result(result_key.clone(), result);
                     steps_executed += 1;
                     tool_calls += 1;
                 }
 
-                WorkflowStep::LlmAnalyze { prompt_template, result_key } => {
+                WorkflowStep::LlmAnalyze {
+                    prompt_template,
+                    result_key,
+                } => {
                     // 执行 LLM 分析
-                    let result = self.execute_llm_analyze(
-                        prompt_template,
-                        &context,
-                    ).await?;
+                    let result = self.execute_llm_analyze(prompt_template, &context).await?;
 
                     context.set_result(result_key.clone(), result);
                     steps_executed += 1;
                     llm_calls += 1;
                 }
 
-                WorkflowStep::Transform { operation, input_key, result_key } => {
+                WorkflowStep::Transform {
+                    operation,
+                    input_key,
+                    result_key,
+                } => {
                     // 执行数据转换
-                    let result = self.execute_transform(
-                        operation,
-                        input_key,
-                        &context,
-                    )?;
+                    let result = self.execute_transform(operation, input_key, &context)?;
 
                     context.set_result(result_key.clone(), result);
                     steps_executed += 1;
@@ -354,7 +353,8 @@ impl WorkflowExecutor {
         };
 
         // 6. 更新缓存
-        self.update_cache(workflow_intent, &context.parameters, &output).await;
+        self.update_cache(workflow_intent, &context.parameters, &output)
+            .await;
 
         Ok(result)
     }
@@ -390,7 +390,9 @@ impl WorkflowExecutor {
         // 2. 调用 LLM
         if let Some(llm_manager) = &self.llm_manager {
             let manager = llm_manager.read().await;
-            manager.chat(&prompt).await
+            manager
+                .chat(&prompt)
+                .await
                 .map_err(|e| format!("LLM 调用失败: {}", e))
         } else {
             Err("LLM 管理器未配置".to_string())
@@ -404,7 +406,8 @@ impl WorkflowExecutor {
         input_key: &str,
         context: &ExecutionContext,
     ) -> Result<String, String> {
-        let input = context.get(input_key)
+        let input = context
+            .get(input_key)
             .ok_or_else(|| format!("输入数据不存在: {}", input_key))?;
 
         match operation {
@@ -446,7 +449,8 @@ impl WorkflowExecutor {
 
             CacheStrategy::TimeBased { ttl } => {
                 if let Some(cache) = &self.cache {
-                    let cache_key = generate_cache_key(&workflow_intent.base_intent.name, parameters);
+                    let cache_key =
+                        generate_cache_key(&workflow_intent.base_intent.name, parameters);
                     let cache_guard = cache.read().await;
 
                     if let Some((cached_output, cached_time)) = cache_guard.get(&cache_key) {
@@ -470,7 +474,8 @@ impl WorkflowExecutor {
             CacheStrategy::ParameterBased => {
                 // 与 TimeBased 类似，但不检查 TTL
                 if let Some(cache) = &self.cache {
-                    let cache_key = generate_cache_key(&workflow_intent.base_intent.name, parameters);
+                    let cache_key =
+                        generate_cache_key(&workflow_intent.base_intent.name, parameters);
                     let cache_guard = cache.read().await;
 
                     if let Some((cached_output, _)) = cache_guard.get(&cache_key) {
@@ -501,12 +506,10 @@ impl WorkflowExecutor {
 
             CacheStrategy::TimeBased { .. } | CacheStrategy::ParameterBased => {
                 if let Some(cache) = &self.cache {
-                    let cache_key = generate_cache_key(&workflow_intent.base_intent.name, parameters);
+                    let cache_key =
+                        generate_cache_key(&workflow_intent.base_intent.name, parameters);
                     let mut cache_guard = cache.write().await;
-                    cache_guard.insert(
-                        cache_key,
-                        (output.to_string(), std::time::Instant::now()),
-                    );
+                    cache_guard.insert(cache_key, (output.to_string(), std::time::Instant::now()));
                 }
             }
         }
@@ -530,7 +533,8 @@ fn generate_cache_key(intent_name: &str, parameters: &HashMap<String, String>) -
     let mut keys: Vec<_> = parameters.keys().collect();
     keys.sort();
 
-    let params_str = keys.iter()
+    let params_str = keys
+        .iter()
         .map(|k| format!("{}={}", k, parameters.get(*k).unwrap()))
         .collect::<Vec<_>>()
         .join("&");
@@ -540,11 +544,12 @@ fn generate_cache_key(intent_name: &str, parameters: &HashMap<String, String>) -
 
 /// 简单的 JSON 路径提取
 fn extract_json_path(json_str: &str, path: &str) -> Result<String, String> {
-    let value: JsonValue = serde_json::from_str(json_str)
-        .map_err(|e| format!("JSON 解析失败: {}", e))?;
+    let value: JsonValue =
+        serde_json::from_str(json_str).map_err(|e| format!("JSON 解析失败: {}", e))?;
 
     // 简单实现：只支持单层路径
-    let result = value.get(path)
+    let result = value
+        .get(path)
         .ok_or_else(|| format!("路径不存在: {}", path))?;
 
     Ok(result.to_string())

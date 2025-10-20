@@ -218,7 +218,10 @@ pub enum ValidationRule {
     FloatRange { min: Option<f64>, max: Option<f64> },
 
     /// 长度验证
-    StringLength { min: Option<usize>, max: Option<usize> },
+    StringLength {
+        min: Option<usize>,
+        max: Option<usize>,
+    },
 
     /// 正则表达式验证
     Regex(String),
@@ -391,9 +394,15 @@ mod tests {
             max: Some(10),
         };
 
-        assert!(validation.validate(&ParameterValue::String("hello".to_string())).is_ok());
-        assert!(validation.validate(&ParameterValue::String("hi".to_string())).is_err());
-        assert!(validation.validate(&ParameterValue::String("hello world!".to_string())).is_err());
+        assert!(validation
+            .validate(&ParameterValue::String("hello".to_string()))
+            .is_ok());
+        assert!(validation
+            .validate(&ParameterValue::String("hi".to_string()))
+            .is_err());
+        assert!(validation
+            .validate(&ParameterValue::String("hello world!".to_string()))
+            .is_err());
     }
 
     #[test]

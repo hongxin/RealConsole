@@ -10,7 +10,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// 注册工具管理命令
-pub fn register_tool_commands(registry: &mut CommandRegistry, tool_registry: Arc<RwLock<ToolRegistry>>) {
+pub fn register_tool_commands(
+    registry: &mut CommandRegistry,
+    tool_registry: Arc<RwLock<ToolRegistry>>,
+) {
     // /tools 命令
     let tools_cmd = Command::from_fn(
         "tools",
@@ -91,7 +94,11 @@ fn handle_tools_list(tool_registry: Arc<RwLock<ToolRegistry>>) -> String {
 }
 
 /// 调用工具
-fn handle_tools_call(tool_name: &str, args_str: &str, tool_registry: Arc<RwLock<ToolRegistry>>) -> String {
+fn handle_tools_call(
+    tool_name: &str,
+    args_str: &str,
+    tool_registry: Arc<RwLock<ToolRegistry>>,
+) -> String {
     tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current().block_on(async {
             // 解析 JSON 参数
@@ -133,7 +140,11 @@ fn handle_tools_info(tool_name: &str, tool_registry: Arc<RwLock<ToolRegistry>>) 
                         lines.push(format!("\n{}", "参数:".bold()));
                         for param in &tool.parameters {
                             let required_text = if param.required { "必需" } else { "可选" };
-                            let required_colored = if param.required { required_text.red() } else { required_text.dimmed() };
+                            let required_colored = if param.required {
+                                required_text.red()
+                            } else {
+                                required_text.dimmed()
+                            };
                             lines.push(format!(
                                 "  {} {} [{}] - {}",
                                 "•".dimmed(),
@@ -141,17 +152,9 @@ fn handle_tools_info(tool_name: &str, tool_registry: Arc<RwLock<ToolRegistry>>) 
                                 required_colored,
                                 param.description.dimmed()
                             ));
-                            lines.push(format!(
-                                "    {} {:?}",
-                                "类型:".dimmed(),
-                                param.param_type
-                            ));
+                            lines.push(format!("    {} {:?}", "类型:".dimmed(), param.param_type));
                             if let Some(ref default) = param.default {
-                                lines.push(format!(
-                                    "    {} {}",
-                                    "默认值:".dimmed(),
-                                    default
-                                ));
+                                lines.push(format!("    {} {}", "默认值:".dimmed(), default));
                             }
                         }
                     }
@@ -159,7 +162,10 @@ fn handle_tools_info(tool_name: &str, tool_registry: Arc<RwLock<ToolRegistry>>) 
                     // 示例 Schema
                     lines.push(format!("\n{}", "Function Schema:".bold()));
                     let schema = tool.to_function_schema();
-                    lines.push(format!("{}", serde_json::to_string_pretty(&schema).unwrap().dimmed()));
+                    lines.push(format!(
+                        "{}",
+                        serde_json::to_string_pretty(&schema).unwrap().dimmed()
+                    ));
 
                     lines.join("\n")
                 }
@@ -235,11 +241,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tools_call() {
         let registry = create_test_registry();
-        let result = handle_tools_call(
-            "test_tool",
-            r#"{"value": "hello"}"#,
-            registry,
-        );
+        let result = handle_tools_call("test_tool", r#"{"value": "hello"}"#, registry);
         assert!(result.contains("返回: hello"));
     }
 

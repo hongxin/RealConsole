@@ -28,15 +28,10 @@ pub enum ConversationState {
     Executing,
 
     /// 完成：任务完成
-    Completed {
-        success: bool,
-        message: String,
-    },
+    Completed { success: bool, message: String },
 
     /// 已取消：用户取消操作
-    Cancelled {
-        reason: String,
-    },
+    Cancelled { reason: String },
 
     /// 超时：对话超时未完成
     Timeout,
@@ -102,7 +97,10 @@ impl ConversationState {
             }
 
             // 收集参数 -> 继续收集下一个
-            (Self::CollectingParameters { retry_count, .. }, StateEvent::ParameterProvided { name }) => {
+            (
+                Self::CollectingParameters { retry_count, .. },
+                StateEvent::ParameterProvided { name },
+            ) => {
                 *self = Self::CollectingParameters {
                     current_param: name,
                     retry_count,
@@ -117,7 +115,13 @@ impl ConversationState {
             }
 
             // 收集参数 -> 重试（验证失败）
-            (Self::CollectingParameters { current_param, retry_count }, StateEvent::ValidationFailed { reason: _ }) => {
+            (
+                Self::CollectingParameters {
+                    current_param,
+                    retry_count,
+                },
+                StateEvent::ValidationFailed { reason: _ },
+            ) => {
                 if retry_count >= 3 {
                     *self = Self::Cancelled {
                         reason: "Too many invalid attempts".to_string(),

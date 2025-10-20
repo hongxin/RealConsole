@@ -6,9 +6,9 @@
 //! - 变更分析
 //! - 冲突解决建议
 
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
 
 /// Git 仓库状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,8 +102,8 @@ impl GitRepository {
 
     /// 获取当前目录的 Git 仓库
     pub fn current() -> Result<Self, String> {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| format!("无法获取当前目录: {}", e))?;
+        let current_dir =
+            std::env::current_dir().map_err(|e| format!("无法获取当前目录: {}", e))?;
 
         Self::new(current_dir)
     }
@@ -293,7 +293,10 @@ impl GitRepository {
                             analysis.rust_files += 1;
                         } else if path.ends_with(".md") || path.ends_with(".txt") {
                             analysis.doc_files += 1;
-                        } else if path.ends_with(".toml") || path.ends_with(".yaml") || path.ends_with(".json") {
+                        } else if path.ends_with(".toml")
+                            || path.ends_with(".yaml")
+                            || path.ends_with(".json")
+                        {
                             analysis.config_files += 1;
                         } else if path.ends_with(".sh") {
                             analysis.script_files += 1;

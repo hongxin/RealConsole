@@ -152,10 +152,7 @@ fn bench_append_batch_10(c: &mut Criterion) {
             |mut mem| {
                 for i in 0..10 {
                     let content = format!("批量记忆 {}", i);
-                    mem.add(
-                        black_box(content),
-                        black_box(EntryType::User),
-                    );
+                    mem.add(black_box(content), black_box(EntryType::User));
                 }
             },
             criterion::BatchSize::SmallInput,

@@ -13,17 +13,15 @@ use tokio::sync::RwLock;
 /// 注册 LLM 命令
 ///
 /// 需要传入 LlmManager 的引用以便命令可以访问
-pub fn register_llm_commands(
-    registry: &mut CommandRegistry,
-    llm_manager: Arc<RwLock<LlmManager>>,
-) {
+pub fn register_llm_commands(registry: &mut CommandRegistry, llm_manager: Arc<RwLock<LlmManager>>) {
     // /ask 命令
     let ask_manager = Arc::clone(&llm_manager);
-    let ask_cmd =
-        Command::from_fn("ask", "向 LLM 提问 (使用 fallback LLM)", move |arg: &str| {
-            cmd_ask(arg, Arc::clone(&ask_manager))
-        })
-        .with_group("llm");
+    let ask_cmd = Command::from_fn(
+        "ask",
+        "向 LLM 提问 (使用 fallback LLM)",
+        move |arg: &str| cmd_ask(arg, Arc::clone(&ask_manager)),
+    )
+    .with_group("llm");
     registry.register(ask_cmd);
 
     // /llm 命令
@@ -41,7 +39,11 @@ pub fn register_llm_commands(
 fn cmd_ask(arg: &str, manager: Arc<RwLock<LlmManager>>) -> String {
     let query = arg.trim();
     if query.is_empty() {
-        return format!("{}\n{}", "用法: /ask <问题>".yellow(), "示例: /ask 你好".dimmed());
+        return format!(
+            "{}\n{}",
+            "用法: /ask <问题>".yellow(),
+            "示例: /ask 你好".dimmed()
+        );
     }
 
     // 使用 block_in_place 在同步上下文中调用异步代码
@@ -111,7 +113,10 @@ fn cmd_llm_status(manager: Arc<RwLock<LlmManager>>) -> String {
             }
 
             lines.push("".to_string());
-            lines.push(format!("{}", "提示: /llm diag <primary|fallback> 诊断连接".dimmed()));
+            lines.push(format!(
+                "{}",
+                "提示: /llm diag <primary|fallback> 诊断连接".dimmed()
+            ));
 
             lines.join("\n")
         })

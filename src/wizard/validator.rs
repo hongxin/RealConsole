@@ -53,10 +53,7 @@ impl ApiValidator {
         match status {
             StatusCode::OK | StatusCode::BAD_REQUEST => Ok(true),
             StatusCode::UNAUTHORIZED => Ok(false),
-            _ => Err(anyhow!(
-                "服务返回异常状态码: {}",
-                status.as_u16()
-            )),
+            _ => Err(anyhow!("服务返回异常状态码: {}", status.as_u16())),
         }
     }
 
@@ -74,10 +71,7 @@ impl ApiValidator {
             .map_err(|e| anyhow!("无法连接到 Ollama 服务: {}", e))?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "Ollama 服务返回错误: {}",
-                response.status()
-            ));
+            return Err(anyhow!("Ollama 服务返回错误: {}", response.status()));
         }
 
         let data: serde_json::Value = response

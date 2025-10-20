@@ -2,8 +2,8 @@
 //!
 //! 提供一组常用的工作流模板，基于成功案例固化的套路
 
-use super::workflow::{CacheStrategy, TransformOperation, WorkflowIntent, WorkflowStep};
 use super::types::{EntityType, Intent, IntentDomain};
+use super::workflow::{CacheStrategy, TransformOperation, WorkflowIntent, WorkflowStep};
 use std::collections::HashMap;
 
 /// 注册所有内置工作流模板
@@ -47,8 +47,14 @@ fn create_crypto_analysis_workflow() -> WorkflowIntent {
         ],
         0.6,
     )
-    .with_entity("symbol", EntityType::Custom("crypto_symbol".to_string(), "BTC".to_string()))
-    .with_entity("source_url", EntityType::Custom("url".to_string(), "https://www.feixiaohao.co".to_string()));
+    .with_entity(
+        "symbol",
+        EntityType::Custom("crypto_symbol".to_string(), "BTC".to_string()),
+    )
+    .with_entity(
+        "source_url",
+        EntityType::Custom("url".to_string(), "https://www.feixiaohao.co".to_string()),
+    );
 
     // 定义工作流步骤
     let workflow_steps = vec![
@@ -57,13 +63,15 @@ fn create_crypto_analysis_workflow() -> WorkflowIntent {
             tool_name: "http_get".to_string(),
             args_template: {
                 let mut args = HashMap::new();
-                args.insert("url".to_string(), "{source_url}/currencies/{symbol}".to_string());
+                args.insert(
+                    "url".to_string(),
+                    "{source_url}/currencies/{symbol}".to_string(),
+                );
                 args.insert("timeout".to_string(), "30".to_string());
                 args
             },
             result_key: "website_data".to_string(),
         },
-
         // 步骤 2: LLM 分析数据
         WorkflowStep::LlmAnalyze {
             prompt_template: r#"基于以下从非小号网站获取的 {symbol} 数据，请进行全面的投资分析：
@@ -106,7 +114,8 @@ fn create_crypto_analysis_workflow() -> WorkflowIntent {
 ## 投资建议
 [适合投资者类型、仓位建议、止损建议]
 
-请注意，以上分析仅供参考，投资有风险，请根据自身情况谨慎决策。"#.to_string(),
+请注意，以上分析仅供参考，投资有风险，请根据自身情况谨慎决策。"#
+                .to_string(),
             result_key: "analysis_result".to_string(),
         },
     ];
@@ -121,32 +130,36 @@ fn create_stock_analysis_workflow() -> WorkflowIntent {
     let base_intent = Intent::new(
         "stock_analysis",
         IntentDomain::Custom("Financial".to_string()),
-        vec![
-            "分析".to_string(),
-            "股票".to_string(),
-            "走势".to_string(),
-        ],
+        vec!["分析".to_string(), "股票".to_string(), "走势".to_string()],
         vec![
             r"分析.*(?P<symbol>\w+).*股票".to_string(),
             r"(?P<symbol>\w+).*投资价值".to_string(),
         ],
         0.6,
     )
-    .with_entity("symbol", EntityType::Custom("stock_symbol".to_string(), "600519".to_string()))
-    .with_entity("source_url", EntityType::Custom("url".to_string(), "https://quote.eastmoney.com".to_string()));
+    .with_entity(
+        "symbol",
+        EntityType::Custom("stock_symbol".to_string(), "600519".to_string()),
+    )
+    .with_entity(
+        "source_url",
+        EntityType::Custom("url".to_string(), "https://quote.eastmoney.com".to_string()),
+    );
 
     let workflow_steps = vec![
         WorkflowStep::ToolCall {
             tool_name: "http_get".to_string(),
             args_template: {
                 let mut args = HashMap::new();
-                args.insert("url".to_string(), "{source_url}/stock/{symbol}.html".to_string());
+                args.insert(
+                    "url".to_string(),
+                    "{source_url}/stock/{symbol}.html".to_string(),
+                );
                 args.insert("timeout".to_string(), "30".to_string());
                 args
             },
             result_key: "stock_data".to_string(),
         },
-
         WorkflowStep::LlmAnalyze {
             prompt_template: r#"基于以下股票数据，分析 {symbol} 的投资价值：
 
@@ -156,7 +169,8 @@ fn create_stock_analysis_workflow() -> WorkflowIntent {
 1. 基本面分析
 2. 技术面分析
 3. 估值分析
-4. 投资建议"#.to_string(),
+4. 投资建议"#
+                .to_string(),
             result_key: "analysis_result".to_string(),
         },
     ];
@@ -171,31 +185,32 @@ fn create_weather_analysis_workflow() -> WorkflowIntent {
     let base_intent = Intent::new(
         "weather_analysis",
         IntentDomain::Custom("Weather".to_string()),
-        vec![
-            "天气".to_string(),
-            "预报".to_string(),
-            "分析".to_string(),
-        ],
+        vec!["天气".to_string(), "预报".to_string(), "分析".to_string()],
         vec![
             r"分析.*(?P<city>\w+).*天气".to_string(),
             r"(?P<city>\w+).*未来.*天气".to_string(),
         ],
         0.6,
     )
-    .with_entity("city", EntityType::Custom("city".to_string(), "北京".to_string()));
+    .with_entity(
+        "city",
+        EntityType::Custom("city".to_string(), "北京".to_string()),
+    );
 
     let workflow_steps = vec![
         WorkflowStep::ToolCall {
             tool_name: "http_get".to_string(),
             args_template: {
                 let mut args = HashMap::new();
-                args.insert("url".to_string(), "http://www.weather.com.cn/weather/{city}.shtml".to_string());
+                args.insert(
+                    "url".to_string(),
+                    "http://www.weather.com.cn/weather/{city}.shtml".to_string(),
+                );
                 args.insert("timeout".to_string(), "20".to_string());
                 args
             },
             result_key: "weather_data".to_string(),
         },
-
         WorkflowStep::LlmAnalyze {
             prompt_template: r#"基于以下天气数据，分析 {city} 未来一周的天气趋势：
 
@@ -205,7 +220,8 @@ fn create_weather_analysis_workflow() -> WorkflowIntent {
 1. 天气概况
 2. 温度变化趋势
 3. 降水可能性
-4. 生活建议"#.to_string(),
+4. 生活建议"#
+                .to_string(),
             result_key: "analysis_result".to_string(),
         },
     ];
@@ -220,18 +236,17 @@ fn create_website_summary_workflow() -> WorkflowIntent {
     let base_intent = Intent::new(
         "website_summary",
         IntentDomain::Custom("Web".to_string()),
-        vec![
-            "总结".to_string(),
-            "摘要".to_string(),
-            "网站".to_string(),
-        ],
+        vec!["总结".to_string(), "摘要".to_string(), "网站".to_string()],
         vec![
             r"总结.*网站.*内容".to_string(),
             r"访问.*(?P<url>https?://\S+).*摘要".to_string(),
         ],
         0.5,
     )
-    .with_entity("url", EntityType::Custom("url".to_string(), "https://example.com".to_string()));
+    .with_entity(
+        "url",
+        EntityType::Custom("url".to_string(), "https://example.com".to_string()),
+    );
 
     let workflow_steps = vec![
         WorkflowStep::ToolCall {
@@ -244,14 +259,12 @@ fn create_website_summary_workflow() -> WorkflowIntent {
             },
             result_key: "website_content".to_string(),
         },
-
         // 数据转换：截断过长的内容
         WorkflowStep::Transform {
             operation: TransformOperation::Truncate { max_length: 5000 },
             input_key: "website_content".to_string(),
             result_key: "truncated_content".to_string(),
         },
-
         WorkflowStep::LlmAnalyze {
             prompt_template: r#"请总结以下网站内容的核心要点：
 
@@ -263,7 +276,8 @@ fn create_website_summary_workflow() -> WorkflowIntent {
 请提供：
 1. 主题摘要（100字以内）
 2. 核心要点（3-5 条）
-3. 适合人群"#.to_string(),
+3. 适合人群"#
+                .to_string(),
             result_key: "summary_result".to_string(),
         },
     ];
@@ -283,12 +297,16 @@ mod tests {
         assert!(workflows.len() >= 4);
 
         // 验证加密货币分析模板
-        let crypto_workflow = workflows.iter()
+        let crypto_workflow = workflows
+            .iter()
             .find(|w| w.base_intent.name == "crypto_analysis")
             .expect("crypto_analysis workflow should exist");
 
         assert_eq!(crypto_workflow.workflow_steps.len(), 2);
-        assert!(crypto_workflow.base_intent.keywords.contains(&"分析".to_string()));
+        assert!(crypto_workflow
+            .base_intent
+            .keywords
+            .contains(&"分析".to_string()));
     }
 
     #[test]

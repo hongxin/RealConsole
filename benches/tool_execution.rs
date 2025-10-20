@@ -75,10 +75,7 @@ fn bench_execute_datetime(c: &mut Criterion) {
 
     c.bench_function("tool_execute_datetime", |b| {
         b.iter(|| {
-            black_box(registry.execute(
-                black_box("datetime"),
-                black_box(json!({"action": "now"})),
-            ))
+            black_box(registry.execute(black_box("datetime"), black_box(json!({"action": "now"}))))
         })
     });
 }
@@ -86,7 +83,13 @@ fn bench_execute_datetime(c: &mut Criterion) {
 /// 基准测试：批量工具查询
 fn bench_batch_get_tools(c: &mut Criterion) {
     let registry = create_tool_registry();
-    let tool_names = vec!["calculator", "datetime", "read_file", "write_file", "http_get"];
+    let tool_names = vec![
+        "calculator",
+        "datetime",
+        "read_file",
+        "write_file",
+        "http_get",
+    ];
 
     c.bench_function("tool_batch_get", |b| {
         b.iter(|| {

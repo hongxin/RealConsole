@@ -196,13 +196,7 @@ impl Dashboard {
                 let percentage = (*count as f32 / max_usage as f32) * 100.0;
                 let bar = self.render_progress_bar(percentage, 15);
 
-                let line = format!(
-                    "{}. {} ({}) {}",
-                    i + 1,
-                    tool_name,
-                    count,
-                    bar
-                );
+                let line = format!("{}. {} ({}) {}", i + 1, tool_name, count, bar);
 
                 let padded = self.pad_line(&line, DASHBOARD_WIDTH);
                 output.push_str(&format!("║{}║\n", padded));
@@ -220,10 +214,7 @@ impl Dashboard {
         let p95 = perf_metrics.p95() as f64 / 1000.0;
         let p99 = perf_metrics.p99() as f64 / 1000.0;
 
-        let slowest_cmd = perf_metrics
-            .slowest_command
-            .as_deref()
-            .unwrap_or("N/A");
+        let slowest_cmd = perf_metrics.slowest_command.as_deref().unwrap_or("N/A");
         let max_time = perf_metrics.max_response_ms as f64 / 1000.0;
 
         let mut output = String::new();
@@ -244,7 +235,11 @@ impl Dashboard {
         ));
         output.push_str(&self.render_data_line(
             "Slowest Cmd",
-            &format!("\"{}\" ({:.2}s)", self.truncate_str(slowest_cmd, 30), max_time),
+            &format!(
+                "\"{}\" ({:.2}s)",
+                self.truncate_str(slowest_cmd, 30),
+                max_time
+            ),
             None,
         ));
 
@@ -316,7 +311,7 @@ impl Dashboard {
                 // 跳过整个 ANSI 序列：ESC [ ... m
                 if chars.peek() == Some(&'[') {
                     chars.next(); // 跳过 '['
-                    // 跳过直到 'm' 或其他终止字符
+                                  // 跳过直到 'm' 或其他终止字符
                     while let Some(c) = chars.next() {
                         if c == 'm' || c.is_ascii_alphabetic() {
                             break;
@@ -352,7 +347,12 @@ impl Dashboard {
 
         if content_width >= inner_width {
             // 内容过长，直接使用边框
-            format!("{}{}{}\n", left, fill.to_string().repeat(inner_width), right)
+            format!(
+                "{}{}{}\n",
+                left,
+                fill.to_string().repeat(inner_width),
+                right
+            )
         } else {
             // 居中显示
             let padding_total = inner_width - content_width;
@@ -383,12 +383,7 @@ impl Dashboard {
         let dots_width = available_width.saturating_sub(label_width + 1 + value_width + 1);
 
         // 先构建无颜色的行来确保宽度正确
-        let plain_line = format!(
-            "{} {} {}",
-            label,
-            ".".repeat(dots_width),
-            value
-        );
+        let plain_line = format!("{} {} {}", label, ".".repeat(dots_width), value);
 
         // 验证显示宽度
         let actual_width = self.display_width(&plain_line);
@@ -411,12 +406,7 @@ impl Dashboard {
         };
 
         // 构建最终行（带颜色）
-        let line = format!(
-            "{} {} {}",
-            label,
-            colored_dots,
-            colored_value
-        );
+        let line = format!("{} {} {}", label, colored_dots, colored_value);
 
         // 计算需要的填充（考虑 ANSI 代码）
         let display_width = self.display_width(&line);

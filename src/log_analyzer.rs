@@ -10,14 +10,14 @@
 //! - 使用 once_cell 缓存正则表达式（避免重复编译）
 //! - 预期性能提升：5-10倍
 
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 /// 正则表达式缓存 - 日志级别检测
 static LEVEL_REGEXES: Lazy<Vec<(Regex, LogLevel)>> = Lazy::new(|| {
@@ -38,11 +38,20 @@ static LEVEL_REGEXES: Lazy<Vec<(Regex, LogLevel)>> = Lazy::new(|| {
 static TIMESTAMP_REGEXES: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
     vec![
         // ISO 8601: 2025-10-16T10:30:45Z
-        (Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}").unwrap(), "%Y-%m-%dT%H:%M:%S"),
+        (
+            Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}").unwrap(),
+            "%Y-%m-%dT%H:%M:%S",
+        ),
         // 2025-10-16 10:30:45
-        (Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").unwrap(), "%Y-%m-%d %H:%M:%S"),
+        (
+            Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").unwrap(),
+            "%Y-%m-%d %H:%M:%S",
+        ),
         // [2025-10-16 10:30:45]
-        (Regex::new(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]").unwrap(), "%Y-%m-%d %H:%M:%S"),
+        (
+            Regex::new(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]").unwrap(),
+            "%Y-%m-%d %H:%M:%S",
+        ),
     ]
 });
 
@@ -59,10 +68,10 @@ static MESSAGE_CLEANUP_REGEXES: Lazy<[Regex; 2]> = Lazy::new(|| {
 /// 正则表达式缓存 - 错误模式归一化
 static PATTERN_NORMALIZE_REGEXES: Lazy<[Regex; 4]> = Lazy::new(|| {
     [
-        Regex::new(r"\b\d+\b").unwrap(),           // 数字 → N
-        Regex::new(r"/[\w/.-]+").unwrap(),         // 路径 → /PATH
-        Regex::new(r#""[^"]*""#).unwrap(),         // 引号内容 → "..."
-        Regex::new(r"0x[0-9a-fA-F]+").unwrap(),    // 十六进制地址 → 0xADDR
+        Regex::new(r"\b\d+\b").unwrap(),        // 数字 → N
+        Regex::new(r"/[\w/.-]+").unwrap(),      // 路径 → /PATH
+        Regex::new(r#""[^"]*""#).unwrap(),      // 引号内容 → "..."
+        Regex::new(r"0x[0-9a-fA-F]+").unwrap(), // 十六进制地址 → 0xADDR
     ]
 });
 
@@ -166,8 +175,11 @@ impl LogEntry {
         }
 
         // 如果包含常见错误关键词
-        if content.contains("exception") || content.contains("Exception")
-            || content.contains("panic") || content.contains("fatal") {
+        if content.contains("exception")
+            || content.contains("Exception")
+            || content.contains("panic")
+            || content.contains("fatal")
+        {
             return LogLevel::Error;
         }
 
@@ -261,7 +273,9 @@ impl LogAnalysis {
 
     /// 获取最常见的错误模式（前N个）
     pub fn top_error_patterns(&self, n: usize) -> Vec<(String, usize)> {
-        let mut patterns: Vec<_> = self.error_patterns.iter()
+        let mut patterns: Vec<_> = self
+            .error_patterns
+            .iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect();
         patterns.sort_by(|a, b| b.1.cmp(&a.1));
@@ -328,8 +342,7 @@ impl LogAnalyzer {
 
     /// 分析日志文件
     pub fn analyze_file<P: AsRef<Path>>(&self, path: P) -> Result<LogAnalysis, String> {
-        let file = File::open(path.as_ref())
-            .map_err(|e| format!("无法打开文件: {}", e))?;
+        let file = File::open(path.as_ref()).map_err(|e| format!("无法打开文件: {}", e))?;
 
         let reader = BufReader::new(file);
         let mut analysis = LogAnalysis::new();
@@ -411,7 +424,11 @@ impl LogAnalyzer {
     }
 
     /// 分析最近的N行日志
-    pub fn analyze_tail<P: AsRef<Path>>(&self, path: P, lines: usize) -> Result<LogAnalysis, String> {
+    pub fn analyze_tail<P: AsRef<Path>>(
+        &self,
+        path: P,
+        lines: usize,
+    ) -> Result<LogAnalysis, String> {
         // 读取最后N行
         let tail_lines = self.read_tail(path.as_ref(), lines)?;
 
@@ -473,8 +490,7 @@ impl LogAnalyzer {
     fn read_tail<P: AsRef<Path>>(&self, path: P, n: usize) -> Result<Vec<String>, String> {
         use std::collections::VecDeque;
 
-        let file = File::open(path.as_ref())
-            .map_err(|e| format!("无法打开文件: {}", e))?;
+        let file = File::open(path.as_ref()).map_err(|e| format!("无法打开文件: {}", e))?;
 
         let reader = BufReader::new(file);
         let mut buffer: VecDeque<String> = VecDeque::with_capacity(n);
@@ -497,10 +513,18 @@ impl LogAnalyzer {
 
         // 使用预编译的正则表达式进行归一化
         // 顺序: 数字 → 路径 → 引号内容 → 十六进制地址
-        pattern = PATTERN_NORMALIZE_REGEXES[0].replace_all(&pattern, "N").to_string();
-        pattern = PATTERN_NORMALIZE_REGEXES[1].replace_all(&pattern, "/PATH").to_string();
-        pattern = PATTERN_NORMALIZE_REGEXES[2].replace_all(&pattern, "\"...\"").to_string();
-        pattern = PATTERN_NORMALIZE_REGEXES[3].replace_all(&pattern, "0xADDR").to_string();
+        pattern = PATTERN_NORMALIZE_REGEXES[0]
+            .replace_all(&pattern, "N")
+            .to_string();
+        pattern = PATTERN_NORMALIZE_REGEXES[1]
+            .replace_all(&pattern, "/PATH")
+            .to_string();
+        pattern = PATTERN_NORMALIZE_REGEXES[2]
+            .replace_all(&pattern, "\"...\"")
+            .to_string();
+        pattern = PATTERN_NORMALIZE_REGEXES[3]
+            .replace_all(&pattern, "0xADDR")
+            .to_string();
 
         pattern
     }
@@ -553,7 +577,9 @@ mod tests {
     fn test_is_stacktrace() {
         assert!(LogEntry::is_stacktrace_line("  at main.rs:123"));
         assert!(LogEntry::is_stacktrace_line("Stack trace:"));
-        assert!(LogEntry::is_stacktrace_line("  File \"/path/to/file.py\", line 42"));
+        assert!(LogEntry::is_stacktrace_line(
+            "  File \"/path/to/file.py\", line 42"
+        ));
         assert!(!LogEntry::is_stacktrace_line("Regular log message"));
     }
 

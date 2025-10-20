@@ -28,7 +28,10 @@ fn test_fix_largest_file_matching() {
 
     println!("✅ 修复验证成功！");
     println!("   输入：{}", input);
-    println!("   匹配：{} (置信度: {:.2})", best_match.intent.name, best_match.confidence);
+    println!(
+        "   匹配：{} (置信度: {:.2})",
+        best_match.intent.name, best_match.confidence
+    );
 }
 
 #[test]
@@ -52,7 +55,10 @@ fn test_list_directory_without_filter() {
 
     println!("✅ list_directory 基础功能正常！");
     println!("   输入：{}", input);
-    println!("   匹配：{} (置信度: {:.2})", best_match.intent.name, best_match.confidence);
+    println!(
+        "   匹配：{} (置信度: {:.2})",
+        best_match.intent.name, best_match.confidence
+    );
 }
 
 #[test]
@@ -79,8 +85,10 @@ fn test_filter_keywords_priority() {
             input, expected, best_match.intent.name
         );
 
-        println!("✅ '{}'  →  {} (置信度: {:.2})",
-                 input, best_match.intent.name, best_match.confidence);
+        println!(
+            "✅ '{}'  →  {} (置信度: {:.2})",
+            input, best_match.intent.name, best_match.confidence
+        );
     }
 }
 
@@ -114,12 +122,17 @@ fn test_filter_intent_priority_over_list() {
             assert!(
                 list_dir_match.confidence < best_match.confidence,
                 "输入 '{}' 的 list_directory 置信度 ({:.2}) 应该低于 {} ({:.2})",
-                input, list_dir_match.confidence, expected_intent, best_match.confidence
+                input,
+                list_dir_match.confidence,
+                expected_intent,
+                best_match.confidence
             );
         }
 
-        println!("✅ '{}'  →  {} (置信度: {:.2}) 优先于 list_directory",
-                 input, best_match.intent.name, best_match.confidence);
+        println!(
+            "✅ '{}'  →  {} (置信度: {:.2}) 优先于 list_directory",
+            input, best_match.intent.name, best_match.confidence
+        );
     }
 }
 
@@ -141,7 +154,9 @@ fn test_enhanced_find_large_files_keywords() {
         assert!(!matches.is_empty(), "输入 '{}' 应该有匹配结果", input);
 
         // 应该匹配到 find_files_by_size
-        let has_find_files_by_size = matches.iter().any(|m| m.intent.name == "find_files_by_size");
+        let has_find_files_by_size = matches
+            .iter()
+            .any(|m| m.intent.name == "find_files_by_size");
         assert!(
             has_find_files_by_size,
             "输入 '{}' 应该匹配 find_files_by_size",
@@ -149,7 +164,9 @@ fn test_enhanced_find_large_files_keywords() {
         );
 
         let best_match = &matches[0];
-        println!("✅ '{}'  →  {} (置信度: {:.2})",
-                 input, best_match.intent.name, best_match.confidence);
+        println!(
+            "✅ '{}'  →  {} (置信度: {:.2})",
+            input, best_match.intent.name, best_match.confidence
+        );
     }
 }

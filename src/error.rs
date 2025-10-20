@@ -355,8 +355,7 @@ mod tests {
             "配置文件 'realconsole.yaml' 不存在",
         )
         .with_suggestion(
-            FixSuggestion::new("运行配置向导创建配置")
-                .with_command("realconsole wizard"),
+            FixSuggestion::new("运行配置向导创建配置").with_command("realconsole wizard"),
         );
 
         let formatted = error.format_user_friendly();

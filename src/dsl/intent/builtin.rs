@@ -25,7 +25,9 @@
 //! let templates = builtin.all_templates();
 //! ```
 
-use crate::dsl::intent::{EntityType, Intent, IntentDomain, IntentMatcher, Template, TemplateEngine};
+use crate::dsl::intent::{
+    EntityType, Intent, IntentDomain, IntentMatcher, Template, TemplateEngine,
+};
 
 /// 内置意图和模板集合
 ///
@@ -75,18 +77,18 @@ impl BuiltinIntents {
             // ===== 文件操作类 (FileOps) =====
             self.count_python_lines(),
             self.count_files(),
-            self.find_files_by_size(),      // Phase 6.2: 按体积查找（支持最大/最小）
+            self.find_files_by_size(), // Phase 6.2: 按体积查找（支持最大/最小）
             self.find_recent_files(),
-            self.find_files_by_name(),     // Phase 6.1: 按名称查找文件
+            self.find_files_by_name(), // Phase 6.1: 按名称查找文件
             self.list_directory(),
-            self.create_directory(),        // Phase 6.1: 创建目录
-            self.create_symlink(),          // Phase 6.1: 创建符号链接
+            self.create_directory(), // Phase 6.1: 创建目录
+            self.create_symlink(),   // Phase 6.1: 创建符号链接
             // ===== 数据处理类 (DataOps) =====
             self.grep_pattern(),
             self.sort_lines(),
             self.count_pattern(),
-            self.count_file_stats(),        // Phase 6.1: 统计文件信息
-            self.compare_files(),           // Phase 6.1: 比较文件差异
+            self.count_file_stats(), // Phase 6.1: 统计文件信息
+            self.compare_files(),    // Phase 6.1: 比较文件差异
             // ===== 诊断分析类 (DiagnosticOps) =====
             self.analyze_errors(),
             self.check_disk_usage(),
@@ -97,9 +99,9 @@ impl BuiltinIntents {
             self.check_cpu_usage(),
             self.check_network_connections(),
             self.check_uptime(),
-            self.ping_host(),               // Phase 6.1: 测试网络连通性
-            self.view_env_var(),            // Phase 6.1: 查看环境变量
-            self.check_service_status(),    // Phase 6.1: 查看服务状态
+            self.ping_host(),            // Phase 6.1: 测试网络连通性
+            self.view_env_var(),         // Phase 6.1: 查看环境变量
+            self.check_service_status(), // Phase 6.1: 查看服务状态
         ]
     }
 
@@ -113,18 +115,18 @@ impl BuiltinIntents {
             // ===== 文件操作类 =====
             self.template_count_python_lines(),
             self.template_count_files(),
-            self.template_find_files_by_size(),     // Phase 6.2: 按体积查找
+            self.template_find_files_by_size(), // Phase 6.2: 按体积查找
             self.template_find_recent_files(),
-            self.template_find_files_by_name(),     // Phase 6.1
+            self.template_find_files_by_name(), // Phase 6.1
             self.template_list_directory(),
-            self.template_create_directory(),        // Phase 6.1
-            self.template_create_symlink(),          // Phase 6.1
+            self.template_create_directory(), // Phase 6.1
+            self.template_create_symlink(),   // Phase 6.1
             // ===== 数据处理类 =====
             self.template_grep_pattern(),
             self.template_sort_lines(),
             self.template_count_pattern(),
-            self.template_count_file_stats(),        // Phase 6.1
-            self.template_compare_files(),           // Phase 6.1
+            self.template_count_file_stats(), // Phase 6.1
+            self.template_compare_files(),    // Phase 6.1
             // ===== 诊断分析类 =====
             self.template_analyze_errors(),
             self.template_check_disk_usage(),
@@ -135,9 +137,9 @@ impl BuiltinIntents {
             self.template_check_cpu_usage(),
             self.template_check_network_connections(),
             self.template_check_uptime(),
-            self.template_ping_host(),               // Phase 6.1
-            self.template_view_env_var(),            // Phase 6.1
-            self.template_check_service_status(),    // Phase 6.1
+            self.template_ping_host(),            // Phase 6.1
+            self.template_view_env_var(),         // Phase 6.1
+            self.template_check_service_status(), // Phase 6.1
         ]
     }
 
@@ -263,13 +265,16 @@ impl BuiltinIntents {
                 r"(?i)(体积|大小).*(最大|最小|大于|小于)".to_string(),
                 r"(?i)(最大|最小).*(文件|file)".to_string(),
             ],
-            0.7,  // 提高置信度阈值，优先于 list_directory
+            0.7, // 提高置信度阈值，优先于 list_directory
         )
         .with_entity("path", EntityType::Path(".".to_string()))
         .with_entity("ext", EntityType::FileType("*".to_string()))
         .with_entity("limit", EntityType::Number(10.0))
         // sort_order 将由实体提取器动态确定："-hr" (降序/最大) 或 "-h" (升序/最小)
-        .with_entity("sort_order", EntityType::Custom("sort".to_string(), "-hr".to_string()))
+        .with_entity(
+            "sort_order",
+            EntityType::Custom("sort".to_string(), "-hr".to_string()),
+        )
     }
 
     /// 模板: 按体积查找文件
@@ -313,7 +318,7 @@ impl BuiltinIntents {
                 r"(?i)(最近|最新).*(修改|更新|变更).*文件".to_string(),
                 r"(?i)文件.*(最近|最新)".to_string(),
             ],
-            0.65,  // 提高优先级，避免被 list_directory 覆盖
+            0.65, // 提高优先级，避免被 list_directory 覆盖
         )
         .with_entity("path", EntityType::Path(".".to_string()))
         .with_entity("ext", EntityType::FileType("*".to_string()))
@@ -369,11 +374,7 @@ impl BuiltinIntents {
         Intent::new(
             "sort_lines",
             IntentDomain::DataOps,
-            vec![
-                "排序".to_string(),
-                "sort".to_string(),
-                "排列".to_string(),
-            ],
+            vec!["排序".to_string(), "sort".to_string(), "排列".to_string()],
             vec![r"(?i)排序.*文本".to_string()],
             0.5,
         )
@@ -381,12 +382,8 @@ impl BuiltinIntents {
 
     /// 模板: 排序文本行
     fn template_sort_lines(&self) -> Template {
-        Template::new(
-            "sort_lines",
-            "sort {file}",
-            vec!["file".to_string()],
-        )
-        .with_description("对文件内容进行排序")
+        Template::new("sort_lines", "sort {file}", vec!["file".to_string()])
+            .with_description("对文件内容进行排序")
     }
 
     /// 意图: 统计模式出现次数
@@ -532,7 +529,7 @@ impl BuiltinIntents {
                 r"(?i)(检查|查看).*(内存|memory|ram)".to_string(),
                 r"(?i)内存.*(使用|情况|可用)".to_string(),
             ],
-            0.6,  // 稍高的置信度阈值，避免误匹配
+            0.6, // 稍高的置信度阈值，避免误匹配
         )
     }
 
@@ -541,7 +538,7 @@ impl BuiltinIntents {
         Template::new(
             "check_memory_usage",
             "top -l 1 | head -n 10 | grep PhysMem",
-            vec![],  // 无需参数
+            vec![], // 无需参数
         )
         .with_description("查看系统内存使用情况（macOS）")
     }
@@ -570,21 +567,17 @@ impl BuiltinIntents {
                 // 简化正则，不使用否定前瞻断言（Rust regex不支持）
                 r"(?i)(查看|列出).*(目录|文件夹|当前)".to_string(),
                 r"(?i)(ls|list).*(dir|directory|files?)".to_string(),
-                r"(?i)^ls\s*$".to_string(),  // 单独的 "ls" 命令
+                r"(?i)^ls\s*$".to_string(), // 单独的 "ls" 命令
             ],
-            0.50,  // 降低置信度阈值，让过滤型Intent优先
+            0.50, // 降低置信度阈值，让过滤型Intent优先
         )
         .with_entity("path", EntityType::Path(".".to_string()))
     }
 
     /// 模板: 查看目录内容
     fn template_list_directory(&self) -> Template {
-        Template::new(
-            "list_directory",
-            "ls -lh {path}",
-            vec!["path".to_string()],
-        )
-        .with_description("列出指定目录下的文件和子目录")
+        Template::new("list_directory", "ls -lh {path}", vec!["path".to_string()])
+            .with_description("列出指定目录下的文件和子目录")
     }
 
     /// 意图: 检查CPU使用率
@@ -717,12 +710,8 @@ impl BuiltinIntents {
 
     /// 模板: 查看系统运行时长
     fn template_check_uptime(&self) -> Template {
-        Template::new(
-            "check_uptime",
-            "uptime",
-            vec![],
-        )
-        .with_description("显示系统启动时间和运行时长")
+        Template::new("check_uptime", "uptime", vec![])
+            .with_description("显示系统启动时间和运行时长")
     }
 
     // ==================== Phase 6.1: 安全功能增强 ====================
@@ -794,12 +783,8 @@ impl BuiltinIntents {
 
     /// 模板: 统计文件行数/字数
     fn template_count_file_stats(&self) -> Template {
-        Template::new(
-            "count_file_stats",
-            "wc {file}",
-            vec!["file".to_string()],
-        )
-        .with_description("统计文件的行数、单词数和字节数")
+        Template::new("count_file_stats", "wc {file}", vec!["file".to_string()])
+            .with_description("统计文件的行数、单词数和字节数")
     }
 
     /// 意图: 比较文件差异
@@ -904,12 +889,8 @@ impl BuiltinIntents {
 
     /// 模板: 查看环境变量
     fn template_view_env_var(&self) -> Template {
-        Template::new(
-            "view_env_var",
-            "echo ${var}",
-            vec!["var".to_string()],
-        )
-        .with_description("查看指定环境变量的值")
+        Template::new("view_env_var", "echo ${var}", vec!["var".to_string()])
+            .with_description("查看指定环境变量的值")
     }
 
     /// 意图: 查看服务状态
@@ -947,12 +928,8 @@ impl BuiltinIntents {
         #[cfg(not(target_os = "macos"))]
         let command = "systemctl status {service}";
 
-        Template::new(
-            "check_service_status",
-            command,
-            vec!["service".to_string()],
-        )
-        .with_description("查看指定服务的运行状态")
+        Template::new("check_service_status", command, vec!["service".to_string()])
+            .with_description("查看指定服务的运行状态")
     }
 
     /// 意图: 创建目录
@@ -1196,10 +1173,7 @@ mod tests {
         bindings.insert("limit".to_string(), "10".to_string());
 
         let plan = engine.generate("check_disk_usage", bindings).unwrap();
-        assert_eq!(
-            plan.command,
-            "du -sh /var/log/* | sort -hr | head -n 10"
-        );
+        assert_eq!(plan.command, "du -sh /var/log/* | sort -hr | head -n 10");
     }
 
     #[test]
@@ -1343,28 +1317,35 @@ mod tests {
         // 最大文件
         let largest_input = "显示当前目录下体积最大的rs文件";
         let largest_matches = matcher.match_intent(largest_input);
-        let largest_entities = extractor.extract(largest_input, &largest_matches[0].intent.entities);
+        let largest_entities =
+            extractor.extract(largest_input, &largest_matches[0].intent.entities);
 
         // 最小文件
         let smallest_input = "显示当前目录下体积最小的rs文件";
         let smallest_matches = matcher.match_intent(smallest_input);
-        let smallest_entities = extractor.extract(smallest_input, &smallest_matches[0].intent.entities);
+        let smallest_entities =
+            extractor.extract(smallest_input, &smallest_matches[0].intent.entities);
 
         // 验证：Intent相同
-        assert_eq!(largest_matches[0].intent.name, smallest_matches[0].intent.name);
+        assert_eq!(
+            largest_matches[0].intent.name,
+            smallest_matches[0].intent.name
+        );
 
         // 验证：sort_order 不同
-        let largest_order = if let Some(EntityType::Custom(_, order)) = largest_entities.get("sort_order") {
-            order.clone()
-        } else {
-            panic!("应该提取到 sort_order");
-        };
+        let largest_order =
+            if let Some(EntityType::Custom(_, order)) = largest_entities.get("sort_order") {
+                order.clone()
+            } else {
+                panic!("应该提取到 sort_order");
+            };
 
-        let smallest_order = if let Some(EntityType::Custom(_, order)) = smallest_entities.get("sort_order") {
-            order.clone()
-        } else {
-            panic!("应该提取到 sort_order");
-        };
+        let smallest_order =
+            if let Some(EntityType::Custom(_, order)) = smallest_entities.get("sort_order") {
+                order.clone()
+            } else {
+                panic!("应该提取到 sort_order");
+            };
 
         assert_eq!(largest_order, "-hr", "最大 = 降序");
         assert_eq!(smallest_order, "-h", "最小 = 升序");
