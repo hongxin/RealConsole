@@ -61,7 +61,30 @@ LLM 提供商:
 现在可以运行: realconsole
 ```
 
-### 3. 启动 RealConsole
+### 3. 配置文件位置（可选）
+
+RealConsole 支持灵活的配置文件位置，自动搜索以下目录：
+
+```
+1. 当前工作目录:    ./realconsole.yaml
+2. 用户配置目录:    ~/.realconsole/realconsole.yaml
+```
+
+**推荐做法**（全局使用）：
+
+```bash
+# 将配置文件移到用户目录
+mkdir -p ~/.realconsole
+mv realconsole.yaml ~/.realconsole/
+mv .env ~/.realconsole/  # 如果使用 .env 文件
+
+# 同样适用于语言文件
+cp -r locales ~/.realconsole/
+```
+
+这样你可以从**任何目录**运行 `realconsole`，无需每次都在项目目录下。
+
+### 4. 启动 RealConsole
 
 ```bash
 ./target/release/realconsole
@@ -217,7 +240,65 @@ RealConsole 提供了丰富的帮助信息：
   ...
 ```
 
-### 5. 单次执行模式
+### 5. 对话上下文（可选）
+
+RealConsole 支持**可选的对话上下文模式**，适应不同使用场景：
+
+#### 三种模式
+
+**Disabled（关闭，默认）**：
+- 单命令执行，无上下文
+- 最快速度，最低 Token 消耗
+- 适合：快速查询、脚本调用
+
+**Manual（手动）**：
+```bash
+% /context start      # 开始记录上下文
+[上下文: 已启用]
+
+% 分析 error.log 中的错误
+🤖 AI: 发现 3 种错误类型...
+
+% 统计每种错误的数量    # 自动使用上下文，记住上一轮对话
+🤖 AI: 根据刚才分析的 error.log...
+- TypeError: 15 次
+- ValueError: 8 次
+- RuntimeError: 2 次
+
+% /context show       # 查看状态
+当前轮次: 2/10
+上下文长度: 847/8000 字符
+
+% /context stop       # 停止并清除
+```
+
+**Auto（自动）**：
+```bash
+% 列出当前目录的文件
+🤖 AI: 当前目录有 12 个文件...
+
+% 显示它们的大小          # 检测到"它们"，自动启用上下文
+[上下文: 自动启用]
+🤖 AI: 这些文件的大小分别是...
+```
+
+#### 配置示例
+
+编辑 `realconsole.yaml`：
+
+```yaml
+conversation:
+  mode: manual  # disabled, manual, auto
+  max_turns: 10
+  max_context_length: 8000
+  auto_clear:
+    enabled: true
+    idle_timeout: 600  # 10 分钟
+```
+
+详见：`config/conversation-*.yaml` 示例配置
+
+### 6. 单次执行模式
 
 不启动 REPL，直接执行单个命令（适合脚本调用）：
 
@@ -279,6 +360,18 @@ RealConsole 提供了丰富的帮助信息：
 | `realconsole wizard` | 启动配置向导（完整模式） |
 | `realconsole wizard --quick` | 启动配置向导（快速模式） |
 | `realconsole --config <path>` | 使用指定配置文件 |
+
+### 对话上下文（可选）
+
+| 命令 | 说明 |
+|------|------|
+| `/context start` | 开始记录上下文（Manual 模式） |
+| `/context stop` | 停止并清除上下文 |
+| `/context clear` | 清除上下文但不停止 |
+| `/context show` | 查看当前上下文状态 |
+| `/context status` | 查看配置和统计 |
+
+**注**：需要在配置文件中启用 `conversation.mode: manual` 或 `auto`
 
 ---
 

@@ -1,0 +1,73 @@
+# RealConsole 对话上下文配置示例 - Auto 模式
+# 适用于：混合用户、日常使用、平衡便利性和性能
+
+prefix: "/"
+
+llm:
+  primary:
+    provider: deepseek
+    model: deepseek-chat
+    endpoint: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+
+features:
+  shell_enabled: true
+  shell_timeout: 10
+  tool_calling_enabled: true
+
+# 对话上下文：自动模式
+conversation:
+  mode: auto  # 智能识别需要上下文的场景
+
+  # 保留最近 5 轮对话（适合短对话）
+  max_turns: 5
+
+  # 最大上下文长度 8K 字符（约 2K tokens）
+  max_context_length: 8000
+
+  # 自动清除策略
+  auto_clear:
+    enabled: true
+    idle_timeout: 300      # 5 分钟空闲后清除
+    on_task_complete: true # 任务完成后清除
+
+  # 包含工具调用和错误信息
+  include:
+    tool_calls: true
+    shell_output: false
+    errors: true
+
+# 自动启用上下文的场景：
+# 1. 检测到代词：
+#    > 列出当前目录的文件
+#    > 显示它们的大小  ← 检测到"它们"，自动启用上下文
+#
+# 2. 追问：
+#    > 什么是 Rust？
+#    > 为什么它快？  ← 检测到"为什么"，自动启用上下文
+#
+# 3. 继续任务：
+#    > 分析 error.log
+#    > 继续  ← 检测到"继续"，自动启用上下文
+
+# 自动清除上下文的场景：
+# 1. 空闲超时：
+#    [上下文: 3轮 | 4分钟前]
+#    ⚠️  上下文即将因空闲清除（5分钟超时）
+#
+# 2. 任务完成：
+#    > 分析完成，共 3 个错误
+#    [上下文已自动清除]
+
+# 提示信息：
+# - 上下文激活时：
+#   [上下文: 3轮] >
+#
+# - 空闲警告：
+#   [上下文: 5轮 | 4分钟前] >
+
+# 特点：
+# ✓ 智能识别（无需手动控制）
+# ✓ 自动清除（避免 Token 浪费）
+# ✓ 平衡性能和便利性
+# ✓ 适合日常混合使用

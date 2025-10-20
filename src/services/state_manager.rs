@@ -6,7 +6,9 @@
 //! - ContextTracker（上下文追踪）
 //! - StatsCollector（统计收集）
 //! - ExecutionLogger（执行日志）
+//! - ContextManager（对话上下文）
 
+use crate::conversation::ContextManager;
 use crate::execution_logger::ExecutionLogger;
 use crate::history::HistoryManager;
 use crate::memory::{ContextTracker, Memory};
@@ -28,6 +30,8 @@ pub struct StateManager {
     stats_collector: Arc<StatsCollector>,
     /// 执行日志
     exec_logger: Arc<RwLock<ExecutionLogger>>,
+    /// 对话上下文管理器
+    conversation_context: Arc<RwLock<ContextManager>>,
 }
 
 impl StateManager {
@@ -38,6 +42,7 @@ impl StateManager {
         context_tracker: Arc<RwLock<ContextTracker>>,
         stats_collector: Arc<StatsCollector>,
         exec_logger: Arc<RwLock<ExecutionLogger>>,
+        conversation_context: Arc<RwLock<ContextManager>>,
     ) -> Self {
         Self {
             memory,
@@ -45,6 +50,7 @@ impl StateManager {
             context_tracker,
             stats_collector,
             exec_logger,
+            conversation_context,
         }
     }
 
@@ -69,6 +75,10 @@ impl StateManager {
     pub fn exec_logger(&self) -> Arc<RwLock<ExecutionLogger>> {
         Arc::clone(&self.exec_logger)
     }
+
+    pub fn conversation_context(&self) -> Arc<RwLock<ContextManager>> {
+        Arc::clone(&self.conversation_context)
+    }
 }
 
 #[cfg(test)]
@@ -77,11 +87,15 @@ mod tests {
 
     #[test]
     fn test_state_manager_creation() {
+        use crate::config::ConversationConfig;
+
         let memory = Arc::new(RwLock::new(Memory::new(100)));
         let history = Arc::new(RwLock::new(HistoryManager::new("test_history.jsonl", 100)));
         let context_tracker = Arc::new(RwLock::new(ContextTracker::new()));
         let stats_collector = Arc::new(StatsCollector::new());
         let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(100)));
+        let conversation_context =
+            Arc::new(RwLock::new(ContextManager::new(ConversationConfig::default())));
 
         let state_manager = StateManager::new(
             memory,
@@ -89,10 +103,12 @@ mod tests {
             context_tracker,
             stats_collector,
             exec_logger,
+            conversation_context,
         );
 
         // 验证可以访问各个组件
         assert!(Arc::strong_count(&state_manager.memory()) > 0);
         assert!(Arc::strong_count(&state_manager.history()) > 0);
+        assert!(Arc::strong_count(&state_manager.conversation_context()) > 0);
     }
 }

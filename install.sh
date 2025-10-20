@@ -52,13 +52,43 @@ cp "target/release/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
 chmod +x "$INSTALL_DIR/$BINARY_NAME"
 echo -e "${GREEN}✓ 可执行文件已安装${NC}\n"
 
-# 复制配置示例（如果不存在）
-if [ ! -f "$CONFIG_DIR/realconsole.yaml" ]; then
+# 复制配置文件到用户目录（如果当前目录存在）
+echo "复制配置文件到用户目录..."
+copied_files=0
+
+# 1. 复制 realconsole.yaml（如果当前目录存在且用户目录不存在）
+if [ -f "realconsole.yaml" ] && [ ! -f "$CONFIG_DIR/realconsole.yaml" ]; then
+    echo "  - realconsole.yaml"
+    cp "realconsole.yaml" "$CONFIG_DIR/realconsole.yaml"
+    ((copied_files++))
+fi
+
+# 2. 复制 .env 文件（如果当前目录存在且用户目录不存在）
+if [ -f ".env" ] && [ ! -f "$CONFIG_DIR/.env" ]; then
+    echo "  - .env"
+    cp ".env" "$CONFIG_DIR/.env"
+    ((copied_files++))
+fi
+
+# 3. 复制 locales 目录（如果当前目录存在且用户目录不存在）
+if [ -d "locales" ] && [ ! -d "$CONFIG_DIR/locales" ]; then
+    echo "  - locales/"
+    cp -r "locales" "$CONFIG_DIR/"
+    ((copied_files++))
+fi
+
+# 4. 如果都不存在，复制配置示例
+if [ $copied_files -eq 0 ]; then
     if [ -f "config/minimal.yaml" ]; then
-        echo "复制配置示例到: $CONFIG_DIR/"
+        echo "  - config/minimal.yaml (示例)"
         cp "config/minimal.yaml" "$CONFIG_DIR/realconsole.yaml.example"
-        echo -e "${GREEN}✓ 配置示例已复制${NC}\n"
     fi
+fi
+
+if [ $copied_files -gt 0 ]; then
+    echo -e "${GREEN}✓ 已复制 $copied_files 个配置文件/目录${NC}\n"
+else
+    echo -e "${YELLOW}! 未找到配置文件（稍后可运行 wizard 创建）${NC}\n"
 fi
 
 # 检查 PATH
@@ -99,6 +129,11 @@ echo "  • 可执行文件: $INSTALL_DIR/$BINARY_NAME"
 echo "  • 配置目录:   $CONFIG_DIR/"
 echo "  • 数据目录:   $CONFIG_DIR/memory/"
 echo ""
+echo "配置文件搜索策略："
+echo "  RealConsole 会按以下顺序自动搜索配置文件："
+echo "    1. 当前工作目录:  ./realconsole.yaml"
+echo "    2. 用户配置目录:  ~/.realconsole/realconsole.yaml"
+echo ""
 echo "下一步："
 echo "  1. 运行配置向导创建配置文件："
 echo -e "     ${GREEN}realconsole wizard${NC}"
@@ -107,7 +142,7 @@ echo "  2. 或者手动配置："
 echo -e "     ${GREEN}cd $CONFIG_DIR${NC}"
 echo "     编辑 realconsole.yaml 和 .env"
 echo ""
-echo "  3. 开始使用："
+echo "  3. 开始使用（从任意目录）："
 echo -e "     ${GREEN}realconsole${NC}"
 echo ""
 echo "需要帮助？运行："

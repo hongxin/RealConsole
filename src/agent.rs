@@ -31,8 +31,8 @@ use tokio::sync::RwLock;
 // ✨ Phase 8 Week 2: 多轮对话支持
 use crate::conversation::{
     clear_current_conversation, get_current_conversation, has_active_conversation,
-    set_current_conversation, ConversationManager, ParameterSpec, ParameterType, ParameterValue,
-    Response,
+    set_current_conversation, ContextManager, ConversationManager, ParameterSpec, ParameterType,
+    ParameterValue, Response,
 };
 
 // ✨ Phase 9: 统计与可视化支持
@@ -274,6 +274,11 @@ impl Agent {
 
             let last_failed_command = Arc::new(RwLock::new(None));
 
+            // 初始化对话上下文管理器
+            let conversation_context = Arc::new(RwLock::new(ContextManager::new(
+                config.conversation.clone(),
+            )));
+
             // ✨ Phase 2 (v1.3.0): 初始化服务层
             let state_manager = Arc::new(StateManager::new(
                 Arc::clone(&memory_arc),
@@ -281,6 +286,7 @@ impl Agent {
                 Arc::clone(&context_tracker_arc),
                 Arc::clone(&stats_collector),
                 Arc::clone(&exec_logger_arc),
+                Arc::clone(&conversation_context),
             ));
 
             let intent_service = Arc::new(IntentService::new(
@@ -337,6 +343,11 @@ impl Agent {
             Arc::new(ShellExecutorWithFixer::new().with_feedback_learner(feedback_learner));
         let last_failed_command = Arc::new(RwLock::new(None));
 
+        // 初始化对话上下文管理器
+        let conversation_context = Arc::new(RwLock::new(ContextManager::new(
+            config.conversation.clone(),
+        )));
+
         // ✨ Phase 2 (v1.3.0): 初始化服务层（Fallback 分支）
         let state_manager = Arc::new(StateManager::new(
             Arc::clone(&memory_arc),
@@ -344,6 +355,7 @@ impl Agent {
             Arc::clone(&context_tracker_arc),
             Arc::clone(&stats_collector),
             Arc::clone(&exec_logger_arc),
+            Arc::clone(&conversation_context),
         ));
 
         let intent_service = Arc::new(IntentService::new(
@@ -1046,8 +1058,21 @@ impl Agent {
     fn handle_text_with_tools(&self, text: &str) -> String {
         // ✨ Phase 2.2 (v1.3.0): 使用 LlmService 处理
 
-        // 启动 spinner
-        let spinner = Spinner::new();
+        // 先获取模型名称（用于 spinner）
+        let model_name = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let manager = self.llm_manager.read().await;
+                manager
+                    .primary()
+                    .or(manager.fallback())
+                    .map(|llm| llm.model().to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
+            })
+        });
+
+        // 启动 spinner（带模型名称）
+        use crate::spinner::simplify_model_name;
+        let spinner = Spinner::with_label(&simplify_model_name(&model_name));
 
         // 创建 LLM 请求
         let request = LlmRequest::with_tools(text.to_string());
@@ -1170,8 +1195,21 @@ impl Agent {
         // 开始计时
         let start = Instant::now();
 
-        // 启动 spinner
-        let spinner = Spinner::new();
+        // 先获取模型名称（用于 spinner）
+        let model_name = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let manager = self.llm_manager.read().await;
+                manager
+                    .primary()
+                    .or(manager.fallback())
+                    .map(|llm| llm.model().to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
+            })
+        });
+
+        // 启动 spinner（带模型名称）
+        use crate::spinner::simplify_model_name;
+        let spinner = Spinner::with_label(&simplify_model_name(&model_name));
 
         // 创建流式 LLM 请求
         let request = LlmRequest::streaming(text.to_string());

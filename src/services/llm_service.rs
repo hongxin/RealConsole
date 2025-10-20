@@ -82,6 +82,8 @@ pub struct LlmResponse {
     pub used_fallback: bool,
     /// 执行耗时（毫秒）
     pub duration_ms: u64,
+    /// 使用的模型名称
+    pub model_name: String,
 }
 
 /// LLM 服务错误
@@ -153,7 +155,10 @@ impl LlmService {
     /// 普通模式 - 一次性返回完整响应
     async fn process_normal(&self, text: &str) -> Result<LlmResponse, LlmError> {
         let start = std::time::Instant::now();
-        let (_llm, used_fallback) = self.get_llm_client().await?;
+        let (llm, used_fallback) = self.get_llm_client().await?;
+
+        // 获取模型名称
+        let model_name = llm.model().to_string();
 
         let manager = self.llm_manager.read().await;
         let response = manager
@@ -167,6 +172,7 @@ impl LlmService {
             text: response,
             used_fallback,
             duration_ms,
+            model_name,
         })
     }
 
@@ -178,7 +184,10 @@ impl LlmService {
         F: FnMut(&str),
     {
         let start = std::time::Instant::now();
-        let (_llm_client, used_fallback) = self.get_llm_client().await?;
+        let (llm_client, used_fallback) = self.get_llm_client().await?;
+
+        // 获取模型名称
+        let model_name = llm_client.model().to_string();
 
         let manager = self.llm_manager.read().await;
         manager
@@ -192,6 +201,7 @@ impl LlmService {
             text: String::new(), // 流式模式不返回文本
             used_fallback,
             duration_ms,
+            model_name,
         })
     }
 
@@ -199,6 +209,9 @@ impl LlmService {
     async fn process_with_tools(&self, text: &str) -> Result<LlmResponse, LlmError> {
         let start = std::time::Instant::now();
         let (llm_client, used_fallback) = self.get_llm_client().await?;
+
+        // 获取模型名称
+        let model_name = llm_client.model().to_string();
 
         // 获取工具 schemas
         let registry = self.tool_registry.read().await;
@@ -223,6 +236,7 @@ impl LlmService {
             text: response,
             used_fallback,
             duration_ms,
+            model_name,
         })
     }
 }

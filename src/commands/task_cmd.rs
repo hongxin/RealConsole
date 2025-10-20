@@ -196,8 +196,11 @@ async fn execute_plan_command(
         }
     };
 
-    // 3. 分解任务（显示 spinner）
-    let spinner = Spinner::new();
+    // 3. 分解任务（显示 spinner 带模型名称）
+    use crate::spinner::simplify_model_name;
+    let model_name = simplify_model_name(llm.model());
+    let spinner = Spinner::with_label(&model_name);
+
     let decomposer = TaskDecomposer::new(llm);
     let subtasks = match decomposer.decompose(goal, &context).await {
         Ok(tasks) => {

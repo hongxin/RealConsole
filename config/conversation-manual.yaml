@@ -1,0 +1,62 @@
+# RealConsole 对话上下文配置示例 - Manual 模式
+# 适用于：对话用户、长时间会话、需要精确控制的场景
+
+prefix: "/"
+
+llm:
+  primary:
+    provider: deepseek
+    model: deepseek-chat
+    endpoint: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+
+features:
+  shell_enabled: true
+  shell_timeout: 10
+  tool_calling_enabled: true
+
+# 对话上下文：手动模式
+conversation:
+  mode: manual  # 用户显式控制上下文的开启/关闭
+
+  # 保留最近 20 轮对话（适合长时间会话）
+  max_turns: 20
+
+  # 最大上下文长度 16K 字符（约 4K tokens）
+  max_context_length: 16000
+
+  # 不自动清除，完全手动控制
+  auto_clear:
+    enabled: false
+
+  # 包含工具调用和错误信息
+  include:
+    tool_calls: true
+    shell_output: false  # Shell 输出通常很长，不包含
+    errors: true
+
+# 使用流程：
+# 1. 开始对话：
+#    > /context start
+#    [上下文: 已启用]
+#
+# 2. 多轮对话（自动记住上下文）：
+#    > 分析 access.log 中的错误
+#    > 统计每种错误的数量
+#    > 显示最常见的 3 种错误
+#
+# 3. 查看上下文状态：
+#    > /context show
+#    当前轮次: 3/20
+#    上下文长度: 1247/16000 字符
+#
+# 4. 清除上下文（但不停止）：
+#    > /context clear
+#
+# 5. 停止并清除：
+#    > /context stop
+
+# 特点：
+# ✓ 完全可控（用户决定何时启用/停止）
+# ✓ 适合长对话（20 轮）
+# ✓ 不会意外清除（手动控制）

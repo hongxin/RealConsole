@@ -2,11 +2,13 @@
 //!
 //! 支持：
 //! - YAML 配置文件加载
+//! - 多路径搜索（当前目录 + ~/.realconsole/）
 //! - 环境变量扩展 ${VAR} 和 ${VAR:-default}
 //! - 默认配置
 
 use crate::display::DisplayMode;
 use crate::error::{ErrorCode, FixSuggestion, RealError};
+use crate::path_resolver::PathResolver;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -39,6 +41,10 @@ pub struct Config {
     /// 显示模式配置
     #[serde(default)]
     pub display: DisplayConfig,
+
+    /// 对话上下文配置
+    #[serde(default)]
+    pub conversation: ConversationConfig,
 }
 
 fn default_prefix() -> String {
@@ -213,6 +219,134 @@ impl Default for DisplayConfig {
     }
 }
 
+/// 对话上下文配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationConfig {
+    /// 上下文模式
+    #[serde(default)]
+    pub mode: ContextMode,
+
+    /// 最大轮次（保留最近 N 轮对话）
+    #[serde(default = "default_max_turns")]
+    pub max_turns: usize,
+
+    /// 最大上下文长度（字符数，超过则自动裁剪）
+    #[serde(default = "default_max_context_length")]
+    pub max_context_length: usize,
+
+    /// 自动清除策略
+    #[serde(default)]
+    pub auto_clear: AutoClearConfig,
+
+    /// 上下文包含内容
+    #[serde(default)]
+    pub include: ContextIncludeConfig,
+}
+
+fn default_max_turns() -> usize {
+    10
+}
+
+fn default_max_context_length() -> usize {
+    8000
+}
+
+impl Default for ConversationConfig {
+    fn default() -> Self {
+        Self {
+            mode: ContextMode::Disabled, // 默认关闭，保持向后兼容
+            max_turns: 10,
+            max_context_length: 8000,
+            auto_clear: AutoClearConfig::default(),
+            include: ContextIncludeConfig::default(),
+        }
+    }
+}
+
+/// 上下文模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ContextMode {
+    /// 关闭（默认）：单命令执行，无上下文
+    Disabled,
+    /// 手动：用户显式控制上下文
+    Manual,
+    /// 自动：智能识别需要上下文的场景
+    Auto,
+}
+
+impl Default for ContextMode {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+impl std::fmt::Display for ContextMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContextMode::Disabled => write!(f, "Disabled"),
+            ContextMode::Manual => write!(f, "Manual"),
+            ContextMode::Auto => write!(f, "Auto"),
+        }
+    }
+}
+
+/// 自动清除配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoClearConfig {
+    /// 是否启用自动清除
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// 空闲多久后清除（秒）
+    #[serde(default = "default_idle_timeout")]
+    pub idle_timeout: u64,
+
+    /// 任务完成后是否清除
+    #[serde(default = "default_false")]
+    pub on_task_complete: bool,
+}
+
+fn default_idle_timeout() -> u64 {
+    600 // 10 分钟
+}
+
+impl Default for AutoClearConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            idle_timeout: 600,
+            on_task_complete: false,
+        }
+    }
+}
+
+/// 上下文包含配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextIncludeConfig {
+    /// 是否包含工具调用历史
+    #[serde(default = "default_true")]
+    pub tool_calls: bool,
+
+    /// 是否包含 Shell 执行结果
+    #[serde(default = "default_false")]
+    pub shell_output: bool,
+
+    /// 是否包含错误信息
+    #[serde(default = "default_true")]
+    pub errors: bool,
+}
+
+impl Default for ContextIncludeConfig {
+    fn default() -> Self {
+        Self {
+            tool_calls: true,
+            shell_output: false,
+            errors: true,
+        }
+    }
+}
+
 impl Default for FeaturesConfig {
     fn default() -> Self {
         Self {
@@ -237,36 +371,64 @@ impl Default for Config {
             features: FeaturesConfig::default(),
             intent: IntentConfig::default(),
             display: DisplayConfig::default(),
+            conversation: ConversationConfig::default(),
         }
     }
 }
 
 impl Config {
-    /// 从 YAML 文件加载配置
+    /// 从 YAML 文件加载配置（支持多路径搜索）
+    ///
+    /// # 搜索策略
+    /// 1. 如果提供的是绝对路径：直接使用
+    /// 2. 如果是相对路径/文件名：按以下顺序搜索
+    ///    - 当前工作目录
+    ///    - ~/.realconsole/ 目录
+    ///
+    /// # 示例
+    /// ```ignore
+    /// // 显式路径
+    /// Config::from_file("/etc/realconsole.yaml");
+    ///
+    /// // 自动搜索
+    /// Config::from_file("realconsole.yaml");  // 在 ./ 和 ~/.realconsole/ 中搜索
+    /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, RealError> {
-        let path = path.as_ref();
-        let content = fs::read_to_string(path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                RealError::new(
-                    ErrorCode::ConfigNotFound,
-                    format!("配置文件不存在: {}", path.display()),
-                )
-                .with_suggestion(
-                    FixSuggestion::new("运行配置向导创建配置文件")
-                        .with_command("realconsole wizard"),
-                )
-                .with_suggestion(
-                    FixSuggestion::new("参考示例配置手动创建")
-                        .with_command("cp config/minimal.yaml realconsole.yaml"),
-                )
-            } else {
-                RealError::new(
-                    ErrorCode::FileReadError,
-                    format!("无法读取配置文件: {}", path.display()),
-                )
-                .with_suggestion(FixSuggestion::new("检查文件权限和路径是否正确"))
-                .with_source(e)
-            }
+        let path_str = path.as_ref().to_str().unwrap_or("realconsole.yaml");
+
+        // 使用 PathResolver 进行路径解析
+        let resolved_path = PathResolver::resolve_config(path_str).ok_or_else(|| {
+            let search_paths = PathResolver::search_paths(path_str);
+            let search_locations = search_paths
+                .iter()
+                .map(|p| format!("  - {}", p.display()))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            RealError::new(
+                ErrorCode::ConfigNotFound,
+                format!(
+                    "配置文件未找到: {}\n\n搜索位置：\n{}",
+                    path_str, search_locations
+                ),
+            )
+            .with_suggestion(
+                FixSuggestion::new("运行配置向导创建配置文件")
+                    .with_command("realconsole wizard"),
+            )
+            .with_suggestion(
+                FixSuggestion::new("手动复制示例配置到用户目录")
+                    .with_command("cp config/minimal.yaml ~/.realconsole/realconsole.yaml"),
+            )
+        })?;
+
+        let content = fs::read_to_string(&resolved_path).map_err(|e| {
+            RealError::new(
+                ErrorCode::FileReadError,
+                format!("无法读取配置文件: {}", resolved_path.display()),
+            )
+            .with_suggestion(FixSuggestion::new("检查文件权限和路径是否正确"))
+            .with_source(e)
         })?;
 
         // 扩展环境变量
@@ -276,7 +438,7 @@ impl Config {
         let config: Config = serde_yml::from_str(&expanded).map_err(|e| {
             RealError::new(
                 ErrorCode::ConfigParseError,
-                format!("配置文件解析失败: {}", path.display()),
+                format!("配置文件解析失败: {}", resolved_path.display()),
             )
             .with_suggestion(FixSuggestion::new("检查 YAML 语法是否正确"))
             .with_suggestion(
@@ -408,5 +570,88 @@ features:
         assert_eq!(config.features.workflow_enabled, Some(true));
         assert_eq!(config.features.workflow_cache_enabled, Some(true));
         assert_eq!(config.features.workflow_cache_ttl_default, Some(600));
+    }
+
+    #[test]
+    fn test_conversation_config_default() {
+        // 测试对话上下文默认配置（向后兼容：默认关闭）
+        let config = Config::default();
+
+        assert_eq!(config.conversation.mode, ContextMode::Disabled);
+        assert_eq!(config.conversation.max_turns, 10);
+        assert_eq!(config.conversation.max_context_length, 8000);
+        assert!(config.conversation.auto_clear.enabled);
+        assert_eq!(config.conversation.auto_clear.idle_timeout, 600);
+        assert!(!config.conversation.auto_clear.on_task_complete);
+        assert!(config.conversation.include.tool_calls);
+        assert!(!config.conversation.include.shell_output);
+        assert!(config.conversation.include.errors);
+    }
+
+    #[test]
+    fn test_conversation_config_manual_mode() {
+        // 测试手动模式配置
+        let yaml = r#"
+prefix: "/"
+conversation:
+  mode: manual
+  max_turns: 20
+  max_context_length: 16000
+  auto_clear:
+    enabled: false
+"#;
+        let config: Config = serde_yml::from_str(yaml).unwrap();
+
+        assert_eq!(config.conversation.mode, ContextMode::Manual);
+        assert_eq!(config.conversation.max_turns, 20);
+        assert_eq!(config.conversation.max_context_length, 16000);
+        assert!(!config.conversation.auto_clear.enabled);
+    }
+
+    #[test]
+    fn test_conversation_config_auto_mode() {
+        // 测试自动模式配置
+        let yaml = r#"
+prefix: "/"
+conversation:
+  mode: auto
+  max_turns: 5
+  max_context_length: 8000
+  auto_clear:
+    enabled: true
+    idle_timeout: 300
+    on_task_complete: true
+  include:
+    tool_calls: true
+    shell_output: false
+    errors: true
+"#;
+        let config: Config = serde_yml::from_str(yaml).unwrap();
+
+        assert_eq!(config.conversation.mode, ContextMode::Auto);
+        assert_eq!(config.conversation.max_turns, 5);
+        assert_eq!(config.conversation.max_context_length, 8000);
+        assert!(config.conversation.auto_clear.enabled);
+        assert_eq!(config.conversation.auto_clear.idle_timeout, 300);
+        assert!(config.conversation.auto_clear.on_task_complete);
+        assert!(config.conversation.include.tool_calls);
+        assert!(!config.conversation.include.shell_output);
+        assert!(config.conversation.include.errors);
+    }
+
+    #[test]
+    fn test_conversation_backward_compatibility() {
+        // 测试向后兼容：旧配置文件没有 conversation 字段
+        let yaml = r#"
+prefix: "/"
+features:
+  shell_enabled: true
+  shell_timeout: 10
+"#;
+        let config: Config = serde_yml::from_str(yaml).unwrap();
+
+        // 验证使用默认值（关闭模式）
+        assert_eq!(config.conversation.mode, ContextMode::Disabled);
+        assert_eq!(config.conversation.max_turns, 10);
     }
 }

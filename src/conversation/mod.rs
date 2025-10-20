@@ -8,6 +8,7 @@
 
 pub mod analyzer;
 pub mod context;
+pub mod context_manager;
 pub mod current;
 pub mod manager;
 pub mod parameter;
@@ -15,6 +16,7 @@ pub mod state;
 
 // 导出核心类型
 pub use context::ParameterSpec;
+pub use context_manager::ContextManager;
 pub use current::{
     clear_current_conversation, get_current_conversation, has_active_conversation,
     set_current_conversation,

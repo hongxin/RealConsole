@@ -27,6 +27,7 @@ mod llm_manager;
 mod log_analyzer; // ✨ Phase 6: 日志分析工具
 mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支生肖
 mod memory;
+mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
 mod project_context; // ✨ Phase 6: 项目上下文感知
 mod repl;
 mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
@@ -198,33 +199,53 @@ fn show_config(config_path: &str, show_path: bool) {
     }
 }
 
-/// 尝试从配置文件所在目录加载 .env 文件
+/// 加载 .env 文件（支持多路径搜索）
+///
+/// # 搜索策略
+/// 1. 配置文件所在目录
+/// 2. 当前工作目录
+/// 3. 用户配置目录 ~/.realconsole/
 fn load_env_file(config_path: &str) {
-    // 获取配置文件所在目录
-    let config_path = PathBuf::from(config_path);
-    let config_dir = config_path
+    use path_resolver::PathResolver;
+
+    // 策略 1: 配置文件所在目录（保持原有行为）
+    let config_path_buf = PathBuf::from(config_path);
+    let config_dir = config_path_buf
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."));
+    let env_in_config_dir = config_dir.join(".env");
 
-    let env_path = config_dir.join(".env");
+    if env_in_config_dir.exists() {
+        if try_load_dotenv(&env_in_config_dir) {
+            return;
+        }
+    }
 
-    if env_path.exists() {
-        match dotenvy::from_path(&env_path) {
-            Ok(_) => {
-                // 只在 RUST_LOG 环境变量存在时显示（相当于 debug 模式）
-                if std::env::var("RUST_LOG").is_ok() {
-                    Display::env_loaded(
-                        display::DisplayMode::Debug,
-                        &env_path.display().to_string(),
-                    );
-                }
+    // 策略 2 & 3: 使用 PathResolver 搜索 .env 文件
+    if let Some(env_path) = PathResolver::resolve(".env") {
+        try_load_dotenv(&env_path);
+    }
+}
+
+/// 尝试加载 .env 文件
+fn try_load_dotenv(env_path: &std::path::Path) -> bool {
+    match dotenvy::from_path(env_path) {
+        Ok(_) => {
+            // 只在 RUST_LOG 环境变量存在时显示（相当于 debug 模式）
+            if std::env::var("RUST_LOG").is_ok() {
+                Display::env_loaded(
+                    display::DisplayMode::Debug,
+                    &env_path.display().to_string(),
+                );
             }
-            Err(e) => {
-                // 只在调试模式下显示错误，不影响主流程
-                if std::env::var("RUST_LOG").is_ok() {
-                    eprintln!("{} {}", "⚠ .env 加载失败:".yellow(), e);
-                }
+            true
+        }
+        Err(e) => {
+            // 只在调试模式下显示错误，不影响主流程
+            if std::env::var("RUST_LOG").is_ok() {
+                eprintln!("{} {}", "⚠ .env 加载失败:".yellow(), e);
             }
+            false
         }
     }
 }

@@ -4,12 +4,16 @@
 //! - 明确态：已知语言（zh-CN 中文、en-US 英文）
 //! - 演化态：可扩展架构，便于添加新语言
 //! - 容错态：多级回退机制（命令行 > 配置 > 环境变量 > 系统语言 > 默认中文）
+//!
+//! 语言文件搜索策略：
+//! - 当前目录 locales/
+//! - 用户配置目录 ~/.realconsole/locales/
 
+use crate::path_resolver::PathResolver;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 use std::sync::RwLock;
 
 /// 全局 i18n 实例
@@ -108,28 +112,38 @@ impl I18n {
         i18n
     }
 
-    /// 加载语言文件
+    /// 加载语言文件（支持多路径搜索）
+    ///
+    /// # 搜索策略
+    /// 1. 当前目录 locales/{lang}.yaml
+    /// 2. 用户配置目录 ~/.realconsole/locales/{lang}.yaml
+    /// 3. 如果都不存在，使用内置翻译（硬编码）
     fn load_language(&mut self, lang: Language) {
-        let locale_file = format!("locales/{}.yaml", lang.code());
+        let locale_filename = format!("locales/{}.yaml", lang.code());
 
-        // 如果文件不存在，使用内置翻译
-        if !Path::new(&locale_file).exists() {
-            self.load_builtin_translations(lang);
-            return;
-        }
+        // 使用 PathResolver 搜索语言文件
+        let locale_path = match PathResolver::resolve(&locale_filename) {
+            Some(path) => path,
+            None => {
+                // 未找到文件，使用内置翻译
+                self.load_builtin_translations(lang);
+                return;
+            }
+        };
 
-        match fs::read_to_string(&locale_file) {
+        // 尝试读取和解析文件
+        match fs::read_to_string(&locale_path) {
             Ok(content) => match serde_yml::from_str::<HashMap<String, String>>(&content) {
                 Ok(translations) => {
                     self.translations.insert(lang, translations);
                 }
                 Err(e) => {
-                    eprintln!("⚠ 解析语言文件 {} 失败: {}", locale_file, e);
+                    eprintln!("⚠ 解析语言文件 {} 失败: {}", locale_path.display(), e);
                     self.load_builtin_translations(lang);
                 }
             },
-            Err(_) => {
-                // 静默失败，使用内置翻译
+            Err(e) => {
+                eprintln!("⚠ 读取语言文件 {} 失败: {}", locale_path.display(), e);
                 self.load_builtin_translations(lang);
             }
         }

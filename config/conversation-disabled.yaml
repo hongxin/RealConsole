@@ -1,0 +1,30 @@
+# RealConsole 对话上下文配置示例 - Disabled 模式
+# 适用于：极简用户、单命令执行、脚本化使用
+
+prefix: "/"
+
+llm:
+  primary:
+    provider: deepseek
+    model: deepseek-chat
+    endpoint: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+
+features:
+  shell_enabled: true
+  shell_timeout: 10
+  tool_calling_enabled: true
+
+# 对话上下文：关闭模式
+conversation:
+  mode: disabled  # 每条命令独立执行，无上下文
+
+# 使用场景：
+# - 快速查询："今天天气"、"计算 2+2"
+# - 单次命令："列出最大的文件"
+# - 脚本调用：echo "查询" | realconsole
+#
+# 特点：
+# ✓ 最快响应（无上下文开销）
+# ✓ 最低 Token 消耗
+# ✓ 无状态，易于并发

@@ -127,6 +127,7 @@ impl OllamaClient {
                 "qwen3:4b".to_string(),
                 "qwen3:8b".to_string(),
                 "qwen3:30b".to_string(),
+                "qwen3-coder:30b".to_string(),
                 "gemma3:27b".to_string(),
                 "deepseek-r1:8b".to_string(),
             ];
@@ -252,6 +253,88 @@ impl LlmClient for OllamaClient {
             .record_operation(|| {
                 let msgs = messages.clone();
                 async move { self.chat_with_retry(&msgs).await }
+            })
+            .await
+    }
+
+    /// 带工具的聊天接口（Function Calling）
+    ///
+    /// 支持 OpenAI Function Calling 格式的工具调用
+    async fn chat_with_tools(
+        &self,
+        messages: Vec<Message>,
+        tools: Vec<serde_json::Value>,
+    ) -> Result<super::ChatResponse, LlmError> {
+        // 使用 HttpClientBase 的统计记录包装器
+        self.base
+            .record_operation(|| async {
+                let url = format!("{}/v1/chat/completions", self.base.endpoint);
+
+                // 构建请求 payload
+                let mut payload = serde_json::json!({
+                    "model": self.model,
+                    "messages": messages,
+                });
+
+                // 添加工具定义
+                if !tools.is_empty() {
+                    payload["tools"] = serde_json::Value::Array(tools);
+                    payload["tool_choice"] = serde_json::json!("auto"); // 让模型自动决定是否调用工具
+                }
+
+                // 发送请求
+                let resp = self
+                    .base
+                    .post_json(&url, payload, None) // Ollama 不需要认证
+                    .await?;
+
+                // 处理响应
+                let data = super::http_base::HttpClientBase::handle_response(resp).await?;
+
+                // 解析响应
+                if let Some(choices) = data["choices"].as_array() {
+                    if let Some(first) = choices.first() {
+                        let message = &first["message"];
+
+                        // 检查是否有工具调用
+                        if let Some(tool_calls) = message["tool_calls"].as_array() {
+                            if !tool_calls.is_empty() {
+                                // 解析工具调用
+                                let mut parsed_tool_calls = Vec::new();
+
+                                for tc in tool_calls {
+                                    if let (Some(id), Some(func)) =
+                                        (tc["id"].as_str(), tc["function"].as_object())
+                                    {
+                                        if let (Some(name), Some(args)) = (
+                                            func.get("name").and_then(|v| v.as_str()),
+                                            func.get("arguments").and_then(|v| v.as_str()),
+                                        ) {
+                                            parsed_tool_calls.push(super::ToolCall {
+                                                id: id.to_string(),
+                                                call_type: "function".to_string(),
+                                                function: super::FunctionCall {
+                                                    name: name.to_string(),
+                                                    arguments: args.to_string(),
+                                                },
+                                            });
+                                        }
+                                    }
+                                }
+
+                                return Ok(super::ChatResponse::with_tools(parsed_tool_calls));
+                            }
+                        }
+
+                        // 没有工具调用，返回文本响应
+                        if let Some(content) = message["content"].as_str() {
+                            return Ok(super::ChatResponse::text(content.to_string()));
+                        }
+                    }
+                }
+
+                // 兜底：返回解析错误
+                Err(LlmError::Parse(format!("无法解析 LLM 响应: {}", data)))
             })
             .await
     }

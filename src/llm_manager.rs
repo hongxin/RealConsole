@@ -54,13 +54,18 @@ impl LlmManager {
 
     /// 简单 chat（使用 fallback 优先）
     pub async fn chat(&self, query: &str) -> Result<String, LlmError> {
+        let messages = vec![Message::user(query)];
+        self.chat_with_messages(messages).await
+    }
+
+    /// 使用消息列表进行对话（支持多轮上下文）
+    pub async fn chat_with_messages(&self, messages: Vec<Message>) -> Result<String, LlmError> {
         let client = self
             .fallback
             .as_ref()
             .or(self.primary.as_ref())
             .ok_or_else(|| LlmError::Config("No LLM configured".to_string()))?;
 
-        let messages = vec![Message::user(query)];
         client.chat(messages).await
     }
 
@@ -70,7 +75,18 @@ impl LlmManager {
         F: FnMut(&str),
     {
         let messages = vec![Message::user(query)];
+        self.chat_stream_with_messages(messages, callback).await
+    }
 
+    /// 使用消息列表进行流式对话（支持多轮上下文）
+    pub async fn chat_stream_with_messages<F>(
+        &self,
+        messages: Vec<Message>,
+        callback: F,
+    ) -> Result<String, LlmError>
+    where
+        F: FnMut(&str),
+    {
         // 优先使用 Deepseek 流式输出
         if let Some(deepseek_client) = &self.deepseek_client {
             return deepseek_client.chat_stream(&messages, callback).await;
