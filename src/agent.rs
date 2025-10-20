@@ -72,8 +72,13 @@ pub struct Agent {
 
     // === 原有字段（保留，向后兼容）===
     pub llm_manager: Arc<RwLock<LlmManager>>,
+
+    /// ⚠️ **v2.0.0 将改为 private** - 请使用 `state_manager().memory()` 代替
     pub memory: Arc<RwLock<Memory>>,
+
+    /// ⚠️ **v2.0.0 将改为 private** - 请使用 `state_manager().exec_logger()` 代替
     pub exec_logger: Arc<RwLock<ExecutionLogger>>,
+
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
     pub tool_executor: Arc<ToolExecutor>,
     // ✨ Intent DSL 支持 (Phase 3)
@@ -83,12 +88,19 @@ pub struct Agent {
     pub pipeline_converter: IntentToPipeline,
     // ✨ LLM-driven Pipeline 支持 (Phase 7)
     pub llm_bridge: Option<Arc<LlmToPipeline>>,
+
+    /// ⚠️ **v2.0.0 将改为 private** - 请使用 `state_manager().history()` 代替
     // ✨ Phase 8: 命令历史记录管理
     pub history: Arc<RwLock<HistoryManager>>,
+
     // ✨ Phase 8 Week 2: 多轮对话管理
     pub conversation_manager: Arc<RwLock<ConversationManager>>,
+
+    /// ⚠️ **v2.0.0 将改为 private** - 请使用 `state_manager().stats_collector()` 代替
     // ✨ Phase 9: 统计收集器
     pub stats_collector: Arc<StatsCollector>,
+
+    /// ⚠️ **v2.0.0 将改为 private** - 请使用 `state_manager().context_tracker()` 代替
     // ✨ Phase 9.1: 上下文追踪器
     pub context_tracker: Arc<RwLock<ContextTracker>>,
     // ✨ Phase 9.2: Shell执行器（带错误修复）
@@ -389,11 +401,23 @@ impl Agent {
     }
 
     /// 获取记忆系统的引用
+    ///
+    /// ⚠️ **已废弃**: 请使用 `state_manager().memory()` 代替
+    #[deprecated(
+        since = "1.3.0",
+        note = "Use `state_manager().memory()` instead for better encapsulation"
+    )]
     pub fn memory(&self) -> Arc<RwLock<Memory>> {
         Arc::clone(&self.memory)
     }
 
     /// 获取执行日志系统的引用
+    ///
+    /// ⚠️ **已废弃**: 请使用 `state_manager().exec_logger()` 代替
+    #[deprecated(
+        since = "1.3.0",
+        note = "Use `state_manager().exec_logger()` instead for better encapsulation"
+    )]
     pub fn exec_logger(&self) -> Arc<RwLock<ExecutionLogger>> {
         Arc::clone(&self.exec_logger)
     }
@@ -404,6 +428,12 @@ impl Agent {
     }
 
     /// 获取历史记录管理器的引用
+    ///
+    /// ⚠️ **已废弃**: 请使用 `state_manager().history()` 代替
+    #[deprecated(
+        since = "1.3.0",
+        note = "Use `state_manager().history()` instead for better encapsulation"
+    )]
     pub fn history(&self) -> Arc<RwLock<HistoryManager>> {
         Arc::clone(&self.history)
     }
@@ -436,11 +466,23 @@ impl Agent {
     }
 
     /// 获取统计收集器的引用
+    ///
+    /// ⚠️ **已废弃**: 请使用 `state_manager().stats_collector()` 代替
+    #[deprecated(
+        since = "1.3.0",
+        note = "Use `state_manager().stats_collector()` instead for better encapsulation"
+    )]
     pub fn stats_collector(&self) -> Arc<StatsCollector> {
         Arc::clone(&self.stats_collector)
     }
 
     /// 获取上下文追踪器的引用
+    ///
+    /// ⚠️ **已废弃**: 请使用 `state_manager().context_tracker()` 代替
+    #[deprecated(
+        since = "1.3.0",
+        note = "Use `state_manager().context_tracker()` instead for better encapsulation"
+    )]
     pub fn context_tracker(&self) -> Arc<RwLock<ContextTracker>> {
         Arc::clone(&self.context_tracker)
     }

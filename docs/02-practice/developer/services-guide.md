@@ -305,6 +305,104 @@ let intent_service = agent.intent_service();
 let llm_service = agent.llm_service();
 ```
 
+## ⚠️ API 废弃警告（v1.3.0-beta）
+
+为了引导用户迁移到新的服务层 API，以下旧 API 已在 v1.3.0-beta 中标记为废弃，将在 v2.0.0 中移除。
+
+### 废弃的访问器方法
+
+| 废弃 API | 替代 API | 迁移难度 |
+|----------|----------|----------|
+| `agent.memory()` | `agent.state_manager().memory()` | 简单 ⭐ |
+| `agent.exec_logger()` | `agent.state_manager().exec_logger()` | 简单 ⭐ |
+| `agent.history()` | `agent.state_manager().history()` | 简单 ⭐ |
+| `agent.stats_collector()` | `agent.state_manager().stats_collector()` | 简单 ⭐ |
+| `agent.context_tracker()` | `agent.state_manager().context_tracker()` | 简单 ⭐ |
+
+### 迁移示例
+
+**记忆系统访问**:
+```rust
+// ❌ 废弃写法（v2.0.0 将不可用）
+let memory = agent.memory();
+memory.write().await.add(EntryType::UserQuery, "test");
+
+// ✅ 推荐写法
+let memory = agent.state_manager().memory();
+memory.write().await.add(EntryType::UserQuery, "test");
+```
+
+**执行日志访问**:
+```rust
+// ❌ 废弃写法
+let exec_logger = agent.exec_logger();
+exec_logger.write().await.log_command("ls -la", CommandType::Shell);
+
+// ✅ 推荐写法
+let exec_logger = agent.state_manager().exec_logger();
+exec_logger.write().await.log_command("ls -la", CommandType::Shell);
+```
+
+**历史记录访问**:
+```rust
+// ❌ 废弃写法
+let history = agent.history();
+history.write().await.add_command("git status");
+
+// ✅ 推荐写法
+let history = agent.state_manager().history();
+history.write().await.add_command("git status");
+```
+
+**统计收集器访问**:
+```rust
+// ❌ 废弃写法
+let stats = agent.stats_collector();
+stats.record(StatEvent::CommandExecuted { command: "test".to_string() });
+
+// ✅ 推荐写法
+let stats = agent.state_manager().stats_collector();
+stats.record(StatEvent::CommandExecuted { command: "test".to_string() });
+```
+
+### 编译警告示例
+
+使用废弃 API 时，编译器会显示：
+
+```
+warning: use of deprecated method `agent::Agent::memory`: Use `state_manager().memory()` instead for better encapsulation
+  --> src/main.rs:416:30
+   |
+416|     let memory = agent.memory();
+   |                        ^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+```
+
+### 迁移时间表
+
+| 版本 | 状态 | 说明 |
+|------|------|------|
+| v1.3.0-alpha | ✅ 完成 | 服务层基础架构 |
+| v1.3.0-beta | 🚧 当前 | API 废弃标记，编译警告 |
+| v1.3.0 | 📅 计划 | 正式发布，文档完善 |
+| v2.0.0 | 📅 未来 | 移除废弃 API，破坏性更新 |
+
+### 为什么要迁移？
+
+1. **更好的封装性** - StateManager 统一管理所有状态组件
+2. **清晰的职责分离** - 服务层明确区分业务逻辑和状态管理
+3. **易于测试** - 服务可以独立测试和替换
+4. **未来可扩展性** - 为新功能提供更好的架构基础
+
+### 不废弃的 API
+
+以下 API 暂不废弃（Phase 4 再评估）：
+
+- `llm_manager()` - LLM 底层管理器，某些场景仍需直接访问
+- `tool_registry()` - 工具注册表，命令注册时需要
+- `conversation_manager()` - 对话管理器，服务层暂未封装
+
 ## 未来扩展
 
 服务层架构为未来功能扩展奠定了基础：

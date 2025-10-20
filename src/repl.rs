@@ -102,7 +102,7 @@ fn load_history_to_editor(rl: &mut DefaultEditor, agent: &Agent) {
     // 使用 tokio runtime 访问异步的 HistoryManager
     tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current().block_on(async {
-            let history = agent.history();
+            let history = agent.state_manager().history();
             let history_guard = history.read().await;
 
             // 获取所有历史记录（按时间排序，从旧到新）

@@ -330,8 +330,15 @@ async fn main() {
     // 创建 Agent
     let mut agent = agent::Agent::new(config.clone(), registry);
 
+    // ✨ Phase 3 (v1.3.0-beta): 预先获取 StateManager 的所有引用
+    // 避免后续与 agent.registry 的可变借用冲突
+    let state_manager = agent.state_manager();
+    let stats_collector = state_manager.stats_collector();
+    let memory = state_manager.memory();
+    let exec_logger = state_manager.exec_logger();
+    let history = state_manager.history();
+
     // 注册统计命令（Phase 9） - 需要 stats_collector
-    let stats_collector = agent.stats_collector();
     commands::register_stats_commands(&mut agent.registry, stats_collector);
 
     // 初始化 LLM 客户端
@@ -411,20 +418,17 @@ async fn main() {
     let llm_manager = agent.llm_manager();
     commands::register_llm_commands(&mut agent.registry, llm_manager);
 
-    // 注册记忆管理命令（需要访问 agent 的 memory）
-    let memory = agent.memory();
+    // 注册记忆管理命令（使用预先获取的 memory 引用）
     commands::register_memory_commands(&mut agent.registry, memory);
 
-    // 注册执行日志命令（需要访问 agent 的 exec_logger）
-    let exec_logger = agent.exec_logger();
+    // 注册执行日志命令（使用预先获取的 exec_logger 引用）
     commands::register_log_commands(&mut agent.registry, exec_logger);
 
     // 注册工具管理命令（需要访问 agent 的 tool_registry）
     let tool_registry = agent.tool_registry();
     commands::register_tool_commands(&mut agent.registry, tool_registry);
 
-    // ✨ Phase 8: 注册历史记录命令（需要访问 agent 的 history）
-    let history = agent.history();
+    // ✨ Phase 8: 注册历史记录命令（使用预先获取的 history 引用）
     commands::register_history_commands(&mut agent.registry, history);
 
     // ✨ Phase 10: 注册任务分解与规划命令
