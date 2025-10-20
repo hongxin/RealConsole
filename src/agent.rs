@@ -408,6 +408,23 @@ impl Agent {
         Arc::clone(&self.history)
     }
 
+    // ✨ Phase 2.2 (v1.3.0): 服务层访问器
+
+    /// 获取 Intent 服务的引用
+    fn intent_service(&self) -> &IntentService {
+        &self.intent_service
+    }
+
+    /// 获取 LLM 服务的引用
+    fn llm_service(&self) -> &LlmService {
+        &self.llm_service
+    }
+
+    /// 获取 Shell 服务的引用
+    fn shell_service(&self) -> &ShellService {
+        &self.shell_service
+    }
+
     /// 获取对话管理器的引用
     pub fn conversation_manager(&self) -> Arc<RwLock<ConversationManager>> {
         Arc::clone(&self.conversation_manager)
@@ -980,39 +997,27 @@ impl Agent {
 
     /// 使用工具调用处理文本
     fn handle_text_with_tools(&self, text: &str) -> String {
+        // ✨ Phase 2.2 (v1.3.0): 使用 LlmService 处理
+        use crate::services::{LlmRequest, Service};
+
         // 启动 spinner
         let spinner = Spinner::new();
 
-        match tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                // 获取 LLM 客户端
-                let manager = self.llm_manager.read().await;
-                let llm = manager
-                    .primary()
-                    .or(manager.fallback())
-                    .ok_or_else(|| "未配置 LLM 客户端".to_string())?;
+        // 创建 LLM 请求
+        let request = LlmRequest::with_tools(text.to_string());
 
-                // 获取工具 schemas
-                let registry = self.tool_registry.read().await;
-                let tool_schemas = registry.get_function_schemas();
-                drop(registry); // 提前释放锁
+        // 调用 LlmService
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(async { self.llm_service().process(request).await })
+        });
 
-                // 如果没有工具，回退到普通对话
-                if tool_schemas.is_empty() {
-                    let response: Result<String, String> =
-                        manager.chat(text).await.map_err(|e| e.to_string());
-                    return response;
-                }
-
-                // 使用工具执行引擎
-                self.tool_executor
-                    .execute_iterative(llm.as_ref(), text, tool_schemas)
-                    .await
-            })
-        }) {
-            Ok(response) => {
+        match result {
+            Ok(llm_response) => {
                 // 停止 spinner
                 spinner.stop();
+
+                let response = llm_response.text;
 
                 // ✨ 解析并显示对话轮次调试信息（成功时，仅当配置启用且为 debug 模式）
                 if self.config.display.show_conversation_rounds
@@ -1056,8 +1061,10 @@ impl Agent {
                 // 停止 spinner
                 spinner.stop();
 
+                let error_msg = e.to_string();
+
                 // ✨ 解析并显示对话轮次调试信息（仅 debug 模式）
-                if let Some(rounds) = crate::tool_executor::ToolExecutor::decode_debug_info(&e) {
+                if let Some(rounds) = crate::tool_executor::ToolExecutor::decode_debug_info(&error_msg) {
                     let round_infos: Vec<crate::display::ConversationRoundInfo> = rounds
                         .iter()
                         .map(|r| crate::display::ConversationRoundInfo {
@@ -1082,14 +1089,14 @@ impl Agent {
                 }
 
                 // 提取错误主消息（移除调试信息）
-                let error_msg = if let Some(pos) = e.find("__DEBUG__") {
-                    &e[..pos]
+                let error_text = if let Some(pos) = error_msg.find("__DEBUG__") {
+                    &error_msg[..pos]
                 } else {
-                    &e
+                    &error_msg
                 };
 
                 // 解析上下文长度错误
-                if let Some((requested, limit)) = parse_context_length_error(error_msg) {
+                if let Some((requested, limit)) = parse_context_length_error(error_text) {
                     Display::context_overflow_error(self.config.display.mode, requested, limit);
                     return format!(
                         "\n{} 使用 {}help 查看帮助",
@@ -1102,7 +1109,7 @@ impl Agent {
                 format!(
                     "{} {}\n{} {}help",
                     "处理失败:".red(),
-                    error_msg,
+                    error_text,
                     "提示: 使用".dimmed(),
                     self.config.prefix.dimmed()
                 )
@@ -1187,121 +1194,46 @@ impl Agent {
     /// - `Some(ExecutionPlan)`: 匹配成功，返回可执行计划
     /// - `None`: 没有匹配的意图，应回退到 LLM 处理
     fn try_match_intent(&self, text: &str) -> Option<ExecutionPlan> {
-        // 0. Phase 7: 优先尝试 LLM 驱动的 Pipeline 生成（如果启用）
-        if self.config.intent.llm_generation_enabled.unwrap_or(false) {
-            if let Some(llm_bridge) = &self.llm_bridge {
-                match tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(async { llm_bridge.understand_and_generate(text).await })
-                }) {
-                    Ok(pipeline_plan) => {
-                        // LLM 成功生成 ExecutionPlan
-                        let command = pipeline_plan.to_shell_command();
+        // ✨ Phase 2.2 (v1.3.0): 使用 IntentService 处理
+        use crate::services::{IntentRequest, Service};
 
+        // 创建 Intent 请求
+        let request = IntentRequest::from_config(text.to_string(), &self.config);
+
+        // 调用 IntentService
+        let response = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(async { self.intent_service().process(request).await })
+        });
+
+        match response {
+            Ok(intent_response) => {
+                // 显示意图识别结果
+                if let Some(intent_name) = &intent_response.intent_name {
+                    if intent_name == "llm_generated" {
                         Display::llm_generation(self.config.display.mode);
-
-                        return Some(ExecutionPlan {
-                            command,
-                            template_name: "llm_generated".to_string(),
-                            bindings: std::collections::HashMap::new(),
-                        });
-                    }
-                    Err(e) => {
-                        // LLM 失败，根据配置决定是否 fallback
-                        if self.config.intent.llm_generation_fallback.unwrap_or(true) {
-                            Display::fallback_warning(self.config.display.mode, &e);
-                        } else {
-                            Display::error(
-                                self.config.display.mode,
-                                &format!("LLM 生成失败: {}", e),
-                            );
-                            return None;
-                        }
+                    } else if !intent_response.is_workflow {
+                        Display::intent_match(
+                            self.config.display.mode,
+                            intent_name,
+                            intent_response.confidence,
+                        );
                     }
                 }
+
+                // TODO: Phase 2.2 - LLM 验证逻辑需要迁移到 IntentService
+                // 当前暂时跳过验证，后续完善
+
+                intent_response.plan
             }
-        }
-
-        // 1. 使用 IntentMatcher 匹配最佳意图
-        let mut intent_match = self.intent_matcher.best_match(text)?;
-
-        // 2. Phase 2: 使用 LLM 智能补充参数提取（如果启用）
-        if self.config.intent.llm_extraction_enabled {
-            intent_match = tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current()
-                    .block_on(async { self.try_llm_extraction(text, intent_match).await })
-            });
-        }
-
-        // 3. Phase 6.3: 优先尝试使用 Pipeline DSL 生成执行计划
-        let plan = if let Some(pipeline_plan) = self
-            .pipeline_converter
-            .convert(&intent_match, &intent_match.extracted_entities)
-        {
-            // Pipeline DSL 成功生成 ExecutionPlan
-            // 将 Pipeline ExecutionPlan 转换为 Template ExecutionPlan
-            let command = pipeline_plan.to_shell_command();
-
-            // 将实体转换为字符串绑定
-            let mut bindings = std::collections::HashMap::new();
-            for (key, entity) in &intent_match.extracted_entities {
-                let value = match entity {
-                    crate::dsl::intent::EntityType::Path(p) => p.clone(),
-                    crate::dsl::intent::EntityType::FileType(ft) => ft.clone(),
-                    crate::dsl::intent::EntityType::Number(n) => n.to_string(),
-                    crate::dsl::intent::EntityType::Custom(_, v) => v.clone(),
-                    crate::dsl::intent::EntityType::Operation(op) => op.clone(),
-                    crate::dsl::intent::EntityType::Date(d) => d.clone(),
-                };
-                bindings.insert(key.clone(), value);
-            }
-
-            ExecutionPlan {
-                command,
-                template_name: intent_match.intent.name.clone(),
-                bindings,
-            }
-        } else {
-            // 回退到传统模板引擎
-            match self.template_engine.generate_from_intent(&intent_match) {
-                Ok(plan) => plan,
-                Err(e) => {
-                    // 生成执行计划失败，记录错误但不中断流程
-                    eprintln!("{} {}", "⚠ 执行计划生成失败:".yellow(), e);
-                    return None;
+            Err(e) => {
+                // IntentService 匹配失败
+                if self.config.intent.llm_generation_enabled.unwrap_or(false) {
+                    Display::fallback_warning(self.config.display.mode, &e.to_string());
                 }
-            }
-        };
-
-        // 显示意图识别结果
-        Display::intent_match(
-            self.config.display.mode,
-            &intent_match.intent.name,
-            intent_match.confidence,
-        );
-
-        // 4. Phase 3: 使用 LLM 验证命令（如果启用）
-        if self.config.intent.llm_validation_enabled {
-            let intent_name = intent_match.intent.name.clone();
-            let validation = tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current()
-                    .block_on(async { self.try_llm_validation(text, &plan, &intent_name).await })
-            });
-
-            // 如果验证失败或置信度低，警告用户
-            if let Some(validation) = validation {
-                if validation.should_warn(self.config.intent.validation_threshold) {
-                    self.display_validation_warning(&validation);
-
-                    // 如果需要用户确认
-                    if self.config.intent.require_confirmation && !self.ask_user_confirmation() {
-                        return None; // 用户拒绝执行
-                    }
-                }
+                None
             }
         }
-
-        Some(plan)
     }
 
     /// Phase 8: 尝试匹配 Workflow Intent
