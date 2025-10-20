@@ -408,21 +408,26 @@ impl Agent {
         Arc::clone(&self.history)
     }
 
-    // ✨ Phase 2.2 (v1.3.0): 服务层访问器
+    // ✨ Phase 2.2 (v1.3.0): 服务层访问器（Phase 2.4 改为 public）
 
     /// 获取 Intent 服务的引用
-    fn intent_service(&self) -> &IntentService {
+    pub fn intent_service(&self) -> &IntentService {
         &self.intent_service
     }
 
     /// 获取 LLM 服务的引用
-    fn llm_service(&self) -> &LlmService {
+    pub fn llm_service(&self) -> &LlmService {
         &self.llm_service
     }
 
     /// 获取 Shell 服务的引用
-    fn shell_service(&self) -> &ShellService {
+    pub fn shell_service(&self) -> &ShellService {
         &self.shell_service
+    }
+
+    /// 获取状态管理器的引用
+    pub fn state_manager(&self) -> &StateManager {
+        &self.state_manager
     }
 
     /// 获取对话管理器的引用
@@ -1118,8 +1123,7 @@ impl Agent {
 
     /// 使用流式输出处理文本（传统模式）
     fn handle_text_streaming(&self, text: &str) -> String {
-        // 不显示 "AI:" 前缀，让输出更接近普通 console
-        // 显示 spinner 等待 LLM 响应
+        // ✨ Phase 2.4 (v1.3.0): 使用 LlmService 处理流式输出
 
         // 开始计时
         let start = Instant::now();
@@ -1127,19 +1131,16 @@ impl Agent {
         // 启动 spinner
         let spinner = Spinner::new();
 
-        // 使用 block_in_place 在同步上下文中调用异步代码
-        match tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let manager = self.llm_manager.read().await;
-                // 使用流式输出，实时显示每个 token
-                manager
-                    .chat_stream(text, |token| {
-                        print!("{}", token);
-                        let _ = io::stdout().flush();
-                    })
-                    .await
-            })
-        }) {
+        // 创建流式 LLM 请求
+        let request = LlmRequest::streaming(text.to_string());
+
+        // 调用 LlmService（流式输出直接打印到 stdout）
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(async { self.llm_service().process(request).await })
+        });
+
+        match result {
             Ok(_response) => {
                 // 停止 spinner
                 spinner.stop();
@@ -1148,7 +1149,6 @@ impl Agent {
                 let elapsed = start.elapsed();
 
                 // 流式输出已经完成，不需要额外换行
-                // 因为流式输出已经包含了完整的输出内容
                 Display::execution_timing(self.config.display.mode, elapsed.as_secs_f64());
 
                 // 返回空字符串，因为内容已通过流式输出显示
