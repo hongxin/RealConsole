@@ -24,10 +24,10 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 // 重新导出子模块
-mod state_manager;
-mod intent_service;
-mod llm_service;
-mod shell_service;
+pub mod state_manager;
+pub mod intent_service;
+pub mod llm_service;
+pub mod shell_service;
 // mod tool_service;
 // mod command_service;
 

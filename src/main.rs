@@ -29,6 +29,7 @@ mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支生�
 mod memory;
 mod project_context; // ✨ Phase 6: 项目上下文感知
 mod repl;
+mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 mod shell_executor;
 mod spinner;
 mod stats; // ✨ Phase 9: 统计与可视化

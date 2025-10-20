@@ -50,7 +50,7 @@ use crate::dsl::intent::{WorkflowExecutor, WorkflowIntent};
 
 // ✨ Phase 2 (v1.3.0): 服务层架构
 use crate::services::{
-    IntentService, LlmService, ShellService, StateManager,
+    IntentRequest, IntentService, LlmRequest, LlmService, Service, ShellService, StateManager,
 };
 
 /// Agent 核心
@@ -998,7 +998,6 @@ impl Agent {
     /// 使用工具调用处理文本
     fn handle_text_with_tools(&self, text: &str) -> String {
         // ✨ Phase 2.2 (v1.3.0): 使用 LlmService 处理
-        use crate::services::{LlmRequest, Service};
 
         // 启动 spinner
         let spinner = Spinner::new();
@@ -1195,7 +1194,6 @@ impl Agent {
     /// - `None`: 没有匹配的意图，应回退到 LLM 处理
     fn try_match_intent(&self, text: &str) -> Option<ExecutionPlan> {
         // ✨ Phase 2.2 (v1.3.0): 使用 IntentService 处理
-        use crate::services::{IntentRequest, Service};
 
         // 创建 Intent 请求
         let request = IntentRequest::from_config(text.to_string(), &self.config);
@@ -1308,89 +1306,12 @@ impl Agent {
     }
 
     /// Phase 2: 尝试使用 LLM 补充提取实体
-    async fn try_llm_extraction(
-        &self,
-        text: &str,
-        mut intent_match: crate::dsl::intent::types::IntentMatch,
-    ) -> crate::dsl::intent::types::IntentMatch {
-        // 检查是否有缺失的实体
-        let expected_count = intent_match.intent.entities.len();
-        let extracted_count = intent_match.extracted_entities.len();
-
-        if extracted_count < expected_count {
-            // 有缺失实体，使用 LLM 补充
-            let manager = self.llm_manager.read().await;
-            if let Some(llm) = manager.primary().or(manager.fallback()) {
-                let extractor = EntityExtractor::new();
-                match extractor
-                    .extract_with_llm(text, &intent_match.intent.entities, llm.as_ref())
-                    .await
-                {
-                    entities if !entities.is_empty() => {
-                        Display::debug_info(self.config.display.mode, "LLM 参数提取成功");
-                        intent_match.extracted_entities = entities;
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        intent_match
-    }
-
-    /// Phase 3: 尝试使用 LLM 验证命令
-    async fn try_llm_validation(
-        &self,
-        text: &str,
-        plan: &ExecutionPlan,
-        intent_name: &str,
-    ) -> Option<ValidationResult> {
-        let manager = self.llm_manager.read().await;
-        if let Some(llm) = manager.primary().or(manager.fallback()) {
-            let validator = CommandValidator::new();
-            match validator
-                .validate(text, plan, intent_name, llm.as_ref())
-                .await
-            {
-                Ok(result) => Some(result),
-                Err(e) => {
-                    eprintln!("{} {}", "⚠ LLM 验证失败:".yellow(), e);
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    }
-
-    /// 显示验证警告
-    fn display_validation_warning(&self, validation: &ValidationResult) {
-        println!("\n{}", "⚠️ 命令验证警告:".yellow().bold());
-        println!("  {}: {:.2}", "置信度".dimmed(), validation.confidence);
-        println!("  {}: {}", "原因".dimmed(), validation.reason);
-
-        if !validation.suggestions.is_empty() {
-            println!("\n  {}:", "建议".dimmed());
-            for suggestion in &validation.suggestions {
-                println!("    - {}", suggestion);
-            }
-        }
-        println!();
-    }
-
-    /// 询问用户确认
-    fn ask_user_confirmation(&self) -> bool {
-        print!("是否继续执行? [y/N]: ");
-        let _ = io::stdout().flush();
-
-        let mut input = String::new();
-        if io::stdin().read_line(&mut input).is_ok() {
-            let answer = input.trim().to_lowercase();
-            matches!(answer.as_str(), "y" | "yes")
-        } else {
-            false
-        }
-    }
+    // ✨ Phase 2.3 (v1.3.0): 清理未使用的辅助方法
+    // 已删除：try_llm_extraction (29 lines)
+    // 已删除：try_llm_validation (23 lines)
+    // 已删除：display_validation_warning (13 lines)
+    // 已删除：ask_user_confirmation (12 lines)
+    // 原因：这些方法在迁移到 IntentService 后不再使用
 
     /// 执行意图对应的命令
     ///
