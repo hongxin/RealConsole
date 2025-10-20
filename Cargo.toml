@@ -1,6 +1,6 @@
 [package]
 name = "realconsole"
-version = "1.3.0"
+version = "1.3.5"
 edition = "2021"
 authors = ["RealConsole Contributors"]
 description = "An intelligent CLI agent with task planning, combining Eastern philosophy wisdom with modern AI"

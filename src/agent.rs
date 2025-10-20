@@ -17,6 +17,7 @@ use crate::dsl::intent::{
 };
 use crate::execution_logger::{CommandType, ExecutionLogger};
 use crate::history::HistoryManager;
+use crate::llm::Message;
 use crate::llm_manager::LlmManager;
 use crate::memory::{EntryType, Memory};
 use crate::spinner::Spinner;
@@ -32,7 +33,7 @@ use tokio::sync::RwLock;
 use crate::conversation::{
     clear_current_conversation, get_current_conversation, has_active_conversation,
     set_current_conversation, ContextManager, ConversationManager, ParameterSpec, ParameterType,
-    ParameterValue, Response,
+    ParameterValue, Response, Turn,
 };
 
 // ✨ Phase 9: 统计与可视化支持
@@ -1122,11 +1123,24 @@ impl Agent {
                 }
 
                 // 提取实际响应内容（移除调试信息）
-                if let Some(pos) = response.find("__DEBUG__") {
+                let clean_response = if let Some(pos) = response.find("__DEBUG__") {
                     response[..pos].to_string()
                 } else {
                     response
-                }
+                };
+
+                // ✨ Phase 3: 记录轮次到 ContextManager
+                // 注意：工具模式暂不支持上下文输入，但仍记录对话用于未来使用
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let ctx_arc = self.state_manager().conversation_context();
+                        let mut ctx_manager = ctx_arc.write().await;
+                        let turn = Turn::new(text.to_string(), clean_response.clone());
+                        ctx_manager.add_turn(turn);
+                    })
+                });
+
+                clean_response
             }
             Err(e) => {
                 // 停止 spinner
@@ -1190,10 +1204,31 @@ impl Agent {
 
     /// 使用流式输出处理文本（传统模式）
     fn handle_text_streaming(&self, text: &str) -> String {
+        // ✨ Phase 3: 集成对话上下文
         // ✨ Phase 2.4 (v1.3.0): 使用 LlmService 处理流式输出
 
         // 开始计时
         let start = Instant::now();
+
+        // 检查是否应该使用上下文
+        let (should_use_context, messages) = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let ctx_arc = self.state_manager().conversation_context();
+                let mut ctx_manager = ctx_arc.write().await;
+
+                // 检查是否应该使用上下文
+                let should_use = ctx_manager.should_use_context(text);
+
+                // 如果使用上下文，构建消息列表
+                let msgs = if should_use {
+                    ctx_manager.build_messages(text)
+                } else {
+                    vec![Message::user(text)]
+                };
+
+                (should_use, msgs)
+            })
+        });
 
         // 先获取模型名称（用于 spinner）
         let model_name = tokio::task::block_in_place(|| {
@@ -1211,19 +1246,37 @@ impl Agent {
         use crate::spinner::simplify_model_name;
         let spinner = Spinner::with_label(&simplify_model_name(&model_name));
 
-        // 创建流式 LLM 请求
-        let request = LlmRequest::streaming(text.to_string());
-
-        // 调用 LlmService（流式输出直接打印到 stdout）
+        // 调用 LLM（直接使用 LlmManager 以支持多轮上下文）
         let result = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current()
-                .block_on(async { self.llm_service().process(request).await })
+            tokio::runtime::Handle::current().block_on(async {
+                let manager = self.llm_manager.read().await;
+
+                // 使用新的 chat_stream_with_messages 方法
+                manager.chat_stream_with_messages(messages.clone(), |chunk| {
+                    print!("{}", chunk);
+                    std::io::Write::flush(&mut std::io::stdout()).ok();
+                }).await
+            })
         });
 
         match result {
-            Ok(_response) => {
+            Ok(response) => {
                 // 停止 spinner
                 spinner.stop();
+
+                // ✨ Phase 3: 添加轮次到 ContextManager
+                if should_use_context {
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            let ctx_arc = self.state_manager().conversation_context();
+                            let mut ctx_manager = ctx_arc.write().await;
+
+                            // 创建新的轮次
+                            let turn = Turn::new(text.to_string(), response.clone());
+                            ctx_manager.add_turn(turn);
+                        })
+                    });
+                }
 
                 // 计算耗时
                 let elapsed = start.elapsed();

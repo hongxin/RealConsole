@@ -452,6 +452,10 @@ async fn main() {
     // ✨ Phase 8: 注册历史记录命令（使用预先获取的 history 引用）
     commands::register_history_commands(&mut agent.registry, history);
 
+    // ✨ Phase 对话上下文: 注册上下文管理命令
+    let conversation_context = agent.state_manager().conversation_context();
+    commands::register_context_commands(&mut agent.registry, conversation_context);
+
     // ✨ Phase 10: 注册任务分解与规划命令
     let llm_mgr_for_task = agent.llm_manager();
     let shell_exec_for_task = agent.shell_executor_with_fixer.clone();

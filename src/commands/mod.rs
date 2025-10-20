@@ -1,3 +1,4 @@
+pub mod context_cmd; // ✨ Phase 对话上下文: 上下文管理命令
 pub mod core;
 pub mod git_cmd; // ✨ Phase 6: Git 智能助手命令
 pub mod history_cmd; // ✨ Phase 8: 命令历史记录命令
@@ -11,6 +12,7 @@ pub mod system_cmd; // ✨ Phase 6: 系统监控命令
 pub mod task_cmd; // ✨ Phase 10: 任务分解与规划命令
 pub mod tool;
 
+pub use context_cmd::register_context_commands;
 pub use core::register_core_commands;
 pub use git_cmd::register_git_commands;
 pub use history_cmd::register_history_commands;

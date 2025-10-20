@@ -33,8 +33,8 @@ pub fn run(agent: &Agent) -> RustyResult<()> {
     print_welcome();
 
     loop {
-        // 每次循环重新构建提示符，以反映当前目录
-        let prompt = build_prompt();
+        // 每次循环重新构建提示符，以反映当前目录和上下文状态
+        let prompt = build_prompt(agent);
 
         // 读取输入
         let readline = rl.readline(&prompt);
@@ -120,7 +120,7 @@ fn load_history_to_editor(rl: &mut DefaultEditor, agent: &Agent) {
 }
 
 /// 构建标准的 shell 提示符
-fn build_prompt() -> String {
+fn build_prompt(agent: &Agent) -> String {
     // 获取版本号并提取主版本号
     let version = env!("CARGO_PKG_VERSION");
     let major_version = version.split('.').next().unwrap_or("1");
@@ -140,15 +140,65 @@ fn build_prompt() -> String {
         })
         .unwrap_or_else(|| "~".to_string());
 
-    // 构建提示符：(RealConsole v1) Username Pathname %
+    // ✨ Phase 对话上下文: 获取上下文状态
+    let context_indicator = build_context_indicator(agent);
+
+    // 构建提示符：(RealConsole v1) Username Pathname [上下文] %
     // 样式与欢迎信息保持一致：RealConsole 粗体青色，版本号灰色
     format!(
-        "({} {}) {} {} % ",
+        "({} {}) {} {}{} % ",
         "RealConsole".bold().cyan(), // 粗体青色 RealConsole（与首行一致）
         format!("v{}", major_version).dimmed(), // 灰色版本号（与首行一致）
         username.truecolor(255, 165, 0), // 橙色用户名
-        current_dir.truecolor(255, 165, 0)  // 橙色目录名
+        current_dir.truecolor(255, 165, 0), // 橙色目录名
+        context_indicator // 上下文指示器
     )
+}
+
+/// ✨ Phase 对话上下文: 构建上下文状态指示器
+fn build_context_indicator(agent: &Agent) -> String {
+    // 使用 block_in_place 来访问异步的 ContextManager
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            let ctx_arc = agent.state_manager().conversation_context();
+            let manager = ctx_arc.read().await;
+
+            // 检查是否激活
+            if !manager.is_active() {
+                return String::new(); // 未激活，不显示
+            }
+
+            let turn_count = manager.turn_count();
+            if turn_count == 0 {
+                return String::new(); // 无轮次，不显示
+            }
+
+            // 检查空闲时间
+            let idle_seconds = manager.idle_seconds();
+            let is_near_timeout = manager.is_near_timeout();
+
+            // 构建指示器
+            if is_near_timeout {
+                // 即将超时：显示警告
+                let idle_minutes = idle_seconds / 60;
+                format!(
+                    " {}",
+                    format!("[上下文: {}轮 | {}分钟前]", turn_count, idle_minutes)
+                        .yellow()
+                )
+            } else if idle_seconds > 60 {
+                // 空闲超过 1 分钟：显示空闲时间
+                let idle_minutes = idle_seconds / 60;
+                format!(
+                    " {}",
+                    format!("[上下文: {}轮 | {}分钟前]", turn_count, idle_minutes).dimmed()
+                )
+            } else {
+                // 正常激活：只显示轮次
+                format!(" {}", format!("[上下文: {}轮]", turn_count).green())
+            }
+        })
+    })
 }
 
 /// 单次执行模式（--once）
