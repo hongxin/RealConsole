@@ -48,10 +48,29 @@ use crate::shell_executor::ShellExecutorWithFixer;
 // ✨ Phase 8 (Workflow): Workflow Intent 支持
 use crate::dsl::intent::{WorkflowExecutor, WorkflowIntent};
 
+// ✨ Phase 2 (v1.3.0): 服务层架构
+use crate::services::{
+    IntentService, LlmService, ShellService, StateManager,
+};
+
 /// Agent 核心
+///
+/// ✨ Phase 2 (v1.3.0): 服务层架构重构
+/// - 新增服务层字段（state_manager, intent_service, llm_service, shell_service）
+/// - 保留原有字段以维持向后兼容
+/// - 逐步迁移方法实现到服务调用
 pub struct Agent {
+    // === 核心配置 ===
     pub config: Config,
     pub registry: CommandRegistry,
+
+    // === 服务层（v1.3.0 新增）===
+    state_manager: Arc<StateManager>,
+    intent_service: Arc<IntentService>,
+    llm_service: Arc<LlmService>,
+    shell_service: Arc<ShellService>,
+
+    // === 原有字段（保留，向后兼容）===
     pub llm_manager: Arc<RwLock<LlmManager>>,
     pub memory: Arc<RwLock<Memory>>,
     pub exec_logger: Arc<RwLock<ExecutionLogger>>,
@@ -210,6 +229,15 @@ impl Agent {
         // 这个在 main.rs 中调用 configure_llm() 后会被设置
         let llm_bridge = None;
 
+        // 预先创建 Arc 包装的组件（在分支之前）
+        let llm_manager = Arc::new(RwLock::new(LlmManager::new()));
+        let memory_arc = Arc::new(RwLock::new(memory));
+        let exec_logger_arc = Arc::new(RwLock::new(exec_logger));
+        let history_arc = Arc::new(RwLock::new(history));
+        let conversation_manager_arc = Arc::new(RwLock::new(conversation_manager));
+        let context_tracker_arc = Arc::new(RwLock::new(context_tracker));
+        let tool_executor_arc = Arc::new(tool_executor);
+
         // ✨ Phase 9.2: 初始化错误修复系统
         let feedback_learner = Arc::new(FeedbackLearner::new());
         // 如果配置了持久化路径，设置存储路径
@@ -234,22 +262,56 @@ impl Agent {
 
             let last_failed_command = Arc::new(RwLock::new(None));
 
+            // ✨ Phase 2 (v1.3.0): 初始化服务层
+            let state_manager = Arc::new(StateManager::new(
+                Arc::clone(&memory_arc),
+                Arc::clone(&history_arc),
+                Arc::clone(&context_tracker_arc),
+                Arc::clone(&stats_collector),
+                Arc::clone(&exec_logger_arc),
+            ));
+
+            let intent_service = Arc::new(IntentService::new(
+                intent_matcher.clone(),
+                template_engine.clone(),
+                pipeline_converter.clone(),
+                llm_bridge.clone(),
+                workflow_intents.clone(),
+                workflow_executor.clone(),
+                Arc::clone(&llm_manager),
+            ));
+
+            let llm_service = Arc::new(LlmService::new(
+                Arc::clone(&llm_manager),
+                Arc::clone(&tool_registry),
+                Arc::clone(&tool_executor_arc),
+            ));
+
+            let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
+
             return Self {
+                // 核心配置
                 config,
                 registry,
-                llm_manager: Arc::new(RwLock::new(LlmManager::new())),
-                memory: Arc::new(RwLock::new(memory)),
-                exec_logger: Arc::new(RwLock::new(exec_logger)),
+                // 服务层
+                state_manager,
+                intent_service,
+                llm_service,
+                shell_service,
+                // 原有字段
+                llm_manager: Arc::clone(&llm_manager),
+                memory: Arc::clone(&memory_arc),
+                exec_logger: Arc::clone(&exec_logger_arc),
                 tool_registry,
-                tool_executor: Arc::new(tool_executor),
+                tool_executor: Arc::clone(&tool_executor_arc),
                 intent_matcher,
                 template_engine,
                 pipeline_converter,
                 llm_bridge,
-                history: Arc::new(RwLock::new(history)),
-                conversation_manager: Arc::new(RwLock::new(conversation_manager)),
+                history: Arc::clone(&history_arc),
+                conversation_manager: Arc::clone(&conversation_manager_arc),
                 stats_collector,
-                context_tracker: Arc::new(RwLock::new(context_tracker)),
+                context_tracker: Arc::clone(&context_tracker_arc),
                 shell_executor_with_fixer,
                 last_failed_command,
                 command_router,
@@ -263,22 +325,56 @@ impl Agent {
             Arc::new(ShellExecutorWithFixer::new().with_feedback_learner(feedback_learner));
         let last_failed_command = Arc::new(RwLock::new(None));
 
+        // ✨ Phase 2 (v1.3.0): 初始化服务层（Fallback 分支）
+        let state_manager = Arc::new(StateManager::new(
+            Arc::clone(&memory_arc),
+            Arc::clone(&history_arc),
+            Arc::clone(&context_tracker_arc),
+            Arc::clone(&stats_collector),
+            Arc::clone(&exec_logger_arc),
+        ));
+
+        let intent_service = Arc::new(IntentService::new(
+            intent_matcher.clone(),
+            template_engine.clone(),
+            pipeline_converter.clone(),
+            llm_bridge.clone(),
+            workflow_intents.clone(),
+            workflow_executor.clone(),
+            Arc::clone(&llm_manager),
+        ));
+
+        let llm_service = Arc::new(LlmService::new(
+            Arc::clone(&llm_manager),
+            Arc::clone(&tool_registry),
+            Arc::clone(&tool_executor_arc),
+        ));
+
+        let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
+
         Self {
+            // 核心配置
             config,
             registry,
-            llm_manager: Arc::new(RwLock::new(LlmManager::new())),
-            memory: Arc::new(RwLock::new(memory)),
-            exec_logger: Arc::new(RwLock::new(exec_logger)),
+            // 服务层
+            state_manager,
+            intent_service,
+            llm_service,
+            shell_service,
+            // 原有字段
+            llm_manager: Arc::clone(&llm_manager),
+            memory: Arc::clone(&memory_arc),
+            exec_logger: Arc::clone(&exec_logger_arc),
             tool_registry,
-            tool_executor: Arc::new(tool_executor),
+            tool_executor: Arc::clone(&tool_executor_arc),
             intent_matcher,
             template_engine,
             pipeline_converter,
             llm_bridge,
-            history: Arc::new(RwLock::new(history)),
-            conversation_manager: Arc::new(RwLock::new(conversation_manager)),
+            history: Arc::clone(&history_arc),
+            conversation_manager: Arc::clone(&conversation_manager_arc),
             stats_collector,
-            context_tracker: Arc::new(RwLock::new(context_tracker)),
+            context_tracker: Arc::clone(&context_tracker_arc),
             shell_executor_with_fixer,
             last_failed_command,
             command_router,

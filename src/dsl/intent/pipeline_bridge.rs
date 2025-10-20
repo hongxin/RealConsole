@@ -33,6 +33,7 @@ use std::collections::HashMap;
 /// let plan = converter.convert(&intent_match, &entities);
 /// ```
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct IntentToPipeline {
     /// 是否启用 Pipeline DSL（配置开关）
     enabled: bool,

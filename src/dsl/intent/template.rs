@@ -117,6 +117,7 @@ pub struct ExecutionPlan {
 /// assert_eq!(plan.command, "find . -name '*.py' | wc -l");
 /// ```
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct TemplateEngine {
     /// 已注册的模板（模板名 -> 模板）
     templates: HashMap<String, Template>,

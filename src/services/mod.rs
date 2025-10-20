@@ -26,13 +26,15 @@ use std::sync::Arc;
 // 重新导出子模块
 mod state_manager;
 mod intent_service;
-// mod shell_service;
+mod llm_service;
+mod shell_service;
 // mod tool_service;
-// mod llm_service;
 // mod command_service;
 
 pub use state_manager::StateManager;
 pub use intent_service::{IntentError, IntentRequest, IntentResponse, IntentService};
+pub use llm_service::{LlmError, LlmMode, LlmRequest, LlmResponse, LlmService};
+pub use shell_service::{ShellError, ShellRequest, ShellResponse, ShellService};
 
 /// Service trait - 所有服务的基础抽象
 ///

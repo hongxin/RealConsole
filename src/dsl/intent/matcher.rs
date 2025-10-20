@@ -766,6 +766,30 @@ impl Default for IntentMatcher {
     }
 }
 
+// ✨ Phase 2 (v1.3.0): 手动实现 Clone（Regex 不支持 Clone）
+impl Clone for IntentMatcher {
+    fn clone(&self) -> Self {
+        // Clone intents（Intent 已实现 Clone）
+        let intents = self.intents.clone();
+
+        // Clone extractor（已手动实现 Clone）
+        let extractor = self.extractor.clone();
+
+        // Clone fuzzy_config（已实现 Clone）
+        let fuzzy_config = self.fuzzy_config.clone();
+
+        // 创建新的 IntentMatcher
+        // regex_cache 会被清空（重新编译）
+        // query_cache、cache_hits、cache_misses 会重置
+        let mut matcher = Self::new();
+        matcher.intents = intents;
+        matcher.extractor = extractor;
+        matcher.fuzzy_config = fuzzy_config;
+
+        matcher
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

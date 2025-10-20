@@ -1042,3 +1042,12 @@ mod tests {
         }
     }
 }
+
+// ✨ Phase 2 (v1.3.0): 手动实现 Clone（Regex 不支持 Clone）
+impl Clone for EntityExtractor {
+    fn clone(&self) -> Self {
+        // 重新创建 EntityExtractor，因为 Regex 不能 Clone
+        // 这会重新编译正则表达式
+        Self::new()
+    }
+}

@@ -202,6 +202,7 @@ pub async fn execute_shell(command: &str) -> Result<String, RealError> {
 }
 
 /// Shell 执行器结果（带错误分析）
+#[derive(Debug, Clone)]
 pub struct ExecutionResult {
     /// 命令是否成功
     pub success: bool,
