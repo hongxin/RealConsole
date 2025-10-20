@@ -35,6 +35,7 @@ pub mod log_analyzer; // ✨ Phase 6: 日志分析工具
 pub mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支生肖
 pub mod memory;
 pub mod project_context; // ✨ Phase 6: 项目上下文感知
+pub mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 pub mod shell_executor;
 pub mod spinner;
 pub mod stats; // ✨ Phase 9: 统计与可视化系统
