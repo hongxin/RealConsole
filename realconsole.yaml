@@ -19,6 +19,14 @@ llm:
     # model: qwen3:4b
     # endpoint: http://192.168.3.120:11434
 
+  # LLM 交互日志（用于复盘、debug、性能分析）
+  logging:
+    enabled: true                    # 是否启用（默认 false）
+    # log_dir: ~/.realconsole/llm_logs  # 日志目录（可选，默认 ~/.realconsole/llm_logs）
+    include_content: true             # 是否记录完整内容（默认 true）
+    retention_days: 30                # 日志保留天数（默认 30）
+    max_size_mb: 100                  # 最大日志大小 MB（默认 100）
+
 # 功能开关
 features:
   shell_enabled: true
@@ -35,7 +43,7 @@ features:
   workflow_cache_ttl_default: 300  # 缓存 5 分钟
 
 memory:
-  capacity: 100
+  capacity: 30
   persistent_file: "memory/session.jsonl"
   auto_save: true
 

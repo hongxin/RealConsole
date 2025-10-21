@@ -3,7 +3,7 @@
 //! 提供记忆查看、搜索、清空等功能
 
 use crate::command::{Command, CommandRegistry};
-use crate::memory::{EntryType, Memory};
+use crate::memory::{EntryType, Importance, Memory, MemoryStats};
 use colored::Colorize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -39,6 +39,9 @@ fn handle_memory(arg: &str, memory: Arc<RwLock<Memory>>) -> String {
         "dump" | "d" => handle_memory_dump(memory),
         "save" => handle_memory_save(&rest, memory),
         "type" | "t" => handle_memory_type(&rest, memory),
+        "stats" => handle_memory_stats(memory),
+        "mark" | "m" => handle_memory_mark(&rest, memory),
+        "important" | "i" => handle_memory_important(&rest, memory),
         "help" | "h" => memory_help(),
         _ => format!(
             "{} 未知子命令: {}\n使用 /memory help 查看帮助",
@@ -201,6 +204,62 @@ fn handle_memory_save(path: &str, memory: Arc<RwLock<Memory>>) -> String {
     })
 }
 
+/// 显示统计分析
+fn handle_memory_stats(memory: Arc<RwLock<Memory>>) -> String {
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            let mem = memory.read().await;
+            let stats = mem.stats();
+
+            if stats.total_entries == 0 {
+                return format!("{}", "暂无记忆数据".dimmed());
+            }
+
+            let mut lines = vec![format!("{}", "记忆统计分析".bold().cyan())];
+
+            // 基本统计
+            lines.push(format!("\n{}", "基本信息:".bold()));
+            lines.push(format!("  总条目数: {}", stats.total_entries.to_string().green()));
+
+            // 时间范围
+            if let (Some(earliest), Some(latest)) = (stats.earliest_timestamp, stats.latest_timestamp) {
+                let duration = latest.signed_duration_since(earliest);
+                let time_span = if duration.num_days() > 0 {
+                    format!("{} 天", duration.num_days())
+                } else if duration.num_hours() > 0 {
+                    format!("{} 小时", duration.num_hours())
+                } else if duration.num_minutes() > 0 {
+                    format!("{} 分钟", duration.num_minutes())
+                } else {
+                    format!("{} 秒", duration.num_seconds())
+                };
+                lines.push(format!("  时间跨度: {}", time_span.cyan()));
+                lines.push(format!("  最早记忆: {}", earliest.format("%Y-%m-%d %H:%M:%S").to_string().dimmed()));
+                lines.push(format!("  最新记忆: {}", latest.format("%Y-%m-%d %H:%M:%S").to_string().dimmed()));
+            }
+
+            // 类型分布
+            lines.push(format!("\n{}", "类型分布:".bold()));
+            let mut type_vec: Vec<_> = stats.type_distribution.iter().collect();
+            type_vec.sort_by(|a, b| b.1.cmp(a.1)); // 按数量降序排序
+
+            for (entry_type, count) in type_vec {
+                let percentage = (*count as f64 / stats.total_entries as f64 * 100.0) as usize;
+                let bar = "█".repeat((percentage / 5).max(1)); // 每5%一个方块
+                lines.push(format!(
+                    "  {:10} {} {:3}% ({})",
+                    format!("{}", entry_type).yellow(),
+                    bar.green(),
+                    percentage,
+                    count.to_string().dimmed()
+                ));
+            }
+
+            lines.join("\n")
+        })
+    })
+}
+
 /// 按类型过滤记忆
 fn handle_memory_type(type_str: &str, memory: Arc<RwLock<Memory>>) -> String {
     let entry_type = match type_str.to_lowercase().as_str() {
@@ -243,28 +302,131 @@ fn handle_memory_type(type_str: &str, memory: Arc<RwLock<Memory>>) -> String {
     })
 }
 
+/// 标记记忆的重要性
+fn handle_memory_mark(arg: &str, memory: Arc<RwLock<Memory>>) -> String {
+    let parts: Vec<&str> = arg.split_whitespace().collect();
+
+    if parts.len() < 2 {
+        return format!(
+            "{} 用法: /memory mark <索引> <级别>\n级别: normal, important, critical",
+            "错误:".red()
+        );
+    }
+
+    let index: usize = match parts[0].parse() {
+        Ok(i) => i,
+        Err(_) => {
+            return format!("{} 无效的索引: {}", "错误:".red(), parts[0]);
+        }
+    };
+
+    let importance = match parts[1].to_lowercase().as_str() {
+        "normal" | "n" => Importance::Normal,
+        "important" | "i" => Importance::Important,
+        "critical" | "c" => Importance::Critical,
+        _ => {
+            return format!(
+                "{} 未知级别: {}\n支持的级别: normal, important, critical",
+                "错误:".red(),
+                parts[1]
+            );
+        }
+    };
+
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            let mut mem = memory.write().await;
+            match mem.mark_importance(index, importance) {
+                Ok(()) => {
+                    format!(
+                        "{} 已将第 {} 条记忆标记为 {}",
+                        "✓".green(),
+                        index,
+                        importance
+                    )
+                }
+                Err(e) => {
+                    format!("{} {}", "错误:".red(), e)
+                }
+            }
+        })
+    })
+}
+
+/// 查看重要的记忆
+fn handle_memory_important(arg: &str, memory: Arc<RwLock<Memory>>) -> String {
+    let importance = if arg.trim().is_empty() {
+        Importance::Important // 默认查看 Important 级别
+    } else {
+        match arg.trim().to_lowercase().as_str() {
+            "normal" | "n" => Importance::Normal,
+            "important" | "i" => Importance::Important,
+            "critical" | "c" => Importance::Critical,
+            _ => {
+                return format!(
+                    "{} 未知级别: {}\n支持的级别: normal, important, critical",
+                    "错误:".red(),
+                    arg.trim()
+                );
+            }
+        }
+    };
+
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            let mem = memory.read().await;
+            let results = mem.filter_by_importance(importance);
+
+            if results.is_empty() {
+                return format!("{} 未找到 {} 级别的记忆", "提示:".yellow(), importance);
+            }
+
+            let mut lines = vec![format!(
+                "{} {} 条 {} 级别的记忆:",
+                "找到".bold().green(),
+                results.len().to_string().green(),
+                importance
+            )];
+
+            for entry in results {
+                lines.push(entry.format());
+            }
+
+            lines.join("\n")
+        })
+    })
+}
+
 /// 记忆命令帮助
 fn memory_help() -> String {
     format!(
         r#"{title}
 
 {subtitle}
-  /memory              - 显示记忆状态和最近记忆
-  /memory recent <n>   - 查看最近 N 条记忆（默认 10）
-  /memory search <关键词> - 搜索包含关键词的记忆
-  /memory type <类型>   - 按类型过滤（user/assistant/system/shell/tool）
-  /memory clear        - 清空所有记忆
-  /memory dump         - 导出所有记忆
-  /memory save [路径]  - 保存记忆到文件（默认 memory_export.jsonl）
+  /memory                      - 显示记忆状态和最近记忆
+  /memory recent <n>           - 查看最近 N 条记忆（默认 10）
+  /memory search <关键词>       - 搜索包含关键词的记忆
+  /memory type <类型>          - 按类型过滤（user/assistant/system/shell/tool）
+  /memory stats                - 显示统计分析（类型分布、时间跨度等）
+  /memory mark <索引> <级别>   - 标记记忆重要性（normal/important/critical）
+  /memory important [级别]     - 查看重要记忆（默认 important）
+  /memory clear                - 清空所有记忆
+  /memory dump                 - 导出所有记忆
+  /memory save [路径]          - 保存记忆到文件（默认 memory_export.jsonl）
 
 {examples}
   /memory recent 20
   /memory search "rust"
   /memory type user
+  /memory stats
+  /memory mark 0 important     # 标记最新的记忆为重要
+  /memory mark 2 critical      # 标记第3条记忆为关键
+  /memory important            # 查看所有重要的记忆
+  /memory important critical   # 查看所有关键的记忆
   /memory save my_memory.jsonl
 
 {shortcuts}
-  recent → r, search → s, clear → c, dump → d, type → t
+  recent → r, search → s, clear → c, dump → d, type → t, mark → m, important → i
 "#,
         title = "记忆管理".bold().cyan(),
         subtitle = "用法:".bold(),

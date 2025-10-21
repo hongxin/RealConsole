@@ -11,13 +11,13 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
 /// 记忆条目类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EntryType {
     /// 用户输入
@@ -32,6 +32,18 @@ pub enum EntryType {
     Tool,
 }
 
+/// 记忆重要性级别
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Importance {
+    /// 普通
+    Normal,
+    /// 重要
+    Important,
+    /// 关键
+    Critical,
+}
+
 impl std::fmt::Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -44,6 +56,40 @@ impl std::fmt::Display for EntryType {
     }
 }
 
+impl Importance {
+    /// 获取重要性标记符号
+    pub fn symbol(&self) -> &str {
+        match self {
+            Importance::Normal => "",
+            Importance::Important => "⭐",
+            Importance::Critical => "⭐⭐",
+        }
+    }
+}
+
+impl std::fmt::Display for Importance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Importance::Normal => write!(f, "Normal"),
+            Importance::Important => write!(f, "Important"),
+            Importance::Critical => write!(f, "Critical"),
+        }
+    }
+}
+
+/// 记忆统计信息
+#[derive(Debug, Clone)]
+pub struct MemoryStats {
+    /// 总条目数
+    pub total_entries: usize,
+    /// 各类型条目数量
+    pub type_distribution: HashMap<EntryType, usize>,
+    /// 最早记忆时间
+    pub earliest_timestamp: Option<DateTime<Utc>>,
+    /// 最新记忆时间
+    pub latest_timestamp: Option<DateTime<Utc>>,
+}
+
 /// 记忆条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryEntry {
@@ -54,6 +100,14 @@ pub struct MemoryEntry {
     pub entry_type: EntryType,
     /// 内容
     pub content: String,
+    /// 重要性级别（默认为 Normal，向后兼容）
+    #[serde(default = "default_importance")]
+    pub importance: Importance,
+}
+
+/// 默认重要性级别为 Normal（用于 serde 反序列化）
+fn default_importance() -> Importance {
+    Importance::Normal
 }
 
 impl MemoryEntry {
@@ -63,20 +117,63 @@ impl MemoryEntry {
             timestamp: Utc::now(),
             entry_type,
             content,
+            importance: Importance::Normal,
         }
     }
 
-    /// 格式化输出
+    /// 创建带重要性级别的记忆条目
+    pub fn new_with_importance(
+        content: String,
+        entry_type: EntryType,
+        importance: Importance,
+    ) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            entry_type,
+            content,
+            importance,
+        }
+    }
+
+    /// 相对时间展示
+    ///
+    /// 将时间戳转换为相对时间字符串（如"刚刚"、"5分钟前"等）
+    fn relative_time(&self) -> String {
+        let now = Utc::now();
+        let duration = now.signed_duration_since(self.timestamp);
+
+        if duration.num_seconds() < 60 {
+            "刚刚".to_string()
+        } else if duration.num_minutes() < 60 {
+            format!("{}分钟前", duration.num_minutes())
+        } else if duration.num_hours() < 24 {
+            format!("{}小时前", duration.num_hours())
+        } else if duration.num_days() < 7 {
+            format!("{}天前", duration.num_days())
+        } else {
+            // 超过7天显示具体日期
+            self.timestamp.format("%m-%d %H:%M").to_string()
+        }
+    }
+
+    /// 格式化输出（使用相对时间）
     pub fn format(&self) -> String {
+        let importance_mark = self.importance.symbol();
+        let mark = if importance_mark.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", importance_mark)
+        };
         format!(
-            "[{}] {}: {}",
-            self.timestamp.format("%H:%M:%S"),
+            "[{}] {}:{} {}",
+            self.relative_time(),
             self.entry_type,
+            mark,
             self.content
         )
     }
 
-    /// 简短预览（前80个字符）
+    /// 简短预览（前80个字符，使用相对时间）
     ///
     /// **注意**：使用 chars() 按字符数截断，而不是字节数，以避免 UTF-8 边界问题
     pub fn preview(&self) -> String {
@@ -86,10 +183,17 @@ impl MemoryEntry {
         } else {
             self.content.clone()
         };
+        let importance_mark = self.importance.symbol();
+        let mark = if importance_mark.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", importance_mark)
+        };
         format!(
-            "[{}] {}: {}",
-            self.timestamp.format("%H:%M:%S"),
+            "[{}] {}:{} {}",
+            self.relative_time(),
             self.entry_type,
+            mark,
             content
         )
     }
@@ -208,6 +312,60 @@ impl Memory {
             .iter()
             .filter(|entry| entry.entry_type == entry_type)
             .collect()
+    }
+
+    /// 按重要性过滤记忆
+    pub fn filter_by_importance(&self, importance: Importance) -> Vec<&MemoryEntry> {
+        self.entries
+            .iter()
+            .filter(|entry| entry.importance == importance)
+            .collect()
+    }
+
+    /// 标记记忆的重要性（通过索引，从最新的开始计数）
+    ///
+    /// # 参数
+    /// - `index`: 记忆索引（0 为最新的记忆）
+    /// - `importance`: 重要性级别
+    ///
+    /// # 返回
+    /// - `Ok(())`: 标记成功
+    /// - `Err(String)`: 标记失败
+    pub fn mark_importance(&mut self, index: usize, importance: Importance) -> Result<(), String> {
+        let len = self.entries.len();
+        if index >= len {
+            return Err(format!("索引 {} 超出范围（总共 {} 条记忆）", index, len));
+        }
+
+        // 从后往前数（index 0 是最新的）
+        let actual_index = len - 1 - index;
+        if let Some(entry) = self.entries.get_mut(actual_index) {
+            entry.importance = importance;
+            Ok(())
+        } else {
+            Err("无法找到指定的记忆条目".to_string())
+        }
+    }
+
+    /// 获取记忆统计信息
+    pub fn stats(&self) -> MemoryStats {
+        let mut type_distribution = HashMap::new();
+
+        // 统计各类型数量
+        for entry in &self.entries {
+            *type_distribution.entry(entry.entry_type).or_insert(0) += 1;
+        }
+
+        // 获取最早和最新的时间戳
+        let earliest_timestamp = self.entries.front().map(|e| e.timestamp);
+        let latest_timestamp = self.entries.back().map(|e| e.timestamp);
+
+        MemoryStats {
+            total_entries: self.entries.len(),
+            type_distribution,
+            earliest_timestamp,
+            latest_timestamp,
+        }
     }
 
     // ========== 持久化功能 ==========

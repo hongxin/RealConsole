@@ -13,9 +13,13 @@
 
 mod deepseek;
 pub mod http_base;
+pub mod logger;
 mod ollama;
 
 pub use deepseek::DeepseekClient;
+pub use logger::{
+    CallContext, LlmInteractionLog, LlmLogger, LlmLoggerConfig, LogStatistics, TokenUsage,
+};
 pub use ollama::OllamaClient;
 
 use async_trait::async_trait;

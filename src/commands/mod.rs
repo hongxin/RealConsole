@@ -3,6 +3,7 @@ pub mod core;
 pub mod git_cmd; // ✨ Phase 6: Git 智能助手命令
 pub mod history_cmd; // ✨ Phase 8: 命令历史记录命令
 pub mod llm;
+pub mod llm_log; // ✨ LLM 交互日志命令
 pub mod log;
 pub mod logfile_cmd; // ✨ Phase 6: 日志文件分析命令
 pub mod memory;
@@ -17,6 +18,7 @@ pub use core::register_core_commands;
 pub use git_cmd::register_git_commands;
 pub use history_cmd::register_history_commands;
 pub use llm::register_llm_commands;
+pub use llm_log::register_llm_log_commands;
 pub use log::register_log_commands;
 pub use logfile_cmd::register_log_analysis_commands;
 pub use memory::register_memory_commands;

@@ -39,6 +39,7 @@ mod task; // ✨ Phase 10: 任务分解与规划系统
 mod tool;
 mod tool_cache; // ✨ Phase 5.3 Week 3 Day 2
 mod tool_executor;
+mod voice; // ✨ 语音播报系统
 mod wizard;
 
 use clap::{Parser, Subcommand};
@@ -444,6 +445,10 @@ async fn main() {
 
     // 注册执行日志命令（使用预先获取的 exec_logger 引用）
     commands::register_log_commands(&mut agent.registry, exec_logger);
+
+    // 注册 LLM 交互日志命令
+    let llm_logger = agent.llm_logger();
+    commands::register_llm_log_commands(&mut agent.registry, llm_logger);
 
     // 注册工具管理命令（需要访问 agent 的 tool_registry）
     let tool_registry = agent.tool_registry();

@@ -10,7 +10,7 @@ pub mod memory_core;
 // 导出 memory_core 的所有公共类型
 #[allow(unused_imports)]
 pub use memory_core::MemoryEntry;
-pub use memory_core::{EntryType, Memory};
+pub use memory_core::{EntryType, Importance, Memory, MemoryStats};
 
 // 导出 context_tracker 的公共类型
 #[allow(unused_imports)]

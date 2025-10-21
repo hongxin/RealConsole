@@ -45,6 +45,7 @@ pub mod task; // ✨ Phase 10: 任务分解与规划系统
 pub mod tool;
 pub mod tool_cache; // ✨ Week 3 Day 2: 工具缓存系统
 pub mod tool_executor;
+pub mod voice; // ✨ 语音播报系统
 pub mod wizard;
 
 // Re-export commonly used types

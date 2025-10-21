@@ -45,6 +45,10 @@ pub struct Config {
     /// 对话上下文配置
     #[serde(default)]
     pub conversation: ConversationConfig,
+
+    /// 语音播报配置
+    #[serde(default)]
+    pub voice: VoiceConfig,
 }
 
 fn default_prefix() -> String {
@@ -55,6 +59,10 @@ fn default_prefix() -> String {
 pub struct LlmConfig {
     pub primary: Option<LlmProvider>,
     pub fallback: Option<LlmProvider>,
+
+    /// LLM 交互日志配置
+    #[serde(default)]
+    pub logging: LlmLoggingConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +71,49 @@ pub struct LlmProvider {
     pub model: Option<String>,
     pub endpoint: Option<String>,
     pub api_key: Option<String>,
+}
+
+/// LLM 交互日志配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmLoggingConfig {
+    /// 是否启用日志（默认 false）
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// 日志目录（默认 ~/.realconsole/llm_logs）
+    pub log_dir: Option<String>,
+
+    /// 是否记录完整内容（默认 true）
+    #[serde(default = "default_true")]
+    pub include_content: bool,
+
+    /// 日志保留天数（默认 30）
+    #[serde(default = "default_retention_days")]
+    pub retention_days: u32,
+
+    /// 最大日志大小 MB（默认 100）
+    #[serde(default = "default_max_size_mb")]
+    pub max_size_mb: u32,
+}
+
+fn default_retention_days() -> u32 {
+    30
+}
+
+fn default_max_size_mb() -> u32 {
+    100
+}
+
+impl Default for LlmLoggingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            log_dir: None,
+            include_content: true,
+            retention_days: 30,
+            max_size_mb: 100,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -347,6 +398,36 @@ impl Default for ContextIncludeConfig {
     }
 }
 
+/// 语音播报配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceConfig {
+    /// 是否启用语音播报（默认 false）
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+
+    /// 语音名称（可选，使用系统默认）
+    /// macOS: Ting-Ting (中文), Samantha (英文)
+    pub voice: Option<String>,
+
+    /// 最大队列长度（默认 10）
+    #[serde(default = "default_max_queue_size")]
+    pub max_queue_size: usize,
+}
+
+fn default_max_queue_size() -> usize {
+    10
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            voice: None,
+            max_queue_size: 10,
+        }
+    }
+}
+
 impl Default for FeaturesConfig {
     fn default() -> Self {
         Self {
@@ -372,6 +453,7 @@ impl Default for Config {
             intent: IntentConfig::default(),
             display: DisplayConfig::default(),
             conversation: ConversationConfig::default(),
+            voice: VoiceConfig::default(),
         }
     }
 }

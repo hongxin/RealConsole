@@ -54,6 +54,9 @@ use crate::services::{
     IntentRequest, IntentService, LlmRequest, LlmService, Service, ShellService, StateManager,
 };
 
+// ✨ 语音播报系统
+use crate::voice::{BroadcastConfig, VoiceBroadcaster};
+
 /// Agent 核心
 ///
 /// ✨ Phase 2 (v1.3.0): 服务层架构重构
@@ -113,6 +116,10 @@ pub struct Agent {
     // ✨ Phase 8 (Workflow): Workflow Intent 系统
     pub workflow_intents: Vec<WorkflowIntent>,
     pub workflow_executor: Option<Arc<WorkflowExecutor>>,
+    // ✨ LLM 交互日志系统
+    llm_logger: Option<Arc<crate::llm::LlmLogger>>,
+    // ✨ 语音播报系统
+    pub voice_broadcaster: Option<Arc<VoiceBroadcaster>>,
 }
 
 impl Agent {
@@ -308,6 +315,12 @@ impl Agent {
 
             let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
 
+            // ✨ 初始化 LLM 日志系统
+            let llm_logger = Self::create_llm_logger(&config);
+
+            // ✨ 初始化语音播报系统
+            let voice_broadcaster = Self::create_voice_broadcaster(&config);
+
             return Self {
                 // 核心配置
                 config,
@@ -336,6 +349,8 @@ impl Agent {
                 command_router,
                 workflow_intents: workflow_intents.clone(),
                 workflow_executor: workflow_executor.clone(),
+                llm_logger,
+                voice_broadcaster,
             };
         }
 
@@ -377,6 +392,12 @@ impl Agent {
 
         let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
 
+        // ✨ 初始化 LLM 日志系统
+        let llm_logger = Self::create_llm_logger(&config);
+
+        // ✨ 初始化语音播报系统
+        let voice_broadcaster = Self::create_voice_broadcaster(&config);
+
         Self {
             // 核心配置
             config,
@@ -405,12 +426,76 @@ impl Agent {
             command_router,
             workflow_intents,
             workflow_executor,
+            llm_logger,
+            voice_broadcaster,
         }
+    }
+
+    /// 创建 LLM 日志记录器
+    fn create_llm_logger(config: &Config) -> Option<Arc<crate::llm::LlmLogger>> {
+        use crate::llm::{LlmLogger, LlmLoggerConfig};
+        use std::path::PathBuf;
+
+        if !config.llm.logging.enabled {
+            return None;
+        }
+
+        // 构建 logger 配置
+        let log_dir = if let Some(ref dir) = config.llm.logging.log_dir {
+            PathBuf::from(Self::normalize_path(dir))
+        } else {
+            // 使用默认目录
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home)
+                .join(".realconsole")
+                .join("llm_logs")
+        };
+
+        let logger_config = LlmLoggerConfig {
+            enabled: true,
+            log_dir,
+            include_content: config.llm.logging.include_content,
+            sensitive_patterns: vec![], // TODO: 从配置中读取
+            retention_days: config.llm.logging.retention_days,
+            max_size_mb: config.llm.logging.max_size_mb,
+        };
+
+        Some(Arc::new(LlmLogger::new(logger_config)))
+    }
+
+    /// 创建语音播报器
+    fn create_voice_broadcaster(config: &Config) -> Option<Arc<VoiceBroadcaster>> {
+        if !config.voice.enabled {
+            return None;
+        }
+
+        // 检查平台支持
+        if !VoiceBroadcaster::is_platform_supported() {
+            eprintln!("⚠ 当前平台不支持语音播报功能");
+            return None;
+        }
+
+        let broadcast_config = BroadcastConfig {
+            enabled: config.voice.enabled,
+            voice: config.voice.voice.clone(),
+            max_queue_size: config.voice.max_queue_size,
+        };
+
+        Some(Arc::new(VoiceBroadcaster::new(broadcast_config)))
     }
 
     /// 获取 LLM 管理器的引用
     pub fn llm_manager(&self) -> Arc<RwLock<LlmManager>> {
         Arc::clone(&self.llm_manager)
+    }
+
+    /// 获取 LLM 日志记录器的引用
+    ///
+    /// # 返回
+    /// - `Some(logger)`: 如果日志功能已启用
+    /// - `None`: 如果日志功能未启用
+    pub fn llm_logger(&self) -> Option<Arc<crate::llm::LlmLogger>> {
+        self.llm_logger.as_ref().map(Arc::clone)
     }
 
     /// 获取记忆系统的引用
@@ -1060,6 +1145,15 @@ impl Agent {
         // ✨ Phase 3: 集成对话上下文支持（与 handle_text_streaming 对齐）
         // ✨ Phase 2.2 (v1.3.0): 使用 LlmService 处理
 
+        // 🔍 LLM Logger: 初始化日志记录
+        let (logger_opt, session_id_opt, start_time) = if let Some(ref logger) = self.llm_logger {
+            let (session_id, start) = logger.start_logging("tools");
+            (Some(logger.clone()), Some(session_id), start)
+        } else {
+            use std::time::Instant;
+            (None, None, Instant::now())
+        };
+
         // ✨ Phase 3: 检查是否应该使用上下文
         let (should_use_context, messages) = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
@@ -1096,6 +1190,11 @@ impl Agent {
         use crate::spinner::simplify_model_name;
         let spinner = Spinner::with_label(&simplify_model_name(&model_name));
 
+        // 🔍 LLM Logger: 保存消息副本用于日志
+        let messages_for_log = messages.as_ref().map(|msgs| msgs.clone()).unwrap_or_else(|| {
+            vec![crate::llm::Message::user(text)]
+        });
+
         // 创建 LLM 请求（带上下文支持）
         let request = if let Some(msgs) = messages {
             LlmRequest::with_tools_and_context(msgs)
@@ -1115,6 +1214,8 @@ impl Agent {
                 spinner.stop();
 
                 let response = llm_response.text;
+                // Clone for logging before response is moved
+                let full_response_clone = response.clone();
 
                 // ✨ 解析并显示对话轮次调试信息（成功时，仅当配置启用且为 debug 模式）
                 if self.config.display.show_conversation_rounds
@@ -1168,6 +1269,61 @@ impl Agent {
                     });
                 }
 
+                // 🔍 LLM Logger: 记录成功的交互
+                if let (Some(logger), Some(session_id)) = (logger_opt.clone(), session_id_opt.clone()) {
+                    let response_clone = clean_response.clone();
+                    // full_response_clone already created above
+                    let messages_clone = messages_for_log.clone();
+                    let model_name_clone = model_name.clone();
+                    let text_clone = text.to_string();
+                    tokio::spawn(async move {
+                        // 从调试信息中提取工具调用
+                        let (tools_used, tool_results_summary) =
+                            if let Some(rounds) = crate::tool_executor::ToolExecutor::decode_debug_info(&full_response_clone) {
+                                let mut tools = Vec::new();
+                                let mut results = Vec::new();
+
+                                for round in rounds {
+                                    for tool_call in &round.tool_calls {
+                                        if !tools.contains(&tool_call.name) {
+                                            tools.push(tool_call.name.clone());
+                                        }
+                                    }
+                                    results.extend(round.tool_results.clone());
+                                }
+
+                                let summary = if !results.is_empty() {
+                                    Some(format!("{} 个工具调用，{} 次执行", tools.len(), results.len()))
+                                } else {
+                                    None
+                                };
+
+                                (tools, summary)
+                            } else {
+                                (vec![], None)
+                            };
+
+                        // 构建上下文信息
+                        let context = Some(crate::llm::CallContext {
+                            user_input: Some(text_clone),
+                            intent: None, // TODO: 添加 Intent 识别结果
+                            tools_used,
+                            tool_results_summary,
+                        });
+
+                        logger.log_interaction(
+                            session_id,
+                            model_name_clone,
+                            &messages_clone,
+                            Some(response_clone),
+                            start_time,
+                            false, // is_streaming
+                            None,  // no error
+                            context,
+                        ).await;
+                    });
+                }
+
                 clean_response
             }
             Err(e) => {
@@ -1208,6 +1364,61 @@ impl Agent {
                     &error_msg
                 };
 
+                // 🔍 LLM Logger: 记录失败的交互
+                if let (Some(logger), Some(session_id)) = (logger_opt, session_id_opt) {
+                    let error_clone = error_text.to_string();
+                    let error_msg_full = error_msg.clone();
+                    let messages_clone = messages_for_log.clone();
+                    let model_name_clone = model_name.clone();
+                    let text_clone = text.to_string();
+                    tokio::spawn(async move {
+                        // 从调试信息中提取工具调用（即使失败也可能有部分工具调用）
+                        let (tools_used, tool_results_summary) =
+                            if let Some(rounds) = crate::tool_executor::ToolExecutor::decode_debug_info(&error_msg_full) {
+                                let mut tools = Vec::new();
+                                let mut _results_count = 0;
+
+                                for round in rounds {
+                                    for tool_call in &round.tool_calls {
+                                        if !tools.contains(&tool_call.name) {
+                                            tools.push(tool_call.name.clone());
+                                        }
+                                    }
+                                    _results_count += round.tool_results.len();
+                                }
+
+                                let summary = if !tools.is_empty() {
+                                    Some(format!("{} 个工具调用（部分失败）", tools.len()))
+                                } else {
+                                    None
+                                };
+
+                                (tools, summary)
+                            } else {
+                                (vec![], None)
+                            };
+
+                        // 构建上下文信息
+                        let context = Some(crate::llm::CallContext {
+                            user_input: Some(text_clone),
+                            intent: None,
+                            tools_used,
+                            tool_results_summary,
+                        });
+
+                        logger.log_interaction(
+                            session_id,
+                            model_name_clone,
+                            &messages_clone,
+                            None, // no response
+                            start_time,
+                            false, // is_streaming
+                            Some(error_clone),
+                            context,
+                        ).await;
+                    });
+                }
+
                 // 解析上下文长度错误
                 if let Some((requested, limit)) = parse_context_length_error(error_text) {
                     Display::context_overflow_error(self.config.display.mode, requested, limit);
@@ -1237,6 +1448,14 @@ impl Agent {
 
         // 开始计时
         let start = Instant::now();
+
+        // ✨ LLM 日志: 开始记录（如果启用）
+        let (logger_opt, session_id_opt) = if let Some(ref logger) = self.llm_logger {
+            let (session_id, _) = logger.start_logging("streaming");
+            (Some(logger), Some(session_id))
+        } else {
+            (None, None)
+        };
 
         // 检查是否应该使用上下文
         let (should_use_context, messages) = tokio::task::block_in_place(|| {
@@ -1292,6 +1511,41 @@ impl Agent {
                 // 停止 spinner
                 spinner.stop();
 
+                // ✨ LLM 日志: 记录成功的交互
+                if let (Some(logger), Some(session_id)) = (logger_opt, session_id_opt) {
+                    let logger_clone = Arc::clone(logger);
+                    let session_id_clone = session_id.clone();
+                    let model_name_clone = model_name.clone();
+                    let messages_clone = messages.clone();
+                    let response_clone = response.clone();
+                    let start_clone = start;
+                    let text_clone = text.to_string();
+
+                    // 异步记录日志，不阻塞主流程
+                    tokio::spawn(async move {
+                        // 构建上下文信息
+                        let context = Some(crate::llm::CallContext {
+                            user_input: Some(text_clone),
+                            intent: None,
+                            tools_used: vec![],
+                            tool_results_summary: None,
+                        });
+
+                        logger_clone
+                            .log_interaction(
+                                session_id_clone,
+                                model_name_clone,
+                                &messages_clone,
+                                Some(response_clone),
+                                start_clone,
+                                true, // is_streaming
+                                None, // no error
+                                context,
+                            )
+                            .await;
+                    });
+                }
+
                 // ✨ Phase 3: 添加轮次到 ContextManager
                 if should_use_context {
                     tokio::task::block_in_place(|| {
@@ -1318,6 +1572,41 @@ impl Agent {
             Err(e) => {
                 // 停止 spinner
                 spinner.stop();
+
+                // ✨ LLM 日志: 记录失败的交互
+                if let (Some(logger), Some(session_id)) = (logger_opt, session_id_opt) {
+                    let logger_clone = Arc::clone(logger);
+                    let session_id_clone = session_id.clone();
+                    let model_name_clone = model_name.clone();
+                    let messages_clone = messages.clone();
+                    let error_msg = e.to_string();
+                    let start_clone = start;
+                    let text_clone = text.to_string();
+
+                    // 异步记录错误日志
+                    tokio::spawn(async move {
+                        // 构建上下文信息
+                        let context = Some(crate::llm::CallContext {
+                            user_input: Some(text_clone),
+                            intent: None,
+                            tools_used: vec![],
+                            tool_results_summary: None,
+                        });
+
+                        logger_clone
+                            .log_interaction(
+                                session_id_clone,
+                                model_name_clone,
+                                &messages_clone,
+                                None,                  // no response
+                                start_clone,
+                                true,                  // is_streaming
+                                Some(error_msg),       // error
+                                context,
+                            )
+                            .await;
+                    });
+                }
 
                 // LLM 调用失败，显示友好的错误信息
                 format!(
