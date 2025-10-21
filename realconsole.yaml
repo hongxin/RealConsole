@@ -102,6 +102,15 @@ conversation:
     shell_output: false
     errors: true
 
+# 语音播报配置 (v1.3.7+)
+voice:
+  enabled: true                    # 是否启用语音播报（默认 false）
+  # voice: "Ting-Ting"             # 语音名称（可选，macOS 中文语音）
+  max_queue_size: 10               # 播报队列最大长度（默认 10）
+  auto_broadcast: true             # 自动播报 LLM 响应（默认 true）
+  max_broadcast_length: 200        # 最大播报长度/字符（默认 200）
+  filter_code_blocks: true         # 过滤代码块（默认 true）
+
 # ============================================================================
 # 配置说明
 # ============================================================================

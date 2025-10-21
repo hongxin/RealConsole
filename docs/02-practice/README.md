@@ -12,39 +12,46 @@
 
 面向最终用户的使用指南：
 
-- [quickstart.md](user/quickstart.md) - 5分钟快速上手
-- [user-guide.md](user/user-guide.md) - 完整用户手册
-- [tool-calling-guide.md](user/tool-calling-guide.md) - 工具调用完整指南
-- [intent-dsl-guide.md](user/intent-dsl-guide.md) - Intent DSL使用说明
-- [llm-setup.md](user/llm-setup.md) - LLM配置指南
-- [env-config.md](user/env-config.md) - 环境变量配置
+**快速开始**:
+- **[quickstart.md](user/quickstart.md)** - 5分钟快速上手
+- **[user-guide.md](user/user-guide.md)** - 完整用户手册
+
+**核心功能**:
+- **[tool-calling-guide.md](user/tool-calling-guide.md)** - 工具调用完整指南
+- **[intent-dsl-guide.md](user/intent-dsl-guide.md)** - Intent DSL使用说明
+- **[conversation-guide.md](user/conversation-guide.md)** - 多轮对话指南
+- **[history-feature-guide.md](user/history-feature-guide.md)** - 命令历史功能
+
+**高级特性**:
+- **[context-mode-best-practices.md](user/context-mode-best-practices.md)** - 上下文模式最佳实践
+- **[workflow-migration-guide.md](user/workflow-migration-guide.md)** - Workflow Intent 迁移指南（实验性）
+
+**配置管理**:
+- **[llm-setup.md](user/llm-setup.md)** - LLM配置指南
+- **[env-config.md](user/env-config.md)** - 环境变量配置
 
 ### 💻 [developer/](developer/) - 开发者实践
 
 面向扩展开发的指南：
 
-- [developer-guide.md](developer/developer-guide.md) - 开发者完整指南
-- [tool-development.md](developer/tool-development.md) - 创建自定义工具
-- [api-reference.md](developer/api-reference.md) - API参考文档
+- **[developer-guide.md](developer/developer-guide.md)** - 开发者完整指南
+- **[tool-development.md](developer/tool-development.md)** - 创建自定义工具
+- **[api-reference.md](developer/api-reference.md)** - API参考文档
+- **[project-structure.md](developer/project-structure.md)** - 项目结构说明
+- **[services-guide.md](developer/services-guide.md)** - 服务层架构指南
+- **[i18n-guide.md](developer/i18n-guide.md)** - 国际化开发指南
 
 ### 📦 [use-cases/](use-cases/) - 使用场景
 
-从基础到专家的实际使用场景：
+实际使用场景和案例：
 
-- [basic-10-cases.md](use-cases/basic-10-cases.md) - 10个基础场景
-- [basic-20-cases.md](use-cases/basic-20-cases.md) - 20个基础场景
-- [advanced-30-cases.md](use-cases/advanced-30-cases.md) - 30个进阶场景
-- [expert-50-cases.md](use-cases/expert-50-cases.md) - 50个专家场景
-- [selected-cases.md](use-cases/selected-cases.md) - 精选典型案例
-
-### 🎨 [examples/](examples/) - 示例代码
-
-实际可运行的示例代码
+- **[selected-cases.md](use-cases/selected-cases.md)** - 精选典型案例
+- **[README.md](use-cases/README.md)** - 场景索引
 
 ## 🎯 推荐路径
 
-**新用户**: quickstart.md → user-guide.md → basic-cases
-**进阶用户**: tool-calling-guide.md → intent-dsl-guide.md → advanced-cases
+**新用户**: quickstart.md → user-guide.md → tool-calling-guide.md
+**进阶用户**: context-mode-best-practices.md → intent-dsl-guide.md
 **开发者**: developer-guide.md → tool-development.md → api-reference.md
 
 ---

@@ -461,6 +461,10 @@ async fn main() {
     let conversation_context = agent.state_manager().conversation_context();
     commands::register_context_commands(&mut agent.registry, conversation_context);
 
+    // ✨ 注册语音播报命令
+    let voice_broadcaster = agent.voice_broadcaster.clone();
+    commands::register_voice_commands(&mut agent.registry, voice_broadcaster);
+
     // ✨ Phase 10: 注册任务分解与规划命令
     let llm_mgr_for_task = agent.llm_manager();
     let shell_exec_for_task = agent.shell_executor_with_fixer.clone();

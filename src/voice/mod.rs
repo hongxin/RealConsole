@@ -11,6 +11,8 @@
 
 pub mod voice_broadcaster;
 pub mod platform;
+pub mod filter;
 
 pub use voice_broadcaster::{VoiceBroadcaster, BroadcastConfig};
 pub use platform::PlatformVoice;
+pub use filter::{filter_for_voice, FilterConfig};

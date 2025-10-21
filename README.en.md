@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-654%2B%20passed-green.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-78%2B%25-yellow.svg)](docs/test_reports/)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.7-blue.svg)](CHANGELOG.md)
 
 ## ⚠️ Disclaimer
 
@@ -565,7 +565,7 @@ realconsole/
 - **Security Protection** - Blacklist + timeout + output limits
 - **Multi-Layer Fallback** - LLM generation → rule matching → template → conversation
 
-**Detailed Documentation**: [Architecture Overview](docs/01-understanding/overview.md) | [Design Documents](docs/01-understanding/design/)
+**Detailed Documentation**: [System Architecture](docs/01-understanding/design/architecture.md) | [Design Documents](docs/01-understanding/design/)
 
 ## 🔐 Security Features
 
@@ -574,7 +574,7 @@ realconsole/
 - **Output Limits** - Maximum 100KB to prevent resource exhaustion
 - **API Key Security** - Environment variable storage, `.env` not committed to version control
 
-**Detailed Documentation**: [Shell Safe Execution](docs/03-evolution/features/shell-execution.md)
+**Detailed Documentation**: [Security Design](docs/01-understanding/design/security.md)
 
 ## 📊 Project Highlights
 
@@ -615,7 +615,7 @@ realconsole/
 
 - **User Guides**: [LLM Configuration](docs/02-practice/user/llm-setup.md) · [Tool Calling](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md) · [Workflow Migration](docs/02-practice/user/workflow-migration-guide.md)
 - **Developer Docs**: [API Reference](docs/02-practice/developer/api-reference.md) · [Tool Development](docs/02-practice/developer/tool-development.md) · [Project Structure](docs/02-practice/developer/project-structure.md)
-- **Features**: [Task Orchestration](examples/task_system_usage.md) · [Git Assistant](docs/03-evolution/features/git-assistant.md) · [Log Analysis](docs/03-evolution/features/log-analyzer.md)
+- **Evolution**: [Version History](docs/03-evolution/version-history.md) · [Evolution Stories](docs/03-evolution/archives/) · [Development Reports](docs/03-evolution/README.md)
 
 ## 🚧 Planned Features
 

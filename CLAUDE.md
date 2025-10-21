@@ -47,12 +47,11 @@
 - 主配置 `realconsole.yaml`，环境变量 `.env`（不提交）
 - 测试覆盖报告放到 `coverage/` 目录
 
-**文档组织**（五态架构）：
+**文档组织**（四态体系）：
 - 00-core：核心理念（philosophy/vision/roadmap）
 - 01-understanding：设计分析
 - 02-practice：用户/开发者指南
 - 03-evolution：开发历程
-- 04-reports：协同报告
 
 **国际化**：
 - 中文优先，英文同步
@@ -111,4 +110,4 @@ make uninstall                # 或 ./uninstall.sh
 
 ---
 
-**最后更新**: 2025-10-17 | **许可**: MIT | **维护**: RealConsole Contributors
+**最后更新**: 2025-10-22 | **许可**: MIT | **维护**: RealConsole Contributors

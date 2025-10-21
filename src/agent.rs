@@ -498,6 +498,43 @@ impl Agent {
         self.llm_logger.as_ref().map(Arc::clone)
     }
 
+    /// 尝试播报响应内容
+    ///
+    /// 根据配置自动播报 LLM 响应，会进行内容过滤和截断
+    async fn try_broadcast_response(&self, response: &str) {
+        // 检查是否启用语音播报
+        let Some(ref broadcaster) = self.voice_broadcaster else {
+            return;
+        };
+
+        // 检查是否启用自动播报
+        if !self.config.voice.auto_broadcast {
+            return;
+        }
+
+        // 检查播报器是否启用
+        if !broadcaster.is_enabled().await {
+            return;
+        }
+
+        // 过滤和处理内容
+        use crate::voice::{filter_for_voice, FilterConfig};
+
+        let filter_config = FilterConfig {
+            filter_code_blocks: self.config.voice.filter_code_blocks,
+            max_length: self.config.voice.max_broadcast_length,
+        };
+
+        // 过滤内容
+        let filtered = match filter_for_voice(response, &filter_config) {
+            Some(text) => text,
+            None => return, // 过滤后为空，不播报
+        };
+
+        // 异步播报（不等待完成）
+        let _ = broadcaster.speak(filtered).await;
+    }
+
     /// 获取记忆系统的引用
     ///
     /// ⚠️ **已废弃**: 请使用 `state_manager().memory()` 代替
@@ -722,6 +759,11 @@ impl Agent {
                                 duration,
                             })
                             .await;
+                    }
+
+                    // ✨ 语音播报：自动播报 LLM 响应
+                    if command_type == CommandType::Text {
+                        self.try_broadcast_response(&response).await;
                     }
 
                     // 记录到记忆

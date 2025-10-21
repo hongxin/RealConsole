@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-703%2B%20passed-green.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-78%2B%25-yellow.svg)](docs/test_reports/)
-[![Version](https://img.shields.io/badge/version-1.3.6-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.7-blue.svg)](CHANGELOG.md)
 
 ## ⚠️ 免责声明
 
@@ -665,7 +665,7 @@ realconsole/
 │   └── tool/               # 工具调用系统（14+ 内置工具）
 │
 ├── tests/                  # 🧪 测试（654+ 通过，覆盖率 78%+）
-├── docs/                   # 📚 文档（五态架构，226+ 归档文档）
+├── docs/                   # 📚 文档（四态体系：理念·理解·实践·演化）
 ├── config/                 # ⚙️ 配置样例
 └── examples/               # 💡 使用示例
 ```
@@ -695,7 +695,7 @@ realconsole/
 - **安全防护** - 黑名单 + 超时 + 输出限制
 - **多层 Fallback** - LLM 生成 → 规则匹配 → 模板 → 对话
 
-**详细文档**: [架构总览](docs/01-understanding/overview.md) | [设计文档集](docs/01-understanding/design/)
+**详细文档**: [系统架构](docs/01-understanding/design/architecture.md) | [设计文档集](docs/01-understanding/design/)
 
 ## 🔐 安全特性
 
@@ -704,7 +704,7 @@ realconsole/
 - **输出限制** - 最大 100KB 防止资源耗尽
 - **API Key 安全** - 环境变量存储，`.env` 不提交版本控制
 
-**详细文档**: [Shell 安全执行](docs/03-evolution/features/shell-execution.md)
+**详细文档**: [安全设计](docs/01-understanding/design/security.md)
 
 ## 📊 项目亮点
 
@@ -722,11 +722,11 @@ realconsole/
 - 🎨 新增任务编排 UI 显示函数
 - 🧪 优化测试环境性能
 
-**完整历史**: [CHANGELOG.md](docs/CHANGELOG.md)
+**完整历史**: [CHANGELOG.md](CHANGELOG.md)
 
 ## 📚 文档导航
 
-> **文档系统**: 基于"一分为三"哲学的五态架构（理念·理解·实践·演化·报告）
+> **文档系统**: 基于"一分为三"哲学的四态体系（00-core 理念·01-understanding 理解·02-practice 实践·03-evolution 演化）
 
 ### 快速入口
 
@@ -745,7 +745,7 @@ realconsole/
 
 - **用户指南**: [LLM 配置](docs/02-practice/user/llm-setup.md) · [工具调用](docs/02-practice/user/tool-calling-guide.md) · [Intent DSL](docs/02-practice/user/intent-dsl-guide.md) · [Workflow 迁移](docs/02-practice/user/workflow-migration-guide.md)
 - **开发文档**: [API 参考](docs/02-practice/developer/api-reference.md) · [工具开发](docs/02-practice/developer/tool-development.md) · [项目结构](docs/02-practice/developer/project-structure.md)
-- **功能特性**: [任务编排](examples/task_system_usage.md) · [Git 助手](docs/03-evolution/features/git-assistant.md) · [日志分析](docs/03-evolution/features/log-analyzer.md)
+- **演化历程**: [版本历史](docs/03-evolution/version-history.md) · [演化故事](docs/03-evolution/archives/) · [开发报告](docs/03-evolution/README.md)
 
 ## 🚧 计划功能
 

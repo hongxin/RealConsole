@@ -412,10 +412,29 @@ pub struct VoiceConfig {
     /// 最大队列长度（默认 10）
     #[serde(default = "default_max_queue_size")]
     pub max_queue_size: usize,
+
+    /// 是否自动播报 LLM 响应（默认 true）
+    /// 当 enabled=true 时，自动播报所有 LLM 的回复
+    #[serde(default = "default_true")]
+    pub auto_broadcast: bool,
+
+    /// 最大播报长度（字符数，默认 200）
+    /// 超过此长度会被截断并添加省略提示
+    #[serde(default = "default_max_broadcast_length")]
+    pub max_broadcast_length: usize,
+
+    /// 是否过滤代码块（默认 true）
+    /// 自动跳过 markdown 代码块内容
+    #[serde(default = "default_true")]
+    pub filter_code_blocks: bool,
 }
 
 fn default_max_queue_size() -> usize {
     10
+}
+
+fn default_max_broadcast_length() -> usize {
+    200
 }
 
 impl Default for VoiceConfig {
@@ -424,6 +443,9 @@ impl Default for VoiceConfig {
             enabled: false,
             voice: None,
             max_queue_size: 10,
+            auto_broadcast: true,
+            max_broadcast_length: 200,
+            filter_code_blocks: true,
         }
     }
 }

@@ -12,6 +12,7 @@ pub mod stats_cmd; // ✨ Phase 9: 统计与可视化命令
 pub mod system_cmd; // ✨ Phase 6: 系统监控命令
 pub mod task_cmd; // ✨ Phase 10: 任务分解与规划命令
 pub mod tool;
+pub mod voice_cmd; // ✨ 语音播报命令
 
 pub use context_cmd::register_context_commands;
 pub use core::register_core_commands;
@@ -27,3 +28,4 @@ pub use stats_cmd::register_stats_commands;
 pub use system_cmd::register_system_commands;
 pub use task_cmd::register_task_commands;
 pub use tool::register_tool_commands;
+pub use voice_cmd::register_voice_commands;
