@@ -12,6 +12,19 @@ use crate::llm::Message;
 use chrono::{DateTime, Utc};
 use std::collections::VecDeque;
 
+/// 轻量级上下文状态快照（用于 UI 显示，避免锁竞争）
+#[derive(Debug, Clone)]
+pub struct ContextSnapshot {
+    /// 是否处于活跃状态
+    pub is_active: bool,
+    /// 当前轮次数
+    pub turn_count: usize,
+    /// 空闲时间（秒）
+    pub idle_seconds: i64,
+    /// 是否即将超时
+    pub is_near_timeout: bool,
+}
+
 /// 对话上下文管理器
 #[derive(Debug)]
 pub struct ContextManager {
@@ -264,6 +277,18 @@ impl ContextManager {
     pub fn turns(&self) -> &VecDeque<Turn> {
         &self.turns
     }
+
+    /// 获取轻量级快照（无需异步，避免锁竞争）
+    ///
+    /// 用于 UI 显示等高频场景，避免频繁获取 RwLock
+    pub fn snapshot(&self) -> ContextSnapshot {
+        ContextSnapshot {
+            is_active: self.is_active,
+            turn_count: self.turns.len(),
+            idle_seconds: self.idle_seconds(),
+            is_near_timeout: self.is_near_timeout(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -469,5 +494,37 @@ mod tests {
 
         // 后续输入继续使用上下文
         assert!(manager.should_use_context("列出文件"));
+    }
+
+    #[test]
+    fn test_snapshot() {
+        let mut config = default_config();
+        config.mode = ContextMode::Manual;
+        let mut manager = ContextManager::new(config);
+
+        // 初始状态快照
+        let snapshot = manager.snapshot();
+        assert!(!snapshot.is_active);
+        assert_eq!(snapshot.turn_count, 0);
+
+        // 启动上下文
+        manager.start();
+
+        // 添加轮次
+        manager.add_turn(Turn::new("hello".to_string(), "hi".to_string()));
+        manager.add_turn(Turn::new("how are you".to_string(), "fine".to_string()));
+
+        // 获取快照
+        let snapshot = manager.snapshot();
+
+        // 验证快照数据
+        assert!(snapshot.is_active);
+        assert_eq!(snapshot.turn_count, 2);
+        assert!(snapshot.idle_seconds >= 0);
+        assert!(!snapshot.is_near_timeout);
+
+        // 快照应该是轻量级的，可以多次调用
+        let snapshot2 = manager.snapshot();
+        assert_eq!(snapshot2.turn_count, snapshot.turn_count);
     }
 }

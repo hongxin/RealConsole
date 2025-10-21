@@ -16,7 +16,7 @@ pub mod state;
 
 // 导出核心类型
 pub use context::ParameterSpec;
-pub use context_manager::ContextManager;
+pub use context_manager::{ContextManager, ContextSnapshot};
 pub use current::{
     clear_current_conversation, get_current_conversation, has_active_conversation,
     set_current_conversation,

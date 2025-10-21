@@ -82,7 +82,7 @@ conversation:
   # 保留最近 9 轮对话（适合短对话）
   max_turns: 9
   # 最大上下文长度 8K 字符（约 2K tokens）
-  max_context_length: 8000
+  max_context_length: 64000
   # 自动清除策略
   auto_clear:
     enabled: true

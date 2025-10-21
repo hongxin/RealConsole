@@ -8,9 +8,9 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-654%2B%20passed-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-703%2B%20passed-green.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-78%2B%25-yellow.svg)](docs/test_reports/)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](docs/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.6-blue.svg)](docs/CHANGELOG.md)
 
 ## ⚠️ 免责声明
 
@@ -34,6 +34,7 @@
 
 ### 🧠 智能 AI 能力
 - **LLM 驱动的智能对话** - 支持 Ollama/Deepseek，实时流式输出，自然语言交互
+- **多轮对话上下文** 🆕 - Auto/Manual/Disabled 三种模式，智能检测上下文依赖（20+ 触发词），工具调用全面支持（`/context`）
 - **任务编排系统** ⭐ NEW - LLM智能分解复杂目标，自动依赖分析和并行优化执行（`/plan`, `/execute`）
 - **智能 Pipeline 生成** - 自动理解用户意图，将自然语言转换为文件操作命令
 - **工具自动调用** - 14+ 内置工具（计算器、文件操作、时间查询等），智能并行执行
@@ -43,6 +44,11 @@
 
 **使用示例**:
 ```bash
+% 现在你叫小灵通
+好的，我现在是小灵通！
+% 那么你现在叫什么？
+我叫小灵通！                     # ← 自动记住上下文
+
 % 显示最大的3个rs文件
 🤖 LLM 生成
 → 执行: find . -name '*.rs' -type f -exec ls -lh {} + | sort -k5 -hr | head -n 3

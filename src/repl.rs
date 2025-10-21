@@ -155,50 +155,58 @@ fn build_prompt(agent: &Agent) -> String {
     )
 }
 
-/// ✨ Phase 对话上下文: 构建上下文状态指示器
+/// ✨ Phase 对话上下文: 构建上下文状态指示器（优化版 - 避免死锁）
 fn build_context_indicator(agent: &Agent) -> String {
     // 使用 block_in_place 来访问异步的 ContextManager
-    tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(async {
-            let ctx_arc = agent.state_manager().conversation_context();
-            let manager = ctx_arc.read().await;
+    // 但添加了 try_read 保护，避免在高负载时死锁
+    let snapshot_opt = tokio::task::block_in_place(|| {
+        let ctx_arc = agent.state_manager().conversation_context();
 
-            // 检查是否激活
-            if !manager.is_active() {
-                return String::new(); // 未激活，不显示
-            }
-
-            let turn_count = manager.turn_count();
-            if turn_count == 0 {
-                return String::new(); // 无轮次，不显示
-            }
-
-            // 检查空闲时间
-            let idle_seconds = manager.idle_seconds();
-            let is_near_timeout = manager.is_near_timeout();
-
-            // 构建指示器
-            if is_near_timeout {
-                // 即将超时：显示警告
-                let idle_minutes = idle_seconds / 60;
-                format!(
-                    " {}",
-                    format!("[上下文: {}轮 | {}分钟前]", turn_count, idle_minutes)
-                        .yellow()
-                )
-            } else if idle_seconds > 60 {
-                // 空闲超过 1 分钟：显示空闲时间
-                let idle_minutes = idle_seconds / 60;
-                format!(
-                    " {}",
-                    format!("[上下文: {}轮 | {}分钟前]", turn_count, idle_minutes).dimmed()
-                )
-            } else {
-                // 正常激活：只显示轮次
-                format!(" {}", format!("[上下文: {}轮]", turn_count).green())
+        tokio::runtime::Handle::current().block_on(async move {
+            // 使用 try_read 而不是 read().await
+            // 如果锁被占用（比如正在处理命令），直接返回 None
+            // 这样可以避免 REPL 循环被阻塞
+            match ctx_arc.try_read() {
+                Ok(manager) => Some(manager.snapshot()),
+                Err(_) => None,
             }
         })
-    })
+    });
+
+    // 如果无法获取锁，返回空字符串（安全降级）
+    // 下一次循环会重新尝试获取状态
+    let snapshot = match snapshot_opt {
+        Some(s) => s,
+        None => return String::new(),
+    };
+
+    // 检查是否激活
+    if !snapshot.is_active || snapshot.turn_count == 0 {
+        return String::new(); // 未激活或无轮次，不显示
+    }
+
+    // 构建指示器（使用快照数据）
+    let idle_minutes = snapshot.idle_seconds / 60;
+
+    if snapshot.is_near_timeout {
+        // 即将超时：显示警告
+        format!(
+            " {}",
+            format!("[上下文: {}轮 | {}分钟前]", snapshot.turn_count, idle_minutes).yellow()
+        )
+    } else if snapshot.idle_seconds > 60 {
+        // 空闲超过 1 分钟：显示空闲时间
+        format!(
+            " {}",
+            format!("[上下文: {}轮 | {}分钟前]", snapshot.turn_count, idle_minutes).dimmed()
+        )
+    } else {
+        // 正常激活：只显示轮次
+        format!(
+            " {}",
+            format!("[上下文: {}轮]", snapshot.turn_count).green()
+        )
+    }
 }
 
 /// 单次执行模式（--once）
