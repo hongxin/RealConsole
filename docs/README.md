@@ -16,8 +16,9 @@
 
 > "道/哲学层" - 指导整个项目的设计思想
 
-**中英双语文档**（6 个文档）:
+**中英双语文档**（7 个文档）:
 - **[philosophy.md](00-core/philosophy.md)** | [EN](00-core/philosophy.en.md) - 一分为三哲学思想
+- **[think.md](00-core/think.md)** - 深层思考：超越"一分为三" 🆕
 - **[vision.md](00-core/vision.md)** | [EN](00-core/vision.en.md) - 产品愿景和定位
 - **[roadmap.md](00-core/roadmap.md)** | [EN](00-core/roadmap.en.md) - 技术路线图
 
