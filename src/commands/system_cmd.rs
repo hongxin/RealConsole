@@ -291,7 +291,8 @@ fn handle_cpu(_arg: &str) -> String {
             ));
 
             output.push(format!(
-                "\n  💡 {}\n",
+                "\n  {} {}\n",
+                "[TIP]".cyan(),
                 "使用 /top 查看占用 CPU 最多的进程".dimmed()
             ));
 
@@ -392,7 +393,8 @@ fn handle_mem(_arg: &str) -> String {
             ));
 
             output.push(format!(
-                "\n  💡 {}\n",
+                "\n  {} {}\n",
+                "[TIP]".cyan(),
                 "使用 /top 查看占用内存最多的进程".dimmed()
             ));
 
@@ -522,7 +524,8 @@ fn handle_top(arg: &str) -> String {
             }
 
             output.push(format!(
-                "\n  💡 {}\n",
+                "\n  {} {}\n",
+                "[TIP]".cyan(),
                 "使用 /top [N] 查看前 N 个进程".dimmed()
             ));
 

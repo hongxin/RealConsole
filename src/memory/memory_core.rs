@@ -61,8 +61,8 @@ impl Importance {
     pub fn symbol(&self) -> &str {
         match self {
             Importance::Normal => "",
-            Importance::Important => "⭐",
-            Importance::Critical => "⭐⭐",
+            Importance::Important => "[*]",
+            Importance::Critical => "[**]",
         }
     }
 }

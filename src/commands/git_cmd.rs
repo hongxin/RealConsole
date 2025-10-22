@@ -302,7 +302,7 @@ fn handle_git_diff(arg: &str) -> String {
 
         // 提示
         output.push(String::new());
-        output.push(format!("  💡 {}", "使用 /ga 生成智能提交信息".dimmed()));
+        output.push(format!("  {} {}", "[TIP]".cyan(), "使用 /ga 生成智能提交信息".dimmed()));
     }
 
     output.push(String::new());
@@ -402,9 +402,10 @@ fn handle_git_analyze(_arg: &str) -> String {
 
     if status.staged_files == 0 {
         return format!(
-            "\n{} {}\n\n  💡 {}\n",
+            "\n{} {}\n\n  {} {}\n",
             "提示:".yellow(),
             "暂存区没有变更",
+            "[TIP]".cyan(),
             "使用 'git add' 命令暂存要提交的文件".dimmed()
         );
     }
@@ -512,7 +513,8 @@ fn handle_git_analyze(_arg: &str) -> String {
 
     output.push(String::new());
     output.push(format!(
-        "  💡 {}",
+        "  {} {}",
+        "[TIP]".cyan(),
         "未来版本将支持 LLM 自动生成详细提交信息".dimmed()
     ));
 

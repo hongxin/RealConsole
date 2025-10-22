@@ -62,6 +62,14 @@ features:
 #     shell_output: false
 #     errors: true
 
+# 显示配置
+display:
+  mode: minimal             # minimal（极简）、standard（标准）、debug（调试）
+  language: zh-CN           # 界面语言（zh-CN, en-US）
+  show_conversation_rounds: false  # debug 模式下是否显示对话轮次详情
+  use_emoji: false          # 是否使用 emoji（默认 false，推荐关闭避免终端兼容性问题）
+  use_colors: true          # 是否使用颜色（默认 true）
+
 # 语音播报（可选，v1.3.7+）
 # voice:
 #   enabled: false           # 是否启用

@@ -39,6 +39,7 @@ mod task; // ✨ Phase 10: 任务分解与规划系统
 mod tool;
 mod tool_cache; // ✨ Phase 5.3 Week 3 Day 2
 mod tool_executor;
+mod utils; // ✨ Phase 2: 软阈值工具（连续场重构）
 mod voice; // ✨ 语音播报系统
 mod wizard;
 

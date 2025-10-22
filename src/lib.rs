@@ -23,6 +23,7 @@ pub mod commands;
 pub mod config;
 pub mod conversation; // ✨ Phase 8 Week 2: 多轮对话支持
 pub mod display;
+pub mod display_helper; // 显示辅助工具（emoji/纯文本切换）
 pub mod dsl;
 pub mod error;
 pub mod error_fixer; // ✨ Phase 9.1 Week 2: 错误自动修复
@@ -45,6 +46,7 @@ pub mod task; // ✨ Phase 10: 任务分解与规划系统
 pub mod tool;
 pub mod tool_cache; // ✨ Week 3 Day 2: 工具缓存系统
 pub mod tool_executor;
+pub mod utils; // ✨ Phase 2: 软阈值工具（连续场重构）
 pub mod voice; // ✨ 语音播报系统
 pub mod wizard;
 

@@ -51,6 +51,7 @@ pub mod pipeline_bridge; // Phase 6.3: Intent → Pipeline Bridge
 pub mod template;
 pub mod types;
 pub mod validator; // Phase 3: LLM Command Validation
+pub mod vector; // ✨ Phase 3: 八卦向量决策系统（连续场重构）
 pub mod workflow; // ✨ Phase 8: Workflow Intent System (套路化复用)
 pub mod workflow_templates; // ✨ Phase 8: Builtin Workflow Templates
 
@@ -63,6 +64,7 @@ pub use pipeline_bridge::IntentToPipeline;
 pub use template::{ExecutionPlan, Template, TemplateEngine};
 pub use types::{EntityType, Intent, IntentDomain, IntentMatch};
 pub use validator::{CommandValidator, ValidationResult};
+pub use vector::{DecisionAction, DecisionWeights, IntentVector, TrigramState}; // ✨ Phase 3: 八卦向量
 pub use workflow::{
     ExecutionContext, WorkflowExecutor, WorkflowIntent, WorkflowResult, WorkflowStep,
 };

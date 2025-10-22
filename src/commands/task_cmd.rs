@@ -94,7 +94,7 @@ pub fn register_task_commands(
             "分解和规划任务",
             move |goal: &str| {
                 if goal.trim().is_empty() {
-                    return format!("{}\n使用方式: /plan <目标描述>", "❌ 请提供任务目标".red());
+                    return format!("{}\n使用方式: /plan <目标描述>", "[ERROR] 请提供任务目标".red());
                 }
 
                 let llm_manager = Arc::clone(&llm_manager);
@@ -189,7 +189,7 @@ async fn execute_plan_command(
             Some(llm) => llm.clone(),
             None => {
                 return format!(
-                    "❌ 未配置 LLM 客户端\n{}",
+                    "[ERROR] 未配置 LLM 客户端\n{}",
                     "提示: 需要 LLM 来智能分解任务".dimmed()
                 );
             }
@@ -209,7 +209,7 @@ async fn execute_plan_command(
         }
         Err(e) => {
             spinner.stop();
-            return format!("❌ 任务分解失败: {}", e);
+            return format!("[ERROR] 任务分解失败: {}", e);
         }
     };
 
@@ -218,7 +218,7 @@ async fn execute_plan_command(
     let plan = match planner.plan(goal, subtasks) {
         Ok(p) => p,
         Err(e) => {
-            return format!("❌ 计划生成失败: {}", e);
+            return format!("[ERROR] 计划生成失败: {}", e);
         }
     };
 
@@ -235,7 +235,7 @@ async fn execute_plan_command(
         analysis.total_stages,
         analysis.total_tasks,
         if analysis.parallel_stages > 0 {
-            "⚡ "
+            "[>] "
         } else {
             ""
         },
@@ -311,7 +311,7 @@ async fn execute_tasks_command(
         match mgr.get_current_plan() {
             Some(p) => p.clone(),
             None => {
-                return format!("❌ 无待执行计划\n{}", "提示: /plan <目标>".dimmed());
+                return format!("[ERROR] 无待执行计划\n{}", "提示: /plan <目标>".dimmed());
             }
         }
     };
@@ -323,7 +323,7 @@ async fn execute_tasks_command(
     let result = match executor.execute(plan.clone()).await {
         Ok(r) => r,
         Err(e) => {
-            return format!("❌ 执行失败: {}", e);
+            return format!("[ERROR] 执行失败: {}", e);
         }
     };
 

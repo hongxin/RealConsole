@@ -221,7 +221,7 @@ fn handle_project(_arg: &str) -> String {
         output.push(String::new());
         output.push(format!(
             "  {}",
-            "💡 提示：可以直接输入\"运行测试\"等自然语言".dimmed()
+            "[TIP] 提示：可以直接输入\"运行测试\"等自然语言".cyan().dimmed()
         ));
     }
 

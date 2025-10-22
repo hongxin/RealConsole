@@ -113,12 +113,12 @@ fn cmd_help_quick() -> String {
         "💬 智能对话:".bold(),
         "示例:".dimmed(),
         "示例:".dimmed(),
-        "🚀 智能命令路由:".bold(),
+        "[>>] 智能命令路由:".bold(),
         "ls".green(),
         "pwd".green(),
         "git status".green(),
         "!ls -la".green(),
-        "⚡ 快速命令:".bold(),
+        "[>] 快速命令:".bold(),
         "/help".green(),
         "/help all".green(),
         "/examples".green(),
@@ -311,7 +311,7 @@ fn cmd_help_log() -> String {
   • 日志容量默认1000条
   • 用于分析命令执行情况
 "#,
-        "📊 执行日志命令".bold(),
+        "[LOG] 执行日志命令".bold(),
         "/log recent".green(),
         "/log search".green(),
         "/log stats".green(),
@@ -324,7 +324,7 @@ fn cmd_help_shell() -> String {
     format!(
         r#"{}
 
-🚀 智能命令路由 (Phase 10.1):
+[>>] 智能命令路由 (Phase 10.1):
   RealConsole 现在支持智能识别常见命令，无需 ! 前缀
 
   ✓ 直接输入常见命令（80+ 支持）:
@@ -369,7 +369,7 @@ fn cmd_help_shell() -> String {
   • 危险命令会被拒绝并显示详细错误
   • 中文疑问句自动识别为自然语言
 "#,
-        "🔧 Shell 执行 & 智能路由".bold(),
+        "[SHELL] Shell 执行 & 智能路由".bold(),
         "ls".green(),
         "pwd".green(),
         "git status".green(),
@@ -461,7 +461,7 @@ fn cmd_examples(_arg: &str) -> String {
   使用 {} 查看各命令详细说明
   使用 {} 查看智能路由说明
 "#,
-        "💡 RealConsole 使用示例".bold(),
+        "[TIP] RealConsole 使用示例".bold(),
         "智能对话".bold(),
         "智能命令路由 (新!)".bold(),
         "工具调用".bold(),

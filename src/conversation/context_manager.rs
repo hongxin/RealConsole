@@ -5,8 +5,11 @@
 //! - 智能检测是否需要上下文（Auto 模式）
 //! - 自动清理过期上下文
 //! - 构建发送给 LLM 的消息列表
+//! - ✨ 连续场模式：支持渐变上下文强度（Phase 1 重构）
 
-use crate::config::{AutoClearConfig, ContextIncludeConfig, ContextMode, ConversationConfig};
+use crate::config::{
+    AutoClearConfig, ContextAwarenessField, ContextIncludeConfig, ContextMode, ConversationConfig,
+};
 use crate::conversation::Turn;
 use crate::llm::Message;
 use chrono::{DateTime, Utc};
@@ -230,14 +233,27 @@ impl ContextManager {
     }
 
     /// 清理过期上下文（如果启用了自动清除）
+    ///
+    /// # 清除策略
+    ///
+    /// - **连续模式**（`awareness_field` 配置存在）：使用渐变清除
+    /// - **传统模式**：硬超时清除（向后兼容）
     pub fn cleanup_if_needed(&mut self) {
         if !self.config.auto_clear.enabled {
             return;
         }
 
-        // 检查空闲时间
-        let idle_duration = Utc::now() - self.last_activity;
-        let idle_seconds = idle_duration.num_seconds();
+        // 检查是否使用连续模式
+        if self.config.is_continuous_mode() {
+            self.smooth_cleanup();
+        } else {
+            self.hard_cleanup();
+        }
+    }
+
+    /// 硬清除（传统模式，向后兼容）
+    fn hard_cleanup(&mut self) {
+        let idle_seconds = self.idle_seconds();
 
         if idle_seconds > self.config.auto_clear.idle_timeout as i64 {
             // 空闲超时，清除上下文
@@ -248,6 +264,36 @@ impl ContextManager {
                 self.is_active = false;
             }
         }
+    }
+
+    /// 平滑清除（连续模式，Phase 2 新增）
+    ///
+    /// 使用软阈值函数实现渐变清除：
+    /// - 前半段（< timeout/2）：几乎不清除
+    /// - 过渡段：概率从 10% → 50%
+    /// - 后半段（> timeout）：概率从 50% → 接近 100%
+    ///
+    /// 不是"超时立即清除"，而是"概率逐渐增加"
+    fn smooth_cleanup(&mut self) {
+        let idle = self.idle_seconds() as f64;
+        let timeout = self.config.auto_clear.idle_timeout as f64;
+
+        // 计算清除概率（使用软阈值函数）
+        let clear_prob = crate::utils::soft_threshold::smooth_clear_probability(idle, timeout);
+
+        if clear_prob > 0.95 {
+            // 几乎必然清除（>95%）
+            self.turns.clear();
+            self.is_active = false;
+        } else if clear_prob > 0.7 && !self.turns.is_empty() {
+            // 高概率清除：逐个移除最旧的轮次（渐变衰减）
+            // 每次调用有 (clear_prob - 0.7) / 0.25 的概率移除一个
+            let decay_prob = (clear_prob - 0.7) / 0.25;
+            if rand::random::<f64>() < decay_prob {
+                self.turns.pop_front();
+            }
+        }
+        // 否则：保持不变（clear_prob < 0.7）
     }
 
     /// 获取空闲时间（秒）
@@ -289,6 +335,167 @@ impl ContextManager {
             is_near_timeout: self.is_near_timeout(),
         }
     }
+
+    // ================================
+    // ✨ 连续场模式方法（Phase 1 重构）
+    // ================================
+
+    /// 计算输入需要上下文的程度（0.0 - 1.0）
+    ///
+    /// 基于多个语义信号计算连续的置信度分数：
+    /// - 代词检测：轻度需求 (+0.3)
+    /// - 追问检测：中度需求 (+0.5)
+    /// - 上下文依赖词：高度需求 (+0.7)
+    ///
+    /// # 示例
+    /// ```ignore
+    /// let score = manager.calculate_context_need("它是什么？");  // ~0.3
+    /// let score = manager.calculate_context_need("为什么？");    // ~0.5
+    /// let score = manager.calculate_context_need("刚才那个");   // ~0.7
+    /// ```
+    pub fn calculate_context_need(&self, input: &str) -> f64 {
+        let input_lower = input.to_lowercase();
+        let mut score: f64 = 0.0;
+
+        // 代词检测：轻度需求
+        let pronouns = [
+            "它", "这个", "那个", "这些", "那些", "this", "that", "it", "these", "those",
+        ];
+        if pronouns.iter().any(|p| input_lower.contains(p)) {
+            score += 0.3;
+        }
+
+        // 追问检测：中度需求
+        let followups = [
+            "为什么", "为啥", "怎么", "继续", "详细", "更多", "why", "how", "continue",
+            "more", "detail", "explain",
+        ];
+        if followups.iter().any(|f| input_lower.contains(f)) {
+            score += 0.5;
+        }
+
+        // 上下文依赖词：高度需求
+        let context_refs = [
+            "刚才", "之前", "上面", "前面", // 回顾过去
+            "现在", "那么", "所以", "因此", "这样", "那", // 承接转折
+            "earlier", "previous", "above", "before", // 英文回顾
+            "now", "then", "so", "thus", "therefore", // 英文承接
+        ];
+        if context_refs.iter().any(|c| input_lower.contains(c)) {
+            score += 0.7;
+        }
+
+        score.min(1.0)
+    }
+
+    /// 计算当前上下文场强度（0.0 - 1.0）
+    ///
+    /// 综合多个因素计算连续的上下文强度：
+    /// 1. 基础敏感度（配置）
+    /// 2. 输入驱动的增强
+    /// 3. 历史上下文的增强
+    /// 4. 时间衰减
+    ///
+    /// # 返回值
+    /// - 0.0 - 1.0 之间的连续值
+    /// - 可用于按权重应用上下文
+    pub fn calculate_context_strength(&mut self, input: &str) -> f64 {
+        // 先清理过期上下文
+        self.cleanup_if_needed();
+
+        let field = self.config.effective_field();
+
+        // 1. 基础强度（配置的敏感度）
+        let mut strength = field.sensitivity;
+
+        // 2. 输入驱动的增强
+        let need_score = self.calculate_context_need(input);
+
+        // 自动触发检查
+        if need_score >= field.auto_threshold {
+            strength = strength.max(need_score);
+            self.is_active = true; // 标记为活跃
+        }
+
+        // 3. 历史上下文的增强
+        if !self.turns.is_empty() {
+            // 有历史上下文时，增强当前强度
+            let history_boost = (self.turns.len() as f64 / self.config.max_turns as f64) * 0.3;
+            strength += history_boost;
+        }
+
+        // 4. 时间衰减
+        let idle = self.idle_seconds() as f64;
+        let decay = (-field.decay_rate * idle).exp();
+        strength *= decay;
+
+        // 5. 限制在最大强度内
+        let final_strength = strength.min(field.max_strength).max(0.0);
+
+        // 更新活动时间
+        if final_strength > 0.1 {
+            self.last_activity = Utc::now();
+        }
+
+        final_strength
+    }
+
+    /// 按强度加权构建消息列表（连续模式）
+    ///
+    /// 根据上下文强度决定包含多少历史轮次：
+    /// - strength < 0.1: 不使用上下文
+    /// - strength = 0.5: 使用 50% 的历史轮次
+    /// - strength = 1.0: 使用全部历史轮次
+    ///
+    /// # 参数
+    /// - `current_input`: 当前用户输入
+    /// - `strength`: 上下文强度 (0.0 - 1.0)
+    ///
+    /// # 返回值
+    /// 构建好的消息列表（包含历史上下文 + 当前输入）
+    pub fn build_messages_with_strength(
+        &self,
+        current_input: &str,
+        strength: f64,
+    ) -> Vec<Message> {
+        let mut messages = Vec::new();
+
+        if strength < 0.1 {
+            // 强度太低，不使用上下文
+            messages.push(Message::user(current_input));
+            return messages;
+        }
+
+        // 根据强度决定包含多少历史轮次
+        let turns_to_include = (self.turns.len() as f64 * strength).ceil() as usize;
+        let turns_to_include = turns_to_include.min(self.turns.len());
+        let start_index = self.turns.len().saturating_sub(turns_to_include);
+
+        // 包含选定的历史轮次
+        for turn in self.turns.iter().skip(start_index) {
+            messages.push(Message::user(&turn.user_input));
+            messages.push(Message::assistant(&turn.assistant_response));
+
+            // 可选：包含工具调用信息
+            if self.config.include.tool_calls && !turn.tools_called.is_empty() {
+                let tool_summary = turn
+                    .tools_called
+                    .iter()
+                    .map(|tc| format!("[Tool: {}]", tc.tool_name))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                if !tool_summary.is_empty() {
+                    messages.push(Message::system(format!("工具调用: {}", tool_summary)));
+                }
+            }
+        }
+
+        // 当前输入
+        messages.push(Message::user(current_input));
+
+        messages
+    }
 }
 
 #[cfg(test)]
@@ -301,6 +508,7 @@ mod tests {
     fn default_config() -> ConversationConfig {
         ConversationConfig {
             mode: ContextMode::Auto,
+            awareness_field: None, // ✨ 新增字段（向后兼容）
             max_turns: 5,
             max_context_length: 1000,
             auto_clear: AutoClearConfig {

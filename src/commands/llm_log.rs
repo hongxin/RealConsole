@@ -130,7 +130,7 @@ fn handle_status(logger: Option<Arc<LlmLogger>>) -> String {
         None => {
             format!(
                 "{} LLM 日志功能未启用\n\n{}\n  {}",
-                "ℹ️".cyan(),
+                "[i]".cyan(),
                 "要启用此功能，请在配置文件中设置:".dimmed(),
                 "llm.logging.enabled: true".cyan()
             )
@@ -186,7 +186,7 @@ fn handle_recent(arg: &str, logger: Option<Arc<LlmLogger>>) -> String {
         }
         None => format!(
             "{} LLM 日志功能未启用",
-            "ℹ️".cyan()
+            "[i]".cyan()
         ),
     }
 }
@@ -195,7 +195,7 @@ fn handle_recent(arg: &str, logger: Option<Arc<LlmLogger>>) -> String {
 fn handle_enable(_logger: Option<Arc<LlmLogger>>) -> String {
     format!(
         "{} 动态启用功能暂未实现\n{} 请在配置文件中设置 llm.logging.enabled: true 并重启",
-        "⚠️".yellow(),
+        "[!]".yellow(),
         "提示:".dimmed()
     )
 }
@@ -204,7 +204,7 @@ fn handle_enable(_logger: Option<Arc<LlmLogger>>) -> String {
 fn handle_disable(_logger: Option<Arc<LlmLogger>>) -> String {
     format!(
         "{} 动态禁用功能暂未实现\n{} 请在配置文件中设置 llm.logging.enabled: false 并重启",
-        "⚠️".yellow(),
+        "[!]".yellow(),
         "提示:".dimmed()
     )
 }
@@ -288,7 +288,7 @@ fn handle_search(args: &str, logger: Option<Arc<LlmLogger>>) -> String {
 
             output.join("\n")
         }
-        None => format!("{} LLM 日志功能未启用", "ℹ️".cyan()),
+        None => format!("{} LLM 日志功能未启用", "[i]".cyan()),
     }
 }
 
@@ -426,7 +426,7 @@ fn handle_stats(args: &str, logger: Option<Arc<LlmLogger>>) -> String {
 
             lines.join("\n")
         }
-        None => format!("{} LLM 日志功能未启用", "ℹ️".cyan()),
+        None => format!("{} LLM 日志功能未启用", "[i]".cyan()),
     }
 }
 
@@ -468,7 +468,7 @@ fn handle_clean(args: &str, logger: Option<Arc<LlmLogger>>) -> String {
                 )
             }
         }
-        None => format!("{} LLM 日志功能未启用", "ℹ️".cyan()),
+        None => format!("{} LLM 日志功能未启用", "[i]".cyan()),
     }
 }
 
@@ -513,7 +513,7 @@ fn handle_sessions(args: &str, logger: Option<Arc<LlmLogger>>) -> String {
 
             output.join("\n")
         }
-        None => format!("{} LLM 日志功能未启用", "ℹ️".cyan()),
+        None => format!("{} LLM 日志功能未启用", "[i]".cyan()),
     }
 }
 
@@ -748,7 +748,7 @@ fn handle_replay(args: &str, logger: Option<Arc<LlmLogger>>) -> String {
                 ),
             }
         }
-        None => format!("{} LLM 日志功能未启用", "ℹ️".cyan()),
+        None => format!("{} LLM 日志功能未启用", "[i]".cyan()),
     }
 }
 

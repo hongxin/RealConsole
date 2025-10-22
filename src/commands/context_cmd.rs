@@ -37,38 +37,50 @@ pub fn register_context_commands(
 fn handle_context(args: &str, context_manager: Arc<RwLock<ContextManager>>) -> String {
     let args_str = args.trim();
 
-    // 使用 tokio runtime 处理异步锁
-    tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(async {
-            if args_str.is_empty() {
-                // 显示帮助
-                show_help(&context_manager).await
-            } else if args_str == "start" {
-                // 启动上下文
-                start_context(&context_manager).await
-            } else if args_str == "stop" {
-                // 停止上下文
-                stop_context(&context_manager).await
-            } else if args_str == "show" {
-                // 显示上下文内容
-                show_context(&context_manager).await
-            } else if args_str == "status" {
-                // 显示状态信息
-                show_status(&context_manager).await
-            } else if args_str == "clear" {
-                // 清除上下文
-                clear_context(&context_manager).await
-            } else {
-                // 未知子命令
-                format!(
-                    "{} {}\n\n{}",
-                    "未知子命令:".red(),
-                    args_str.yellow(),
-                    show_help_text()
-                )
-            }
-        })
-    })
+    // 改进的异步锁处理：使用 try_current + block_on，避免 block_in_place 嵌套
+    // 这样可以减少运行时开销和潜在的死锁风险
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => {
+            // 在现有的 tokio runtime 上下文中执行
+            handle.block_on(async {
+                if args_str.is_empty() {
+                    // 显示帮助
+                    show_help(&context_manager).await
+                } else if args_str == "start" {
+                    // 启动上下文
+                    start_context(&context_manager).await
+                } else if args_str == "stop" {
+                    // 停止上下文
+                    stop_context(&context_manager).await
+                } else if args_str == "show" {
+                    // 显示上下文内容
+                    show_context(&context_manager).await
+                } else if args_str == "status" {
+                    // 显示状态信息
+                    show_status(&context_manager).await
+                } else if args_str == "clear" {
+                    // 清除上下文
+                    clear_context(&context_manager).await
+                } else {
+                    // 未知子命令
+                    format!(
+                        "{} {}\n\n{}",
+                        "未知子命令:".red(),
+                        args_str.yellow(),
+                        show_help_text()
+                    )
+                }
+            })
+        }
+        Err(_) => {
+            // 如果不在 tokio runtime 中，返回错误提示
+            // 这种情况通常不应该发生，因为 RealConsole 启动时会初始化 tokio runtime
+            format!(
+                "{} Context commands require async runtime (tokio not initialized)",
+                "[ERROR]".red()
+            )
+        }
+    }
 }
 
 /// 显示帮助信息
@@ -118,7 +130,7 @@ async fn start_context(context_manager: &Arc<RwLock<ContextManager>>) -> String 
     if mode == ContextMode::Disabled {
         return format!(
             "{} 当前模式为 {}，无法手动启动上下文\n{} 请在配置文件中将 mode 设置为 {} 或 {}",
-            "⚠️".yellow(),
+            "[!]".yellow(),
             "Disabled".yellow(),
             "提示:".dimmed(),
             "Manual".green(),
@@ -130,7 +142,7 @@ async fn start_context(context_manager: &Arc<RwLock<ContextManager>>) -> String 
     if manager.is_active() {
         return format!(
             "{} 上下文已处于激活状态\n{} 当前轮次数: {}",
-            "ℹ️".cyan(),
+            "[i]".cyan(),
             "状态:".dimmed(),
             manager.turn_count().to_string().yellow()
         );
@@ -141,7 +153,7 @@ async fn start_context(context_manager: &Arc<RwLock<ContextManager>>) -> String 
 
     format!(
         "{} 上下文已启动\n{} 模式: {}\n{} 最大轮次: {}",
-        "✓".green(),
+        "[OK]".green(),
         "模式:".dimmed(),
         format!("{:?}", mode).yellow(),
         "限制:".dimmed(),
@@ -159,14 +171,14 @@ async fn stop_context(context_manager: &Arc<RwLock<ContextManager>>) -> String {
     if mode == ContextMode::Disabled {
         return format!(
             "{} 当前模式为 {}，无上下文运行",
-            "ℹ️".cyan(),
+            "[i]".cyan(),
             "Disabled".yellow()
         );
     }
 
     // 检查是否已停止
     if !manager.is_active() {
-        return format!("{} 上下文已处于停止状态", "ℹ️".cyan());
+        return format!("{} 上下文已处于停止状态", "[i]".cyan());
     }
 
     // 记录停止前的统计
@@ -178,7 +190,7 @@ async fn stop_context(context_manager: &Arc<RwLock<ContextManager>>) -> String {
 
     format!(
         "{} 上下文已停止\n{} 已清除 {} 轮对话（{} 字符）",
-        "✓".green(),
+        "[OK]".green(),
         "统计:".dimmed(),
         turn_count.to_string().yellow(),
         context_length.to_string().yellow()
@@ -210,7 +222,7 @@ async fn show_context(context_manager: &Arc<RwLock<ContextManager>>) -> String {
     let turns = manager.turns();
 
     if turns.is_empty() {
-        return format!("{} 当前无上下文", "ℹ️".cyan());
+        return format!("{} 当前无上下文", "[i]".cyan());
     }
 
     let mut output = Vec::new();
@@ -230,13 +242,13 @@ async fn show_context(context_manager: &Arc<RwLock<ContextManager>>) -> String {
 
         // 用户输入 - 使用安全的字符截取
         let user_preview = truncate_str(&turn.user_input, 60);
-        output.push(format!("  {} {}", "👤".to_string(), user_preview.white()));
+        output.push(format!("  {} {}", "[User]".cyan(), user_preview.white()));
 
         // AI 响应 - 使用安全的字符截取
         let assistant_preview = truncate_str(&turn.assistant_response, 60);
         output.push(format!(
             "  {} {}",
-            "🤖".to_string(),
+            "[AI]".green(),
             assistant_preview.dimmed()
         ));
 
@@ -268,16 +280,14 @@ async fn show_status(context_manager: &Arc<RwLock<ContextManager>>) -> String {
     ));
 
     // 激活状态
-    let status_icon = if is_active { "🟢" } else { "🔴" };
     let status_text = if is_active {
-        "激活".green()
+        "[ON]".green().bold()
     } else {
-        "未激活".red()
+        "[OFF]".red()
     };
     output.push(format!(
-        "{} {} {}",
+        "{} {}",
         "状态:".dimmed(),
-        status_icon,
         status_text
     ));
 
@@ -318,7 +328,7 @@ async fn show_status(context_manager: &Arc<RwLock<ContextManager>>) -> String {
             output.push("".to_string());
             output.push(format!(
                 "{} 上下文即将超时（{} 分钟未活动将自动清除）",
-                "⚠️".yellow(),
+                "[!]".yellow(),
                 timeout.to_string().yellow()
             ));
         }
@@ -337,7 +347,7 @@ async fn clear_context(context_manager: &Arc<RwLock<ContextManager>>) -> String 
     if mode == ContextMode::Disabled {
         return format!(
             "{} 当前模式为 {}，无上下文运行",
-            "ℹ️".cyan(),
+            "[i]".cyan(),
             "Disabled".yellow()
         );
     }
@@ -347,7 +357,7 @@ async fn clear_context(context_manager: &Arc<RwLock<ContextManager>>) -> String 
     let context_length = manager.context_length();
 
     if turn_count == 0 {
-        return format!("{} 当前无上下文可清除", "ℹ️".cyan());
+        return format!("{} 当前无上下文可清除", "[i]".cyan());
     }
 
     // 清除上下文（但保持激活状态）
@@ -355,7 +365,7 @@ async fn clear_context(context_manager: &Arc<RwLock<ContextManager>>) -> String 
 
     format!(
         "{} 上下文已清除\n{} 已清除 {} 轮对话（{} 字符）\n{} 上下文仍处于 {} 状态",
-        "✓".green(),
+        "[OK]".green(),
         "统计:".dimmed(),
         turn_count.to_string().yellow(),
         context_length.to_string().yellow(),
@@ -377,6 +387,7 @@ mod tests {
     fn create_test_manager() -> Arc<RwLock<ContextManager>> {
         let config = ConversationConfig {
             mode: ContextMode::Manual,
+            awareness_field: None, // ✨ 新增字段（向后兼容）
             max_turns: 5,
             max_context_length: 1000,
             auto_clear: AutoClearConfig {

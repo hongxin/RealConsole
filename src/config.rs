@@ -254,6 +254,14 @@ pub struct DisplayConfig {
     /// 即使是正常成功的对话也会显示 LLM 多轮次来回的详细信息
     #[serde(default = "default_show_conversation_rounds")]
     pub show_conversation_rounds: bool,
+
+    /// 是否使用 emoji（默认 false，推荐关闭以避免终端兼容性问题）
+    #[serde(default)]
+    pub use_emoji: bool,
+
+    /// 是否使用颜色（默认 true）
+    #[serde(default = "default_true")]
+    pub use_colors: bool,
 }
 
 fn default_show_conversation_rounds() -> bool {
@@ -266,6 +274,8 @@ impl Default for DisplayConfig {
             mode: DisplayMode::Minimal,     // 默认极简模式
             language: None,                 // 未指定时从系统环境推断
             show_conversation_rounds: true, // debug 模式下默认显示对话轮次
+            use_emoji: false,               // 默认关闭 emoji（避免终端兼容性问题）
+            use_colors: true,               // 默认启用颜色
         }
     }
 }
@@ -273,9 +283,16 @@ impl Default for DisplayConfig {
 /// 对话上下文配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversationConfig {
-    /// 上下文模式
+    /// 上下文模式（旧配置，保留向后兼容）
     #[serde(default)]
     pub mode: ContextMode,
+
+    /// 上下文感知场（新配置，可选）
+    ///
+    /// 如果未指定，会从 `mode` 自动转换
+    /// 优先级：awareness_field > mode
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub awareness_field: Option<ContextAwarenessField>,
 
     /// 最大轮次（保留最近 N 轮对话）
     #[serde(default = "default_max_turns")]
@@ -306,11 +323,29 @@ impl Default for ConversationConfig {
     fn default() -> Self {
         Self {
             mode: ContextMode::Disabled, // 默认关闭，保持向后兼容
+            awareness_field: None,       // 默认从 mode 转换
             max_turns: 10,
             max_context_length: 8000,
             auto_clear: AutoClearConfig::default(),
             include: ContextIncludeConfig::default(),
         }
+    }
+}
+
+impl ConversationConfig {
+    /// 获取有效的上下文感知场配置
+    ///
+    /// 优先使用显式配置的 `awareness_field`，
+    /// 否则从 `mode` 自动转换（向后兼容）
+    pub fn effective_field(&self) -> ContextAwarenessField {
+        self.awareness_field
+            .clone()
+            .unwrap_or_else(|| self.mode.into())
+    }
+
+    /// 检查是否使用连续场模式
+    pub fn is_continuous_mode(&self) -> bool {
+        self.awareness_field.is_some()
     }
 }
 
@@ -338,6 +373,97 @@ impl std::fmt::Display for ContextMode {
             ContextMode::Disabled => write!(f, "Disabled"),
             ContextMode::Manual => write!(f, "Manual"),
             ContextMode::Auto => write!(f, "Auto"),
+        }
+    }
+}
+
+/// 上下文感知场配置（连续化重构）
+///
+/// 基于 [docs/00-core/think.md](../../docs/00-core/think.md) 哲学：
+/// 将离散的三态（Disabled/Manual/Auto）演化为**连续的势能场**。
+///
+/// 核心理念：
+/// - 上下文感知不是"开/关"，而是 0%-100% 的连续强度
+/// - 支持"部分激活"、"渐变触发"、"平滑衰减"
+/// - 向后兼容：可从旧的 ContextMode 自动转换
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextAwarenessField {
+    /// 基础敏感度 (0.0 - 1.0)
+    ///
+    /// - 0.0 = 完全关闭（等价于 Disabled）
+    /// - 0.5 = 中等感知（等价于 Manual）
+    /// - 1.0 = 全自动感知（等价于 Auto）
+    #[serde(default = "default_sensitivity")]
+    pub sensitivity: f64,
+
+    /// 自动触发阈值 (0.0 - 1.0)
+    ///
+    /// 当"需要上下文"的置信度 >= 此值时自动启用
+    #[serde(default = "default_auto_threshold")]
+    pub auto_threshold: f64,
+
+    /// 上下文衰减速率（每秒衰减百分比）
+    ///
+    /// 控制上下文强度如何随时间衰减
+    #[serde(default = "default_decay_rate")]
+    pub decay_rate: f64,
+
+    /// 最大上下文强度 (0.0 - 1.0)
+    ///
+    /// 限制上下文的最大影响力
+    #[serde(default = "default_max_strength")]
+    pub max_strength: f64,
+}
+
+fn default_sensitivity() -> f64 {
+    0.0 // 默认关闭（向后兼容）
+}
+
+fn default_auto_threshold() -> f64 {
+    0.6 // 60% 置信度触发
+}
+
+fn default_decay_rate() -> f64 {
+    0.001 // 每秒衰减 0.1%
+}
+
+fn default_max_strength() -> f64 {
+    1.0 // 允许全强度
+}
+
+impl Default for ContextAwarenessField {
+    fn default() -> Self {
+        Self {
+            sensitivity: 0.0,
+            auto_threshold: 0.6,
+            decay_rate: 0.001,
+            max_strength: 1.0,
+        }
+    }
+}
+
+/// 向后兼容：从旧的 ContextMode 转换为连续场配置
+impl From<ContextMode> for ContextAwarenessField {
+    fn from(mode: ContextMode) -> Self {
+        match mode {
+            ContextMode::Disabled => Self {
+                sensitivity: 0.0,
+                auto_threshold: 1.0, // 永不自动触发
+                decay_rate: 0.01,    // 快速衰减
+                max_strength: 0.0,   // 零强度
+            },
+            ContextMode::Manual => Self {
+                sensitivity: 0.5,
+                auto_threshold: 1.0, // 不自动触发（需手动启动）
+                decay_rate: 0.001,
+                max_strength: 0.8, // 中等强度
+            },
+            ContextMode::Auto => Self {
+                sensitivity: 1.0,
+                auto_threshold: 0.6, // 较低阈值，容易触发
+                decay_rate: 0.0005,  // 缓慢衰减
+                max_strength: 1.0,   // 全强度
+            },
         }
     }
 }

@@ -201,7 +201,8 @@ fn handle_log_tail(arg: &str) -> String {
     // 提示
     output.push(String::new());
     output.push(format!(
-        "  💡 {}",
+        "  {} {}",
+        "[TIP]".cyan(),
         format!("使用 /le {} 查看所有错误", file_path).dimmed()
     ));
 
