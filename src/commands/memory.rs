@@ -57,6 +57,12 @@ fn handle_memory_status(memory: Arc<RwLock<Memory>>) -> String {
         tokio::runtime::Handle::current().block_on(async {
             let mem = memory.read().await;
             let mut lines = vec![
+                format!("{}", "⚠️  记忆系统已冻结 (Phase 1)".bold().yellow()),
+                format!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed()),
+                format!("{}", "Memory 系统正在重新设计中，当前已停止记录新内容。".dimmed()),
+                format!("{}", "未来 Memory 2.0 将专注于智能上下文编排，而非简单记录。".dimmed()),
+                format!("{}", "详见: docs/04-reports/memory-system-redesign.md".dimmed()),
+                String::new(),
                 format!("{}", "记忆系统状态".bold().cyan()),
                 format!("  当前条目: {}", mem.len().to_string().green()),
                 format!("  最大容量: {}", "100".dimmed()),
@@ -400,7 +406,13 @@ fn handle_memory_important(arg: &str, memory: Arc<RwLock<Memory>>) -> String {
 /// 记忆命令帮助
 fn memory_help() -> String {
     format!(
-        r#"{title}
+        r#"{warning}
+{divider}
+Memory 系统正在重新设计中，当前已停止记录新内容。
+未来 Memory 2.0 将专注于智能上下文编排，而非简单记录。
+详见: docs/04-reports/memory-system-redesign.md
+
+{title}
 
 {subtitle}
   /memory                      - 显示记忆状态和最近记忆
@@ -428,6 +440,8 @@ fn memory_help() -> String {
 {shortcuts}
   recent → r, search → s, clear → c, dump → d, type → t, mark → m, important → i
 "#,
+        warning = "⚠️  记忆系统已冻结 (Phase 1)".bold().yellow(),
+        divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".dimmed(),
         title = "记忆管理".bold().cyan(),
         subtitle = "用法:".bold(),
         examples = "示例:".bold(),

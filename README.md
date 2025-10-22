@@ -8,9 +8,9 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-703%2B%20passed-green.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-78%2B%25-yellow.svg)](docs/test_reports/)
-[![Version](https://img.shields.io/badge/version-1.3.7-blue.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-831%2B%20passed-green.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-85%2B%25-brightgreen.svg)](docs/test_reports/)
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](CHANGELOG.md)
 
 ## ⚠️ 免责声明
 
@@ -82,6 +82,28 @@
 - **系统资源监控** - CPU/内存/磁盘实时监控，进程 TOP 列表（`/sys`, `/cpu`, `/disk`, `/top`）
 - **跨平台支持** - macOS + Linux 完整支持，零额外依赖
 - **执行日志** - 完整的操作记录与审计
+
+### 📊 统一追踪系统 🔥 v1.5.0 NEW
+- **四维观测体系** - 聚合 History、log、llm-log、Context 四个数据源，降低认知负担（`/trace`）
+- **智能去重与排序** - 内容哈希 + 时间窗口算法，自动识别重复视角
+- **多维查询** - 按维度/时间/关键词灵活查询，8个子命令覆盖所有场景
+- **超高性能** - 并行查询四数据源，性能超预期 40-65 倍（< 15ms）
+- **四象哲学** - 基于易经四象理论设计（统计/协同/黑盒/记忆）
+
+**使用示例**:
+```bash
+% /trace                          # 最近20条记录（四维聚合）
+📊 统一追踪 20 条记录
+
+📊 ✓ [15:30:42] Statistics: ls -la
+🔗 ✓ [15:30:45] Coordination: 执行Shell命令 → 成功 (120ms)
+🤖 ✓ [15:30:50] BlackBox: Model: deepseek-chat | Tokens: 1234
+💭 ✓ [15:31:00] Memory: user: 显示最大的3个rs文件
+
+% /trace search error            # 搜索包含error的记录
+% /trace stats                   # 统计分析
+% /trace history 50              # 仅查看命令历史
+```
 
 ### 🎨 友好体验
 - **配置向导** - 5 分钟快速完成初始化（`realconsole wizard --quick`）

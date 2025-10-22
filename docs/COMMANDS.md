@@ -139,6 +139,22 @@ RealConsole 采用智能命令路由系统，支持四种命令类型：
 - `/memory save` - 保存记忆到文件
 - `/memory type <类型>` - 按类型过滤记忆
 
+### 统一追踪 (v1.5.0 新增)
+- `/trace` 或 `/t` - 显示最近 20 条记录（四维聚合）
+- `/trace all [n]` - 显示最近 N 条记录
+- `/trace history [n]` 或 `/trace h [n]` - 仅显示 History 维度（统计）
+- `/trace log [n]` 或 `/trace l [n]` - 仅显示 log 维度（协同）
+- `/trace llm [n]` - 仅显示 llm-log 维度（黑盒）
+- `/trace context [n]` 或 `/trace c [n]` - 仅显示 Context 维度（记忆）
+- `/trace search <关键词>` 或 `/trace s <关键词>` - 关键词搜索
+- `/trace stats` - 显示统计信息
+
+**四维观测体系**：
+- 📊 **History**（统计维度）- 命令频率，使用模式
+- 🔗 **log**（协同维度）- 端到端执行追踪
+- 🤖 **llm-log**（黑盒维度）- LLM API 调用详情
+- 💭 **Context**（记忆维度）- 对话上下文状态
+
 ### 统计信息
 - `/dashboard` - 显示统计仪表板
 - `/stats` - 显示详细统计
@@ -198,6 +214,7 @@ RealConsole 为常用命令提供了简短的别名：
 
 | 完整命令 | 别名 | 描述 |
 |---------|------|------|
+| `/trace` | `/t` | 统一追踪 (v1.5.0) |
 | `/git-status` | `/gs` | Git 状态 |
 | `/git-diff` | `/gd` | Git 变更 |
 | `/git-branch` | `/gb` | Git 分支 |
@@ -243,6 +260,7 @@ RealConsole 为常用命令提供了简短的别名：
 
 ---
 
-**文档版本**: 1.0
-**最后更新**: 2025-10-19
+**文档版本**: 1.5.0
+**最后更新**: 2025-10-23
 **维护者**: RealConsole 开发团队
+**新增功能**: v1.5.0 新增 `/trace` 统一追踪命令，详见 `docs/04-reports/trace-command-design.md`

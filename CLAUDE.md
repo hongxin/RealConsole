@@ -31,6 +31,7 @@
 - `src/llm/` - LLM 客户端
 - `src/dsl/intent/` - Intent DSL
 - `src/task/` - 任务编排系统
+- `src/tracer/` - 统一追踪系统（v1.5.0新增，四维观测体系）
 - `src/i18n.rs` - 国际化系统
 - `docs/` - 五态架构文档（00-core/01-understanding/02-practice/03-evolution/04-reports）
 
@@ -108,6 +109,12 @@ make uninstall                # 或 ./uninstall.sh
 - **开发指南**：`docs/02-practice/developer/developer-guide.md`
 - **完整索引**：`docs/README.md`
 
+**v1.5.0 新增文档**：
+- **trace 命令设计**：`docs/04-reports/trace-command-design.md`
+- **四维哲学理论**：`docs/04-reports/four-dimensions-philosophy.md`
+- **实施计划**：`docs/04-reports/trace-implementation-plan.md`
+- **测试完成报告**：`docs/04-reports/phase-5-testing-completion.md`
+
 ---
 
-**最后更新**: 2025-10-22 | **许可**: MIT | **维护**: RealConsole Contributors
+**最后更新**: 2025-10-23 | **许可**: MIT | **维护**: RealConsole Contributors

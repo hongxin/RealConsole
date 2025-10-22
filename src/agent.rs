@@ -677,12 +677,16 @@ impl Agent {
         let start = Instant::now();
 
         // 记录用户输入
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let mut memory = self.memory.write().await;
-                memory.add(line.to_string(), EntryType::User);
-            })
-        });
+        // NOTE: Memory system FROZEN per Phase 1 of redesign plan
+        // See: docs/04-reports/memory-system-redesign.md
+        // Memory 2.0 will focus on intelligent context orchestration rather than simple recording
+        // Uncomment this when Memory 2.0 is implemented
+        // tokio::task::block_in_place(|| {
+        //     tokio::runtime::Handle::current().block_on(async {
+        //         let mut memory = self.memory.write().await;
+        //         memory.add(line.to_string(), EntryType::User);
+        //     })
+        // });
 
         // ✨ Phase 9.1: 提取实体并更新上下文追踪器
         tokio::task::block_in_place(|| {
@@ -769,35 +773,39 @@ impl Agent {
                     }
 
                     // 记录到记忆
-                    {
-                        let mut memory = self.memory.write().await;
-                        // 简化响应内容（最多保存前200个字符，考虑 UTF-8 边界）
-                        let content = if response.len() > 200 {
-                            // 找到安全的截断位置（UTF-8 字符边界）
-                            let mut cutoff = 200.min(response.len());
-                            while cutoff > 0 && !response.is_char_boundary(cutoff) {
-                                cutoff -= 1;
-                            }
-                            format!("{}...", &response[..cutoff])
-                        } else {
-                            response.clone()
-                        };
-                        memory.add(content, EntryType::Assistant);
-
-                        // 如果启用了自动保存，追加到文件
-                        if let Some(ref mem_config) = self.config.memory {
-                            if mem_config.auto_save.unwrap_or(false) {
-                                if let Some(ref path) = mem_config.persistent_file {
-                                    // 规范化路径，避免跟随工作目录改变
-                                    let normalized_path = Self::normalize_path(path);
-                                    let entries = memory.recent(1);
-                                    if let Some(entry) = entries.first() {
-                                        let _ = Memory::append_to_file(&normalized_path, entry);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    // NOTE: Memory system FROZEN per Phase 1 of redesign plan
+                    // See: docs/04-reports/memory-system-redesign.md
+                    // Memory 2.0 will focus on intelligent context orchestration rather than simple recording
+                    // Uncomment this when Memory 2.0 is implemented
+                    // {
+                    //     let mut memory = self.memory.write().await;
+                    //     // 简化响应内容（最多保存前200个字符，考虑 UTF-8 边界）
+                    //     let content = if response.len() > 200 {
+                    //         // 找到安全的截断位置（UTF-8 字符边界）
+                    //         let mut cutoff = 200.min(response.len());
+                    //         while cutoff > 0 && !response.is_char_boundary(cutoff) {
+                    //             cutoff -= 1;
+                    //         }
+                    //         format!("{}...", &response[..cutoff])
+                    //     } else {
+                    //         response.clone()
+                    //     };
+                    //     memory.add(content, EntryType::Assistant);
+                    //
+                    //     // 如果启用了自动保存，追加到文件
+                    //     if let Some(ref mem_config) = self.config.memory {
+                    //         if mem_config.auto_save.unwrap_or(false) {
+                    //             if let Some(ref path) = mem_config.persistent_file {
+                    //                 // 规范化路径，避免跟随工作目录改变
+                    //                 let normalized_path = Self::normalize_path(path);
+                    //                 let entries = memory.recent(1);
+                    //                 if let Some(entry) = entries.first() {
+                    //                     let _ = Memory::append_to_file(&normalized_path, entry);
+                    //                 }
+                    //             }
+                    //         }
+                    //     }
+                    // }
 
                     // ✨ Phase 9.1: 更新工作上下文（如果命令成功）
                     if success {
@@ -2501,6 +2509,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Phase 1: Memory system frozen, will re-enable when Memory 2.0 is implemented
     async fn test_agent_memory_tracking() {
         let config = Config::default();
         let registry = CommandRegistry::new();
@@ -2965,6 +2974,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Phase 1: Memory system frozen, will re-enable when Memory 2.0 is implemented
     async fn test_memory_persistence_config() {
         let mut config = Config::default();
         // 不配置持久化文件

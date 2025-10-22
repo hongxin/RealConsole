@@ -39,6 +39,7 @@ mod task; // ✨ Phase 10: 任务分解与规划系统
 mod tool;
 mod tool_cache; // ✨ Phase 5.3 Week 3 Day 2
 mod tool_executor;
+mod tracer; // ✨ Phase 2 (Memory Redesign): 统一追踪系统
 mod utils; // ✨ Phase 2: 软阈值工具（连续场重构）
 mod voice; // ✨ 语音播报系统
 mod wizard;
@@ -445,22 +446,31 @@ async fn main() {
     commands::register_memory_commands(&mut agent.registry, memory);
 
     // 注册执行日志命令（使用预先获取的 exec_logger 引用）
-    commands::register_log_commands(&mut agent.registry, exec_logger);
+    commands::register_log_commands(&mut agent.registry, exec_logger.clone());
 
     // 注册 LLM 交互日志命令
     let llm_logger = agent.llm_logger();
-    commands::register_llm_log_commands(&mut agent.registry, llm_logger);
+    commands::register_llm_log_commands(&mut agent.registry, llm_logger.clone());
 
     // 注册工具管理命令（需要访问 agent 的 tool_registry）
     let tool_registry = agent.tool_registry();
     commands::register_tool_commands(&mut agent.registry, tool_registry);
 
     // ✨ Phase 8: 注册历史记录命令（使用预先获取的 history 引用）
-    commands::register_history_commands(&mut agent.registry, history);
+    commands::register_history_commands(&mut agent.registry, history.clone());
 
     // ✨ Phase 对话上下文: 注册上下文管理命令
     let conversation_context = agent.state_manager().conversation_context();
-    commands::register_context_commands(&mut agent.registry, conversation_context);
+    commands::register_context_commands(&mut agent.registry, conversation_context.clone());
+
+    // ✨ Phase 2 (Memory Redesign): 注册统一追踪命令
+    let unified_tracer = Arc::new(tracer::UnifiedTracer::new(
+        history.clone(),
+        exec_logger.clone(),
+        llm_logger.clone(),
+        conversation_context.clone(),
+    ));
+    commands::register_trace_commands(&mut agent.registry, unified_tracer);
 
     // ✨ 注册语音播报命令
     let voice_broadcaster = agent.voice_broadcaster.clone();

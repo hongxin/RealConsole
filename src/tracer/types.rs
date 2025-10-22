@@ -1,0 +1,349 @@
+//! 统一追踪系统的核心类型定义
+//!
+//! 提供四维观测体系的类型抽象
+
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// 四个观测维度
+///
+/// 基于四象理论（太阳、少阴、少阳、太阴），提供互补的观测视角
+///
+/// # 哲学映射
+///
+/// ```text
+/// 太阳 (Taiyang) → Statistics  - 统计维度，宏观规律
+/// 少阴 (Shaoyin) → Coordination - 协同维度，执行追踪
+/// 少阳 (Shaoyang) → BlackBox    - 黑盒维度，LLM透视
+/// 太阴 (Taiyin)  → Memory       - 记忆维度，对话连贯
+/// ```
+///
+/// 详见: `docs/04-reports/four-dimensions-philosophy.md`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Dimension {
+    /// 统计维度 - History (太阳/Taiyang)
+    ///
+    /// 关注：命令频率、使用模式、统计规律
+    Statistics,
+
+    /// 协同维度 - log (少阴/Shaoyin)
+    ///
+    /// 关注：端到端执行、任务协同、完整链路
+    Coordination,
+
+    /// 黑盒维度 - llm-log (少阳/Shaoyang)
+    ///
+    /// 关注：LLM API 调用、模型行为、token 使用
+    BlackBox,
+
+    /// 记忆维度 - Context (太阴/Taiyin)
+    ///
+    /// 关注：对话上下文、状态延续、记忆连贯
+    Memory,
+}
+
+impl fmt::Display for Dimension {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Dimension::Statistics => write!(f, "Statistics"),
+            Dimension::Coordination => write!(f, "Coordination"),
+            Dimension::BlackBox => write!(f, "BlackBox"),
+            Dimension::Memory => write!(f, "Memory"),
+        }
+    }
+}
+
+impl Dimension {
+    /// 获取维度对应的图标
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Dimension::Statistics => "📊",
+            Dimension::Coordination => "🔗",
+            Dimension::BlackBox => "🤖",
+            Dimension::Memory => "💭",
+        }
+    }
+
+    /// 获取维度对应的命令名称
+    pub fn command_name(&self) -> &'static str {
+        match self {
+            Dimension::Statistics => "history",
+            Dimension::Coordination => "log",
+            Dimension::BlackBox => "llm-log",
+            Dimension::Memory => "context",
+        }
+    }
+
+    /// 获取维度的中文名称
+    pub fn chinese_name(&self) -> &'static str {
+        match self {
+            Dimension::Statistics => "统计维度",
+            Dimension::Coordination => "协同维度",
+            Dimension::BlackBox => "黑盒维度",
+            Dimension::Memory => "记忆维度",
+        }
+    }
+
+    /// 获取所有维度
+    pub fn all() -> Vec<Dimension> {
+        vec![
+            Dimension::Statistics,
+            Dimension::Coordination,
+            Dimension::BlackBox,
+            Dimension::Memory,
+        ]
+    }
+}
+
+/// 条目类型
+///
+/// 定义不同维度中的具体条目类型
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EntryType {
+    // ━━━ 统计维度 ━━━
+    /// Shell 命令（如 !ls, !cat）
+    ShellCommand,
+
+    /// 系统命令（如 /help, /history）
+    SystemCommand,
+
+    // ━━━ 协同维度 ━━━
+    /// 任务执行记录
+    TaskExecution,
+
+    /// 工具调用记录
+    ToolInvocation,
+
+    // ━━━ 黑盒维度 ━━━
+    /// LLM 请求
+    LlmRequest,
+
+    /// LLM 响应
+    LlmResponse,
+
+    /// LLM 完整对话（请求+响应）
+    LlmConversation,
+
+    // ━━━ 记忆维度 ━━━
+    /// 对话消息
+    ContextMessage,
+
+    /// 上下文切换
+    ContextSwitch,
+
+    /// 上下文状态变更
+    ContextStateChange,
+}
+
+impl fmt::Display for EntryType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EntryType::ShellCommand => write!(f, "ShellCommand"),
+            EntryType::SystemCommand => write!(f, "SystemCommand"),
+            EntryType::TaskExecution => write!(f, "TaskExecution"),
+            EntryType::ToolInvocation => write!(f, "ToolInvocation"),
+            EntryType::LlmRequest => write!(f, "LlmRequest"),
+            EntryType::LlmResponse => write!(f, "LlmResponse"),
+            EntryType::LlmConversation => write!(f, "LlmConversation"),
+            EntryType::ContextMessage => write!(f, "ContextMessage"),
+            EntryType::ContextSwitch => write!(f, "ContextSwitch"),
+            EntryType::ContextStateChange => write!(f, "ContextStateChange"),
+        }
+    }
+}
+
+impl EntryType {
+    /// 获取条目类型的图标
+    pub fn icon(&self) -> &'static str {
+        match self {
+            EntryType::ShellCommand => "🐚",
+            EntryType::SystemCommand => "⚙️",
+            EntryType::TaskExecution => "▶️",
+            EntryType::ToolInvocation => "🔧",
+            EntryType::LlmRequest => "📤",
+            EntryType::LlmResponse => "📥",
+            EntryType::LlmConversation => "💬",
+            EntryType::ContextMessage => "💭",
+            EntryType::ContextSwitch => "🔄",
+            EntryType::ContextStateChange => "🔀",
+        }
+    }
+
+    /// 获取条目类型的中文名称
+    pub fn chinese_name(&self) -> &'static str {
+        match self {
+            EntryType::ShellCommand => "Shell 命令",
+            EntryType::SystemCommand => "系统命令",
+            EntryType::TaskExecution => "任务执行",
+            EntryType::ToolInvocation => "工具调用",
+            EntryType::LlmRequest => "LLM 请求",
+            EntryType::LlmResponse => "LLM 响应",
+            EntryType::LlmConversation => "LLM 对话",
+            EntryType::ContextMessage => "对话消息",
+            EntryType::ContextSwitch => "上下文切换",
+            EntryType::ContextStateChange => "状态变更",
+        }
+    }
+}
+
+/// 执行状态
+///
+/// 记录条目的执行结果
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Status {
+    /// 成功
+    Success,
+
+    /// 失败（包含错误信息）
+    Failed(String),
+
+    /// 运行中
+    Running,
+
+    /// 已取消
+    Cancelled,
+}
+
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Status::Success => write!(f, "Success"),
+            Status::Failed(err) => write!(f, "Failed({})", err),
+            Status::Running => write!(f, "Running"),
+            Status::Cancelled => write!(f, "Cancelled"),
+        }
+    }
+}
+
+impl Status {
+    /// 获取状态图标
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Status::Success => "✓",
+            Status::Failed(_) => "✗",
+            Status::Running => "⟳",
+            Status::Cancelled => "⊘",
+        }
+    }
+
+    /// 判断是否为成功状态
+    pub fn is_success(&self) -> bool {
+        matches!(self, Status::Success)
+    }
+
+    /// 判断是否为失败状态
+    pub fn is_failed(&self) -> bool {
+        matches!(self, Status::Failed(_))
+    }
+
+    /// 获取错误信息（如果存在）
+    pub fn error_message(&self) -> Option<&str> {
+        if let Status::Failed(err) = self {
+            Some(err)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dimension_display() {
+        assert_eq!(Dimension::Statistics.to_string(), "Statistics");
+        assert_eq!(Dimension::Coordination.to_string(), "Coordination");
+        assert_eq!(Dimension::BlackBox.to_string(), "BlackBox");
+        assert_eq!(Dimension::Memory.to_string(), "Memory");
+    }
+
+    #[test]
+    fn test_dimension_icon() {
+        assert_eq!(Dimension::Statistics.icon(), "📊");
+        assert_eq!(Dimension::Coordination.icon(), "🔗");
+        assert_eq!(Dimension::BlackBox.icon(), "🤖");
+        assert_eq!(Dimension::Memory.icon(), "💭");
+    }
+
+    #[test]
+    fn test_dimension_command_name() {
+        assert_eq!(Dimension::Statistics.command_name(), "history");
+        assert_eq!(Dimension::Coordination.command_name(), "log");
+        assert_eq!(Dimension::BlackBox.command_name(), "llm-log");
+        assert_eq!(Dimension::Memory.command_name(), "context");
+    }
+
+    #[test]
+    fn test_dimension_all() {
+        let all = Dimension::all();
+        assert_eq!(all.len(), 4);
+        assert!(all.contains(&Dimension::Statistics));
+        assert!(all.contains(&Dimension::Coordination));
+        assert!(all.contains(&Dimension::BlackBox));
+        assert!(all.contains(&Dimension::Memory));
+    }
+
+    #[test]
+    fn test_entry_type_icon() {
+        assert_eq!(EntryType::ShellCommand.icon(), "🐚");
+        assert_eq!(EntryType::LlmRequest.icon(), "📤");
+        assert_eq!(EntryType::ContextMessage.icon(), "💭");
+    }
+
+    #[test]
+    fn test_status_icon() {
+        assert_eq!(Status::Success.icon(), "✓");
+        assert_eq!(Status::Failed("error".to_string()).icon(), "✗");
+        assert_eq!(Status::Running.icon(), "⟳");
+        assert_eq!(Status::Cancelled.icon(), "⊘");
+    }
+
+    #[test]
+    fn test_status_is_success() {
+        assert!(Status::Success.is_success());
+        assert!(!Status::Failed("error".to_string()).is_success());
+        assert!(!Status::Running.is_success());
+    }
+
+    #[test]
+    fn test_status_is_failed() {
+        assert!(!Status::Success.is_failed());
+        assert!(Status::Failed("error".to_string()).is_failed());
+        assert!(!Status::Running.is_failed());
+    }
+
+    #[test]
+    fn test_status_error_message() {
+        assert_eq!(Status::Success.error_message(), None);
+        assert_eq!(
+            Status::Failed("test error".to_string()).error_message(),
+            Some("test error")
+        );
+        assert_eq!(Status::Running.error_message(), None);
+    }
+
+    #[test]
+    fn test_dimension_serialization() {
+        let dim = Dimension::Statistics;
+        let json = serde_json::to_string(&dim).unwrap();
+        let deserialized: Dimension = serde_json::from_str(&json).unwrap();
+        assert_eq!(dim, deserialized);
+    }
+
+    #[test]
+    fn test_entry_type_serialization() {
+        let entry_type = EntryType::ShellCommand;
+        let json = serde_json::to_string(&entry_type).unwrap();
+        let deserialized: EntryType = serde_json::from_str(&json).unwrap();
+        assert_eq!(entry_type, deserialized);
+    }
+
+    #[test]
+    fn test_status_serialization() {
+        let status = Status::Failed("test".to_string());
+        let json = serde_json::to_string(&status).unwrap();
+        let deserialized: Status = serde_json::from_str(&json).unwrap();
+        assert_eq!(status, deserialized);
+    }
+}
