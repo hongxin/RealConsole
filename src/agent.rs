@@ -475,8 +475,10 @@ impl Agent {
             return None;
         }
 
+        // 启动时强制关闭语音播报，需要用户主动开启（/voice on）
+        // 这样可以避免用户忘记配置而导致意外播报，提升用户体验
         let broadcast_config = BroadcastConfig {
-            enabled: config.voice.enabled,
+            enabled: false, // 强制关闭，忽略配置文件中的设置
             voice: config.voice.voice.clone(),
             max_queue_size: config.voice.max_queue_size,
         };

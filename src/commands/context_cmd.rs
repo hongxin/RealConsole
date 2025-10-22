@@ -37,50 +37,39 @@ pub fn register_context_commands(
 fn handle_context(args: &str, context_manager: Arc<RwLock<ContextManager>>) -> String {
     let args_str = args.trim();
 
-    // 改进的异步锁处理：使用 try_current + block_on，避免 block_in_place 嵌套
-    // 这样可以减少运行时开销和潜在的死锁风险
-    match tokio::runtime::Handle::try_current() {
-        Ok(handle) => {
-            // 在现有的 tokio runtime 上下文中执行
-            handle.block_on(async {
-                if args_str.is_empty() {
-                    // 显示帮助
-                    show_help(&context_manager).await
-                } else if args_str == "start" {
-                    // 启动上下文
-                    start_context(&context_manager).await
-                } else if args_str == "stop" {
-                    // 停止上下文
-                    stop_context(&context_manager).await
-                } else if args_str == "show" {
-                    // 显示上下文内容
-                    show_context(&context_manager).await
-                } else if args_str == "status" {
-                    // 显示状态信息
-                    show_status(&context_manager).await
-                } else if args_str == "clear" {
-                    // 清除上下文
-                    clear_context(&context_manager).await
-                } else {
-                    // 未知子命令
-                    format!(
-                        "{} {}\n\n{}",
-                        "未知子命令:".red(),
-                        args_str.yellow(),
-                        show_help_text()
-                    )
-                }
-            })
-        }
-        Err(_) => {
-            // 如果不在 tokio runtime 中，返回错误提示
-            // 这种情况通常不应该发生，因为 RealConsole 启动时会初始化 tokio runtime
-            format!(
-                "{} Context commands require async runtime (tokio not initialized)",
-                "[ERROR]".red()
-            )
-        }
-    }
+    // 使用 block_in_place 来避免嵌套运行时错误
+    // 这会将阻塞操作移到专门的线程池中，不会阻塞异步任务
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            if args_str.is_empty() {
+                // 显示帮助
+                show_help(&context_manager).await
+            } else if args_str == "start" {
+                // 启动上下文
+                start_context(&context_manager).await
+            } else if args_str == "stop" {
+                // 停止上下文
+                stop_context(&context_manager).await
+            } else if args_str == "show" {
+                // 显示上下文内容
+                show_context(&context_manager).await
+            } else if args_str == "status" {
+                // 显示状态信息
+                show_status(&context_manager).await
+            } else if args_str == "clear" {
+                // 清除上下文
+                clear_context(&context_manager).await
+            } else {
+                // 未知子命令
+                format!(
+                    "{} {}\n\n{}",
+                    "未知子命令:".red(),
+                    args_str.yellow(),
+                    show_help_text()
+                )
+            }
+        })
+    })
 }
 
 /// 显示帮助信息

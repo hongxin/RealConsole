@@ -71,7 +71,11 @@ display:
   use_colors: true          # 是否使用颜色（默认 true）
 
 # 语音播报（可选，v1.3.7+）
+# 注意：启动时语音播报始终是关闭的，需要运行 /voice on 手动开启
 # voice:
-#   enabled: false           # 是否启用
+#   enabled: false           # 此配置项已被忽略，启动时强制关闭
 #   voice: "Ting-Ting"       # macOS 中文语音（可选）
 #   max_queue_size: 10       # 队列大小
+#   auto_broadcast: true     # 开启后是否自动播报 LLM 响应
+#   max_broadcast_length: 200  # 最大播报长度（字符）
+#   filter_code_blocks: true   # 是否过滤代码块
