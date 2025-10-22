@@ -1,7 +1,7 @@
 # RealConsole (Rust)
 
 > **中文 | [English](README.en.md)**
-
+本系统不仅是氛围编程的系统开发实验与体验，也是对于古老东方哲学的实证与感悟，其表达的结果就是：
 - 程序员和运维工程师都非常喜欢用的智能 CLI Agent 
 - 在Linux/Mac/Windows WSL 命令行环境中顺畅使用，具有丝滑的用户体验
 - 基于 Rust 的高性能终端环境实现
