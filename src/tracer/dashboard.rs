@@ -15,6 +15,7 @@ use anyhow::Result;
 use colored::Colorize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use unicode_width::UnicodeWidthStr;
 
 /// Dashboard 配置
 #[derive(Debug, Clone)]
@@ -520,43 +521,31 @@ impl Dashboard {
         let bb_count = dimensions.get(&super::Dimension::BlackBox).copied().unwrap_or(0);
         let bb_percent = if total > 0 { (bb_count as f64 / total as f64 * 100.0) as usize } else { 0 };
 
+        // 准备四个象限的内容（使用正确的四象符号：两横 digram）
+        let top_left_title = format!("{} 太阳 Statistics", "⚌".yellow());      // U+268C DIGRAM FOR GREATER YANG (老阳)
+        let top_right_title = format!("{} 少阳 Coordination", "⚍".cyan());     // U+268D DIGRAM FOR LESSER YANG
+        let bottom_left_title = format!("{} 太阴 Memory", "⚎".blue());         // U+268E DIGRAM FOR GREATER YIN (老阴)
+        let bottom_right_title = format!("{} 少阴 BlackBox", "⚏".magenta());   // U+268F DIGRAM FOR LESSER YIN
+
+        let top_left_desc = "命令频率、使用模式";
+        let top_right_desc = "执行追踪、协同流程";
+        let bottom_left_desc = "对话上下文、知识积累";
+        let bottom_right_desc = "LLM 调用、智能黑盒";
+
+        let top_left_data = format!("{} {:3}% ({:4} 条)", "▸".yellow(), stat_percent, stat_count);
+        let top_right_data = format!("{} {:3}% ({:4} 条)", "▸".cyan(), coord_percent, coord_count);
+        let bottom_left_data = format!("{} {:3}% ({:4} 条)", "▸".blue(), mem_percent, mem_count);
+        let bottom_right_data = format!("{} {:3}% ({:4} 条)", "▸".magenta(), bb_percent, bb_count);
+
         lines.push(String::new());
         lines.push(format!("┌─────────────────────────┬─────────────────────────┐"));
-        lines.push(format!(
-            "│ {} 太阳 Statistics │ {} 少阳 Coordination │",
-            "☰".yellow(),
-            "☲".cyan()
-        ));
-        lines.push(format!(
-            "│ 命令频率、使用模式      │ 执行追踪、协同流程      │"
-        ));
-        lines.push(format!(
-            "│ {} {:3}% ({:4} 条)        │ {} {:3}% ({:4} 条)        │",
-            "▸".yellow(),
-            stat_percent,
-            stat_count,
-            "▸".cyan(),
-            coord_percent,
-            coord_count
-        ));
+        lines.push(format_quadrant_row(&top_left_title, &top_right_title));
+        lines.push(format_quadrant_row(top_left_desc, top_right_desc));
+        lines.push(format_quadrant_row(&top_left_data, &top_right_data));
         lines.push(format!("├─────────────────────────┼─────────────────────────┤"));
-        lines.push(format!(
-            "│ {} 太阴 Memory      │ {} 少阴 BlackBox    │",
-            "☷".blue(),
-            "☵".magenta()
-        ));
-        lines.push(format!(
-            "│ 对话上下文、知识积累    │ LLM 调用、智能黑盒      │"
-        ));
-        lines.push(format!(
-            "│ {} {:3}% ({:4} 条)        │ {} {:3}% ({:4} 条)        │",
-            "▸".blue(),
-            mem_percent,
-            mem_count,
-            "▸".magenta(),
-            bb_percent,
-            bb_count
-        ));
+        lines.push(format_quadrant_row(&bottom_left_title, &bottom_right_title));
+        lines.push(format_quadrant_row(bottom_left_desc, bottom_right_desc));
+        lines.push(format_quadrant_row(&bottom_left_data, &bottom_right_data));
         lines.push(format!("└─────────────────────────┴─────────────────────────┘"));
 
         lines.join("\n")
@@ -638,6 +627,58 @@ impl Dashboard {
 
         lines.join("\n")
     }
+}
+
+/// 格式化四象分区的一行，确保左右单元格对齐
+///
+/// 使用 unicode-width 计算实际显示宽度，处理中英文混合和 emoji
+fn format_quadrant_row(left: &str, right: &str) -> String {
+    // 每个单元格的目标宽度（不包括边框 "│ " 和 " │"）
+    const CELL_WIDTH: usize = 25;
+
+    // 移除 ANSI 颜色代码后计算实际显示宽度
+    fn visual_width(s: &str) -> usize {
+        // 简单的 ANSI 代码移除（colored crate 生成的）
+        let clean = strip_ansi_codes(s);
+        clean.width()
+    }
+
+    // 简单的 ANSI 代码移除
+    fn strip_ansi_codes(s: &str) -> String {
+        let mut result = String::new();
+        let mut in_escape = false;
+
+        for ch in s.chars() {
+            if ch == '\x1b' {
+                in_escape = true;
+            } else if in_escape {
+                if ch == 'm' {
+                    in_escape = false;
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+
+        result
+    }
+
+    let left_width = visual_width(left);
+    let right_width = visual_width(right);
+
+    let left_padding = if left_width < CELL_WIDTH {
+        " ".repeat(CELL_WIDTH - left_width)
+    } else {
+        String::new()
+    };
+
+    let right_padding = if right_width < CELL_WIDTH {
+        " ".repeat(CELL_WIDTH - right_width)
+    } else {
+        String::new()
+    };
+
+    format!("│ {}{} │ {}{} │", left, left_padding, right, right_padding)
 }
 
 #[cfg(test)]

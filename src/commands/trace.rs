@@ -117,7 +117,7 @@ fn handle_trace_recent(args: &[&str], trace_store: Arc<TraceStore>) -> String {
                     trace.user_input.yellow()
                 ));
 
-                // 显示 Span 统计
+                // 显示 Span 统计和耗时（合并到一行，紧凑化）
                 if !trace.spans.is_empty() {
                     let span_types: std::collections::HashMap<_, _> = trace.spans.iter()
                         .map(|s| s.span_type)
@@ -131,11 +131,20 @@ fn handle_trace_recent(args: &[&str], trace_store: Arc<TraceStore>) -> String {
                         type_strs.push(format!("{} {}", span_type.icon(), count));
                     }
 
-                    lines.push(format!("  {} {}", "Spans:".dimmed(), type_strs.join(", ")));
-                }
+                    let span_info = type_strs.join(", ");
 
-                // 显示总时长
-                if let Some(duration_ms) = trace.total_duration_ms() {
+                    // 合并耗时信息到同一行
+                    if let Some(duration_ms) = trace.total_duration_ms() {
+                        lines.push(format!("  {} {} | 耗时: {}ms",
+                            "Spans:".dimmed(),
+                            span_info,
+                            duration_ms.to_string().cyan()
+                        ));
+                    } else {
+                        lines.push(format!("  {} {}", "Spans:".dimmed(), span_info));
+                    }
+                } else if let Some(duration_ms) = trace.total_duration_ms() {
+                    // 如果没有 Spans，只显示耗时
                     lines.push(format!("  {} {}ms", "耗时:".dimmed(), duration_ms.to_string().cyan()));
                 }
 
@@ -674,18 +683,28 @@ fn build_tree_lines(
     is_last: bool,
     lines: &mut Vec<String>,
 ) {
+    use crate::trace_context::SpanType;
+
     // 当前节点
     let connector = if is_last { "└─" } else { "├─" };
     let status_icon = span.status.icon();
     let span_type_icon = span.span_type.icon();
     let duration_ms = span.duration_ms().unwrap_or(0);
 
+    // 针对 Handler 类型（⚙️ emoji），多加一个空格用于对齐
+    let icon_spacing = if matches!(span.span_type, SpanType::Handler) {
+        "  "  // 两个空格
+    } else {
+        " "   // 一个空格
+    };
+
     lines.push(format!(
-        "{}{} {} {} {} ({}ms)",
+        "{}{} {} {}{}{}({}ms)",
         prefix,
         connector,
         status_icon,
         span_type_icon,
+        icon_spacing,
         span.name.cyan(),
         duration_ms.to_string().dimmed()
     ));
