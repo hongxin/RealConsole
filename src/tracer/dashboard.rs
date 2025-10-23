@@ -10,6 +10,7 @@
 //! 坎卦（☵）- 向内深入：分析系统规律，检测异常
 
 use super::{TraceStats, UnifiedTracer};
+use crate::utils::string::truncate_safe;
 use anyhow::Result;
 use colored::Colorize;
 use std::collections::HashMap;
@@ -321,15 +322,12 @@ impl Dashboard {
                 data.insert("unique_errors".to_string(), repeated_errors.len().to_string());
                 data.insert("top_error".to_string(), most_repeated.to_string());
 
+                // 使用安全截断工具函数（自动处理 UTF-8 字符边界）
+                let error_preview = truncate_safe(most_repeated, 40);
+
                 anomalies.push(Anomaly {
                     anomaly_type: AnomalyType::RepeatedErrors,
-                    description: format!("检测到重复错误：{} 次 - {}", max_count,
-                        if most_repeated.len() > 40 {
-                            format!("{}...", &most_repeated[..40])
-                        } else {
-                            most_repeated.to_string()
-                        }
-                    ),
+                    description: format!("检测到重复错误：{} 次 - {}", max_count, error_preview),
                     severity: if max_count >= 5 { 5 } else { 4 },
                     data,
                 });

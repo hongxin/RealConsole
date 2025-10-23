@@ -216,11 +216,8 @@ impl Display {
                 println!("{} {}", "→ 执行:".dimmed(), command.dimmed());
             } else {
                 // Standard 模式：简化显示（最多50字符）
-                let short_cmd = if command.len() > 50 {
-                    format!("{}...", &command[..47])
-                } else {
-                    command.to_string()
-                };
+                use crate::utils::string::truncate_safe;
+                let short_cmd = truncate_safe(command, 47);
                 println!("{} {}", "→".dimmed(), short_cmd.dimmed());
             }
         }

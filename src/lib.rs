@@ -48,7 +48,7 @@ pub mod tool_cache; // ✨ Week 3 Day 2: 工具缓存系统
 pub mod tool_executor;
 pub mod trace_context; // ✨ v1.5.1: 追踪上下文（TraceContext, ExecutionSpan）
 pub mod tracer; // ✨ Phase 2 (Memory Redesign): 统一追踪系统（四维观测）
-pub mod utils; // ✨ Phase 2: 软阈值工具（连续场重构）
+pub mod utils; // ✨ Phase 2: 软阈值工具（连续场重构） + 字符串处理等通用工具
 pub mod voice; // ✨ 语音播报系统
 pub mod wizard;
 

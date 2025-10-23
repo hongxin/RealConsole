@@ -422,12 +422,9 @@ impl WorkflowExecutor {
             }
 
             TransformOperation::Truncate { max_length } => {
-                // 截断文本
-                let truncated = if input.len() > *max_length {
-                    format!("{}...", &input[..*max_length])
-                } else {
-                    input.clone()
-                };
+                // 安全截断文本（考虑 UTF-8 字符边界）
+                use crate::utils::string::truncate_safe;
+                let truncated = truncate_safe(input, *max_length);
                 Ok(truncated)
             }
 
