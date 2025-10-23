@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 /// 历史记录项
 ///
@@ -37,6 +38,10 @@ pub struct HistoryEntry {
     /// 最后执行是否成功
     #[serde(default)]
     pub last_success: bool,
+
+    /// ✨ v1.5.1: 追踪 ID（关联到 TraceContext）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<Uuid>,
 }
 
 impl HistoryEntry {
@@ -49,6 +54,20 @@ impl HistoryEntry {
             last_timestamp: now,
             count: 1,
             last_success: true,
+            trace_id: None,
+        }
+    }
+
+    /// ✨ v1.5.1: 创建带 trace_id 的历史记录项
+    pub fn with_trace_id(command: String, trace_id: Uuid) -> Self {
+        let now = Utc::now();
+        Self {
+            command,
+            first_timestamp: now,
+            last_timestamp: now,
+            count: 1,
+            last_success: true,
+            trace_id: Some(trace_id),
         }
     }
 
@@ -57,6 +76,14 @@ impl HistoryEntry {
         self.count += 1;
         self.last_timestamp = Utc::now();
         self.last_success = success;
+    }
+
+    /// ✨ v1.5.1: 更新执行信息，同时更新 trace_id
+    pub fn update_with_trace(&mut self, success: bool, trace_id: Uuid) {
+        self.count += 1;
+        self.last_timestamp = Utc::now();
+        self.last_success = success;
+        self.trace_id = Some(trace_id);
     }
 
     /// 计算综合得分（用于排序）
@@ -176,6 +203,47 @@ impl HistoryManager {
         } else {
             // 添加新记录
             let entry = HistoryEntry::new(command.clone());
+            self.entries.push(entry);
+            let index = self.entries.len() - 1;
+            self.command_index.insert(command, index);
+
+            // 检查是否超过最大数量
+            if self.entries.len() > self.max_entries {
+                self.prune();
+            }
+        }
+
+        // 自动持久化
+        if self.auto_save {
+            if let Err(e) = self.save() {
+                eprintln!("警告: 保存历史记录失败: {}", e);
+            }
+        }
+    }
+
+    /// ✨ v1.5.1: 添加带 trace_id 的命令到历史记录
+    ///
+    /// # 参数
+    /// - `command`: 命令内容
+    /// - `success`: 是否执行成功
+    /// - `trace_id`: 追踪 ID
+    pub fn add_with_trace(&mut self, command: impl Into<String>, success: bool, trace_id: Uuid) {
+        let command = command.into();
+
+        // 忽略空命令和系统命令
+        if command.trim().is_empty() || command.starts_with('/') {
+            return;
+        }
+
+        // 检查是否已存在
+        if let Some(&index) = self.command_index.get(&command) {
+            // 更新现有记录
+            if let Some(entry) = self.entries.get_mut(index) {
+                entry.update_with_trace(success, trace_id);
+            }
+        } else {
+            // 添加新记录
+            let entry = HistoryEntry::with_trace_id(command.clone(), trace_id);
             self.entries.push(entry);
             let index = self.entries.len() - 1;
             self.command_index.insert(command, index);

@@ -39,6 +39,7 @@ mod task; // ✨ Phase 10: 任务分解与规划系统
 mod tool;
 mod tool_cache; // ✨ Phase 5.3 Week 3 Day 2
 mod tool_executor;
+mod trace_context; // ✨ v1.5.1: 追踪上下文（TraceContext, ExecutionSpan）
 mod tracer; // ✨ Phase 2 (Memory Redesign): 统一追踪系统
 mod utils; // ✨ Phase 2: 软阈值工具（连续场重构）
 mod voice; // ✨ 语音播报系统
@@ -470,7 +471,9 @@ async fn main() {
         llm_logger.clone(),
         conversation_context.clone(),
     ));
-    commands::register_trace_commands(&mut agent.registry, unified_tracer);
+    // ✨ v1.5.1: 传递 trace_store 到 trace 命令
+    let trace_store_clone = Arc::clone(&agent.trace_store);
+    commands::register_trace_commands(&mut agent.registry, unified_tracer, trace_store_clone);
 
     // ✨ 注册语音播报命令
     let voice_broadcaster = agent.voice_broadcaster.clone();

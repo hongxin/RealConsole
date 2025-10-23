@@ -384,6 +384,29 @@ impl UnifiedTracer {
 
         result
     }
+
+    /// ✨ v1.6.0: 获取失败的执行日志
+    ///
+    /// 用于异常检测和错误分析
+    ///
+    /// # 参数
+    ///
+    /// - `limit`: 最大返回日志数
+    ///
+    /// # 返回
+    ///
+    /// 返回最近的失败执行日志列表
+    pub async fn get_failed_logs(&self, limit: usize) -> Result<Vec<crate::execution_logger::ExecutionLog>> {
+        let logger = self.exec_logger.read().await;
+        let recent_logs = logger.recent(limit * 2); // 获取更多日志，然后过滤失败的
+
+        Ok(recent_logs
+            .into_iter()
+            .filter(|log| !log.success)
+            .take(limit)
+            .cloned()
+            .collect())
+    }
 }
 
 /// 追踪统计信息

@@ -33,6 +33,7 @@
 - `src/task/` - 任务编排系统
 - `src/tracer/` - 统一追踪系统（v1.5.0新增，四维观测体系）
 - `src/i18n.rs` - 国际化系统
+- `scripts/` - Shell 脚本集合（test/ 按功能分类的测试脚本，utils/ 发布等工具）
 - `docs/` - 五态架构文档（00-core/01-understanding/02-practice/03-evolution/04-reports）
 
 ## 开发规范
@@ -48,11 +49,12 @@
 - 主配置 `realconsole.yaml`，环境变量 `.env`（不提交）
 - 测试覆盖报告放到 `coverage/` 目录
 
-**文档组织**（四态体系）：
+**文档组织**（五态体系）：
 - 00-core：核心理念（philosophy/vision/roadmap）
 - 01-understanding：设计分析
 - 02-practice：用户/开发者指南
 - 03-evolution：开发历程
+- 04-reports：开发或测试的报告
 
 **国际化**：
 - 中文优先，英文同步

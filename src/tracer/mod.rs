@@ -40,6 +40,7 @@
 //! - `docs/04-reports/trace-implementation-plan.md` - 实施计划
 //! - `docs/04-reports/four-dimensions-philosophy.md` - 哲学理论基础
 
+pub mod dashboard;
 pub mod entry;
 pub mod types;
 pub mod unified_tracer;
@@ -48,6 +49,7 @@ pub mod unified_tracer;
 mod benchmarks;
 
 // 重新导出核心类型，方便使用
+pub use dashboard::{Dashboard, DashboardConfig, HealthScore};
 pub use entry::TraceEntry;
 pub use types::{Dimension, EntryType, Status};
 pub use unified_tracer::{TraceStats, UnifiedTracer};

@@ -57,6 +57,9 @@ use crate::services::{
 // ✨ 语音播报系统
 use crate::voice::{BroadcastConfig, VoiceBroadcaster};
 
+// ✨ v1.5.1: 追踪上下文系统
+use crate::trace_context::{ExecutionSpan, SpanType, TraceContext, TraceStore};
+
 /// Agent 核心
 ///
 /// ✨ Phase 2 (v1.3.0): 服务层架构重构
@@ -120,6 +123,8 @@ pub struct Agent {
     llm_logger: Option<Arc<crate::llm::LlmLogger>>,
     // ✨ 语音播报系统
     pub voice_broadcaster: Option<Arc<VoiceBroadcaster>>,
+    // ✨ v1.5.1: 追踪上下文存储（保留最近1000个trace）
+    pub trace_store: Arc<TraceStore>,
 }
 
 impl Agent {
@@ -222,6 +227,9 @@ impl Agent {
 
         // ✨ Phase 9.1: 初始化上下文追踪器
         let context_tracker = ContextTracker::new();
+
+        // ✨ v1.5.1: 初始化追踪存储（保留最近1000个trace）
+        let trace_store = Arc::new(TraceStore::new(1000));
 
         // 初始化工具注册表并注册内置工具
         let mut tool_registry = ToolRegistry::new();
@@ -351,6 +359,7 @@ impl Agent {
                 workflow_executor: workflow_executor.clone(),
                 llm_logger,
                 voice_broadcaster,
+                trace_store: Arc::clone(&trace_store),
             };
         }
 
@@ -428,6 +437,7 @@ impl Agent {
             workflow_executor,
             llm_logger,
             voice_broadcaster,
+            trace_store: Arc::clone(&trace_store),
         }
     }
 
@@ -676,6 +686,26 @@ impl Agent {
         // 开始计时
         let start = Instant::now();
 
+        // ✨ v1.5.1: 创建追踪上下文并启动追踪
+        let trace_ctx = TraceContext::new(line);
+        let trace_id = trace_ctx.trace_id;
+
+        // 创建根 Span（UserInput）
+        let mut root_span = ExecutionSpan::new(
+            trace_ctx.span_id,
+            trace_ctx.trace_id,
+            None,
+            "user_input",
+            SpanType::UserInput,
+        );
+
+        // 启动追踪
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let _ = self.trace_store.start_trace(trace_id, line.to_string()).await;
+            })
+        });
+
         // 记录用户输入
         // NOTE: Memory system FROZEN per Phase 1 of redesign plan
         // See: docs/04-reports/memory-system-redesign.md
@@ -705,16 +735,35 @@ impl Agent {
         }
 
         // ✨ Phase 10.1: 使用智能命令路由器识别命令类型
+        // ✨ v1.5.1: 创建 Router Span
+        let (_router_ctx, mut router_span) = trace_ctx.create_child("command_router");
+        router_span.span_type = SpanType::Router;
+
         let router_result = self.command_router.route(line);
+
+        // 记录路由结果到 span 属性
+        router_span.set_attribute(
+            "route_type",
+            serde_json::json!(format!("{:?}", router_result)),
+        );
+        router_span.set_success();
+
+        // 记录 Router Span
+        let router_span_clone = router_span.clone();
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let _ = self.trace_store.record_span(router_span_clone).await;
+            })
+        });
 
         let (command_type, response) = match router_result {
             RouterCommandType::CommonShell(cmd) => {
                 // 常见Shell命令，直接执行
-                (CommandType::Shell, self.handle_shell(&cmd))
+                (CommandType::Shell, self.handle_shell(&trace_ctx, &cmd))
             }
             RouterCommandType::ForcedShell(cmd) => {
                 // 强制Shell执行（!前缀）
-                (CommandType::Shell, self.handle_shell(&cmd))
+                (CommandType::Shell, self.handle_shell(&trace_ctx, &cmd))
             }
             RouterCommandType::SystemCommand(cmd_name, arg) => {
                 // 系统命令（/前缀）
@@ -723,11 +772,11 @@ impl Agent {
                 } else {
                     format!("{} {}", cmd_name, arg)
                 };
-                (CommandType::Command, self.handle_command(&input))
+                (CommandType::Command, self.handle_command(&trace_ctx, &input))
             }
             RouterCommandType::NaturalLanguage(text) => {
                 // 自然语言，交给LLM处理
-                (CommandType::Text, self.handle_text(&text))
+                (CommandType::Text, self.handle_text(&trace_ctx, &text))
             }
         };
 
@@ -744,16 +793,16 @@ impl Agent {
                         && !response.to_lowercase().contains("error")
                         && !response.to_lowercase().contains("failed");
 
-                    // 记录到执行日志
+                    // ✨ v1.5.1: 记录到执行日志（带 trace_id）
                     {
                         let mut logger = self.exec_logger.write().await;
-                        logger.log(line.to_string(), command_type, success, duration, &response);
+                        logger.log_with_trace(line.to_string(), command_type, success, duration, &response, trace_id);
                     }
 
-                    // ✨ Phase 8: 记录到命令历史
+                    // ✨ Phase 8 + v1.5.1: 记录到命令历史（带 trace_id）
                     {
                         let mut history = self.history.write().await;
-                        history.add(line, success);
+                        history.add_with_trace(line, success, trace_id);
                     }
 
                     // ✨ Phase 9: 记录到统计收集器
@@ -828,20 +877,49 @@ impl Agent {
             });
         }
 
+        // ✨ v1.5.1: 完成根 Span 并记录追踪
+        root_span.set_success();
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                // 记录根 Span
+                let _ = self.trace_store.record_span(root_span).await;
+                // 完成追踪
+                let _ = self.trace_store.finish_trace(trace_id).await;
+            })
+        });
+
         response
     }
 
     /// 处理 Shell 命令
     /// ✨ Phase 9.2: 集成错误自动修复系统
-    fn handle_shell(&self, cmd: &str) -> String {
+    fn handle_shell(&self, ctx: &TraceContext, cmd: &str) -> String {
+        // ✨ v1.5.1: 创建 Shell Execution Span
+        let (_shell_ctx, mut shell_span) = ctx.create_child("shell_execution");
+        shell_span.span_type = SpanType::ShellExec;
+        shell_span.set_attribute("command", serde_json::json!(cmd));
+
         if !self.config.features.shell_enabled {
+            shell_span.set_failed("Shell execution disabled");
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let _ = self.trace_store.record_span(shell_span).await;
+                })
+            });
             return format!("{}", "Shell 执行已禁用".red());
         }
 
         // 特殊处理：cd 命令需要在主进程中生效
         let cmd_trimmed = cmd.trim();
         if cmd_trimmed.starts_with("cd ") || cmd_trimmed == "cd" {
-            return self.handle_cd_command(cmd_trimmed);
+            let result = self.handle_cd_command(cmd_trimmed);
+            shell_span.set_success();
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let _ = self.trace_store.record_span(shell_span).await;
+                })
+            });
+            return result;
         }
 
         // ✨ Phase 9.2: 使用 ShellExecutorWithFixer 执行命令（带错误分析）
@@ -853,8 +931,13 @@ impl Agent {
             })
         });
 
+        // 记录执行结果到 Span
+        shell_span.set_attribute("success", serde_json::json!(execution_result.success));
+
         // 如果执行失败且有修复策略，保存失败的命令并显示交互式修复流程
-        if !execution_result.success && !execution_result.fix_strategies.is_empty() {
+        let result = if !execution_result.success && !execution_result.fix_strategies.is_empty() {
+            shell_span.set_attribute("has_fix_strategies", serde_json::json!(true));
+
             // 保存失败的命令（用于 /fix 命令）
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
@@ -868,7 +951,22 @@ impl Agent {
         } else {
             // 正常输出或没有修复建议的错误
             execution_result.output
+        };
+
+        // 完成 Span 并记录
+        if execution_result.success {
+            shell_span.set_success();
+        } else {
+            shell_span.set_failed("Command execution failed");
         }
+
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let _ = self.trace_store.record_span(shell_span).await;
+            })
+        });
+
+        result
     }
 
     /// 处理 cd 命令（在主进程中改变目录）
@@ -1116,20 +1214,43 @@ impl Agent {
 
     /// 处理命令
     /// ✨ Phase 9.2: 添加 /fix 命令支持
-    fn handle_command(&self, input: &str) -> String {
+    fn handle_command(&self, ctx: &TraceContext, input: &str) -> String {
+        // ✨ v1.5.1: 创建 System Command Span
+        let (_cmd_ctx, mut cmd_span) = ctx.create_child("system_command");
+        cmd_span.span_type = SpanType::SystemCommand;
+        cmd_span.set_attribute("command", serde_json::json!(input));
+
         let parts: Vec<&str> = input.splitn(2, ' ').collect();
         let cmd_name = parts[0];
         let arg = parts.get(1).copied().unwrap_or("");
 
-        // ✨ Phase 9.2: 特殊处理 /fix 命令
-        if cmd_name == "fix" {
-            return self.handle_fix_command();
-        }
+        cmd_span.set_attribute("command_name", serde_json::json!(cmd_name));
+        cmd_span.set_attribute("argument", serde_json::json!(arg));
 
-        match self.registry.execute(cmd_name, arg) {
-            Ok(output) => output,
-            Err(err) => format!("{}", err.red()),
-        }
+        // ✨ Phase 9.2: 特殊处理 /fix 命令
+        let result = if cmd_name == "fix" {
+            self.handle_fix_command()
+        } else {
+            match self.registry.execute(cmd_name, arg) {
+                Ok(output) => {
+                    cmd_span.set_success();
+                    output
+                }
+                Err(err) => {
+                    cmd_span.set_failed(err.to_string());
+                    format!("{}", err.red())
+                }
+            }
+        };
+
+        // 记录 Span
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let _ = self.trace_store.record_span(cmd_span).await;
+            })
+        });
+
+        result
     }
 
     /// ✨ Phase 9.2: 处理 /fix 命令 - 重试上次失败的命令
@@ -1144,7 +1265,9 @@ impl Agent {
         match last_cmd {
             Some(cmd) => {
                 println!("{} {}", "🔄 重试命令:".cyan().bold(), cmd.cyan());
-                self.handle_shell(&cmd)
+                // 为重试创建新的追踪上下文
+                let retry_ctx = TraceContext::new(format!("/fix: {}", cmd));
+                self.handle_shell(&retry_ctx, &cmd)
             }
             None => {
                 format!(
@@ -1157,43 +1280,77 @@ impl Agent {
     }
 
     /// 处理自由文本（Intent 识别 → LLM 对话）
-    fn handle_text(&self, text: &str) -> String {
+    fn handle_text(&self, ctx: &TraceContext, text: &str) -> String {
+        // ✨ v1.5.1: 创建 Handler Span
+        let (_text_ctx, mut handler_span) = ctx.create_child("text_handler");
+        handler_span.span_type = SpanType::Handler;
+        handler_span.set_attribute("input", serde_json::json!(text));
+
         // ✨ Phase 8 Week 2: 优先检查多轮对话（一分为三：对话态、意图态、LLM态）
         // 1️⃣ 对话态：如果有活跃对话，继续对话流程
         if has_active_conversation() {
-            return self.handle_conversation_input(text);
+            handler_span.set_attribute("mode", serde_json::json!("conversation"));
+            let result = self.handle_conversation_input(text);
+            handler_span.set_success();
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let _ = self.trace_store.record_span(handler_span).await;
+                })
+            });
+            return result;
         }
 
         // 2️⃣ 检测是否需要启动新对话（特定意图需要参数收集）
         if let Some(response) = self.try_start_conversation(text) {
+            handler_span.set_attribute("mode", serde_json::json!("conversation_start"));
+            handler_span.set_success();
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let _ = self.trace_store.record_span(handler_span).await;
+                })
+            });
             return response;
         }
 
         // 🔧 优先使用 LLM 工具调用（如果启用且可用）
         let use_tools = self.config.features.tool_calling_enabled.unwrap_or(false);
 
-        if use_tools {
+        let result = if use_tools {
             // 使用 LLM 工具调用模式（更智能，支持 count_code_lines 等工具）
-            return self.handle_text_with_tools(text);
-        }
+            handler_span.set_attribute("mode", serde_json::json!("llm_with_tools"));
+            self.handle_text_with_tools(ctx, text)
+        } else if let Some(response) = self.try_match_workflow(text) {
+            // ✨ Phase 8: 尝试匹配 Workflow Intent（套路化复用）
+            handler_span.set_attribute("mode", serde_json::json!("workflow"));
+            response
+        } else if let Some(plan) = self.try_match_intent(text) {
+            // ✨ Phase 3: 回退到 Intent 识别（道法自然 - 先识别意图，未匹配则回退到流式LLM）
+            handler_span.set_attribute("mode", serde_json::json!("intent"));
+            self.execute_intent(&plan)
+        } else {
+            // 最后回退：使用传统流式输出模式
+            handler_span.set_attribute("mode", serde_json::json!("llm_streaming"));
+            self.handle_text_streaming(ctx, text)
+        };
 
-        // ✨ Phase 8: 尝试匹配 Workflow Intent（套路化复用）
-        // 优先于传统 Intent，因为 Workflow 性能更优
-        if let Some(response) = self.try_match_workflow(text) {
-            return response;
-        }
+        handler_span.set_success();
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let _ = self.trace_store.record_span(handler_span).await;
+            })
+        });
 
-        // ✨ Phase 3: 回退到 Intent 识别（道法自然 - 先识别意图，未匹配则回退到流式LLM）
-        if let Some(plan) = self.try_match_intent(text) {
-            return self.execute_intent(&plan);
-        }
-
-        // 最后回退：使用传统流式输出模式
-        self.handle_text_streaming(text)
+        result
     }
 
     /// 使用工具调用处理文本
-    fn handle_text_with_tools(&self, text: &str) -> String {
+    fn handle_text_with_tools(&self, ctx: &TraceContext, text: &str) -> String {
+        // ✨ v1.5.1: 创建 LLM Span（工具调用模式）
+        let (_llm_ctx, mut llm_span) = ctx.create_child("llm_with_tools");
+        llm_span.span_type = SpanType::LlmCall;
+        llm_span.set_attribute("mode", serde_json::json!("with_tools"));
+        llm_span.set_attribute("input", serde_json::json!(text));
+
         // ✨ Phase 3: 集成对话上下文支持（与 handle_text_streaming 对齐）
         // ✨ Phase 2.2 (v1.3.0): 使用 LlmService 处理
 
@@ -1269,12 +1426,53 @@ impl Agent {
                 // Clone for logging before response is moved
                 let full_response_clone = response.clone();
 
+                // ✨ v1.5.1: 记录 LLM 响应到 Span
+                llm_span.set_attribute("success", serde_json::json!(true));
+                llm_span.set_attribute("response_length", serde_json::json!(response.len()));
+
                 // ✨ 解析并显示对话轮次调试信息（成功时，仅当配置启用且为 debug 模式）
-                if self.config.display.show_conversation_rounds
-                    && self.config.display.mode.show_debug()
+                // ✨ v1.5.1: 同时记录工具调用信息和创建 Tool Span
+                if let Some(rounds) =
+                    crate::tool_executor::ToolExecutor::decode_debug_info(&response)
                 {
-                    if let Some(rounds) =
-                        crate::tool_executor::ToolExecutor::decode_debug_info(&response)
+                    // 记录工具调用统计到 LLM Span
+                    let total_tool_calls: usize = rounds.iter().map(|r| r.tool_calls.len()).sum();
+                    llm_span.set_attribute("tool_calls_count", serde_json::json!(total_tool_calls));
+                    llm_span.set_attribute("rounds_count", serde_json::json!(rounds.len()));
+
+                    // ✨ v1.5.1: 为每个工具调用创建 Tool Span
+                    for round in &rounds {
+                        for tool_call in &round.tool_calls {
+                            let (_tool_ctx, mut tool_span) = ctx.create_child(&format!("tool_{}", tool_call.name));
+                            tool_span.span_type = SpanType::ToolCall;
+                            tool_span.set_attribute("tool_name", serde_json::json!(&tool_call.name));
+                            tool_span.set_attribute("arguments", serde_json::json!(&tool_call.arguments));
+
+                            // 查找对应的工具结果
+                            if let Some(result) = round.tool_results.iter()
+                                .find(|r| r.contains(&tool_call.name)) {
+                                tool_span.set_attribute("result_preview", serde_json::json!(
+                                    if result.len() > 100 {
+                                        format!("{}...", &result[..100])
+                                    } else {
+                                        result.clone()
+                                    }
+                                ));
+                            }
+
+                            tool_span.set_success();
+                            let tool_span_clone = tool_span.clone();
+                            tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current().block_on(async {
+                                    let _ = self.trace_store.record_span(tool_span_clone).await;
+                                })
+                            });
+                        }
+                    }
+
+                    // 显示调试信息
+                    if self.config.display.show_conversation_rounds
+                        && self.config.display.mode.show_debug()
                     {
                         let round_infos: Vec<crate::display::ConversationRoundInfo> = rounds
                             .iter()
@@ -1376,6 +1574,15 @@ impl Agent {
                     });
                 }
 
+                // ✨ v1.5.1: 完成并记录 LLM Span
+                llm_span.set_success();
+                let llm_span_clone = llm_span.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let _ = self.trace_store.record_span(llm_span_clone).await;
+                    })
+                });
+
                 clean_response
             }
             Err(e) => {
@@ -1415,6 +1622,15 @@ impl Agent {
                 } else {
                     &error_msg
                 };
+
+                // ✨ v1.5.1: 记录 LLM 失败到 Span
+                llm_span.set_failed(error_text);
+                let llm_span_clone = llm_span.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let _ = self.trace_store.record_span(llm_span_clone).await;
+                    })
+                });
 
                 // 🔍 LLM Logger: 记录失败的交互
                 if let (Some(logger), Some(session_id)) = (logger_opt, session_id_opt) {
@@ -1494,7 +1710,13 @@ impl Agent {
     }
 
     /// 使用流式输出处理文本（传统模式）
-    fn handle_text_streaming(&self, text: &str) -> String {
+    fn handle_text_streaming(&self, ctx: &TraceContext, text: &str) -> String {
+        // ✨ v1.5.1: 创建 LLM Span（流式模式）
+        let (_llm_ctx, mut llm_span) = ctx.create_child("llm_streaming");
+        llm_span.span_type = SpanType::LlmCall;
+        llm_span.set_attribute("mode", serde_json::json!("streaming"));
+        llm_span.set_attribute("input", serde_json::json!(text));
+
         // ✨ Phase 3: 集成对话上下文
         // ✨ Phase 2.4 (v1.3.0): 使用 LlmService 处理流式输出
 
@@ -1563,6 +1785,11 @@ impl Agent {
                 // 停止 spinner
                 spinner.stop();
 
+                // ✨ v1.5.1: 记录 LLM 响应到 Span
+                llm_span.set_attribute("success", serde_json::json!(true));
+                llm_span.set_attribute("response_length", serde_json::json!(response.len()));
+                llm_span.set_success();
+
                 // ✨ LLM 日志: 记录成功的交互
                 if let (Some(logger), Some(session_id)) = (logger_opt, session_id_opt) {
                     let logger_clone = Arc::clone(logger);
@@ -1618,6 +1845,14 @@ impl Agent {
                 // 流式输出已经完成，不需要额外换行
                 Display::execution_timing(self.config.display.mode, elapsed.as_secs_f64());
 
+                // ✨ v1.5.1: 记录 LLM Span
+                let llm_span_clone = llm_span.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let _ = self.trace_store.record_span(llm_span_clone).await;
+                    })
+                });
+
                 // 返回空字符串，因为内容已通过流式输出显示
                 String::new()
             }
@@ -1625,13 +1860,24 @@ impl Agent {
                 // 停止 spinner
                 spinner.stop();
 
+                let error_text = e.to_string();
+
+                // ✨ v1.5.1: 记录 LLM 失败到 Span
+                llm_span.set_failed(&error_text);
+                let llm_span_clone = llm_span.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let _ = self.trace_store.record_span(llm_span_clone).await;
+                    })
+                });
+
                 // ✨ LLM 日志: 记录失败的交互
                 if let (Some(logger), Some(session_id)) = (logger_opt, session_id_opt) {
                     let logger_clone = Arc::clone(logger);
                     let session_id_clone = session_id.clone();
                     let model_name_clone = model_name.clone();
                     let messages_clone = messages.clone();
-                    let error_msg = e.to_string();
+                    let error_msg_clone = error_text.clone();
                     let start_clone = start;
                     let text_clone = text.to_string();
 
@@ -1653,7 +1899,7 @@ impl Agent {
                                 None,                  // no response
                                 start_clone,
                                 true,                  // is_streaming
-                                Some(error_msg),       // error
+                                Some(error_msg_clone), // error
                                 context,
                             )
                             .await;

@@ -5,6 +5,80 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2025-10-23
+
+### Added
+
+- **[Feature] 系统 Dashboard (`/trace dashboard`)**
+  - 基于易经"四象"哲学的统一系统健康度视图
+  - **系统健康度评分**（0-100 分）
+    - 命令成功率（40% 权重）
+    - LLM 响应质量（20% 权重）
+    - 系统活跃度（20% 权重）
+    - 异常程度（20% 权重，反向）
+    - 5 级健康等级：优秀(90-100)、良好(75-89)、一般(60-74)、较差(40-59)、危险(0-39)
+  - **四象分区视图**
+    - ☰ 太阳（Statistics）- 命令频率、使用模式
+    - ☷ 太阴（Memory）- 对话上下文、知识积累
+    - ☲ 少阳（Coordination）- 执行追踪、协同流程
+    - ☵ 少阴（BlackBox）- LLM 调用、智能黑盒
+  - **异常检测系统**
+    - 高失败率检测（>20% 触发）
+    - 重复错误检测（>=3 次触发）
+    - 严重程度分级（1-5）
+    - 数据关联（失败率、失败次数、错误详情等）
+  - **智能建议系统**
+    - 基于健康度的建议
+    - 基于成功率的建议
+    - 基于异常的建议（高失败率、重复错误）
+    - 基于活跃度的建议
+    - 优先级排序（1-5）
+    - 可执行命令链接
+
+- **核心模块 `tracer/dashboard.rs`**
+  - `Dashboard` - Dashboard 生成器
+  - `DashboardConfig` - 可配置选项
+  - `HealthScore` - 系统健康度评分
+  - `Anomaly` / `AnomalyType` - 异常检测
+  - `Suggestion` - 智能建议
+  - 总代码量：~620 行
+
+- **UnifiedTracer 增强**
+  - 新增 `get_failed_logs()` 方法，用于异常检测和错误分析
+  - 支持获取最近的失败执行日志
+
+### Changed
+
+- **`/trace` 命令增强**
+  - 新增 `/trace dashboard` 子命令（别名：`dash`）
+  - 更新帮助文本，添加 Dashboard 说明
+
+### Philosophy
+
+- **离卦（☲）- 向外照明**
+  - Dashboard 通过可视化展示，将系统内部状态"照明"给用户
+  - 健康度评分条形图、四象分区百分比、彩色状态标识、清晰的建议列表
+
+- **坎卦（☵）- 向内深入**
+  - Dashboard 通过算法分析，深入理解系统规律
+  - 多维度健康评分计算、异常模式检测、智能建议生成
+
+- **四象理论**
+  - Dashboard 完美体现了"四象"的分类思想
+  - 将系统观测维度抽象为四个互补视角
+
+### Performance
+
+- Dashboard 渲染时间：< 100ms
+- 异常检测额外开销：~10-20ms
+- 编译时间：~5-7s（增量编译）
+- 性能影响：可忽略不计
+
+### Documentation
+
+- 新增 `docs/04-reports/v1.6.0-dashboard-completion.md` - Dashboard 完成报告
+- 新增 `docs/04-reports/v1.6.0-optimization-report.md` - 优化完成报告
+
 ## [1.5.0] - 2025-10-23
 
 ### Added

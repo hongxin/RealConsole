@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Duration;
+use uuid::Uuid;
 
 /// 执行日志条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,6 +27,9 @@ pub struct ExecutionLog {
     pub duration_ms: u64,
     /// 结果预览（前 100 字符）
     pub result_preview: String,
+    /// ✨ v1.5.1: 追踪 ID（关联到 TraceContext）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<Uuid>,
 }
 
 /// 命令类型
@@ -80,6 +84,41 @@ impl ExecutionLog {
             success,
             duration_ms,
             result_preview,
+            trace_id: None,
+        }
+    }
+
+    /// ✨ v1.5.1: 创建带 trace_id 的执行日志
+    pub fn with_trace_id(
+        command: String,
+        command_type: CommandType,
+        success: bool,
+        duration: Duration,
+        result: &str,
+        trace_id: Uuid,
+    ) -> Self {
+        let duration_ms = duration.as_millis() as u64;
+
+        // 截取结果的前 100 字符作为预览（考虑 UTF-8 边界）
+        let result_preview = if result.len() > 100 {
+            // 找到安全的截断位置（UTF-8 字符边界）
+            let mut cutoff = 100.min(result.len());
+            while cutoff > 0 && !result.is_char_boundary(cutoff) {
+                cutoff -= 1;
+            }
+            format!("{}...", &result[..cutoff])
+        } else {
+            result.to_string()
+        };
+
+        Self {
+            timestamp: Utc::now(),
+            command,
+            command_type,
+            success,
+            duration_ms,
+            result_preview,
+            trace_id: Some(trace_id),
         }
     }
 
@@ -206,6 +245,34 @@ impl ExecutionLogger {
         result: &str,
     ) {
         let log = ExecutionLog::new(command, command_type, success, duration, result);
+
+        // Ring Buffer: 超过容量则移除最旧的
+        if self.logs.len() >= self.max_logs {
+            self.logs.pop_front();
+        }
+
+        self.logs.push_back(log);
+    }
+
+    /// ✨ v1.5.1: 记录带 trace_id 的执行日志
+    ///
+    /// # 参数
+    /// - `command`: 执行的命令
+    /// - `command_type`: 命令类型
+    /// - `success`: 是否成功
+    /// - `duration`: 执行耗时
+    /// - `result`: 执行结果
+    /// - `trace_id`: 追踪 ID
+    pub fn log_with_trace(
+        &mut self,
+        command: String,
+        command_type: CommandType,
+        success: bool,
+        duration: Duration,
+        result: &str,
+        trace_id: Uuid,
+    ) {
+        let log = ExecutionLog::with_trace_id(command, command_type, success, duration, result, trace_id);
 
         // Ring Buffer: 超过容量则移除最旧的
         if self.logs.len() >= self.max_logs {
