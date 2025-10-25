@@ -12,6 +12,7 @@ mod builtin_tools;
 mod command;
 mod command_router; // ✨ Phase 10.1: 智能命令路由系统
 mod commands;
+mod completion; // ✨ Phase 1: Tab 补全系统（静态补全）
 mod config;
 mod conversation; // ✨ Phase 8 Week 2: 多轮对话支持
 mod display;
@@ -29,7 +30,7 @@ mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支生�
 mod memory;
 mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
 mod project_context; // ✨ Phase 6: 项目上下文感知
-mod repl;
+mod repl; // REPL 循环（包含 Tab 补全集成）
 mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 mod shell_executor;
 mod spinner;

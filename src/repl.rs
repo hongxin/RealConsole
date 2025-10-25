@@ -3,22 +3,99 @@
 //! 使用 rustyline 提供基础的 readline 功能
 //! ✨ Phase 8: 集成命令历史记录和 Ctrl+R 搜索
 //! ✨ Phase 11: 多语言支持
+//! ✨ Phase 1: Tab 补全系统集成
 
 use crate::agent::Agent;
+use crate::completion::{CompletionConfig, MultiDimensionalCompleter};
 use crate::history::SortStrategy;
 use crate::i18n;
 use colored::Colorize;
+use rustyline::completion::{Completer, Pair};
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor, Result as RustyResult};
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::validate::Validator;
+use rustyline::{Context, Editor, Result as RustyResult};
+use std::borrow::Cow;
 use std::env;
 
 /// REPL 退出信号
 const QUIT_SIGNAL: &str = "__QUIT__";
 
+/// RealConsole Helper - 集成补全、高亮、提示等功能
+struct RealConsoleHelper {
+    completer: MultiDimensionalCompleter,
+}
+
+impl RealConsoleHelper {
+    fn new(agent: &Agent) -> Self {
+        // 获取 LLM 客户端（用于智能补全）
+        let llm_client = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                // 从 llm_manager 获取 primary 客户端
+                let manager = agent.llm_manager.read().await;
+                manager.primary().map(|c| c.clone())
+            })
+        });
+
+        let completer = MultiDimensionalCompleter::new(
+            std::sync::Arc::new(agent.registry.clone()),
+            agent.state_manager().history(),
+            CompletionConfig::default(),
+            llm_client, // 传递 LLM 客户端（可能为 None）
+        );
+
+        Self { completer }
+    }
+}
+
+// 实现 rustyline 的各种 trait
+impl rustyline::Helper for RealConsoleHelper {}
+
+impl Completer for RealConsoleHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> Result<(usize, Vec<Pair>), ReadlineError> {
+        self.completer.complete(line, pos, ctx)
+    }
+}
+
+impl Highlighter for RealConsoleHelper {
+    fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
+        // TODO: Phase 2 可实现语法高亮
+        Cow::Borrowed(line)
+    }
+
+    fn highlight_char(&self, _line: &str, _pos: usize, _forced: bool) -> bool {
+        false
+    }
+}
+
+impl Hinter for RealConsoleHelper {
+    type Hint = String;
+
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
+        // TODO: Phase 3 可实现智能提示
+        None
+    }
+}
+
+impl Validator for RealConsoleHelper {}
+
 /// 运行 REPL 循环
 pub fn run(agent: &Agent) -> RustyResult<()> {
-    let mut rl = DefaultEditor::new()?;
+    // 创建 Helper（包含补全器）
+    let helper = RealConsoleHelper::new(agent);
+
+    // 创建 Editor 并设置 Helper
+    let mut rl = Editor::new()?;
+    rl.set_helper(Some(helper));
 
     // ✨ Phase 8: 配置历史记录行为（使用 Configurer trait）
     rl.set_max_history_size(1000)?; // 与 HistoryManager 的容量保持一致
@@ -98,7 +175,10 @@ fn print_welcome() {
 /// ✨ Phase 8: 从 HistoryManager 加载历史到 rustyline Editor
 ///
 /// 这样用户可以使用 Ctrl+R 反向搜索历史命令
-fn load_history_to_editor(rl: &mut DefaultEditor, agent: &Agent) {
+fn load_history_to_editor(
+    rl: &mut Editor<RealConsoleHelper, rustyline::history::DefaultHistory>,
+    agent: &Agent,
+) {
     // 使用 tokio runtime 访问异步的 HistoryManager
     tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current().block_on(async {

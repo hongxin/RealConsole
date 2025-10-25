@@ -20,6 +20,7 @@ pub mod builtin_tools;
 pub mod command;
 pub mod command_router; // ✨ Phase 10.1: 智能命令路由系统
 pub mod commands;
+pub mod completion; // ✨ Phase 1: Tab 补全系统（静态补全）
 pub mod config;
 pub mod conversation; // ✨ Phase 8 Week 2: 多轮对话支持
 pub mod display;
@@ -30,6 +31,7 @@ pub mod error_fixer; // ✨ Phase 9.1 Week 2: 错误自动修复
 pub mod execution_logger;
 pub mod git_assistant; // ✨ Phase 6: Git 智能助手
 pub mod history; // ✨ Phase 8: 命令历史记录管理
+pub mod i18n; // ✨ Phase 11: 多语言支持
 pub mod llm;
 pub mod llm_manager;
 pub mod log_analyzer; // ✨ Phase 6: 日志分析工具
@@ -37,6 +39,7 @@ pub mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支�
 pub mod memory;
 pub mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
 pub mod project_context; // ✨ Phase 6: 项目上下文感知
+pub mod repl; // REPL 循环（包含 Tab 补全集成）
 pub mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 pub mod shell_executor;
 pub mod spinner;
@@ -54,6 +57,11 @@ pub mod wizard;
 
 // Re-export commonly used types
 pub use agent::Agent;
+pub use completion::{
+    Candidate, CompletionCache, CompletionConfig, CompletionContext, CompletionSource,
+    CompletionType, IntelligentCompleter, MultiDimensionalCompleter, SemanticCompleter,
+    StaticCompleter,
+};
 pub use config::Config;
 pub use display::{Display, DisplayMode};
 pub use error::{ErrorCode, FixSuggestion, RealError};

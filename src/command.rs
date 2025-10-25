@@ -55,6 +55,7 @@ impl Command {
 }
 
 /// 命令注册表
+#[derive(Clone)]
 pub struct CommandRegistry {
     commands: HashMap<String, Command>,
     alias_map: HashMap<String, String>,
