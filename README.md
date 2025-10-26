@@ -807,7 +807,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 🙏 致谢
 
-- **Python 版本**：SmartConsole- 设计灵感来源
+- **Python 版本**：SmartConsole - 设计灵感来源
 - **Rust 社区**：优秀的工具和库
 - **LLM 提供商**：Ollama、Deepseek、OpenAI
 
