@@ -61,7 +61,7 @@ use crate::voice::{BroadcastConfig, VoiceBroadcaster};
 use crate::trace_context::{ExecutionSpan, SpanType, TraceContext, TraceStore};
 
 // ✨ Phase 4.1: 主动建议系统
-use crate::suggestion::{SuggestionConfig, SuggestionContext, SuggestionEngine};
+use crate::suggestion::{Suggestion, SuggestionConfig, SuggestionContext, SuggestionEngine};
 
 /// Agent 核心
 ///
@@ -130,6 +130,8 @@ pub struct Agent {
     pub trace_store: Arc<TraceStore>,
     // ✨ Phase 4.1: 主动建议系统（三源融合）
     pub suggestion_engine: Option<Arc<SuggestionEngine>>,
+    // ✨ Phase 4.2: 最近显示的建议缓存（用于快速执行）
+    pub last_suggestions: Arc<RwLock<Vec<Suggestion>>>,
 }
 
 impl Agent {
@@ -366,6 +368,7 @@ impl Agent {
                 voice_broadcaster,
                 trace_store: Arc::clone(&trace_store),
                 suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
+                last_suggestions: Arc::new(RwLock::new(Vec::new())), // ✨ Phase 4.2: 建议缓存
             };
         }
 
@@ -445,6 +448,7 @@ impl Agent {
             voice_broadcaster,
             trace_store: Arc::clone(&trace_store),
             suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
+            last_suggestions: Arc::new(RwLock::new(Vec::new())), // ✨ Phase 4.2: 建议缓存
         }
     }
 
@@ -766,6 +770,20 @@ impl Agent {
             return "__QUIT__".to_string();
         }
 
+        // ✨ Phase 4.2: 尝试快速执行建议（数字输入）
+        if let Some(result) = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.try_execute_cached_suggestion(line).await
+            })
+        }) {
+            // 如果是错误消息，直接返回
+            if result.contains("⚠") {
+                return result;
+            }
+            // 否则，result 是要执行的命令，递归调用 handle
+            return self.handle(&result);
+        }
+
         // ✨ Phase 10.1: 使用智能命令路由器识别命令类型
         // ✨ v1.5.1: 创建 Router Span
         let (_router_ctx, mut router_span) = trace_ctx.create_child("command_router");
@@ -875,6 +893,12 @@ impl Agent {
 
                             // 生成建议
                             let suggestions = engine.suggest(&ctx).await;
+
+                            // ✨ Phase 4.2: 更新建议缓存（用于快速执行）
+                            {
+                                let mut cache = self.last_suggestions.write().await;
+                                *cache = suggestions.clone();
+                            }
 
                             // 显示建议（如果有）
                             if !suggestions.is_empty() && self.config.features.auto_suggest.unwrap_or(true) {
@@ -1393,6 +1417,14 @@ impl Agent {
             })
         });
 
+        // ✨ Phase 4.2: 更新建议缓存（用于快速执行）
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let mut cache = self.last_suggestions.write().await;
+                *cache = suggestions.clone();
+            })
+        });
+
         // 格式化输出
         if suggestions.is_empty() {
             return format!(
@@ -1457,6 +1489,56 @@ impl Agent {
         ));
 
         output
+    }
+
+    /// ✨ Phase 4.2: 处理数字快速执行建议
+    ///
+    /// 当用户输入纯数字（如"1"、"2"）时，执行对应索引的建议
+    async fn try_execute_cached_suggestion(&self, input: &str) -> Option<String> {
+        // 检查是否为纯数字
+        let index: usize = match input.trim().parse::<usize>() {
+            Ok(n) if n > 0 => n - 1, // 用户输入1-based，转为0-based索引
+            _ => return None, // 不是有效数字
+        };
+
+        // 获取缓存的建议
+        let cache = self.last_suggestions.read().await;
+
+        if cache.is_empty() {
+            return Some(format!(
+                "{}\n{}",
+                "⚠ 没有可用的建议".yellow(),
+                "提示: 先执行 /suggest 命令查看建议，或等待命令失败时的自动建议".dimmed()
+            ));
+        }
+
+        // 检查索引是否有效
+        if index >= cache.len() {
+            return Some(format!(
+                "{}\n{}",
+                format!("⚠ 无效的建议编号：{}", index + 1).yellow(),
+                format!("提示: 当前有 {} 条建议可用", cache.len()).dimmed()
+            ));
+        }
+
+        // 获取对应的建议
+        let suggestion = &cache[index];
+        let command = suggestion.command.clone();
+
+        // 释放锁
+        drop(cache);
+
+        // 显示将要执行的命令
+        println!(
+            "{} {}",
+            "⚡ 执行建议:".green().bold(),
+            command.cyan()
+        );
+
+        // 执行命令（通过Shell）
+        // 注意：这里返回 None 让调用者继续处理命令
+        // 我们需要返回 Some(command) 让系统重新处理这个命令
+        Some(command)
     }
 
     /// 处理自由文本（Intent 识别 → LLM 对话）

@@ -46,6 +46,7 @@
 
 mod context_suggester;
 mod engine;
+mod error_patterns; // ✨ Phase 4.2: 错误模式识别
 mod history_suggester;
 mod llm_suggester;
 mod ranker;

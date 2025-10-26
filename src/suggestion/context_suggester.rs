@@ -2,6 +2,7 @@
 //!
 //! 根据项目类型、当前目录等上下文信息生成建议
 
+use super::error_patterns::ErrorPatternMatcher; // ✨ Phase 4.2
 use super::types::{
     FileType, Suggestion, SuggestionCategory, SuggestionContext, SuggestionSource,
 };
@@ -11,6 +12,8 @@ use std::path::Path;
 pub struct ContextSuggester {
     /// 是否启用项目类型检测
     enable_project_detection: bool,
+    /// ✨ Phase 4.2: 错误模式匹配器
+    error_matcher: ErrorPatternMatcher,
 }
 
 impl ContextSuggester {
@@ -18,6 +21,7 @@ impl ContextSuggester {
     pub fn new() -> Self {
         Self {
             enable_project_detection: true,
+            error_matcher: ErrorPatternMatcher::new(), // ✨ Phase 4.2
         }
     }
 
@@ -228,8 +232,21 @@ impl ContextSuggester {
     fn suggest_for_failure(&self, context: &SuggestionContext) -> Vec<Suggestion> {
         let mut suggestions = Vec::new();
 
-        // 如果最近有失败的命令，建议查看日志或帮助
-        if !context.recent_commands.is_empty() {
+        // ✨ Phase 4.2: 优先使用错误模式匹配器
+        if let Some(ref error_output) = context.last_command_output {
+            let failed_cmd = if !context.recent_commands.is_empty() {
+                Some(context.recent_commands[0].as_str())
+            } else {
+                None
+            };
+
+            // 使用错误模式匹配器分析错误
+            let pattern_suggestions = self.error_matcher.analyze_error(error_output, failed_cmd);
+            suggestions.extend(pattern_suggestions);
+        }
+
+        // 如果没有错误输出或者没有匹配到模式，使用通用建议
+        if suggestions.is_empty() && !context.recent_commands.is_empty() {
             let last_cmd = &context.recent_commands[0];
 
             // 建议查看帮助
