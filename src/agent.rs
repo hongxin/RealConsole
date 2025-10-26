@@ -61,7 +61,9 @@ use crate::voice::{BroadcastConfig, VoiceBroadcaster};
 use crate::trace_context::{ExecutionSpan, SpanType, TraceContext, TraceStore};
 
 // ✨ Phase 4.1: 主动建议系统
-use crate::suggestion::{Suggestion, SuggestionConfig, SuggestionContext, SuggestionEngine};
+use crate::suggestion::{
+    Suggestion, SuggestionCache, SuggestionConfig, SuggestionContext, SuggestionEngine,
+};
 
 /// Agent 核心
 ///
@@ -130,8 +132,8 @@ pub struct Agent {
     pub trace_store: Arc<TraceStore>,
     // ✨ Phase 4.1: 主动建议系统（三源融合）
     pub suggestion_engine: Option<Arc<SuggestionEngine>>,
-    // ✨ Phase 4.2: 最近显示的建议缓存（用于快速执行）
-    pub last_suggestions: Arc<RwLock<Vec<Suggestion>>>,
+    // ✨ Phase 4.2 P1: 建议缓存（带过期机制）
+    pub last_suggestions: Arc<RwLock<SuggestionCache>>,
 }
 
 impl Agent {
@@ -368,7 +370,7 @@ impl Agent {
                 voice_broadcaster,
                 trace_store: Arc::clone(&trace_store),
                 suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
-                last_suggestions: Arc::new(RwLock::new(Vec::new())), // ✨ Phase 4.2: 建议缓存
+                last_suggestions: Arc::new(RwLock::new(SuggestionCache::with_default_config())), // ✨ Phase 4.2 P1: 建议缓存（5分钟过期）
             };
         }
 
@@ -448,7 +450,7 @@ impl Agent {
             voice_broadcaster,
             trace_store: Arc::clone(&trace_store),
             suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
-            last_suggestions: Arc::new(RwLock::new(Vec::new())), // ✨ Phase 4.2: 建议缓存
+            last_suggestions: Arc::new(RwLock::new(SuggestionCache::with_default_config())), // ✨ Phase 4.2 P1: 建议缓存（5分钟过期）
         }
     }
 
@@ -879,6 +881,8 @@ impl Agent {
                             let mut ctx = SuggestionContext::from_env();
                             ctx.last_command_failed = true;
                             ctx.recent_commands.push(line.to_string());
+                            // ✨ Phase 4.2 P1: 传递错误输出（用于拼写检查）
+                            ctx.last_command_output = Some(response.clone());
 
                             // 获取历史命令
                             let history_guard = self.history.read().await;
@@ -894,10 +898,10 @@ impl Agent {
                             // 生成建议
                             let suggestions = engine.suggest(&ctx).await;
 
-                            // ✨ Phase 4.2: 更新建议缓存（用于快速执行）
+                            // ✨ Phase 4.2 P1: 更新建议缓存（带时间戳和过期检查）
                             {
                                 let mut cache = self.last_suggestions.write().await;
-                                *cache = suggestions.clone();
+                                cache.update(suggestions.clone());
                             }
 
                             // 显示建议（如果有）
@@ -1030,8 +1034,13 @@ impl Agent {
         // 记录执行结果到 Span
         shell_span.set_attribute("success", serde_json::json!(execution_result.success));
 
-        // 如果执行失败且有修复策略，保存失败的命令并显示交互式修复流程
-        let result = if !execution_result.success && !execution_result.fix_strategies.is_empty() {
+        // ✨ Phase 4.2 P1: 检查是否为 "command not found" 错误
+        // 如果是，跳过自动修复流程，让新的建议系统（带拼写纠错）来处理
+        let is_command_not_found = execution_result.output.to_lowercase().contains("command not found")
+            || execution_result.output.to_lowercase().contains("not found");
+
+        // 如果执行失败且有修复策略，但不是 "command not found" 错误，显示交互式修复流程
+        let result = if !execution_result.success && !execution_result.fix_strategies.is_empty() && !is_command_not_found {
             shell_span.set_attribute("has_fix_strategies", serde_json::json!(true));
 
             // 保存失败的命令（用于 /fix 命令）
@@ -1045,7 +1054,7 @@ impl Agent {
             // 显示交互式修复建议
             self.display_fix_suggestions(&execution_result)
         } else {
-            // 正常输出或没有修复建议的错误
+            // 正常输出或没有修复建议的错误，或者是 "command not found" 错误（留给建议系统处理）
             execution_result.output
         };
 
@@ -1417,11 +1426,11 @@ impl Agent {
             })
         });
 
-        // ✨ Phase 4.2: 更新建议缓存（用于快速执行）
+        // ✨ Phase 4.2 P1: 更新建议缓存（带时间戳和过期检查）
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let mut cache = self.last_suggestions.write().await;
-                *cache = suggestions.clone();
+                cache.update(suggestions.clone());
             })
         });
 
@@ -1501,32 +1510,45 @@ impl Agent {
             _ => return None, // 不是有效数字
         };
 
-        // 获取缓存的建议
-        let cache = self.last_suggestions.read().await;
+        // 获取缓存的建议（带过期检查）
+        let mut cache = self.last_suggestions.write().await;
 
-        if cache.is_empty() {
-            return Some(format!(
-                "{}\n{}",
-                "⚠ 没有可用的建议".yellow(),
-                "提示: 先执行 /suggest 命令查看建议，或等待命令失败时的自动建议".dimmed()
-            ));
-        }
+        // 尝试获取建议（如果缓存为空或已过期，get()会返回None并自动清理）
+        let result = if let Some(suggestions) = cache.get() {
+            // 检查索引是否有效
+            if index >= suggestions.len() {
+                let count = suggestions.len();
+                drop(cache);
+                return Some(format!(
+                    "{}\n{}",
+                    format!("⚠ 无效的建议编号：{}", index + 1).yellow(),
+                    format!("提示: 当前有 {} 条建议可用", count).dimmed()
+                ));
+            }
 
-        // 检查索引是否有效
-        if index >= cache.len() {
-            return Some(format!(
-                "{}\n{}",
-                format!("⚠ 无效的建议编号：{}", index + 1).yellow(),
-                format!("提示: 当前有 {} 条建议可用", cache.len()).dimmed()
-            ));
-        }
-
-        // 获取对应的建议
-        let suggestion = &cache[index];
-        let command = suggestion.command.clone();
+            // 获取对应的建议并克隆命令
+            Ok(suggestions[index].command.clone())
+        } else {
+            // 缓存为空或已过期
+            let status = cache.status();
+            Err(status.description())
+        };
 
         // 释放锁
         drop(cache);
+
+        // 处理结果
+        let command = match result {
+            Ok(cmd) => cmd,
+            Err(reason) => {
+                return Some(format!(
+                    "{}\n{}\n{}",
+                    "⚠ 没有可用的建议".yellow(),
+                    format!("原因: {}", reason).dimmed(),
+                    "提示: 先执行 /suggest 命令查看建议，或等待命令失败时的自动建议".dimmed()
+                ));
+            }
+        };
 
         // 显示将要执行的命令
         println!(
@@ -1535,9 +1557,7 @@ impl Agent {
             command.cyan()
         );
 
-        // 执行命令（通过Shell）
-        // 注意：这里返回 None 让调用者继续处理命令
-        // 我们需要返回 Some(command) 让系统重新处理这个命令
+        // 返回命令让系统重新处理
         Some(command)
     }
 

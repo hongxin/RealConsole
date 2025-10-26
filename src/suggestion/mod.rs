@@ -44,20 +44,24 @@
 //! # }
 //! ```
 
+mod cache; // ✨ Phase 4.2 P1: 建议缓存（带过期机制）
 mod context_suggester;
 mod engine;
 mod error_patterns; // ✨ Phase 4.2: 错误模式识别
 mod history_suggester;
 mod llm_suggester;
 mod ranker;
+mod spell_checker; // ✨ Phase 4.2 P1: 拼写纠错
 mod types;
 
 // 公开主要接口
+pub use cache::{CacheStatus, SuggestionCache};
 pub use context_suggester::ContextSuggester;
 pub use engine::SuggestionEngine;
 pub use history_suggester::HistorySuggester;
 pub use llm_suggester::LlmSuggester;
 pub use ranker::SuggestionRanker;
+pub use spell_checker::SpellChecker;
 pub use types::{
     FileType, Suggestion, SuggestionCategory, SuggestionConfig, SuggestionContext,
     SuggestionSource, SuggestionTrigger,

@@ -5,6 +5,95 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2025-10-27
+
+### Added
+
+- **[Phase 4.2 P1] 拼写纠错系统（Spell Checker）**
+  - 基于 Levenshtein 距离算法的智能拼写纠错
+  - 内置 100+ 常用命令词典（系统命令、开发工具、容器工具等）
+  - 三态评分系统（距离1: 高置信度 0.85-0.93，距离2: 中等 0.65-0.78，距离3: 低 0.45-0.58）
+  - 智能检测：只在 "command not found" 错误时触发
+  - 优先级最高：拼写纠错 > 错误模式匹配 > 通用建议
+  - 新增模块：`src/suggestion/spell_checker.rs` (+430 行，12 个测试)
+
+- **[Phase 4.2 P1] 建议缓存过期机制（Suggestion Cache with Expiration）**
+  - 基于"一分为三"哲学的三态时间管理
+    - 新鲜 (< 2.5分钟)：高置信度，直接使用
+    - 陈旧 (2.5-5分钟)：中等置信度，可能提示
+    - 过期 (> 5分钟)：自动清除
+  - 时间戳管理和过期检查
+  - 友好的缓存状态提示（Empty/Fresh/Stale/Expired）
+  - 自动清理机制（惰性清理策略）
+  - 新增模块：`src/suggestion/cache.rs` (+380 行，9 个测试)
+
+- **[Phase 4.2 P0] 快速执行建议（Quick Execute）**
+  - 数字快速执行：查看建议后输入数字（1/2/3...）立即执行
+  - 建议缓存：保存最近显示的建议列表
+  - 完整生命周期：缓存 → 验证 → 执行 → 追踪
+  - 递归执行设计：确保完整的命令生命周期
+
+- **[Phase 4.2 P0] 增强错误分析系统（Enhanced Error Analysis）**
+  - 11 种常见错误模式识别
+    - CommandNotFound、PermissionDenied、NoSuchFileOrDirectory
+    - GitNotARepository、GitNothingToCommit
+    - CargoNotFound、CargoBuildFailed
+    - NpmModuleNotFound、PortAlreadyInUse
+    - ConnectionRefused、DiskSpaceFull
+  - 基于正则表达式的模式匹配
+  - 智能参数提取（如端口号）
+  - 特定场景的针对性建议
+  - 新增模块：`src/suggestion/error_patterns.rs` (+490 行，6 个测试)
+
+### Fixed
+
+- **[Bug #1] 建议系统缺少错误输出传递**
+  - 问题：拼写检查器无法检测 "command not found"
+  - 修复：在构建 SuggestionContext 时添加 `last_command_output` 字段
+  - 位置：`src/agent.rs:884-885`
+
+- **[Bug #2] 自动修复系统与建议系统冲突**
+  - 问题：ShellExecutorWithFixer 优先处理 "command not found"，导致建议系统无法运行
+  - 修复：为 "command not found" 错误添加优先级检查，跳过自动修复流程，交由建议系统处理
+  - 位置：`src/agent.rs:1037-1043`
+
+### Changed
+
+- **建议系统优先级重构**
+  - 拼写纠错（优先级最高）→ 错误模式匹配 → 通用建议
+  - 建议系统优先于自动修复系统（针对拼写错误）
+  - 清晰的责任分离和流程控制
+
+- **建议缓存升级**
+  - 从 `Arc<RwLock<Vec<Suggestion>>>` 升级到 `Arc<RwLock<SuggestionCache>>`
+  - 增加时间戳管理和过期检查
+  - 更友好的错误提示
+
+### Testing
+
+- **单元测试：71 个测试全部通过（100%）**
+  - spell_checker: 12 个测试
+  - cache: 9 个测试
+  - 其他 suggestion 模块: 50 个测试
+
+- **实际使用测试：通过**
+  - 拼写纠错：`!cago build` → 建议 "cargo build" ✅
+  - 快速执行：输入 `1` 立即执行建议 ✅
+  - 缓存过期：5 分钟后提示缓存过期 ✅
+
+### Documentation
+
+- 新增：`docs/04-reports/phase-4.2-p1-completion.md` - P1 功能完成报告
+- 新增：`TESTING-P1.md` - 测试指南
+- 新增：`scripts/test/test-phase-4.2-p1.sh` - 测试脚本
+
+## [1.7.0] - 2025-10-26
+
+### Added
+
+- **[Phase 4.2 P0] 快速执行建议 + 增强错误分析**
+  - 详见 v1.7.1 变更日志（P0 功能合并到 P1 发布）
+
 ## [1.6.0] - 2025-10-23
 
 ### Added

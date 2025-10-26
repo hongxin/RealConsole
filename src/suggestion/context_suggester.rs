@@ -3,6 +3,7 @@
 //! 根据项目类型、当前目录等上下文信息生成建议
 
 use super::error_patterns::ErrorPatternMatcher; // ✨ Phase 4.2
+use super::spell_checker::SpellChecker; // ✨ Phase 4.2 P1
 use super::types::{
     FileType, Suggestion, SuggestionCategory, SuggestionContext, SuggestionSource,
 };
@@ -14,6 +15,8 @@ pub struct ContextSuggester {
     enable_project_detection: bool,
     /// ✨ Phase 4.2: 错误模式匹配器
     error_matcher: ErrorPatternMatcher,
+    /// ✨ Phase 4.2 P1: 拼写检查器
+    spell_checker: SpellChecker,
 }
 
 impl ContextSuggester {
@@ -22,6 +25,7 @@ impl ContextSuggester {
         Self {
             enable_project_detection: true,
             error_matcher: ErrorPatternMatcher::new(), // ✨ Phase 4.2
+            spell_checker: SpellChecker::new(), // ✨ Phase 4.2 P1
         }
     }
 
@@ -232,7 +236,6 @@ impl ContextSuggester {
     fn suggest_for_failure(&self, context: &SuggestionContext) -> Vec<Suggestion> {
         let mut suggestions = Vec::new();
 
-        // ✨ Phase 4.2: 优先使用错误模式匹配器
         if let Some(ref error_output) = context.last_command_output {
             let failed_cmd = if !context.recent_commands.is_empty() {
                 Some(context.recent_commands[0].as_str())
@@ -240,7 +243,18 @@ impl ContextSuggester {
                 None
             };
 
-            // 使用错误模式匹配器分析错误
+            // ✨ Phase 4.2 P1: 优先检查拼写错误
+            if let Some(cmd) = failed_cmd {
+                let spell_suggestions = self.spell_checker.check_and_suggest(cmd, Some(error_output));
+                if !spell_suggestions.is_empty() {
+                    // 找到拼写建议，优先返回
+                    suggestions.extend(spell_suggestions);
+                    // 拼写错误是最可能的原因，不需要继续查找其他建议
+                    return suggestions;
+                }
+            }
+
+            // ✨ Phase 4.2: 使用错误模式匹配器分析错误
             let pattern_suggestions = self.error_matcher.analyze_error(error_output, failed_cmd);
             suggestions.extend(pattern_suggestions);
         }
