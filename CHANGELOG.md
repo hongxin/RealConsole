@@ -5,6 +5,51 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2025-10-27
+
+### Added
+
+- **[Phase 4.2 P2.1] 用户反馈学习系统（User Feedback Learning System）**
+  - 基于"一分为三"哲学的智能反馈学习系统（RICE: 360）
+  - **三态反馈模型**：
+    - Accepted（接受）：积极信号，提升评分（weight: +1.0）
+    - Skipped（跳过）：中性信号，保持评分（weight: 0.0）
+    - Rejected（拒绝）：消极信号，降低评分（weight: -1.0，预留）
+  - **三层学习机制**：
+    - 即时学习（Instant）：基于质量分数直接调整（0.5-1.5x 倍数）
+    - 短期学习（Short-term）：最近 N 次反馈的接受率趋势
+    - 长期学习（Long-term）：历史数据的质量评估和持续优化
+  - **核心组件**：
+    - `FeedbackStorage`: 持久化反馈记录和统计数据（JSON 格式）
+    - `FeedbackCollector`: 收集用户反馈，管理反馈会话
+    - `FeedbackLearner`: 分析历史数据，动态调整建议评分
+    - `FeedbackTypes`: 完整的数据模型和配置
+  - **评分调整算法**：
+    - 质量分数 = 接受率 × 70% + 位置得分 × 30%
+    - 调整倍数 = 1.0 + (质量分数 - 0.5) × 0.2（默认配置）
+    - 样本数限制：至少 3 次展示才开始调整
+  - **数据持久化**：
+    - 存储路径：`~/.realconsole/feedback/`
+    - `feedbacks.json`: 原始反馈记录（最多 1000 条）
+    - `stats.json`: 聚合统计数据
+  - **代码统计**：
+    - 新增模块：`src/suggestion/feedback/` (4 个文件)
+    - 代码行数：~2000 行
+    - 测试覆盖：33 个单元测试（100% 通过）
+  - **功能特性**：
+    - ✅ 反馈会话管理（创建、跟踪、清理）
+    - ✅ 高质量/低质量建议筛选
+    - ✅ 自动清理过期数据（会话 5 分钟超时，记录最多 1000 条）
+    - ✅ 隐私保护（本地存储，错误输出截断到 500 字符）
+    - ✅ 并发安全（Arc<RwLock<>> 支持）
+    - ✅ 异步 I/O（tokio 运行时）
+
+### Notes
+
+- P2.1 核心功能已完整实现并通过所有测试
+- 集成到 Agent 的工作将在后续版本中完成
+- 详见完成报告：`docs/04-reports/phase-4.2-p2.1-completion.md`
+
 ## [1.7.1] - 2025-10-27
 
 ### Added

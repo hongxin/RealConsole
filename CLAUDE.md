@@ -49,12 +49,23 @@
 - 主配置 `realconsole.yaml`，环境变量 `.env`（不提交）
 - 测试覆盖报告放到 `coverage/` 目录
 
-**文档组织**（五态体系）：
-- 00-core：核心理念（philosophy/vision/roadmap）
-- 01-understanding：设计分析
-- 02-practice：用户/开发者指南
-- 03-evolution：开发历程
-- 04-reports：开发或测试的报告
+**文档组织**（五态体系 + 极简README）：
+- **README.md / README.cn.md**：极简主页（~170行），学习 mlx 风格
+  - 英文版（README.md）：面向国际用户
+  - 中文版（README.cn.md）：日常开发优先更新，大版本时同步英文版
+- **docs/**：详细文档体系
+  - 00-core：核心理念（philosophy/vision/roadmap）
+  - 01-understanding：设计分析
+  - 02-practice：用户/开发者指南（详细功能说明、配置、API等）
+  - 03-evolution：开发历程
+  - 04-reports：开发或测试的报告
+  - documentation-restructure.md：文档重组说明
+
+**文档更新流程**：
+1. 日常开发：只更新 README.cn.md（中文版）
+2. 功能迭代：同步更新 docs/ 详细文档
+3. 版本发布：发布前同步 README.md（英文版）
+4. 大版本：审视并优化文档结构
 
 **国际化**：
 - 中文优先，英文同步

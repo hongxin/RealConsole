@@ -48,6 +48,7 @@ mod cache; // ✨ Phase 4.2 P1: 建议缓存（带过期机制）
 mod context_suggester;
 mod engine;
 mod error_patterns; // ✨ Phase 4.2: 错误模式识别
+pub mod feedback; // ✨ Phase 4.2 P2.1: 用户反馈学习系统
 mod history_suggester;
 mod llm_suggester;
 mod ranker;
