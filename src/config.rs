@@ -160,6 +160,10 @@ pub struct FeaturesConfig {
     /// Workflow 缓存默认 TTL（秒，默认 300）
     #[serde(default = "default_workflow_cache_ttl")]
     pub workflow_cache_ttl_default: Option<u64>,
+
+    /// ✨ Phase 4.1: 是否启用命令失败时自动建议（默认 true）
+    #[serde(default = "default_auto_suggest")]
+    pub auto_suggest: Option<bool>,
 }
 
 fn default_true() -> bool {
@@ -188,6 +192,10 @@ fn default_workflow_cache_enabled() -> Option<bool> {
 
 fn default_workflow_cache_ttl() -> Option<u64> {
     Some(300)
+}
+
+fn default_auto_suggest() -> Option<bool> {
+    Some(true)
 }
 
 /// Intent DSL 配置
@@ -587,6 +595,7 @@ impl Default for FeaturesConfig {
             workflow_enabled: Some(false), // Phase 8: 默认关闭，保持向后兼容
             workflow_cache_enabled: Some(true), // 启用 Workflow 时默认开启缓存
             workflow_cache_ttl_default: Some(300), // 默认缓存 5 分钟
+            auto_suggest: Some(true), // ✨ Phase 4.1: 默认开启自动建议
         }
     }
 }

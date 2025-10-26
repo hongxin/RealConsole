@@ -60,6 +60,9 @@ use crate::voice::{BroadcastConfig, VoiceBroadcaster};
 // ✨ v1.5.1: 追踪上下文系统
 use crate::trace_context::{ExecutionSpan, SpanType, TraceContext, TraceStore};
 
+// ✨ Phase 4.1: 主动建议系统
+use crate::suggestion::{SuggestionConfig, SuggestionContext, SuggestionEngine};
+
 /// Agent 核心
 ///
 /// ✨ Phase 2 (v1.3.0): 服务层架构重构
@@ -125,6 +128,8 @@ pub struct Agent {
     pub voice_broadcaster: Option<Arc<VoiceBroadcaster>>,
     // ✨ v1.5.1: 追踪上下文存储（保留最近1000个trace）
     pub trace_store: Arc<TraceStore>,
+    // ✨ Phase 4.1: 主动建议系统（三源融合）
+    pub suggestion_engine: Option<Arc<SuggestionEngine>>,
 }
 
 impl Agent {
@@ -360,6 +365,7 @@ impl Agent {
                 llm_logger,
                 voice_broadcaster,
                 trace_store: Arc::clone(&trace_store),
+                suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
             };
         }
 
@@ -438,6 +444,7 @@ impl Agent {
             llm_logger,
             voice_broadcaster,
             trace_store: Arc::clone(&trace_store),
+            suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
         }
     }
 
@@ -675,6 +682,31 @@ impl Agent {
         Display::startup_workflow(self.config.display.mode, self.workflow_intents.len());
     }
 
+    /// 配置建议引擎（Phase 4.1）
+    ///
+    /// 在配置 LLM 客户端后调用，初始化主动建议系统
+    pub fn configure_suggestion_engine(&mut self) {
+        // 创建建议配置（使用默认配置）
+        let config = SuggestionConfig::default();
+
+        // 获取 LLM 客户端（如果可用）
+        let llm_client = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let manager = self.llm_manager.read().await;
+                manager.primary().or(manager.fallback()).map(|c| c.clone())
+            })
+        });
+
+        // 创建建议引擎
+        let engine = if let Some(llm) = llm_client {
+            SuggestionEngine::new(Arc::clone(&self.history), config).with_llm(llm)
+        } else {
+            SuggestionEngine::new(Arc::clone(&self.history), config)
+        };
+
+        self.suggestion_engine = Some(Arc::new(engine));
+    }
+
     /// 处理用户输入
     pub fn handle(&self, line: &str) -> String {
         let line = line.trim();
@@ -819,6 +851,46 @@ impl Agent {
                     // ✨ 语音播报：自动播报 LLM 响应
                     if command_type == CommandType::Text {
                         self.try_broadcast_response(&response).await;
+                    }
+
+                    // ✨ Phase 4.1: 命令失败时自动触发建议
+                    if !success && command_type == CommandType::Shell {
+                        // 只为Shell命令提供建议（系统命令和LLM对话不需要）
+                        if let Some(ref engine) = self.suggestion_engine {
+                            // 构建失败上下文
+                            let mut ctx = SuggestionContext::from_env();
+                            ctx.last_command_failed = true;
+                            ctx.recent_commands.push(line.to_string());
+
+                            // 获取历史命令
+                            let history_guard = self.history.read().await;
+                            let recent = history_guard.recent(3, crate::history::SortStrategy::Time);
+                            drop(history_guard);
+
+                            for entry in recent.iter().take(2) {
+                                if entry.command != line {
+                                    ctx.recent_commands.push(entry.command.clone());
+                                }
+                            }
+
+                            // 生成建议
+                            let suggestions = engine.suggest(&ctx).await;
+
+                            // 显示建议（如果有）
+                            if !suggestions.is_empty() && self.config.features.auto_suggest.unwrap_or(true) {
+                                println!("\n{}", "💡 建议尝试：".yellow().bold());
+                                for (i, suggestion) in suggestions.iter().take(3).enumerate() {
+                                    let icon = suggestion.category.icon();
+                                    println!(
+                                        "  {}. {} {}",
+                                        i + 1,
+                                        icon,
+                                        suggestion.command.cyan()
+                                    );
+                                }
+                                println!("{}\n", "提示: 使用 /suggest 查看更多建议".dimmed());
+                            }
+                        }
                     }
 
                     // 记录到记忆
@@ -1228,8 +1300,11 @@ impl Agent {
         cmd_span.set_attribute("argument", serde_json::json!(arg));
 
         // ✨ Phase 9.2: 特殊处理 /fix 命令
+        // ✨ Phase 4.1: 特殊处理 /suggest 命令
         let result = if cmd_name == "fix" {
             self.handle_fix_command()
+        } else if cmd_name == "suggest" {
+            self.handle_suggest_command()
         } else {
             match self.registry.execute(cmd_name, arg) {
                 Ok(output) => {
@@ -1277,6 +1352,111 @@ impl Agent {
                 )
             }
         }
+    }
+
+    /// ✨ Phase 4.1: 处理 /suggest 命令 - 生成智能建议
+    fn handle_suggest_command(&self) -> String {
+        // 检查建议引擎是否已初始化
+        let engine = match &self.suggestion_engine {
+            Some(engine) => engine,
+            None => {
+                return format!(
+                    "{}\n{}",
+                    "⚠ 建议系统未启用".yellow(),
+                    "提示: 建议系统需要配置 LLM 客户端".dimmed()
+                );
+            }
+        };
+
+        // 构建建议上下文
+        let context = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let mut ctx = SuggestionContext::from_env();
+
+                // 添加最近的命令（最多3条）
+                let history_guard = self.history.read().await;
+                let recent = history_guard.recent(3, crate::history::SortStrategy::Time);
+                ctx.recent_commands = recent.iter().map(|e| e.command.clone()).collect();
+
+                // 获取最近失败的命令
+                let last_failed = self.last_failed_command.read().await;
+                ctx.last_command_failed = last_failed.is_some();
+
+                ctx
+            })
+        });
+
+        // 生成建议
+        let suggestions = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                engine.suggest(&context).await
+            })
+        });
+
+        // 格式化输出
+        if suggestions.is_empty() {
+            return format!(
+                "{}\n{}",
+                "💡 暂无建议".dimmed(),
+                "提示: 执行一些命令后，系统会学习您的使用模式并提供更好的建议".dimmed()
+            );
+        }
+
+        let mut output = String::new();
+
+        // 头部信息
+        output.push_str(&format!("{}\n", "━━━ 💡 智能建议 ━━━".cyan().bold()));
+
+        // 显示上下文信息
+        if let Ok(current_dir) = std::env::current_dir() {
+            let dir_name = current_dir.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("Unknown");
+            output.push_str(&format!("📂 {}\n", dir_name.dimmed()));
+        }
+
+        // 按类别分组（可选，暂时不分组，保持简洁）
+        output.push_str("\n");
+
+        for (i, suggestion) in suggestions.iter().enumerate() {
+            let icon = suggestion.category.icon();
+            let source_badge = format!("[{}]", suggestion.source.display_name()).dimmed();
+            let score_badge = if suggestion.is_high_quality() {
+                format!("{}%", (suggestion.score * 100.0) as u8).green().bold()
+            } else {
+                format!("{}%", (suggestion.score * 100.0) as u8).yellow()
+            };
+
+            // 主命令行
+            output.push_str(&format!(
+                "  {} {} {} {}\n",
+                format!("[{}]", i + 1).cyan().bold(),
+                icon,
+                suggestion.command.cyan().bold(),
+                score_badge
+            ));
+
+            // 描述和来源
+            output.push_str(&format!(
+                "     {} {}\n",
+                suggestion.description.dimmed(),
+                source_badge
+            ));
+
+            if i < suggestions.len() - 1 {
+                output.push_str("\n");
+            }
+        }
+
+        // 底部提示
+        output.push_str(&format!(
+            "\n{}\n{}\n{}",
+            "━━━━━━━━━━━━━━━━━━".dimmed(),
+            "💡 提示：直接输入数字快速执行建议命令".dimmed(),
+            "⚙️  配置：在 realconsole.yaml 中可关闭自动建议 (features.auto_suggest: false)".dimmed()
+        ));
+
+        output
     }
 
     /// 处理自由文本（Intent 识别 → LLM 对话）

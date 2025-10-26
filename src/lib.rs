@@ -44,6 +44,7 @@ pub mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 pub mod shell_executor;
 pub mod spinner;
 pub mod stats; // ✨ Phase 9: 统计与可视化系统
+pub mod suggestion; // ✨ Phase 4.1: 主动建议系统（三源融合）
 pub mod system_monitor; // ✨ Phase 6: 系统监控工具
 pub mod task; // ✨ Phase 10: 任务分解与规划系统
 pub mod tool;
@@ -71,6 +72,11 @@ pub use error_fixer::{
 };
 pub use llm::{ChatResponse, FunctionCall, LlmClient, LlmError, Message, ToolCall};
 pub use shell_executor::{ExecutionResult, ShellExecutorWithFixer};
+pub use suggestion::{
+    ContextSuggester, FileType, HistorySuggester, LlmSuggester, Suggestion, SuggestionCategory,
+    SuggestionConfig, SuggestionContext, SuggestionEngine, SuggestionRanker, SuggestionSource,
+    SuggestionTrigger,
+};
 pub use task::{
     ExecutionContext, ExecutionPlan, PlanAnalysis, ProgressCallback, SubTask, TaskDecomposer,
     TaskError, TaskExecutor, TaskPlanner, TaskProgress, TaskResult, TaskStatus, TaskType,
