@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **[文档重组] MLX 风格文档结构（Documentation Restructure）**
+  - 采用 MLX 项目风格的简洁 README 设计
+  - **顶部导航**：Installation | Quick Start | Documentation | Examples
+  - **双语支持**：
+    - README.md（英文版，~315 行）- 面向国际用户
+    - README.cn.md（中文版，~310 行）- 本地开发优先
+  - **全新快速开始指南**：`docs/QUICKSTART.md`（315 行）
+    - 5 分钟完整上手流程
+    - 环境要求、安装步骤、配置向导
+    - 故障排除和后续学习路径
+  - **Phase 4.2 特性突出展示**：
+    - 主动建议系统作为核心特性
+    - P0/P1/P2.1 完整功能说明
+    - 实用示例场景（拼写纠错、反馈学习、任务编排等）
+  - **分层文档导航**：
+    - 入门指南（快速开始、用户手册、FAQ）
+    - 核心理念（一分为三哲学、产品愿景、架构设计）
+    - 开发者文档（开发指南、API 参考、项目结构）
+    - 参考资料（命令参考、配置说明、路线图、更新日志）
+  - **架构图更新**：新增主动建议系统组件展示
+  - **链接验证**：79% 链接有效（15/19），核心文档 100% 完整
+  - 详见：`docs/documentation-restructure.md` 和 `docs/04-reports/documentation-restructure-completion.md`
+
 - **[Phase 4.2 P2.1] 用户反馈学习系统（User Feedback Learning System）**
   - 基于"一分为三"哲学的智能反馈学习系统（RICE: 360）
   - **三态反馈模型**：
@@ -44,11 +67,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - ✅ 并发安全（Arc<RwLock<>> 支持）
     - ✅ 异步 I/O（tokio 运行时）
 
+### Changed
+
+- **文档结构优化**：
+  - 清理根目录，删除旧文件（README.old.md, README.en.md）
+  - 移动测试文档到 reports 目录（TESTING-P1.md → docs/04-reports/phase-4.2-p1-testing.md）
+  - 更新 .gitignore，忽略备份和测试文件
+
 ### Notes
 
-- P2.1 核心功能已完整实现并通过所有测试
-- 集成到 Agent 的工作将在后续版本中完成
-- 详见完成报告：`docs/04-reports/phase-4.2-p2.1-completion.md`
+- **Phase 4.2 完整发布**：
+  - ✅ P0 - 快速执行与增强错误分析
+  - ✅ P1 - 拼写检查与建议缓存
+  - ✅ P2.1 - 反馈学习系统
+  - ✅ 文档重组（MLX 风格，双语支持）
+- 详见完成报告：`docs/04-reports/phase-4.2-p2.1-completion.md` 和 `docs/04-reports/documentation-restructure-completion.md`
 
 ## [1.7.1] - 2025-10-27
 

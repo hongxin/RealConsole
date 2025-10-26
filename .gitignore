@@ -63,6 +63,9 @@ perf.data*
 *.bak
 *.backup
 *~
+*.old
+*.old.*
+README.old*
 
 # 本地数据库
 *.db
