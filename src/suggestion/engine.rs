@@ -10,6 +10,7 @@ use super::types::{
     Suggestion, SuggestionConfig, SuggestionContext, SuggestionTrigger,
 };
 use crate::history::HistoryManager;
+use crate::likan::LiEnhancer; // ✨ 引入离增强器
 use crate::llm::LlmClient;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,6 +22,7 @@ use tokio::sync::RwLock;
 /// - Context：基于项目类型和上下文
 /// - History：基于命令历史
 /// - LLM：基于 AI 推理
+/// - Li（离）：基于模式学习的增强（✨ 新增）
 pub struct SuggestionEngine {
     /// 上下文建议生成器
     context_suggester: ContextSuggester,
@@ -33,6 +35,9 @@ pub struct SuggestionEngine {
 
     /// 建议排序器
     ranker: SuggestionRanker,
+
+    /// 离增强器（✨ 炼化炉的离端）
+    li_enhancer: Arc<RwLock<LiEnhancer>>,
 
     /// 配置
     config: SuggestionConfig,
@@ -50,8 +55,24 @@ impl SuggestionEngine {
             history_suggester: HistorySuggester::new(history),
             llm_suggester: None,
             ranker,
+            li_enhancer: Arc::new(RwLock::new(LiEnhancer::new())), // ✨ 初始化离增强器
             config,
         }
+    }
+
+    /// 设置离增强器
+    ///
+    /// 用于与炼化炉共享同一个增强器实例
+    pub fn with_li_enhancer(mut self, li_enhancer: Arc<RwLock<LiEnhancer>>) -> Self {
+        self.li_enhancer = li_enhancer;
+        self
+    }
+
+    /// 获取离增强器引用
+    ///
+    /// 供炼化炉使用
+    pub fn li_enhancer(&self) -> Arc<RwLock<LiEnhancer>> {
+        Arc::clone(&self.li_enhancer)
     }
 
     /// 设置 LLM 客户端
@@ -68,6 +89,7 @@ impl SuggestionEngine {
     /// 1. 并行调用三个建议生成器
     /// 2. 收集所有建议
     /// 3. 通过排序器融合和排序
+    /// 4. ✨ 通过离增强器优化（炼化）
     pub async fn suggest(&self, context: &SuggestionContext) -> Vec<Suggestion> {
         let mut all_suggestions = Vec::new();
 
@@ -92,7 +114,38 @@ impl SuggestionEngine {
         }
 
         // 4. 排序和融合
-        self.ranker.rank(all_suggestions)
+        let mut ranked_suggestions = self.ranker.rank(all_suggestions);
+
+        // 5. ✨ 离（☲火）增强：应用学习到的模式优化建议
+        {
+            let li = self.li_enhancer.read().await;
+
+            // 应用评分增强
+            ranked_suggestions = li.enhance(ranked_suggestions);
+
+            // 添加上下文相关的额外建议（基于序列和错误修复模式）
+            let last_command = context.recent_commands.last().map(|s| s.as_str());
+            let last_error = if context.last_command_failed {
+                context.last_command_output.as_deref()
+            } else {
+                None
+            };
+
+            let additional = li.add_contextual_suggestions(last_command, last_error);
+            ranked_suggestions.extend(additional);
+
+            // 重新排序（因为新增了建议）
+            ranked_suggestions.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            // 限制最终数量
+            ranked_suggestions.truncate(self.config.max_suggestions);
+        }
+
+        ranked_suggestions
     }
 
     /// 基于触发器生成建议

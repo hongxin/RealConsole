@@ -65,6 +65,9 @@ use crate::suggestion::{
     Suggestion, SuggestionCache, SuggestionConfig, SuggestionContext, SuggestionEngine,
 };
 
+// ✨ Phase 4.3: 离坎炼化炉（自主学习循环）
+use crate::likan::{FurnaceConfig, FurnaceStatus, LiKanFurnace, LiKanStatusBar, LiKanTrigger};
+
 /// Agent 核心
 ///
 /// ✨ Phase 2 (v1.3.0): 服务层架构重构
@@ -134,6 +137,14 @@ pub struct Agent {
     pub suggestion_engine: Option<Arc<SuggestionEngine>>,
     // ✨ Phase 4.2 P1: 建议缓存（带过期机制）
     pub last_suggestions: Arc<RwLock<SuggestionCache>>,
+    // ✨ Phase 4.3: 离坎炼化炉（自主学习循环）
+    pub likan_furnace: Option<Arc<RwLock<LiKanFurnace>>>,
+    // ✨ Phase 4.3: 炼化炉后台任务句柄
+    likan_task_handle: Option<tokio::task::JoinHandle<()>>,
+    // ✨ Phase 4.3: 炼化炉状态栏（底部状态显示）
+    pub likan_statusbar: Option<Arc<LiKanStatusBar>>,
+    // ✨ Phase 4.3: 炼化炉手动触发器（用于 /likan cycle 命令）
+    pub likan_trigger: Option<Arc<LiKanTrigger>>,
 }
 
 impl Agent {
@@ -371,6 +382,10 @@ impl Agent {
                 trace_store: Arc::clone(&trace_store),
                 suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
                 last_suggestions: Arc::new(RwLock::new(SuggestionCache::with_default_config())), // ✨ Phase 4.2 P1: 建议缓存（5分钟过期）
+                likan_furnace: None, // ✨ Phase 4.3: 在配置建议引擎后初始化
+                likan_task_handle: None,
+                likan_statusbar: None, // ✨ Phase 4.3: 在启动后台循环时初始化
+                likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
             };
         }
 
@@ -451,6 +466,10 @@ impl Agent {
             trace_store: Arc::clone(&trace_store),
             suggestion_engine: None, // ✨ Phase 4.1: 在配置 LLM 后初始化
             last_suggestions: Arc::new(RwLock::new(SuggestionCache::with_default_config())), // ✨ Phase 4.2 P1: 建议缓存（5分钟过期）
+            likan_furnace: None, // ✨ Phase 4.3: 在配置建议引擎后初始化
+            likan_task_handle: None,
+            likan_statusbar: None, // ✨ Phase 4.3: 在启动后台循环时初始化
+            likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
         }
     }
 
@@ -691,6 +710,8 @@ impl Agent {
     /// 配置建议引擎（Phase 4.1）
     ///
     /// 在配置 LLM 客户端后调用，初始化主动建议系统
+    ///
+    /// ✨ Phase 4.3: 同时初始化离坎炼化炉，共享离增强器
     pub fn configure_suggestion_engine(&mut self) {
         // 创建建议配置（使用默认配置）
         let config = SuggestionConfig::default();
@@ -703,14 +724,158 @@ impl Agent {
             })
         });
 
-        // 创建建议引擎
+        // ✨ Phase 4.3: 创建离坎炼化炉（极简配置）
+        let furnace_config = FurnaceConfig::default();
+        let furnace = LiKanFurnace::new(furnace_config);
+
+        // 获取离增强器的共享引用
+        let li_enhancer = furnace.li_enhancer();
+
+        // 创建建议引擎，注入共享的离增强器
         let engine = if let Some(llm) = llm_client {
-            SuggestionEngine::new(Arc::clone(&self.history), config).with_llm(llm)
+            SuggestionEngine::new(Arc::clone(&self.history), config)
+                .with_llm(llm)
+                .with_li_enhancer(li_enhancer)
         } else {
             SuggestionEngine::new(Arc::clone(&self.history), config)
+                .with_li_enhancer(li_enhancer)
         };
 
         self.suggestion_engine = Some(Arc::new(engine));
+        self.likan_furnace = Some(Arc::new(RwLock::new(furnace)));
+    }
+
+    /// 启动离坎炼化炉后台循环（Phase 4.3）
+    ///
+    /// 在配置建议引擎后调用，启动自主学习循环
+    ///
+    /// 循环策略：
+    /// - 每1分钟检查一次是否需要循环
+    /// - 炼化炉自己决定何时触发（基于配置的间隔）
+    /// - 从 UnifiedTracer 获取最近的追踪数据
+    /// - 执行坎（提取）→ 离（更新）循环
+    /// - 状态栏实时显示（不干扰用户输入）
+    pub fn start_likan_background_cycle(&mut self) {
+        use std::time::{Duration, Instant};
+
+        // 确保炼化炉已初始化
+        let Some(furnace) = self.likan_furnace.as_ref() else {
+            eprintln!("⚠️ 离坎炼化炉未初始化，无法启动后台循环");
+            return;
+        };
+
+        let furnace = Arc::clone(furnace);
+        let history = Arc::clone(&self.history);
+        let exec_logger = Arc::clone(&self.exec_logger);
+        let llm_logger = self.llm_logger.clone();
+        let conversation_context = self.state_manager.conversation_context();
+
+        // 创建状态栏
+        let statusbar = Arc::new(LiKanStatusBar::new());
+        let status = statusbar.status();
+        self.likan_statusbar = Some(Arc::clone(&statusbar));
+
+        // 创建手动触发器（用于 /likan cycle 命令）
+        let trigger = Arc::new(LiKanTrigger::new(
+            Arc::clone(&furnace),
+            Arc::clone(&history),
+            Arc::clone(&exec_logger),
+            llm_logger.clone(),
+            Arc::clone(&conversation_context),
+        ));
+        self.likan_trigger = Some(Arc::clone(&trigger));
+
+        // 获取炼化间隔配置（从默认配置）
+        let cycle_interval_secs = FurnaceConfig::default().cycle_interval_secs;
+
+        // 初始化状态
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let mut s = status.write().await;
+                s.cycle_interval_secs = cycle_interval_secs;
+                drop(s);
+                statusbar.update().await;
+            })
+        });
+
+        // 启动后台任务
+        let handle = tokio::spawn(async move {
+            loop {
+                // 每1分钟检查一次（测试用）
+                tokio::time::sleep(Duration::from_secs(60)).await;
+
+                // 更新状态栏
+                statusbar.update().await;
+
+                // 检查是否应该触发循环
+                let should_cycle = {
+                    let f = furnace.read().await;
+                    f.should_cycle()
+                };
+
+                if !should_cycle {
+                    continue;
+                }
+
+                // 创建 UnifiedTracer 获取数据
+                let tracer = crate::tracer::UnifiedTracer::new(
+                    Arc::clone(&history),
+                    Arc::clone(&exec_logger),
+                    llm_logger.clone(),
+                    Arc::clone(&conversation_context),
+                );
+
+                // 查询最近200条记录
+                match tracer.query_all(200).await {
+                    Ok(entries) => {
+                        // 暂时使用空的 suggestion stats（Phase 4.4 可集成反馈系统）
+                        let stats = std::collections::HashMap::new();
+
+                        // 执行炼化循环
+                        let mut f = furnace.write().await;
+                        match f.cycle_once(&entries, &stats).await {
+                            Ok(report) => {
+                                // 更新状态
+                                {
+                                    let mut s = status.write().await;
+                                    s.last_cycle = Some(Instant::now());
+                                    s.pattern_count = report.patterns_found;
+                                    s.high_confidence_count = report.high_confidence_patterns;
+                                }
+
+                                // 如果状态栏启用，更新显示
+                                if status.read().await.enabled {
+                                    statusbar.update().await;
+                                } else {
+                                    // 状态栏禁用时，输出简洁通知（仅一行，不干扰）
+                                    // 使用 stderr，不影响正常输出流
+                                    eprintln!(
+                                        "🌊🔥 炼化完成: {} 模式{}",
+                                        report.patterns_found,
+                                        if report.high_confidence_patterns > 0 {
+                                            format!(" ({} ⭐)", report.high_confidence_patterns)
+                                        } else {
+                                            String::new()
+                                        }
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("⚠️ 炼化炉循环失败: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️ 无法获取追踪数据: {}", e);
+                    }
+                }
+            }
+        });
+
+        self.likan_task_handle = Some(handle);
+
+        // 不再 println，状态栏会自动显示
+        // println!("✨ 离坎炼化炉后台循环已启动（每1分钟检查，5分钟触发）");
     }
 
     /// 处理用户输入

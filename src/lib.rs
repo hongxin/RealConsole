@@ -32,6 +32,7 @@ pub mod execution_logger;
 pub mod git_assistant; // ✨ Phase 6: Git 智能助手
 pub mod history; // ✨ Phase 8: 命令历史记录管理
 pub mod i18n; // ✨ Phase 11: 多语言支持
+pub mod likan; // ✨ Phase 4.3: 离坎炼化炉（自主学习循环）
 pub mod llm;
 pub mod llm_manager;
 pub mod log_analyzer; // ✨ Phase 6: 日志分析工具
@@ -69,6 +70,9 @@ pub use error::{ErrorCode, FixSuggestion, RealError};
 pub use error_fixer::{
     ErrorAnalysis, ErrorAnalyzer, ErrorCategory, ErrorSeverity, FeedbackLearner, FeedbackRecord,
     FeedbackType, FixOutcome, FixStrategy, LearningSummary,
+};
+pub use likan::{
+    CycleReport, FurnaceConfig, KanExtractor, LiEnhancer, LiKanFurnace, Pattern,
 };
 pub use llm::{ChatResponse, FunctionCall, LlmClient, LlmError, Message, ToolCall};
 pub use shell_executor::{ExecutionResult, ShellExecutorWithFixer};

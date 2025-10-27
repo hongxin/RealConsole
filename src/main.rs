@@ -23,6 +23,7 @@ mod execution_logger;
 mod git_assistant; // ✨ Phase 6: Git 智能助手
 mod history; // ✨ Phase 8: 命令历史记录管理
 mod i18n; // ✨ Phase 11: 多语言支持
+mod likan; // ✨ Phase 4.3: 离坎炼化炉（自主学习循环）
 mod llm;
 mod llm_manager;
 mod log_analyzer; // ✨ Phase 6: 日志分析工具
@@ -443,6 +444,17 @@ async fn main() {
 
     // ✨ Phase 4.1: 配置主动建议系统
     agent.configure_suggestion_engine();
+
+    // ✨ Phase 4.3: 启动离坎炼化炉后台循环
+    agent.start_likan_background_cycle();
+
+    // ✨ Phase 4.3: 注册离坎炼化炉命令
+    commands::register_likan_commands(
+        &mut agent.registry,
+        agent.likan_furnace.clone(),
+        agent.likan_statusbar.clone(),
+        agent.likan_trigger.clone(),
+    );
 
     // 注册 LLM 命令（需要访问 agent 的 llm_manager）
     let llm_manager = agent.llm_manager();
