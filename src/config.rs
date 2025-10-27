@@ -53,6 +53,10 @@ pub struct Config {
     /// 离坎炼化炉配置
     #[serde(default)]
     pub likan: Option<crate::likan::FurnaceConfig>,
+
+    /// 八卦记忆宫配置
+    #[serde(default)]
+    pub bagua: Option<BaguaConfig>,
 }
 
 fn default_prefix() -> String {
@@ -117,6 +121,73 @@ impl Default for LlmLoggingConfig {
             retention_days: 30,
             max_size_mb: 100,
         }
+    }
+}
+
+impl LlmConfig {
+    /// ✨ 从环境变量智能检测 LLM 配置
+    ///
+    /// 检测优先级：
+    /// 1. DEEPSEEK_API_KEY → Deepseek (推荐，性价比高)
+    /// 2. OPENAI_API_KEY → OpenAI
+    /// 3. ANTHROPIC_API_KEY → Claude
+    ///
+    /// # 示例
+    /// ```ignore
+    /// export DEEPSEEK_API_KEY="sk-xxx"
+    /// let config = LlmConfig::detect_from_env();
+    /// ```
+    pub fn detect_from_env() -> Self {
+        // 检测 Deepseek
+        if let Ok(key) = env::var("DEEPSEEK_API_KEY") {
+            if !key.is_empty() {
+                return Self {
+                    primary: Some(LlmProvider {
+                        provider: "deepseek".to_string(),
+                        model: Some("deepseek-chat".to_string()),
+                        endpoint: Some("https://api.deepseek.com/v1".to_string()),
+                        api_key: Some(key),
+                    }),
+                    fallback: None,
+                    logging: LlmLoggingConfig::default(),
+                };
+            }
+        }
+
+        // 检测 OpenAI
+        if let Ok(key) = env::var("OPENAI_API_KEY") {
+            if !key.is_empty() {
+                return Self {
+                    primary: Some(LlmProvider {
+                        provider: "openai".to_string(),
+                        model: Some("gpt-4".to_string()),
+                        endpoint: Some("https://api.openai.com/v1".to_string()),
+                        api_key: Some(key),
+                    }),
+                    fallback: None,
+                    logging: LlmLoggingConfig::default(),
+                };
+            }
+        }
+
+        // 检测 Claude
+        if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
+            if !key.is_empty() {
+                return Self {
+                    primary: Some(LlmProvider {
+                        provider: "claude".to_string(),
+                        model: Some("claude-3-sonnet".to_string()),
+                        endpoint: Some("https://api.anthropic.com/v1".to_string()),
+                        api_key: Some(key),
+                    }),
+                    fallback: None,
+                    logging: LlmLoggingConfig::default(),
+                };
+            }
+        }
+
+        // 未检测到任何 API key，返回默认配置
+        Self::default()
     }
 }
 
@@ -588,6 +659,51 @@ impl Default for VoiceConfig {
     }
 }
 
+/// ✨ 八卦记忆宫配置（v1.8.4+）
+///
+/// 基于易经八卦哲学的多维记忆系统
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaguaConfig {
+    /// 是否启用八卦记忆宫（默认 false）
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+
+    /// 存储位置（默认 ~/.realconsole/bagua）
+    pub storage_path: Option<String>,
+
+    /// 每个维度的最大容量（默认 1000）
+    #[serde(default = "default_dimension_capacity")]
+    pub dimension_capacity: usize,
+
+    /// 数据保留天数（默认 30）
+    #[serde(default = "default_bagua_retention_days")]
+    pub retention_days: u64,
+
+    /// 是否启用跨维度查询（默认 true）
+    #[serde(default = "default_true")]
+    pub cross_dimension_query: bool,
+}
+
+fn default_dimension_capacity() -> usize {
+    1000
+}
+
+fn default_bagua_retention_days() -> u64 {
+    30
+}
+
+impl Default for BaguaConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            storage_path: None, // 使用智能默认路径
+            dimension_capacity: 1000,
+            retention_days: 30,
+            cross_dimension_query: true,
+        }
+    }
+}
+
 impl Default for FeaturesConfig {
     fn default() -> Self {
         Self {
@@ -616,11 +732,45 @@ impl Default for Config {
             conversation: ConversationConfig::default(),
             voice: VoiceConfig::default(),
             likan: None, // 默认使用 None，从配置文件加载
+            bagua: None, // ✨ 八卦记忆宫，默认关闭
         }
     }
 }
 
 impl Config {
+    /// ✨ 创建智能默认配置
+    ///
+    /// 从环境变量智能检测 LLM 配置，其他全部使用合理默认值
+    ///
+    /// # 环境变量检测
+    /// - `DEEPSEEK_API_KEY` → Deepseek
+    /// - `OPENAI_API_KEY` → OpenAI
+    /// - `ANTHROPIC_API_KEY` → Claude
+    ///
+    /// # 示例
+    /// ```ignore
+    /// // 只需设置环境变量
+    /// export DEEPSEEK_API_KEY="sk-xxx"
+    ///
+    /// // 创建配置（自动检测）
+    /// let config = Config::smart_defaults();
+    /// ```
+    pub fn smart_defaults() -> Self {
+        let mut config = Self::default();
+
+        // 智能检测 LLM 配置
+        config.llm = LlmConfig::detect_from_env();
+
+        // 启用常用功能
+        config.features.tool_calling_enabled = Some(true);
+        config.features.auto_suggest = Some(true);
+
+        // 启用离坎炼化炉（自主学习）
+        config.likan = Some(crate::likan::FurnaceConfig::default());
+
+        config
+    }
+
     /// 从 YAML 文件加载配置（支持多路径搜索）
     ///
     /// # 搜索策略
@@ -699,6 +849,62 @@ impl Config {
     #[allow(dead_code)] // 备用 API，可能在库使用场景中需要
     pub fn load_or_default<P: AsRef<Path>>(path: P) -> Self {
         Self::from_file(path).unwrap_or_default()
+    }
+
+    /// ✨ 验证配置并自动修复问题
+    ///
+    /// 返回警告信息列表，同时修复配置中的常见问题
+    ///
+    /// # 示例
+    /// ```ignore
+    /// let mut config = Config::from_file("realconsole.yaml")?;
+    /// let warnings = config.validate_and_fix();
+    /// for warning in warnings {
+    ///     eprintln!("{}", warning);
+    /// }
+    /// ```
+    pub fn validate_and_fix(&mut self) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        // 检查 LLM 配置
+        if self.llm.primary.is_none() {
+            warnings.push("⚠️ 未配置 LLM，部分功能将受限".to_string());
+            warnings.push("💡 提示：设置环境变量 DEEPSEEK_API_KEY 或运行 `realconsole wizard`".to_string());
+        }
+
+        // 检查离坎炼化炉配置
+        if let Some(ref mut likan) = self.likan {
+            // 检查循环间隔
+            if likan.cycle_interval_secs < 60 {
+                warnings.push(format!(
+                    "⚠️ 炼化炉循环间隔过短（{}秒），自动调整为 60 秒",
+                    likan.cycle_interval_secs
+                ));
+                likan.cycle_interval_secs = 60;
+            }
+
+            // 检查配置一致性
+            use crate::likan::NotificationMode;
+            if likan.notification_mode == NotificationMode::Prompt && !likan.show_in_prompt {
+                warnings.push("💡 已自动启用 show_in_prompt（notification_mode=prompt）".to_string());
+                likan.show_in_prompt = true;
+            }
+        }
+
+        // 检查内存配置
+        if let Some(ref mut mem) = self.memory {
+            if let Some(capacity) = mem.capacity {
+                if capacity < 10 {
+                    warnings.push(format!(
+                        "⚠️ 内存容量过小（{}），自动调整为 10",
+                        capacity
+                    ));
+                    mem.capacity = Some(10);
+                }
+            }
+        }
+
+        warnings
     }
 
     /// 扩展环境变量

@@ -68,6 +68,9 @@ use crate::suggestion::{
 // ✨ Phase 4.3: 离坎炼化炉（自主学习循环）
 use crate::likan::{FurnaceConfig, FurnaceStatus, LiKanFurnace, LiKanStatusBar, LiKanTrigger};
 
+// ✨ v1.8.4: 八卦记忆宫（多维记忆系统）
+use crate::bagua::BaguaMemoryPalace;
+
 /// Agent 核心
 ///
 /// ✨ Phase 2 (v1.3.0): 服务层架构重构
@@ -145,6 +148,8 @@ pub struct Agent {
     pub likan_statusbar: Option<Arc<LiKanStatusBar>>,
     // ✨ Phase 4.3: 炼化炉手动触发器（用于 /likan cycle 命令）
     pub likan_trigger: Option<Arc<LiKanTrigger>>,
+    // ✨ v1.8.4: 八卦记忆宫（多维记忆系统）
+    pub bagua_palace: Option<Arc<RwLock<BaguaMemoryPalace>>>,
 }
 
 impl Agent {
@@ -386,6 +391,7 @@ impl Agent {
                 likan_task_handle: None,
                 likan_statusbar: None, // ✨ Phase 4.3: 在启动后台循环时初始化
                 likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
+                bagua_palace: None, // ✨ v1.8.4: 八卦记忆宫，稍后初始化
             };
         }
 
@@ -470,6 +476,7 @@ impl Agent {
             likan_task_handle: None,
             likan_statusbar: None, // ✨ Phase 4.3: 在启动后台循环时初始化
             likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
+            bagua_palace: None, // ✨ v1.8.4: 八卦记忆宫，稍后初始化
         }
     }
 
@@ -744,6 +751,17 @@ impl Agent {
 
         self.suggestion_engine = Some(Arc::new(engine));
         self.likan_furnace = Some(Arc::new(RwLock::new(furnace)));
+
+        // ✨ v1.8.4: 初始化八卦记忆宫
+        if let Some(ref bagua_config) = self.config.bagua {
+            if bagua_config.enabled {
+                // 使用默认配置创建记忆宫殿
+                // TODO: 后续支持持久化配置（storage_path、dimension_capacity等）
+                let palace = BaguaMemoryPalace::new();
+                self.bagua_palace = Some(Arc::new(RwLock::new(palace)));
+                println!("✨ 八卦记忆宫已启动");
+            }
+        }
     }
 
     /// 启动离坎炼化炉后台循环（Phase 4.3）

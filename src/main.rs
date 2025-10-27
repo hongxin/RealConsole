@@ -8,6 +8,7 @@
 
 mod advanced_tools;
 mod agent;
+mod bagua; // ✨ v1.8.4: 八卦记忆宫（多维记忆系统）
 mod builtin_tools;
 mod command;
 mod command_router; // ✨ Phase 10.1: 智能命令路由系统

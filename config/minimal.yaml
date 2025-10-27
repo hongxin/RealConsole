@@ -1,81 +1,37 @@
-# RealConsole 最小配置示例
-# 适用于快速上手和测试
+# RealConsole 最小配置（v1.8.4+）
+# 适用于新手快速上手
+#
+# 理念：Less Config, More Magic
+# ✨ 只需配置 API key，其他全部智能默认
 
-# 命令前缀
-prefix: "/"
-
-# LLM 配置（统一架构：primary + fallback）
+# LLM 配置（必需）
 llm:
-  # 主 LLM（优先使用）
   primary:
-    provider: deepseek
-    model: deepseek-chat
-    endpoint: https://api.deepseek.com/v1
+    # 方式1: 使用环境变量（推荐）
     api_key: ${DEEPSEEK_API_KEY}
 
-  # 备用 LLM（可选，主 LLM 不可用时使用）
-  # fallback:
-  #   provider: ollama
-  #   model: qwen3:4b
-  #   endpoint: ${OLLAMA_ENDPOINT:-http://localhost:11434}
+    # 方式2: 直接填写（不推荐，安全性低）
+    # api_key: "your-api-key-here"
 
-# 功能配置
-features:
-  # Shell 执行
-  shell_enabled: true
-  shell_timeout: 10
-
-  # 工具调用（推荐开启）
-  tool_calling_enabled: true
-
-# 记忆系统（可选）
-# memory:
-#   capacity: 50
-#   persistent_file: "memory/session.jsonl"
-#   auto_save: true
-
-# Intent DSL（默认值已优化，通常无需配置）
-# intent:
-#   llm_extraction_enabled: false
-#   llm_validation_enabled: false
-
-# 对话上下文（默认关闭，保持向后兼容）
-# conversation:
-#   # 模式：disabled（关闭）、manual（手动）、auto（自动）
-#   mode: disabled
+# 就这么简单！🎉
 #
-#   # 最大轮次（保留最近 N 轮对话）
-#   max_turns: 10
+# 🚀 快速开始：
+#   1. 设置环境变量: export DEEPSEEK_API_KEY="your-key"
+#   2. 运行: realconsole
+#   3. 开始使用
 #
-#   # 最大上下文长度（字符数）
-#   max_context_length: 8000
+# 📚 智能默认值：
+#   - LLM provider: 自动检测（deepseek/openai/claude）
+#   - 工具调用: 启用
+#   - 智能建议: 启用
+#   - 离坎炼化炉: 启用（自主学习）
+#   - 所有其他配置: 优化的默认值
 #
-#   # 自动清除策略
-#   auto_clear:
-#     enabled: true
-#     idle_timeout: 600  # 秒（10 分钟）
-#     on_task_complete: false
+# 💡 需要更多配置？
+#   - 查看 config/standard.yaml（常用配置）
+#   - 查看 realconsole.yaml（完整配置）
+#   - 运行 realconsole wizard（配置向导）
 #
-#   # 上下文包含内容
-#   include:
-#     tool_calls: true
-#     shell_output: false
-#     errors: true
-
-# 显示配置
-display:
-  mode: minimal             # minimal（极简）、standard（标准）、debug（调试）
-  language: zh-CN           # 界面语言（zh-CN, en-US）
-  show_conversation_rounds: false  # debug 模式下是否显示对话轮次详情
-  use_emoji: false          # 是否使用 emoji（默认 false，推荐关闭避免终端兼容性问题）
-  use_colors: true          # 是否使用颜色（默认 true）
-
-# 语音播报（可选，v1.3.7+）
-# 注意：启动时语音播报始终是关闭的，需要运行 /voice on 手动开启
-# voice:
-#   enabled: false           # 此配置项已被忽略，启动时强制关闭
-#   voice: "Ting-Ting"       # macOS 中文语音（可选）
-#   max_queue_size: 10       # 队列大小
-#   auto_broadcast: true     # 开启后是否自动播报 LLM 响应
-#   max_broadcast_length: 200  # 最大播报长度（字符）
-#   filter_code_blocks: true   # 是否过滤代码块
+# 📖 文档：
+#   - 快速开始: QUICK_START.md
+#   - 完整文档: docs/02-practice/user/user-guide.md
