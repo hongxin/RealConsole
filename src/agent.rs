@@ -150,6 +150,8 @@ pub struct Agent {
     pub likan_trigger: Option<Arc<LiKanTrigger>>,
     // ✨ v1.8.4: 八卦记忆宫（多维记忆系统）
     pub bagua_palace: Option<Arc<RwLock<BaguaMemoryPalace>>>,
+    // ✨ v1.9.0: 两仪状态追踪器（时间维度演化）
+    pub state_tracker: Option<Arc<crate::liangyyi::StateTracker>>,
 }
 
 impl Agent {
@@ -392,6 +394,7 @@ impl Agent {
                 likan_statusbar: None, // ✨ Phase 4.3: 在启动后台循环时初始化
                 likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
                 bagua_palace: None, // ✨ v1.8.4: 八卦记忆宫，稍后初始化
+                state_tracker: None, // ✨ v1.9.0: 两仪状态追踪器，稍后初始化
             };
         }
 
@@ -477,6 +480,7 @@ impl Agent {
             likan_statusbar: None, // ✨ Phase 4.3: 在启动后台循环时初始化
             likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
             bagua_palace: None, // ✨ v1.8.4: 八卦记忆宫，稍后初始化
+            state_tracker: None, // ✨ v1.9.0: 两仪状态追踪器，稍后初始化
         }
     }
 
@@ -811,6 +815,12 @@ impl Agent {
                 self.bagua_palace = Some(Arc::new(RwLock::new(palace)));
             }
         }
+
+        // ✨ v1.9.0: 初始化两仪状态追踪器
+        let tracker_config = crate::liangyyi::StateTrackerConfig::default();
+        let state_tracker = crate::liangyyi::StateTracker::new(tracker_config);
+        self.state_tracker = Some(Arc::new(state_tracker));
+        println!("✨ 两仪状态追踪器已启动（时间维度）");
     }
 
     /// 启动离坎炼化炉后台循环（Phase 4.3）
@@ -1110,6 +1120,160 @@ impl Agent {
         }
     }
 
+    // ========================================
+    // ✨ v1.9.0: 两仪状态追踪接口
+    // ========================================
+
+    /// 根据命令类型和输入判断事件类型
+    fn classify_event_from_command(&self, command_type: CommandType, input: &str) -> crate::liangyyi::Event {
+        use crate::liangyyi::Event;
+
+        match command_type {
+            CommandType::Text => {
+                // LLM 对话 → 思考
+                Event::UserThink
+            }
+            CommandType::Shell => {
+                // Shell 命令 → 执行
+                Event::UserExecute
+            }
+            CommandType::Command => {
+                // 系统命令，根据具体命令判断
+                let cmd_lower = input.trim_start_matches('/').to_lowercase();
+                let cmd_name = cmd_lower.split_whitespace().next().unwrap_or("");
+
+                match cmd_name {
+                    // 查询类命令 → 读取
+                    "help" | "history" | "list" | "show" | "get" | "view" | "status"
+                    | "trace" | "suggest" | "stats" => Event::UserRead,
+
+                    // 配置类命令 → 写入
+                    "config" | "set" | "add" | "remove" | "clear" | "wizard" => Event::UserWrite,
+
+                    // 执行类命令 → 执行
+                    "run" | "exec" | "test" | "build" => Event::UserExecute,
+
+                    // 默认：读取
+                    _ => Event::UserRead,
+                }
+            }
+        }
+    }
+
+    /// 更新状态追踪器
+    async fn update_state_tracker(&self, command_type: CommandType, input: &str) {
+        if let Some(ref tracker) = self.state_tracker {
+            let event = self.classify_event_from_command(command_type, input);
+            tracker.update_from_event(event).await;
+
+            // ✨ v1.9.0: 连接 Bagua Memory Palace
+            // 每次更新后，记录快照到艮维度
+            self.record_state_snapshot().await;
+
+            // 如果有足够历史（>= 5 个快照），记录趋势到巽维度
+            let history = tracker.history().await;
+            if history.len() >= 5 {
+                self.record_state_trend().await;
+            }
+        }
+    }
+
+    /// 记录状态快照到艮维度（☶）
+    ///
+    /// 艮卦代表山、停止、界限、记录点
+    async fn record_state_snapshot(&self) {
+        if let (Some(ref tracker), Some(ref palace)) = (&self.state_tracker, &self.bagua_palace) {
+            use crate::bagua::{BaguaDimension, MemoryContent, MemoryEntry};
+
+            let state = tracker.current_state().await;
+
+            // 构建状态描述
+            let state_desc = format!(
+                "{} {} (阴={:.2}, 阳={:.2}, 平衡={:.2})",
+                state.liangyyi.symbol(),
+                state.sixiang.symbol(),
+                state.taiji.yin_energy,
+                state.taiji.yang_energy,
+                state.taiji.balance()
+            );
+
+            // 构建元数据（JSON格式）
+            let metadata = serde_json::json!({
+                "yin_energy": state.taiji.yin_energy,
+                "yang_energy": state.taiji.yang_energy,
+                "balance": state.taiji.balance(),
+                "liangyyi": format!("{:?}", state.liangyyi),
+                "sixiang": format!("{:?}", state.sixiang),
+                "timestamp": state.timestamp.to_rfc3339(),
+            });
+
+            let content = MemoryContent::Checkpoint {
+                state: state_desc,
+                snapshot_id: uuid::Uuid::new_v4().to_string(),
+                metadata: Some(metadata.to_string()),
+            };
+
+            let entry = MemoryEntry::new(BaguaDimension::Gen, content);
+
+            if let Err(e) = palace.write().await.store(entry).await {
+                eprintln!("⚠️ 记录状态快照失败: {}", e);
+            }
+        }
+    }
+
+    /// 记录状态趋势到巽维度（☴）
+    ///
+    /// 巽卦代表风、渗透、趋势、渐进
+    async fn record_state_trend(&self) {
+        if let (Some(ref tracker), Some(ref palace)) = (&self.state_tracker, &self.bagua_palace) {
+            use crate::bagua::{BaguaDimension, MemoryContent, MemoryEntry};
+
+            let trend = tracker.analyze_trend().await;
+            let stats = tracker.stats().await;
+
+            // 计算变化率（基于最近历史）
+            let recent_states = tracker.recent_states(5).await;
+            let change_rate = if recent_states.len() >= 2 {
+                let first = &recent_states[0];
+                let last = &recent_states[recent_states.len() - 1];
+                (last.taiji.yang_energy - first.taiji.yang_energy).abs()
+            } else {
+                0.0
+            };
+
+            // 构建趋势描述
+            let pattern = match trend {
+                crate::liangyyi::StateTrend::TowardYin => {
+                    format!(
+                        "趋向阴（变静）- 阴能量上升, 当前四象: {:?}",
+                        stats.current_sixiang
+                    )
+                }
+                crate::liangyyi::StateTrend::TowardYang => {
+                    format!(
+                        "趋向阳（变动）- 阳能量上升, 当前四象: {:?}",
+                        stats.current_sixiang
+                    )
+                }
+                crate::liangyyi::StateTrend::Stable => {
+                    format!("稳定 - 能量平衡, 当前四象: {:?}", stats.current_sixiang)
+                }
+            };
+
+            let content = MemoryContent::Trend {
+                pattern,
+                frequency: stats.total_snapshots,
+                change_rate,
+            };
+
+            let entry = MemoryEntry::new(BaguaDimension::Xun, content);
+
+            if let Err(e) = palace.write().await.store(entry).await {
+                eprintln!("⚠️ 记录状态趋势失败: {}", e);
+            }
+        }
+    }
+
     /// 记录对话到坤维度（☷）
     ///
     /// 坤卦代表地、承载、原始数据
@@ -1323,6 +1487,9 @@ impl Agent {
                             .await;
                     }
 
+                    // ✨ v1.9.0: 更新两仪状态追踪器
+                    self.update_state_tracker(command_type, line).await;
+
                     // ✨ 语音播报：自动播报 LLM 响应
                     if command_type == CommandType::Text {
                         self.try_broadcast_response(&response).await;
@@ -1348,6 +1515,16 @@ impl Agent {
                                 if entry.command != line {
                                     ctx.recent_commands.push(entry.command.clone());
                                 }
+                            }
+
+                            // ✨ v1.9.0: 填充两仪状态信息
+                            if let Some(ref tracker) = self.state_tracker {
+                                let state = tracker.current_state().await;
+                                let trend = tracker.analyze_trend().await;
+
+                                ctx.current_sixiang = Some(format!("{:?}", state.sixiang));
+                                ctx.energy_balance = Some(state.taiji.balance());
+                                ctx.state_trend = Some(format!("{:?}", trend));
                             }
 
                             // 生成建议
@@ -1869,6 +2046,16 @@ impl Agent {
                 // 获取最近失败的命令
                 let last_failed = self.last_failed_command.read().await;
                 ctx.last_command_failed = last_failed.is_some();
+
+                // ✨ v1.9.0: 填充两仪状态信息
+                if let Some(ref tracker) = self.state_tracker {
+                    let state = tracker.current_state().await;
+                    let trend = tracker.analyze_trend().await;
+
+                    ctx.current_sixiang = Some(format!("{:?}", state.sixiang));
+                    ctx.energy_balance = Some(state.taiji.balance());
+                    ctx.state_trend = Some(format!("{:?}", trend));
+                }
 
                 ctx
             })

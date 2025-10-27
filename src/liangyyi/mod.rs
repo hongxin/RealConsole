@@ -49,8 +49,10 @@
 pub mod liangyyi;
 pub mod sixiang;
 pub mod taiji;
+pub mod tracker; // ✨ Phase 2: 状态追踪器
 
 // Re-exports
 pub use liangyyi::Liangyyi;
 pub use sixiang::Sixiang;
 pub use taiji::{EnergyType, Event, Taiji, TaijiContext};
+pub use tracker::{StateSnapshot, StateStats, StateTracker, StateTrackerConfig, StateTrend};

@@ -231,6 +231,16 @@ pub struct SuggestionContext {
 
     /// 用户的常用命令（按频率排序）
     pub frequent_commands: Vec<(String, usize)>,
+
+    // ✨ v1.9.0: 两仪状态信息
+    /// 当前四象状态（老阴/少阳/少阴/老阳）
+    pub current_sixiang: Option<String>,
+
+    /// 阴阳能量平衡度 (0.0-1.0)
+    pub energy_balance: Option<f64>,
+
+    /// 状态趋势（趋向阴/趋向阳/稳定）
+    pub state_trend: Option<String>,
 }
 
 impl SuggestionContext {
@@ -243,6 +253,10 @@ impl SuggestionContext {
             last_command_failed: false,
             last_command_output: None,
             frequent_commands: Vec::new(),
+            // ✨ v1.9.0: 两仪状态信息（默认为 None）
+            current_sixiang: None,
+            energy_balance: None,
+            state_trend: None,
         }
     }
 

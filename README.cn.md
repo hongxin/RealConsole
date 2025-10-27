@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1000%2B-green.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](CHANGELOG.md)
 
 **[English](README.md)** | 中文
 
@@ -244,7 +244,51 @@ realconsole
 - **Suggestion Engine**：三源融合（Context + History + LLM）
 - **Tracer**：四维观测系统
 
-## v1.8.0 新特性
+## v1.9.0 新特性 ⭐
+
+### 两仪演化系统 - 体用合一
+
+**完整实现"先天八卦·竖看"哲学** - 时间维度的状态演化系统：
+
+#### 核心组件
+
+1. **太极·两仪·四象 体系**
+   - 太极（Taiji）：阴阳能量连续模型（0.0-1.0）
+   - 两仪（Liangyyi）：太阴☽ / 太阳☉ 二元状态
+   - 四象（Sixiang）：老阴/少阳/少阴/老阳 四态循环
+
+2. **状态追踪器（StateTracker）**
+   - 实时追踪系统状态演化
+   - 维护状态历史（最近 100 个快照）
+   - 智能活动水平计算
+   - 趋势分析（趋向阴/趋向阳/稳定）
+
+3. **体用合一集成**
+   - 自动状态更新：用户操作 → 事件分类 → 状态演化
+   - 八卦连接：状态快照 → 艮☶维度，状态趋势 → 巽☴维度
+   - 状态感知建议：建议系统获得时间维度感知
+
+#### 哲学实现
+
+```
+体（Liangyyi）        用（Bagua）
+     ↓                    ↓
+  时间演化            空间存储
+     ↓                    ↓
+StateTracker  ←──→  BaguaPalace
+     ↓                    ↓
+  当前状态   ──→   艮/巽维度
+     ↓
+SuggestionEngine
+```
+
+**代码统计**：1152 行，24 个测试，100% 通过
+
+📖 **详细信息**：[两仪系统报告](docs/04-reports/) | [设计文档](docs/01-understanding/design/liangyyi-state-evolution-design.md)
+
+---
+
+## v1.8.0 特性
 
 ### 主动建议系统
 

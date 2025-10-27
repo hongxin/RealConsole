@@ -5,6 +5,87 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2025-10-28
+
+### Added
+
+- **[两仪演化系统] Liangyyi Evolution System - 体用合一（Unity of Essence and Function）**
+  - 完整实现"先天八卦·竖看"哲学 - 时间维度的状态演化系统
+  - **核心组件**：
+    - **Phase 1: 核心结构（570 行）**
+      - `Taiji`（太极）：阴阳能量连续模型（0.0-1.0）
+      - `Liangyyi`（两仪）：太阴☽ / 太阳☉ 二元状态
+      - `Sixiang`（四象）：老阴/少阳/少阴/老阳 四态循环
+      - 事件驱动更新：UserRead/Write/Execute/Think/Idle
+      - 测试：16/16 通过
+    - **Phase 2: 状态追踪器（392 行）**
+      - `StateTracker`: 实时追踪系统状态演化
+      - `StateSnapshot`: 不可变状态快照（带时间戳）
+      - 状态历史管理（最近 100 个快照，VecDeque 环形缓冲）
+      - 智能活动水平计算（基于最近 10 个快照的阳能量平均值）
+      - 趋势分析：TowardYin/TowardYang/Stable
+      - 统计信息：四象分布、平均平衡度、能量值
+      - Arc<RwLock<>> 并发安全设计
+      - 测试：8/8 通过
+    - **Phase 3: 应用集成（190 行）**
+      - 自动状态更新：用户操作 → 事件分类 → 状态演化
+      - 智能事件分类：Command/Shell/Text → Read/Write/Execute/Think
+      - 八卦记忆宫连接：
+        - 状态快照 → 艮☶维度（Checkpoint）
+        - 状态趋势 → 巽☴维度（Trend）
+      - 状态感知建议：SuggestionContext 扩展（current_sixiang, energy_balance, state_trend）
+      - 集成点：handle() 方法中每次命令执行后自动更新
+  - **哲学实现**：
+    - 先天八卦（竖看·时间）：Liangyyi 实现时间维度演化序列
+    - 后天八卦（横看·空间）：Bagua 实现空间维度数据存储
+    - 体用合一：StateTracker ←→ BaguaPalace 完美融合
+    - 竖横结合：状态演化 + 数据记录 = 完整系统
+  - **代码统计**：
+    - 总计：1152 行（Phase 1: 570 + Phase 2: 392 + Phase 3: 190）
+    - 测试：24/24 通过（100%）
+    - 编译：零错误
+  - **使用示例**：
+    ```rust
+    // 自动运行（无需用户干预）
+    用户执行: cargo build
+        ↓
+    Event::UserExecute → Taiji 更新
+        ↓
+    阳能量 +0.08, 阴能量 -0.05
+        ↓
+    Liangyyi: Taiyang ☉
+        ↓
+    Sixiang: LaoYang ▅▅▅▅▅ ▅▅▅▅▅ ▅▅▅▅▅
+        ↓
+    写入艮维度: 状态快照
+        ↓
+    写入巽维度: 趋势分析
+    ```
+  - 详见报告：
+    - `docs/04-reports/liangyyi-phase1-completion.md`
+    - `docs/04-reports/liangyyi-phase2-completion.md`
+    - `docs/04-reports/liangyyi-phase3-completion.md`
+    - `docs/01-understanding/design/liangyyi-state-evolution-design.md`
+
+### Changed
+
+- **Agent**: 集成两仪状态追踪器，自动更新状态
+- **SuggestionContext**: 扩展状态字段，支持状态感知建议
+- **BaguaPalace**: 新增艮、巽维度写入（状态快照和趋势）
+
+### Notes
+
+- **体用合一完成**：Liangyyi（体/竖看/时间） + Bagua（用/横看/空间） = 完整系统 ☯️
+- **无侵入式集成**：状态追踪自动运行，不影响原有功能
+- **可选依赖**：StateTracker 可选，确保向后兼容
+- **未来优化方向**：
+  - 状态感知建议增强（根据四象调整建议策略）
+  - 学习阶段识别（Beginner/Learning/Practicing/Proficient）
+  - 状态可视化（状态栏显示）
+  - 状态驱动的自动化（极静/极动触发建议）
+
+---
+
 ## [1.8.0] - 2025-10-27
 
 ### Added
