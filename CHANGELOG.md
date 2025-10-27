@@ -5,6 +5,46 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2025-10-28
+
+### Added
+
+- **[配置支持] 两仪系统配置文件支持**
+  - 新增 `liangyyi` 配置项到 Config 结构
+  - 支持启用/禁用两仪系统（`enabled` 字段，默认 true）
+  - 支持自定义状态追踪器参数：
+    - `history_size`: 历史记录大小（默认 100）
+    - `snapshot_interval`: 快照间隔秒数（默认 60）
+    - `energy_decay_rate`: 能量衰减率（默认 0.01）
+    - `low_activity_threshold`: 低活动阈值（默认 0.3）
+    - `high_activity_threshold`: 高活动阈值（默认 0.7）
+  - `StateTrackerConfig` 添加 Serde 支持
+  - Agent 初始化逻辑支持从配置加载
+
+### Changed
+
+- **Agent**: 两仪系统初始化现在从配置文件读取设置
+- **StateTrackerConfig**: 添加 Serialize/Deserialize derive
+- 所有配置项都有合理的默认值，确保向后兼容
+
+### Notes
+
+- **向后兼容**: 不配置 `liangyyi` 字段时，系统使用默认值（启用状态）
+- **配置示例**:
+  ```yaml
+  liangyyi:
+    enabled: true
+    state_tracker:
+      history_size: 100
+      energy_decay_rate: 0.01
+      low_activity_threshold: 0.3
+      high_activity_threshold: 0.7
+  ```
+- **禁用示例**: 设置 `liangyyi.enabled: false` 可完全禁用两仪系统
+- 详见文档: `docs/04-reports/v1.9.1-implementation-plan.md`
+
+---
+
 ## [1.9.0] - 2025-10-28
 
 ### Added

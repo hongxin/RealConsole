@@ -816,11 +816,20 @@ impl Agent {
             }
         }
 
-        // ✨ v1.9.0: 初始化两仪状态追踪器
-        let tracker_config = crate::liangyyi::StateTrackerConfig::default();
-        let state_tracker = crate::liangyyi::StateTracker::new(tracker_config);
-        self.state_tracker = Some(Arc::new(state_tracker));
-        println!("✨ 两仪状态追踪器已启动（时间维度）");
+        // ✨ v1.9.0+v1.9.1: 初始化两仪状态追踪器
+        let liangyyi_config = self.config.liangyyi.as_ref();
+
+        if liangyyi_config.map(|c| c.enabled).unwrap_or(true) {
+            let tracker_config = liangyyi_config
+                .map(|c| c.state_tracker.clone())
+                .unwrap_or_default();
+
+            let state_tracker = crate::liangyyi::StateTracker::new(tracker_config);
+            self.state_tracker = Some(Arc::new(state_tracker));
+            println!("✨ 两仪状态追踪器已启动（时间维度）");
+        } else {
+            println!("ℹ️  两仪状态追踪器已禁用");
+        }
     }
 
     /// 启动离坎炼化炉后台循环（Phase 4.3）

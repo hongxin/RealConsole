@@ -57,6 +57,10 @@ pub struct Config {
     /// 八卦记忆宫配置
     #[serde(default)]
     pub bagua: Option<BaguaConfig>,
+
+    /// ✨ v1.9.1: 两仪演化系统配置
+    #[serde(default)]
+    pub liangyyi: Option<LiangyyiConfig>,
 }
 
 fn default_prefix() -> String {
@@ -733,6 +737,7 @@ impl Default for Config {
             voice: VoiceConfig::default(),
             likan: None, // 默认使用 None，从配置文件加载
             bagua: None, // ✨ 八卦记忆宫，默认关闭
+            liangyyi: None, // ✨ v1.9.1: 两仪演化系统，默认使用默认配置
         }
     }
 }
@@ -929,6 +934,35 @@ impl Config {
         });
 
         step2.to_string()
+    }
+}
+
+// ========================================
+// ✨ v1.9.1: 两仪演化系统配置
+// ========================================
+
+/// 两仪演化系统配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiangyyiConfig {
+    /// 是否启用两仪系统（默认: true）
+    #[serde(default = "default_liangyyi_enabled")]
+    pub enabled: bool,
+
+    /// 状态追踪器配置
+    #[serde(default)]
+    pub state_tracker: crate::liangyyi::StateTrackerConfig,
+}
+
+fn default_liangyyi_enabled() -> bool {
+    true
+}
+
+impl Default for LiangyyiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            state_tracker: crate::liangyyi::StateTrackerConfig::default(),
+        }
     }
 }
 

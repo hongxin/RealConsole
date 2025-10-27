@@ -35,22 +35,47 @@ pub struct StateSnapshot {
 }
 
 /// 状态追踪器配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StateTrackerConfig {
     /// 历史记录大小
+    #[serde(default = "default_history_size")]
     pub history_size: usize,
 
     /// 快照间隔（秒）
+    #[serde(default = "default_snapshot_interval")]
     pub snapshot_interval: u64,
 
     /// 能量衰减率（每秒）
+    #[serde(default = "default_energy_decay_rate")]
     pub energy_decay_rate: f64,
 
     /// 低活动阈值
+    #[serde(default = "default_low_activity_threshold")]
     pub low_activity_threshold: f64,
 
     /// 高活动阈值
+    #[serde(default = "default_high_activity_threshold")]
     pub high_activity_threshold: f64,
+}
+
+fn default_history_size() -> usize {
+    100
+}
+
+fn default_snapshot_interval() -> u64 {
+    60
+}
+
+fn default_energy_decay_rate() -> f64 {
+    0.01
+}
+
+fn default_low_activity_threshold() -> f64 {
+    0.3
+}
+
+fn default_high_activity_threshold() -> f64 {
+    0.7
 }
 
 impl Default for StateTrackerConfig {
