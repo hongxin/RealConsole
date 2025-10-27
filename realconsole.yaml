@@ -111,6 +111,19 @@ voice:
   max_broadcast_length: 200        # 最大播报长度/字符（默认 200）
   filter_code_blocks: true         # 过滤代码块（默认 true）
 
+# 离坎炼化炉配置 (v1.8.2+ Phase 4.3)
+# 自主学习循环系统：从交互中提取模式，持续优化建议质量
+likan:
+  enabled: true                    # 是否启用炼化炉（默认 true）
+  cycle_interval_secs: 300         # 循环间隔/秒（默认 300 = 5分钟）
+  notification_mode: minimal       # 通知模式：minimal（简洁）/ prompt（提示符）/ none（静默）
+  show_in_prompt: false            # 是否在提示符中显示状态（默认 false）
+
+  # 模式提取阈值
+  min_confidence: 0.6              # 最小置信度（0.0-1.0，默认 0.6）
+  min_frequency: 3                 # 最小频率/次（默认 3）
+  max_patterns: 50                 # 最大模式数量（默认 50）
+
 # ============================================================================
 # 配置说明
 # ============================================================================

@@ -8,6 +8,7 @@ use crate::conversation::ContextManager;
 use crate::execution_logger::ExecutionLogger;
 use crate::history::HistoryManager;
 use crate::llm::LlmLogger;
+use crate::suggestion::feedback::FeedbackStorage; // ✨ Phase 4.4: 反馈系统集成
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -21,6 +22,7 @@ pub struct LiKanTrigger {
     exec_logger: Arc<RwLock<ExecutionLogger>>,
     llm_logger: Option<Arc<LlmLogger>>,
     context_manager: Arc<RwLock<ContextManager>>,
+    feedback_storage: Option<Arc<RwLock<FeedbackStorage>>>, // ✨ Phase 4.4: 反馈统计
 }
 
 impl LiKanTrigger {
@@ -31,6 +33,7 @@ impl LiKanTrigger {
         exec_logger: Arc<RwLock<ExecutionLogger>>,
         llm_logger: Option<Arc<LlmLogger>>,
         context_manager: Arc<RwLock<ContextManager>>,
+        feedback_storage: Option<Arc<RwLock<FeedbackStorage>>>, // ✨ Phase 4.4: 新增参数
     ) -> Self {
         Self {
             furnace,
@@ -38,6 +41,7 @@ impl LiKanTrigger {
             exec_logger,
             llm_logger,
             context_manager,
+            feedback_storage, // ✨ Phase 4.4: 存储反馈统计
         }
     }
 
@@ -59,8 +63,18 @@ impl LiKanTrigger {
             .await
             .context("查询追踪数据失败")?;
 
-        // 暂时使用空的 suggestion stats（Phase 4.4 可集成反馈系统）
-        let stats = std::collections::HashMap::new();
+        // ✨ Phase 4.4: 从 FeedbackStorage 获取反馈统计
+        let stats = if let Some(ref storage) = self.feedback_storage {
+            match storage.read().await.load_stats().await {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("⚠️ 无法加载反馈统计: {}", e);
+                    std::collections::HashMap::new()
+                }
+            }
+        } else {
+            std::collections::HashMap::new() // 降级到空统计
+        };
 
         // 执行炼化循环
         let mut f = self.furnace.write().await;
@@ -92,13 +106,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_trigger_creation() {
-        let furnace = Arc::new(RwLock::new(LiKanFurnace::new(FurnaceConfig::default())));
-        let history = Arc::new(RwLock::new(HistoryManager::new(None)));
-        let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(None)));
-        let llm_logger = Some(Arc::new(LlmLogger::new(None)));
-        let context = Arc::new(RwLock::new(ContextManager::new()));
+        use crate::config::ConversationConfig;
+        use std::path::PathBuf;
 
-        let trigger = LiKanTrigger::new(furnace, history, exec_logger, llm_logger, context);
+        let furnace = Arc::new(RwLock::new(LiKanFurnace::new(FurnaceConfig::default())));
+        let history = Arc::new(RwLock::new(HistoryManager::new(
+            PathBuf::from("/tmp/test"),
+            100,
+        )));
+        let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(100)));
+        let llm_logger = None; // 测试时不需要 LLM logger
+        let context = Arc::new(RwLock::new(ContextManager::new(
+            ConversationConfig::default(),
+        )));
+
+        let feedback_storage = None; // 测试时不需要反馈存储
+        let trigger = LiKanTrigger::new(furnace, history, exec_logger, llm_logger, context, feedback_storage);
 
         // 应该可以触发第一次循环
         assert!(trigger.should_cycle().await);

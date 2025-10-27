@@ -241,17 +241,17 @@ likan:
 - ✅ 改为通知模式
 - ✅ 编译通过
 
-### Phase 2（建议优先）
+### Phase 2（建议优先）✅ 已完成
 
-- [ ] 实现 `/likan status` 命令
-- [ ] 显示详细状态和历史
-- [ ] 支持 `/likan cycle` 手动触发
+- [x] 实现 `/likan status` 命令
+- [x] 显示详细状态和历史
+- [x] 支持 `/likan cycle` 手动触发
 
-### Phase 3（可选）
+### Phase 3（可选）✅ 已完成
 
-- [ ] 提示符集成选项
-- [ ] 配置文件控制
-- [ ] 多种通知模式
+- [x] 配置文件控制
+- [x] 多种通知模式（minimal/prompt/none）
+- [ ] 提示符集成选项（保留未来实现）
 
 ### Phase 4（长期）
 
@@ -358,7 +358,40 @@ likan:
 ---
 
 **完成者**: Claude & RealConsole Team
-**下一步**: 实现 `/likan status` 命令
+**最后更新**: 2025-10-27
+
+---
+
+## 🎉 Phase 2 & 3 完成总结
+
+### Phase 2 - 命令系统 ✅
+- `/likan status` - 查看详细状态
+- `/likan history` - 查看循环历史
+- `/likan cycle` - 手动触发循环
+
+### Phase 3 - 配置增强 ✅
+**配置文件支持**：
+```yaml
+likan:
+  enabled: true
+  cycle_interval_secs: 300
+  notification_mode: minimal  # minimal / prompt / none
+  show_in_prompt: false
+  min_confidence: 0.6
+  min_frequency: 3
+  max_patterns: 50
+```
+
+**三种通知模式**：
+1. **minimal**（默认）：简洁一行通知
+2. **prompt**：更新状态栏（预留）
+3. **none**：静默模式，仅通过命令查询
+
+**技术实现**：
+- `NotificationMode` 枚举
+- `FurnaceConfig` 扩展支持 serde
+- Agent 后台循环集成配置
+- 从配置文件动态加载
 
 ---
 

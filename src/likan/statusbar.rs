@@ -252,7 +252,7 @@ mod tests {
 
         let s = status.read().await;
         assert_eq!(s.pattern_count, 0);
-        assert!(s.enabled);
+        assert!(!s.enabled); // 默认禁用，由配置控制
     }
 
     #[tokio::test]

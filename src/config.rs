@@ -49,6 +49,10 @@ pub struct Config {
     /// 语音播报配置
     #[serde(default)]
     pub voice: VoiceConfig,
+
+    /// 离坎炼化炉配置
+    #[serde(default)]
+    pub likan: Option<crate::likan::FurnaceConfig>,
 }
 
 fn default_prefix() -> String {
@@ -611,6 +615,7 @@ impl Default for Config {
             display: DisplayConfig::default(),
             conversation: ConversationConfig::default(),
             voice: VoiceConfig::default(),
+            likan: None, // 默认使用 None，从配置文件加载
         }
     }
 }

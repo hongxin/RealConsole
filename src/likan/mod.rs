@@ -31,4 +31,4 @@ pub use kan::KanExtractor;
 pub use li::LiEnhancer;
 pub use statusbar::{FurnaceStatus, LiKanStatusBar};
 pub use trigger::LiKanTrigger;
-pub use types::*;
+pub use types::{CycleReport, FurnaceConfig, NotificationMode, Pattern};

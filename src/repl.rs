@@ -223,10 +223,17 @@ fn build_prompt(agent: &Agent) -> String {
     // ✨ Phase 对话上下文: 获取上下文状态
     let context_indicator = build_context_indicator(agent);
 
-    // 构建提示符：(RealConsole v1) Username Pathname [上下文] %
+    // ✨ Phase 4.3: 获取离坎炼化炉提示符前缀
+    let likan_prefix = agent
+        .get_likan_prompt_prefix()
+        .map(|prefix| format!("{} | ", prefix))
+        .unwrap_or_default();
+
+    // 构建提示符：[🌊🔥 8 | ](RealConsole v1) Username Pathname [上下文] %
     // 样式与欢迎信息保持一致：RealConsole 粗体青色，版本号灰色
     format!(
-        "({} {}) {} {}{} % ",
+        "{}({} {}) {} {}{} % ",
+        likan_prefix, // 离坎前缀（如果有）
         "RealConsole".bold().cyan(), // 粗体青色 RealConsole（与首行一致）
         format!("v{}", major_version).dimmed(), // 灰色版本号（与首行一致）
         username.truecolor(255, 165, 0), // 橙色用户名

@@ -62,6 +62,11 @@ impl LiKanFurnace {
         Arc::clone(&self.li)
     }
 
+    /// 获取炼化炉配置
+    pub fn config(&self) -> &FurnaceConfig {
+        &self.config
+    }
+
     /// 检查是否应该触发循环
     ///
     /// 简化版：只检查时间间隔

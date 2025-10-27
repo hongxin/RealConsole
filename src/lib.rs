@@ -16,6 +16,7 @@
 // Public modules
 pub mod advanced_tools;
 pub mod agent;
+pub mod bagua; // ✨ Phase 4.4: 八卦记忆宫殿（八维知识图谱）
 pub mod builtin_tools;
 pub mod command;
 pub mod command_router; // ✨ Phase 10.1: 智能命令路由系统

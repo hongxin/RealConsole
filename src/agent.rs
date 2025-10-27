@@ -724,8 +724,9 @@ impl Agent {
             })
         });
 
-        // ✨ Phase 4.3: 创建离坎炼化炉（极简配置）
-        let furnace_config = FurnaceConfig::default();
+        // ✨ Phase 4.3: 创建离坎炼化炉
+        // 从配置文件加载或使用默认配置
+        let furnace_config = self.config.likan.clone().unwrap_or_default();
         let furnace = LiKanFurnace::new(furnace_config);
 
         // 获取离增强器的共享引用
@@ -775,6 +776,20 @@ impl Agent {
         let status = statusbar.status();
         self.likan_statusbar = Some(Arc::clone(&statusbar));
 
+        // ✨ Phase 4.4: 尝试加载反馈存储
+        let feedback_storage = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                use crate::suggestion::feedback::FeedbackStorage;
+                match FeedbackStorage::from_default_location().await {
+                    Ok(storage) => Some(Arc::new(RwLock::new(storage))),
+                    Err(e) => {
+                        eprintln!("⚠️ 无法加载反馈存储: {}", e);
+                        None
+                    }
+                }
+            })
+        });
+
         // 创建手动触发器（用于 /likan cycle 命令）
         let trigger = Arc::new(LiKanTrigger::new(
             Arc::clone(&furnace),
@@ -782,11 +797,18 @@ impl Agent {
             Arc::clone(&exec_logger),
             llm_logger.clone(),
             Arc::clone(&conversation_context),
+            feedback_storage, // ✨ Phase 4.4: 传递反馈存储
         ));
         self.likan_trigger = Some(Arc::clone(&trigger));
 
-        // 获取炼化间隔配置（从默认配置）
-        let cycle_interval_secs = FurnaceConfig::default().cycle_interval_secs;
+        // 获取炼化配置
+        let furnace_config = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let f = furnace.read().await;
+                f.config().clone()
+            })
+        });
+        let cycle_interval_secs = furnace_config.cycle_interval_secs;
 
         // 初始化状态
         tokio::task::block_in_place(|| {
@@ -799,6 +821,7 @@ impl Agent {
         });
 
         // 启动后台任务
+        let notification_mode = furnace_config.notification_mode;
         let handle = tokio::spawn(async move {
             loop {
                 // 每1分钟检查一次（测试用）
@@ -843,21 +866,29 @@ impl Agent {
                                     s.high_confidence_count = report.high_confidence_patterns;
                                 }
 
-                                // 如果状态栏启用，更新显示
-                                if status.read().await.enabled {
-                                    statusbar.update().await;
-                                } else {
-                                    // 状态栏禁用时，输出简洁通知（仅一行，不干扰）
-                                    // 使用 stderr，不影响正常输出流
-                                    eprintln!(
-                                        "🌊🔥 炼化完成: {} 模式{}",
-                                        report.patterns_found,
-                                        if report.high_confidence_patterns > 0 {
-                                            format!(" ({} ⭐)", report.high_confidence_patterns)
-                                        } else {
-                                            String::new()
-                                        }
-                                    );
+                                // 根据 notification_mode 决定如何通知
+                                use crate::likan::NotificationMode;
+                                match notification_mode {
+                                    NotificationMode::Minimal => {
+                                        // 最小模式：输出简洁一行通知
+                                        eprintln!(
+                                            "🌊🔥 炼化完成: {} 模式{}",
+                                            report.patterns_found,
+                                            if report.high_confidence_patterns > 0 {
+                                                format!(" ({} ⭐)", report.high_confidence_patterns)
+                                            } else {
+                                                String::new()
+                                            }
+                                        );
+                                    }
+                                    NotificationMode::Prompt => {
+                                        // 提示符模式：更新状态栏（未来实现）
+                                        statusbar.update().await;
+                                    }
+                                    NotificationMode::None => {
+                                        // 静默模式：不输出任何通知
+                                        // 用户可以通过 /likan status 查询
+                                    }
                                 }
                             }
                             Err(e) => {
@@ -876,6 +907,55 @@ impl Agent {
 
         // 不再 println，状态栏会自动显示
         // println!("✨ 离坎炼化炉后台循环已启动（每1分钟检查，5分钟触发）");
+    }
+
+    /// ✨ Phase 4.3: 获取离坎炼化炉提示符前缀
+    ///
+    /// 用于 `notification_mode: prompt` 模式，在命令行提示符中显示炼化炉状态
+    ///
+    /// # 返回
+    /// - 有模式时：`🌊🔥 8` 或 `🌊🔥 8 (3 ⭐)`
+    /// - 无模式时：`None`
+    ///
+    /// # 示例
+    /// ```
+    /// // 默认提示符
+    /// (RealConsole v1) user %
+    ///
+    /// // 集成炼化炉状态后
+    /// 🌊🔥 8 | (RealConsole v1) user %
+    /// ```
+    pub fn get_likan_prompt_prefix(&self) -> Option<String> {
+        // 检查是否启用了炼化炉并且配置了 show_in_prompt
+        let config = self.config.likan.as_ref()?;
+        if !config.show_in_prompt {
+            return None;
+        }
+
+        // 获取状态栏引用
+        let statusbar = self.likan_statusbar.as_ref()?;
+
+        // 使用 try_read 避免阻塞
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match statusbar.status().try_read() {
+                    Ok(status) => {
+                        // 无模式时不显示
+                        if status.pattern_count == 0 {
+                            return None;
+                        }
+
+                        // 格式化前缀
+                        Some(if status.high_confidence_count > 0 {
+                            format!("🌊🔥 {} ({} ⭐)", status.pattern_count, status.high_confidence_count)
+                        } else {
+                            format!("🌊🔥 {}", status.pattern_count)
+                        })
+                    }
+                    Err(_) => None, // 锁被占用，安全降级
+                }
+            })
+        })
     }
 
     /// 处理用户输入

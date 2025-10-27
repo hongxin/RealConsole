@@ -4,6 +4,49 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// 通知模式
+///
+/// 控制炼化炉如何向用户报告状态
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NotificationMode {
+    /// 最小模式：仅在循环完成时输出一行简洁通知
+    Minimal,
+    /// 提示符模式：在命令行提示符中显示状态
+    Prompt,
+    /// 静默模式：完全不主动通知，仅通过命令查询
+    None,
+}
+
+impl Default for NotificationMode {
+    fn default() -> Self {
+        Self::Minimal
+    }
+}
+
+impl fmt::Display for NotificationMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Minimal => write!(f, "minimal"),
+            Self::Prompt => write!(f, "prompt"),
+            Self::None => write!(f, "none"),
+        }
+    }
+}
+
+impl NotificationMode {
+    /// 从字符串解析
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "minimal" => Some(Self::Minimal),
+            "prompt" => Some(Self::Prompt),
+            "none" => Some(Self::None),
+            _ => None,
+        }
+    }
+}
 
 /// 模式（Pattern）- 从坎中提取的规律
 ///
@@ -106,28 +149,68 @@ impl CycleReport {
 /// 炼化配置
 ///
 /// 极简配置，只保留关键参数
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FurnaceConfig {
+    /// 是否启用炼化炉
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+
     /// 循环间隔（秒）
+    #[serde(default = "default_cycle_interval")]
     pub cycle_interval_secs: u64,
 
+    /// 通知模式
+    #[serde(default)]
+    pub notification_mode: NotificationMode,
+
+    /// 是否在提示符中显示状态
+    #[serde(default)]
+    pub show_in_prompt: bool,
+
     /// 最小置信度阈值
+    #[serde(default = "default_min_confidence")]
     pub min_confidence: f64,
 
     /// 最小频率阈值（命令至少出现几次）
+    #[serde(default = "default_min_frequency")]
     pub min_frequency: usize,
 
     /// 最大模式数量（防止过载）
+    #[serde(default = "default_max_patterns")]
     pub max_patterns: usize,
+}
+
+// Serde 默认值函数
+fn default_enabled() -> bool {
+    true
+}
+
+fn default_cycle_interval() -> u64 {
+    300 // 5分钟
+}
+
+fn default_min_confidence() -> f64 {
+    0.6
+}
+
+fn default_min_frequency() -> usize {
+    3
+}
+
+fn default_max_patterns() -> usize {
+    50
 }
 
 impl Default for FurnaceConfig {
     fn default() -> Self {
         Self {
+            enabled: true,
             cycle_interval_secs: 300, // 5分钟（测试用，正式环境建议3600）
-            min_confidence: 0.6,       // 60%置信度
-            min_frequency: 3,          // 至少3次
-            max_patterns: 50,          // 最多50个模式
+            notification_mode: NotificationMode::Minimal,
+            show_in_prompt: false,
+            min_confidence: 0.6, // 60%置信度
+            min_frequency: 3,    // 至少3次
+            max_patterns: 50,    // 最多50个模式
         }
     }
 }
@@ -182,7 +265,7 @@ mod tests {
     #[test]
     fn test_furnace_config_default() {
         let config = FurnaceConfig::default();
-        assert_eq!(config.cycle_interval_secs, 3600);
+        assert_eq!(config.cycle_interval_secs, 300); // 5分钟（已从1小时优化）
         assert_eq!(config.min_confidence, 0.6);
         assert_eq!(config.min_frequency, 3);
     }
