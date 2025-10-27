@@ -755,11 +755,60 @@ impl Agent {
         // ✨ v1.8.4: 初始化八卦记忆宫
         if let Some(ref bagua_config) = self.config.bagua {
             if bagua_config.enabled {
-                // 使用默认配置创建记忆宫殿
-                // TODO: 后续支持持久化配置（storage_path、dimension_capacity等）
-                let palace = BaguaMemoryPalace::new();
+                // ✨ Phase 4: 创建持久化存储
+                let storage = if let Some(ref path) = bagua_config.storage_path {
+                    match crate::bagua::BaguaStorage::from_config(path) {
+                        Ok(s) => Some(s),
+                        Err(e) => {
+                            eprintln!("⚠️ 八卦存储初始化失败: {}，使用内存模式", e);
+                            None
+                        }
+                    }
+                } else {
+                    match crate::bagua::BaguaStorage::from_default_location() {
+                        Ok(s) => Some(s),
+                        Err(e) => {
+                            eprintln!("⚠️ 八卦存储初始化失败: {}，使用内存模式", e);
+                            None
+                        }
+                    }
+                };
+
+                // 创建宫殿配置
+                let palace_config = crate::bagua::palace::PalaceConfig {
+                    max_entries_per_dimension: bagua_config.dimension_capacity,
+                    energy_decay_rate: 0.95,
+                    relevance_threshold: 0.1,
+                };
+
+                // 创建记忆宫殿
+                let palace = if let Some(storage) = storage {
+                    let p = crate::bagua::BaguaMemoryPalace::with_storage(palace_config, storage);
+
+                    // ✨ Phase 4: 启动时加载数据
+                    match tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            p.load_from_storage().await
+                        })
+                    }) {
+                        Ok(count) if count > 0 => {
+                            println!("✨ 八卦记忆宫已启动（加载 {} 条记忆）", count);
+                        }
+                        Ok(_) => {
+                            println!("✨ 八卦记忆宫已启动（新建宫殿）");
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ 八卦记忆加载失败: {}，从空宫殿开始", e);
+                        }
+                    }
+
+                    p
+                } else {
+                    println!("✨ 八卦记忆宫已启动（内存模式）");
+                    crate::bagua::BaguaMemoryPalace::with_config(palace_config)
+                };
+
                 self.bagua_palace = Some(Arc::new(RwLock::new(palace)));
-                println!("✨ 八卦记忆宫已启动");
             }
         }
     }
@@ -788,6 +837,8 @@ impl Agent {
         let exec_logger = Arc::clone(&self.exec_logger);
         let llm_logger = self.llm_logger.clone();
         let conversation_context = self.state_manager.conversation_context();
+        let bagua_palace = self.bagua_palace.as_ref().map(Arc::clone); // ✨ v1.8.4: 克隆八卦记忆宫
+        let suggestion_engine = self.suggestion_engine.as_ref().map(Arc::clone); // ✨ v1.8.4 Phase 3: 克隆建议引擎
 
         // 创建状态栏
         let statusbar = Arc::new(LiKanStatusBar::new());
@@ -815,7 +866,8 @@ impl Agent {
             Arc::clone(&exec_logger),
             llm_logger.clone(),
             Arc::clone(&conversation_context),
-            feedback_storage, // ✨ Phase 4.4: 传递反馈存储
+            feedback_storage,                         // ✨ Phase 4.4: 传递反馈存储
+            self.bagua_palace.as_ref().map(Arc::clone), // ✨ v1.8.4: 传递八卦记忆宫
         ));
         self.likan_trigger = Some(Arc::clone(&trigger));
 
@@ -872,9 +924,19 @@ impl Agent {
                         // 暂时使用空的 suggestion stats（Phase 4.4 可集成反馈系统）
                         let stats = std::collections::HashMap::new();
 
+                        // ✨ v1.8.4: 准备八卦记忆宫引用
+                        let palace_guard = if let Some(ref palace) = bagua_palace {
+                            Some(palace.read().await)
+                        } else {
+                            None
+                        };
+
                         // 执行炼化循环
                         let mut f = furnace.write().await;
-                        match f.cycle_once(&entries, &stats).await {
+                        match f
+                            .cycle_once(&entries, &stats, palace_guard.as_deref())
+                            .await
+                        {
                             Ok(report) => {
                                 // 更新状态
                                 {
@@ -882,6 +944,24 @@ impl Agent {
                                     s.last_cycle = Some(Instant::now());
                                     s.pattern_count = report.patterns_found;
                                     s.high_confidence_count = report.high_confidence_patterns;
+                                }
+
+                                // ✨ v1.8.4 Phase 3: 炼化完成后刷新建议引擎知识
+                                if let (Some(ref engine), Some(ref palace)) = (&suggestion_engine, &bagua_palace) {
+                                    let palace_guard = palace.read().await;
+                                    match engine.refresh_knowledge_from_bagua(&palace_guard).await {
+                                        Ok(count) if count > 0 => {
+                                            if notification_mode == crate::likan::NotificationMode::Minimal {
+                                                eprintln!("✨ 建议引擎更新: {} 条新知识", count);
+                                            }
+                                        }
+                                        Ok(_) => {
+                                            // 没有新知识，不输出
+                                        }
+                                        Err(e) => {
+                                            eprintln!("⚠️ 建议引擎刷新失败: {}", e);
+                                        }
+                                    }
                                 }
 
                                 // 根据 notification_mode 决定如何通知
@@ -976,6 +1056,108 @@ impl Agent {
         })
     }
 
+    // ========================================
+    // ✨ v1.8.4: 八卦记忆宫数据写入接口
+    // ========================================
+
+    /// 记录用户意图到乾维度（☰）
+    ///
+    /// 乾卦代表天、意图、目标
+    async fn record_intent(&self, goal: &str, context: Option<String>, priority: f64) {
+        if let Some(ref palace) = self.bagua_palace {
+            use crate::bagua::{BaguaDimension, MemoryContent, MemoryEntry};
+
+            let content = MemoryContent::Intent {
+                goal: goal.to_string(),
+                context,
+                priority,
+            };
+
+            let entry = MemoryEntry::new(BaguaDimension::Qian, content);
+
+            if let Err(e) = palace.write().await.store(entry).await {
+                eprintln!("⚠️ 记录意图失败: {}", e);
+            }
+        }
+    }
+
+    /// 记录命令执行到震维度（☳）
+    ///
+    /// 震卦代表雷、行动、触发
+    async fn record_action(&self, command: &str, success: bool, duration_ms: u64) {
+        if let Some(ref palace) = self.bagua_palace {
+            use crate::bagua::{entry::ActionResult, BaguaDimension, MemoryContent, MemoryEntry};
+
+            let result = if success {
+                ActionResult::Success
+            } else {
+                ActionResult::Failure {
+                    error: "执行失败".to_string(),
+                }
+            };
+
+            let content = MemoryContent::Action {
+                command: command.to_string(),
+                result,
+                duration_ms,
+            };
+
+            let entry = MemoryEntry::new(BaguaDimension::Zhen, content);
+
+            if let Err(e) = palace.write().await.store(entry).await {
+                eprintln!("⚠️ 记录动作失败: {}", e);
+            }
+        }
+    }
+
+    /// 记录对话到坤维度（☷）
+    ///
+    /// 坤卦代表地、承载、原始数据
+    async fn record_conversation(&self, role: &str, message: &str, session_id: Option<String>) {
+        if let Some(ref palace) = self.bagua_palace {
+            use crate::bagua::{BaguaDimension, MemoryContent, MemoryEntry};
+
+            let content = MemoryContent::Conversation {
+                role: role.to_string(),
+                message: message.to_string(),
+                session_id,
+            };
+
+            let entry = MemoryEntry::new(BaguaDimension::Kun, content);
+
+            if let Err(e) = palace.write().await.store(entry).await {
+                eprintln!("⚠️ 记录对话失败: {}", e);
+            }
+        }
+    }
+
+    /// 记录用户反馈到兑维度（☱）
+    ///
+    /// 兑卦代表泽、交流、反馈
+    async fn record_feedback(&self, action: &str, accepted: bool, score: f64) {
+        if let Some(ref palace) = self.bagua_palace {
+            use crate::bagua::{entry::FeedbackType, BaguaDimension, MemoryContent, MemoryEntry};
+
+            let feedback_type = if accepted {
+                FeedbackType::Accept
+            } else {
+                FeedbackType::Reject
+            };
+
+            let content = MemoryContent::Feedback {
+                action: action.to_string(),
+                feedback_type,
+                score,
+            };
+
+            let entry = MemoryEntry::new(BaguaDimension::Dui, content);
+
+            if let Err(e) = palace.write().await.store(entry).await {
+                eprintln!("⚠️ 记录反馈失败: {}", e);
+            }
+        }
+    }
+
     /// 处理用户输入
     pub fn handle(&self, line: &str) -> String {
         let line = line.trim();
@@ -1027,6 +1209,13 @@ impl Agent {
                 for entity in entities {
                     tracker.record_entity(entity);
                 }
+            })
+        });
+
+        // ✨ v1.8.4: 记录用户意图到八卦记忆宫（乾维度）
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.record_intent(line, None, 0.8).await;
             })
         });
 
@@ -1113,6 +1302,9 @@ impl Agent {
                         let mut logger = self.exec_logger.write().await;
                         logger.log_with_trace(line.to_string(), command_type, success, duration, &response, trace_id);
                     }
+
+                    // ✨ v1.8.4: 记录命令执行到八卦记忆宫（震维度）
+                    self.record_action(line, success, duration.as_millis() as u64).await;
 
                     // ✨ Phase 8 + v1.5.1: 记录到命令历史（带 trace_id）
                     {

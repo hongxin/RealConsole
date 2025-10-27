@@ -25,6 +25,7 @@ mod git_assistant; // ✨ Phase 6: Git 智能助手
 mod history; // ✨ Phase 8: 命令历史记录管理
 mod i18n; // ✨ Phase 11: 多语言支持
 mod likan; // ✨ Phase 4.3: 离坎炼化炉（自主学习循环）
+mod liangyyi; // ✨ v1.9.0: 两仪演化系统（先天八卦·竖看·体）
 mod llm;
 mod llm_manager;
 mod log_analyzer; // ✨ Phase 6: 日志分析工具

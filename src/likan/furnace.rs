@@ -16,7 +16,7 @@
 
 use super::kan::KanExtractor;
 use super::li::LiEnhancer;
-use super::types::{CycleReport, FurnaceConfig};
+use super::types::{CycleReport, FurnaceConfig, Pattern}; // ✨ v1.8.4: 添加 Pattern
 use anyhow::Result;
 use chrono::Utc;
 use std::sync::Arc;
@@ -83,6 +83,8 @@ impl LiKanFurnace {
     /// 执行一次完整的炼化循环
     ///
     /// 坎（提取）→ 离（更新）→ 反馈（记录）
+    ///
+    /// ✨ v1.8.4: 支持从八卦记忆宫读取数据
     pub async fn cycle_once(
         &mut self,
         trace_entries: &[crate::tracer::entry::TraceEntry],
@@ -90,16 +92,41 @@ impl LiKanFurnace {
             String,
             crate::suggestion::feedback::SuggestionStats, // 使用公开的 re-export
         >,
+        bagua_palace: Option<&crate::bagua::BaguaMemoryPalace>, // ✨ v1.8.4: 八卦记忆宫
     ) -> Result<CycleReport> {
         let started_at = Utc::now();
 
         // 1. 坎阶段：提取模式
-        let patterns = self.kan.extract_patterns(trace_entries, suggestion_stats);
+        let mut patterns = self.kan.extract_patterns(trace_entries, suggestion_stats);
 
-        // 2. 离阶段：更新增强器
-        {
+        // ✨ v1.8.4: 从八卦记忆宫提取额外模式
+        if let Some(palace) = bagua_palace {
+            let bagua_patterns = self.kan.extract_patterns_from_bagua(palace).await;
+            patterns.extend(bagua_patterns);
+        }
+
+        // 2. 离阶段：更新增强器并生成知识
+        let knowledge_items = {
             let mut li = self.li.write().await;
             li.update_patterns(patterns.clone());
+            li.generate_knowledge(&patterns) // ✨ v1.8.4: 生成显性知识
+        };
+
+        // ✨ v1.8.4: 写回八卦记忆宫
+        if let Some(palace) = bagua_palace {
+            // 写入坎维度（模式）
+            for pattern in &patterns {
+                if let Err(e) = self.store_pattern_to_kan(palace, pattern).await {
+                    eprintln!("⚠️ 写入坎维度失败: {}", e);
+                }
+            }
+
+            // 写入离维度（知识）
+            for knowledge in &knowledge_items {
+                if let Err(e) = self.store_knowledge_to_li(palace, knowledge).await {
+                    eprintln!("⚠️ 写入离维度失败: {}", e);
+                }
+            }
         }
 
         // 3. 反馈：生成报告
@@ -131,6 +158,72 @@ impl LiKanFurnace {
     pub fn time_since_last_cycle(&self) -> Option<u64> {
         self.last_cycle_time
             .map(|t| t.elapsed().as_secs())
+    }
+
+    /// ✨ v1.8.4: 将模式写入坎维度 ☵
+    async fn store_pattern_to_kan(
+        &self,
+        palace: &crate::bagua::BaguaMemoryPalace,
+        pattern: &Pattern,
+    ) -> Result<()> {
+        use crate::bagua::entry::{MemoryContent, MemoryEntry, PatternType};
+        use crate::bagua::dimension::BaguaDimension;
+
+        let pattern_type = match pattern {
+            Pattern::Frequency { command, count, .. } => PatternType::Frequency {
+                command: command.clone(),
+                count: *count,
+            },
+            Pattern::Sequence {
+                commands,
+                occurrences,
+                ..
+            } => PatternType::Sequence {
+                commands: commands.clone(),
+                occurrences: *occurrences,
+            },
+            Pattern::ErrorFix {
+                error_pattern,
+                fix_command,
+                success_rate,
+            } => PatternType::ErrorFix {
+                error_pattern: error_pattern.clone(),
+                fix_command: fix_command.clone(),
+                success_rate: *success_rate,
+            },
+        };
+
+        let content = MemoryContent::Pattern {
+            pattern_type,
+            confidence: pattern.confidence(),
+            occurrences: match pattern {
+                Pattern::Frequency { count, .. } => *count,
+                Pattern::Sequence { occurrences, .. } => *occurrences,
+                Pattern::ErrorFix { .. } => 1,
+            },
+        };
+
+        let entry = MemoryEntry::new(BaguaDimension::Kan, content);
+        palace.store(entry).await
+    }
+
+    /// ✨ v1.8.4: 将知识写入离维度 ☲
+    async fn store_knowledge_to_li(
+        &self,
+        palace: &crate::bagua::BaguaMemoryPalace,
+        knowledge: &str,
+    ) -> Result<()> {
+        use crate::bagua::entry::{KnowledgeSource, MemoryContent, MemoryEntry};
+        use crate::bagua::dimension::BaguaDimension;
+
+        let content = MemoryContent::Knowledge {
+            fact: knowledge.to_string(),
+            source: KnowledgeSource::ExtractedFromKan,
+            confidence: 0.8, // 默认置信度
+        };
+
+        let entry = MemoryEntry::new(BaguaDimension::Li, content);
+        palace.store(entry).await
     }
 }
 
@@ -167,8 +260,8 @@ mod tests {
 
         let stats = HashMap::new();
 
-        // 执行一次循环
-        let report = furnace.cycle_once(&entries, &stats).await.unwrap();
+        // ✨ v1.8.4: 传入 None 表示不使用八卦记忆宫
+        let report = furnace.cycle_once(&entries, &stats, None).await.unwrap();
 
         // 应该发现一些模式
         assert!(report.patterns_found > 0);
@@ -222,7 +315,7 @@ mod tests {
 
         // 执行11次循环
         for _ in 0..11 {
-            furnace.cycle_once(&entries, &stats).await.unwrap();
+            furnace.cycle_once(&entries, &stats, None).await.unwrap(); // ✨ v1.8.4
         }
 
         // 应该只保留10次

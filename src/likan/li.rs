@@ -165,6 +165,64 @@ impl LiEnhancer {
             .filter(|p| p.is_high_confidence())
             .count()
     }
+
+    /// ✨ v1.8.4: 从模式生成显性知识
+    ///
+    /// 将隐性模式转化为显性知识，用于写入离维度
+    pub fn generate_knowledge(&self, patterns: &[Pattern]) -> Vec<String> {
+        let mut knowledge = Vec::new();
+
+        for pattern in patterns {
+            // 只从高置信度模式生成知识
+            if !pattern.is_high_confidence() {
+                continue;
+            }
+
+            match pattern {
+                Pattern::Frequency {
+                    command,
+                    count,
+                    confidence,
+                } => {
+                    knowledge.push(format!(
+                        "命令 '{}' 被频繁使用（{}次，置信度{:.0}%），应优先推荐",
+                        command,
+                        count,
+                        confidence * 100.0
+                    ));
+                }
+                Pattern::Sequence {
+                    commands,
+                    occurrences,
+                    confidence,
+                } => {
+                    if commands.len() >= 2 {
+                        knowledge.push(format!(
+                            "命令序列 '{}' → '{}' 常一起执行（{}次，置信度{:.0}%）",
+                            commands[0],
+                            commands[1],
+                            occurrences,
+                            confidence * 100.0
+                        ));
+                    }
+                }
+                Pattern::ErrorFix {
+                    error_pattern,
+                    fix_command,
+                    success_rate,
+                } => {
+                    knowledge.push(format!(
+                        "错误模式 '{}' 通常用 '{}' 修复（成功率{:.0}%）",
+                        error_pattern,
+                        fix_command,
+                        success_rate * 100.0
+                    ));
+                }
+            }
+        }
+
+        knowledge
+    }
 }
 
 impl Default for LiEnhancer {

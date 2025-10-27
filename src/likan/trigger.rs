@@ -23,6 +23,7 @@ pub struct LiKanTrigger {
     llm_logger: Option<Arc<LlmLogger>>,
     context_manager: Arc<RwLock<ContextManager>>,
     feedback_storage: Option<Arc<RwLock<FeedbackStorage>>>, // ✨ Phase 4.4: 反馈统计
+    bagua_palace: Option<Arc<RwLock<crate::bagua::BaguaMemoryPalace>>>, // ✨ v1.8.4: 八卦记忆宫
 }
 
 impl LiKanTrigger {
@@ -34,6 +35,7 @@ impl LiKanTrigger {
         llm_logger: Option<Arc<LlmLogger>>,
         context_manager: Arc<RwLock<ContextManager>>,
         feedback_storage: Option<Arc<RwLock<FeedbackStorage>>>, // ✨ Phase 4.4: 新增参数
+        bagua_palace: Option<Arc<RwLock<crate::bagua::BaguaMemoryPalace>>>, // ✨ v1.8.4: 八卦记忆宫
     ) -> Self {
         Self {
             furnace,
@@ -42,6 +44,7 @@ impl LiKanTrigger {
             llm_logger,
             context_manager,
             feedback_storage, // ✨ Phase 4.4: 存储反馈统计
+            bagua_palace,     // ✨ v1.8.4: 存储八卦记忆宫
         }
     }
 
@@ -76,12 +79,23 @@ impl LiKanTrigger {
             std::collections::HashMap::new() // 降级到空统计
         };
 
-        // 执行炼化循环
-        let mut f = self.furnace.write().await;
-        let report = f
-            .cycle_once(&entries, &stats)
-            .await
-            .context("炼化循环执行失败")?;
+        // ✨ v1.8.4: 执行炼化循环（带八卦记忆宫）
+        let report = if let Some(ref palace) = self.bagua_palace {
+            // 先锁定八卦记忆宫
+            let palace_guard = palace.read().await;
+
+            // 再锁定炼化炉并执行
+            let mut f = self.furnace.write().await;
+            f.cycle_once(&entries, &stats, Some(&*palace_guard))
+                .await
+                .context("炼化循环执行失败")?
+        } else {
+            // 不使用八卦记忆宫
+            let mut f = self.furnace.write().await;
+            f.cycle_once(&entries, &stats, None)
+                .await
+                .context("炼化循环执行失败")?
+        };
 
         Ok(report)
     }
@@ -121,7 +135,16 @@ mod tests {
         )));
 
         let feedback_storage = None; // 测试时不需要反馈存储
-        let trigger = LiKanTrigger::new(furnace, history, exec_logger, llm_logger, context, feedback_storage);
+        let bagua_palace = None; // ✨ v1.8.4: 测试时不需要八卦记忆宫
+        let trigger = LiKanTrigger::new(
+            furnace,
+            history,
+            exec_logger,
+            llm_logger,
+            context,
+            feedback_storage,
+            bagua_palace, // ✨ v1.8.4
+        );
 
         // 应该可以触发第一次循环
         assert!(trigger.should_cycle().await);

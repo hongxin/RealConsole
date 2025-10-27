@@ -31,7 +31,9 @@
 pub mod dimension;
 pub mod entry;
 pub mod palace;
+pub mod storage; // ✨ v1.8.4 Phase 4: 持久化存储
 
 pub use dimension::BaguaDimension;
 pub use entry::{MemoryContent, MemoryEntry};
 pub use palace::BaguaMemoryPalace;
+pub use storage::{BaguaStorage, StorageStats};

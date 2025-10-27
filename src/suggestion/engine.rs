@@ -234,6 +234,146 @@ impl SuggestionEngine {
     pub fn config(&self) -> &SuggestionConfig {
         &self.config
     }
+
+    /// ✨ v1.8.4 Phase 3: 从八卦记忆宫离维度加载知识
+    ///
+    /// 读取离维度的知识条目，并解析为建议优化规则
+    /// 这些知识由炼化炉的离阶段生成
+    pub async fn load_knowledge_from_li(
+        &self,
+        palace: &crate::bagua::BaguaMemoryPalace,
+    ) -> anyhow::Result<usize> {
+        use crate::bagua::dimension::BaguaDimension;
+        use crate::bagua::entry::MemoryContent;
+
+        // 从离维度读取最近的知识
+        let knowledge_entries = palace.retrieve(BaguaDimension::Li, Some(100)).await?;
+
+        let mut loaded_count = 0;
+
+        // 解析知识并应用到 LiEnhancer
+        for entry in knowledge_entries {
+            if let MemoryContent::Knowledge { fact, confidence, .. } = &entry.content {
+                // 解析知识字符串并提取信息
+                // 格式示例：
+                // "命令 'cargo build' 被频繁使用（15次，置信度85%），应优先推荐"
+                // "命令序列 'cargo build' → 'cargo run' 常一起执行（10次，置信度78%）"
+                // "错误模式 'type mismatch' 通常用 'cargo check' 修复（成功率90%）"
+
+                if Self::apply_knowledge_to_enhancer(&self.li_enhancer, fact, *confidence).await {
+                    loaded_count += 1;
+                }
+            }
+        }
+
+        Ok(loaded_count)
+    }
+
+    /// 将单条知识应用到离增强器
+    ///
+    /// 解析知识字符串并转换为增强器能理解的形式
+    async fn apply_knowledge_to_enhancer(
+        li_enhancer: &Arc<RwLock<LiEnhancer>>,
+        knowledge: &str,
+        confidence: f64,
+    ) -> bool {
+        use crate::likan::types::Pattern;
+
+        // 解析知识字符串
+        // 1. 频率模式："命令 'X' 被频繁使用"
+        if let Some(command) = Self::extract_frequent_command(knowledge) {
+            let pattern = Pattern::Frequency {
+                command: command.to_string(),
+                count: 10, // 默认计数
+                confidence,
+            };
+
+            let mut li = li_enhancer.write().await;
+            li.update_patterns(vec![pattern]);
+            return true;
+        }
+
+        // 2. 序列模式："命令序列 'X' → 'Y'"
+        if let Some((cmd1, cmd2)) = Self::extract_sequence_pattern(knowledge) {
+            let pattern = Pattern::Sequence {
+                commands: vec![cmd1.to_string(), cmd2.to_string()],
+                occurrences: 5, // 默认出现次数
+                confidence,
+            };
+
+            let mut li = li_enhancer.write().await;
+            li.update_patterns(vec![pattern]);
+            return true;
+        }
+
+        // 3. 错误修复模式："错误模式 'X' 通常用 'Y' 修复"
+        if let Some((error_pattern, fix_cmd)) = Self::extract_error_fix_pattern(knowledge) {
+            let pattern = Pattern::ErrorFix {
+                error_pattern: error_pattern.to_string(),
+                fix_command: fix_cmd.to_string(),
+                success_rate: confidence,
+            };
+
+            let mut li = li_enhancer.write().await;
+            li.update_patterns(vec![pattern]);
+            return true;
+        }
+
+        false
+    }
+
+    /// 提取频繁命令："命令 'cargo build' 被频繁使用"
+    fn extract_frequent_command(knowledge: &str) -> Option<&str> {
+        if knowledge.contains("被频繁使用") || knowledge.contains("应优先推荐") {
+            // 提取单引号中的命令
+            Self::extract_quoted_text(knowledge)
+        } else {
+            None
+        }
+    }
+
+    /// 提取序列模式："命令序列 'cargo build' → 'cargo run' 常一起执行"
+    fn extract_sequence_pattern(knowledge: &str) -> Option<(&str, &str)> {
+        if knowledge.contains("命令序列") && knowledge.contains("→") {
+            // 提取两个单引号中的命令
+            let parts: Vec<&str> = knowledge.split('\'').collect();
+            if parts.len() >= 4 {
+                return Some((parts[1], parts[3]));
+            }
+        }
+        None
+    }
+
+    /// 提取错误修复模式："错误模式 'type mismatch' 通常用 'cargo check' 修复"
+    fn extract_error_fix_pattern(knowledge: &str) -> Option<(&str, &str)> {
+        if knowledge.contains("错误模式") && knowledge.contains("修复") {
+            let parts: Vec<&str> = knowledge.split('\'').collect();
+            if parts.len() >= 4 {
+                return Some((parts[1], parts[3]));
+            }
+        }
+        None
+    }
+
+    /// 从单引号中提取文本
+    fn extract_quoted_text(text: &str) -> Option<&str> {
+        let parts: Vec<&str> = text.split('\'').collect();
+        if parts.len() >= 2 {
+            Some(parts[1])
+        } else {
+            None
+        }
+    }
+
+    /// ✨ v1.8.4 Phase 3: 周期性从离维度刷新知识
+    ///
+    /// 返回新增的知识数量
+    pub async fn refresh_knowledge_from_bagua(
+        &self,
+        palace: &crate::bagua::BaguaMemoryPalace,
+    ) -> anyhow::Result<usize> {
+        self.load_knowledge_from_li(palace).await
+    }
 }
 
 #[cfg(test)]

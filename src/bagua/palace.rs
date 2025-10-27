@@ -4,6 +4,7 @@
 
 use super::dimension::BaguaDimension;
 use super::entry::{MemoryEntry, MemoryContent};
+use super::storage::BaguaStorage;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,6 +19,9 @@ pub struct BaguaMemoryPalace {
 
     /// 配置
     config: PalaceConfig,
+
+    /// 持久化存储 (✨ v1.8.4 Phase 4)
+    storage: Option<Arc<BaguaStorage>>,
 }
 
 /// 宫殿配置
@@ -58,7 +62,27 @@ impl BaguaMemoryPalace {
             dimensions.insert(dim, Arc::new(RwLock::new(Vec::new())));
         }
 
-        Self { dimensions, config }
+        Self {
+            dimensions,
+            config,
+            storage: None,
+        }
+    }
+
+    /// 使用持久化存储创建 (✨ v1.8.4 Phase 4)
+    pub fn with_storage(config: PalaceConfig, storage: BaguaStorage) -> Self {
+        let mut dimensions = HashMap::new();
+
+        // 初始化八个维度
+        for dim in BaguaDimension::all() {
+            dimensions.insert(dim, Arc::new(RwLock::new(Vec::new())));
+        }
+
+        Self {
+            dimensions,
+            config,
+            storage: Some(Arc::new(storage)),
+        }
     }
 
     /// 存储记忆条目
@@ -67,13 +91,16 @@ impl BaguaMemoryPalace {
 
         if let Some(storage) = self.dimensions.get(&dimension) {
             let mut entries = storage.write().await;
-            entries.push(entry);
+            entries.push(entry.clone());
 
             // 如果超过最大数量，移除最旧的
             if entries.len() > self.config.max_entries_per_dimension {
                 entries.remove(0);
             }
         }
+
+        // ✨ v1.8.4 Phase 4: 同步持久化到磁盘
+        self.save_dimension_to_storage(dimension, &entry).await?;
 
         Ok(())
     }
@@ -154,6 +181,100 @@ impl BaguaMemoryPalace {
             li_count: li_stats.count,
             kan_count: kan_stats.count,
             balance: li_stats.avg_energy - kan_stats.avg_energy,
+        }
+    }
+
+    // ============================================================
+    // ✨ v1.8.4 Phase 4: 持久化方法
+    // ============================================================
+
+    /// 从存储加载所有维度的数据
+    pub async fn load_from_storage(&self) -> Result<usize> {
+        if let Some(ref storage) = self.storage {
+            let mut total_loaded = 0;
+
+            for dimension in BaguaDimension::all() {
+                // 从存储加载数据（不限制数量，使用配置的容量）
+                let entries = storage
+                    .load_dimension(dimension, Some(self.config.max_entries_per_dimension))
+                    .await?;
+
+                if !entries.is_empty() {
+                    // 写入内存
+                    if let Some(dim_storage) = self.dimensions.get(&dimension) {
+                        let mut dim_entries = dim_storage.write().await;
+                        *dim_entries = entries.clone();
+                        total_loaded += entries.len();
+                    }
+                }
+            }
+
+            Ok(total_loaded)
+        } else {
+            Ok(0)
+        }
+    }
+
+    /// 保存所有维度到存储
+    pub async fn save_to_storage(&self) -> Result<usize> {
+        if let Some(ref storage) = self.storage {
+            let mut total_saved = 0;
+
+            for dimension in BaguaDimension::all() {
+                if let Some(dim_storage) = self.dimensions.get(&dimension) {
+                    let entries = dim_storage.read().await;
+                    if !entries.is_empty() {
+                        storage
+                            .save_dimension(dimension, &entries)
+                            .await?;
+                        total_saved += entries.len();
+                    }
+                }
+            }
+
+            Ok(total_saved)
+        } else {
+            Ok(0)
+        }
+    }
+
+    /// 保存单个维度到存储（追加模式）
+    async fn save_dimension_to_storage(
+        &self,
+        dimension: BaguaDimension,
+        entry: &MemoryEntry,
+    ) -> Result<()> {
+        if let Some(ref storage) = self.storage {
+            storage.append_dimension(dimension, &[entry.clone()]).await?;
+        }
+        Ok(())
+    }
+
+    /// 清理过期数据
+    pub async fn cleanup_expired(&self, retention_days: u64) -> Result<usize> {
+        if let Some(ref storage) = self.storage {
+            let mut total_removed = 0;
+
+            for dimension in BaguaDimension::all() {
+                let removed = storage.cleanup_expired(dimension, retention_days).await?;
+                total_removed += removed;
+
+                // 如果有删除，重新加载该维度
+                if removed > 0 {
+                    let entries = storage
+                        .load_dimension(dimension, Some(self.config.max_entries_per_dimension))
+                        .await?;
+
+                    if let Some(dim_storage) = self.dimensions.get(&dimension) {
+                        let mut dim_entries = dim_storage.write().await;
+                        *dim_entries = entries;
+                    }
+                }
+            }
+
+            Ok(total_removed)
+        } else {
+            Ok(0)
         }
     }
 }

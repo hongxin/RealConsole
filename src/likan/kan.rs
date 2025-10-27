@@ -196,6 +196,90 @@ impl KanExtractor {
             .collect()
     }
 
+    /// ✨ v1.8.4: 从八卦记忆宫提取模式
+    ///
+    /// 读取五个维度：乾（意图）、坤（对话）、震（动作）、巽（趋势）、兑（反馈）
+    pub async fn extract_patterns_from_bagua(
+        &self,
+        palace: &crate::bagua::BaguaMemoryPalace,
+    ) -> Vec<Pattern> {
+        use crate::bagua::dimension::BaguaDimension;
+        use crate::bagua::entry::MemoryContent;
+
+        let mut patterns = Vec::new();
+
+        // 1. 从震维度（动作）提取频率模式
+        if let Ok(entries) = palace.retrieve(BaguaDimension::Zhen, Some(200)).await {
+            let mut command_counts: HashMap<String, usize> = HashMap::new();
+
+            for entry in entries {
+                if let MemoryContent::Action { command, .. } = &entry.content {
+                    *command_counts.entry(command.clone()).or_insert(0) += 1;
+                }
+            }
+
+            // 转换为模式
+            for (command, count) in command_counts {
+                if count >= self.config.min_frequency {
+                    let confidence = (count as f64 / 200.0).min(1.0);
+                    patterns.push(Pattern::Frequency {
+                        command,
+                        count,
+                        confidence,
+                    });
+                }
+            }
+        }
+
+        // 2. 从巽维度（趋势）提取序列模式
+        if let Ok(entries) = palace.retrieve(BaguaDimension::Xun, Some(100)).await {
+            for entry in entries {
+                if let MemoryContent::Trend {
+                    pattern, frequency, ..
+                } = &entry.content
+                {
+                    // 简单地将趋势转换为频率模式
+                    if *frequency >= self.config.min_frequency {
+                        let confidence = (*frequency as f64 / 100.0).min(1.0);
+                        patterns.push(Pattern::Frequency {
+                            command: pattern.clone(),
+                            count: *frequency,
+                            confidence,
+                        });
+                    }
+                }
+            }
+        }
+
+        // 3. 从乾维度（意图）提取高优先级命令
+        if let Ok(entries) = palace.retrieve(BaguaDimension::Qian, Some(100)).await {
+            let mut intent_counts: HashMap<String, (usize, f64)> = HashMap::new();
+
+            for entry in entries {
+                if let MemoryContent::Intent { goal, priority, .. } = &entry.content {
+                    let (count, max_priority) = intent_counts
+                        .entry(goal.clone())
+                        .or_insert((0, 0.0));
+                    *count += 1;
+                    *max_priority = max_priority.max(*priority);
+                }
+            }
+
+            // 转换为模式
+            for (goal, (count, priority)) in intent_counts {
+                if count >= self.config.min_frequency {
+                    patterns.push(Pattern::Frequency {
+                        command: goal,
+                        count,
+                        confidence: priority, // 使用优先级作为置信度
+                    });
+                }
+            }
+        }
+
+        patterns
+    }
+
     /// 过滤和排序模式
     ///
     /// 只保留高置信度的，按置信度排序
