@@ -10,6 +10,10 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+// ✨ v1.10.0: 八卦宫殿集成
+use crate::bagua::{BaguaDimension, BaguaMemoryPalace, MemoryContent, MemoryEntry};
+use uuid::Uuid;
+
 /// 状态追踪器
 pub struct StateTracker {
     /// 当前太极状态
@@ -168,6 +172,83 @@ impl StateSnapshot {
             && self.system_load < 0.8  // 负载不能太高
             && self.learning_efficiency > 0.6
             && self.decision_confidence > 0.6
+    }
+
+    // ========== ✨ v1.10.0: 八卦宫殿集成 ==========
+
+    /// 转换为检查点格式（用于存储到艮卦）
+    ///
+    /// 提取关键状态信息，避免完整序列化
+    pub fn to_checkpoint_state(&self) -> String {
+        serde_json::json!({
+            "yin_energy": self.taiji.yin_energy,
+            "yang_energy": self.taiji.yang_energy,
+            "context_intensity": self.taiji.context_intensity,
+            "context_duration_secs": self.taiji.context_duration.num_seconds(),
+            "liangyyi": format!("{:?}", self.liangyyi),
+            "sixiang": format!("{:?}", self.sixiang),
+            "user_activity_level": self.user_activity_level,
+            "system_load": self.system_load,
+            "learning_efficiency": self.learning_efficiency,
+            "decision_confidence": self.decision_confidence,
+            "timestamp": self.timestamp.to_rfc3339(),
+        })
+        .to_string()
+    }
+
+    /// 从检查点恢复（从艮卦读取）
+    ///
+    /// 重建关键状态，其他部分使用默认值
+    pub fn from_checkpoint_state(state: &str) -> anyhow::Result<Self> {
+        let data: serde_json::Value = serde_json::from_str(state)?;
+
+        // 重建 Taiji（只恢复关键字段）
+        let mut taiji = Taiji::new();
+        taiji.yin_energy = data["yin_energy"].as_f64().unwrap_or(0.5);
+        taiji.yang_energy = data["yang_energy"].as_f64().unwrap_or(0.5);
+        taiji.context_intensity = data["context_intensity"].as_f64().unwrap_or(0.5);
+
+        // 恢复上下文持续时间
+        if let Some(secs) = data["context_duration_secs"].as_i64() {
+            taiji.context_duration = chrono::Duration::seconds(secs);
+        }
+
+        // 解析 Liangyyi（从 Debug 格式）
+        let liangyyi = match data["liangyyi"].as_str().unwrap_or("Taiyin") {
+            "Taiyin" => Liangyyi::Taiyin,
+            "Taiyang" => Liangyyi::Taiyang,
+            _ => Liangyyi::Taiyin,
+        };
+
+        // 解析 Sixiang（从 Debug 格式）
+        let sixiang = match data["sixiang"].as_str().unwrap_or("LaoYin") {
+            "LaoYin" => Sixiang::LaoYin,
+            "ShaoYang" => Sixiang::ShaoYang,
+            "ShaoYin" => Sixiang::ShaoYin,
+            "LaoYang" => Sixiang::LaoYang,
+            _ => Sixiang::LaoYin,
+        };
+
+        // 解析时间戳
+        let timestamp = if let Some(ts_str) = data["timestamp"].as_str() {
+            chrono::DateTime::parse_from_rfc3339(ts_str)
+                .ok()
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(Utc::now)
+        } else {
+            Utc::now()
+        };
+
+        Ok(Self {
+            taiji,
+            liangyyi,
+            sixiang,
+            timestamp,
+            user_activity_level: data["user_activity_level"].as_f64().unwrap_or(0.5),
+            system_load: data["system_load"].as_f64().unwrap_or(0.5),
+            learning_efficiency: data["learning_efficiency"].as_f64().unwrap_or(0.5),
+            decision_confidence: data["decision_confidence"].as_f64().unwrap_or(0.5),
+        })
     }
 }
 
@@ -417,6 +498,123 @@ impl StateTracker {
             sixiang_change_rate,
         }
     }
+
+    // ========== ✨ v1.10.0: 八卦宫殿集成方法 ==========
+
+    /// 同步当前状态到八卦宫殿
+    ///
+    /// ## 存储策略
+    ///
+    /// - **艮卦（Gen）**: 存储状态快照（检查点）
+    /// - **巽卦（Xun）**: 存储状态趋势（模式）
+    ///
+    /// ## 使用示例
+    ///
+    /// ```ignore
+    /// tracker.sync_to_bagua(&mut palace).await?;
+    /// ```
+    pub async fn sync_to_bagua(&self, palace: &mut BaguaMemoryPalace) -> anyhow::Result<()> {
+        // 1. 获取当前状态快照
+        let snapshot = self.current_state().await;
+
+        // 2. 将快照存储到艮卦（Gen - 检查点维度）
+        let checkpoint_content = MemoryContent::Checkpoint {
+            state: snapshot.to_checkpoint_state(),
+            snapshot_id: Uuid::new_v4().to_string(),
+            metadata: Some(format!(
+                "activity:{:.2},load:{:.2},efficiency:{:.2},confidence:{:.2}",
+                snapshot.user_activity_level,
+                snapshot.system_load,
+                snapshot.learning_efficiency,
+                snapshot.decision_confidence
+            )),
+        };
+
+        let checkpoint_entry = MemoryEntry::new(BaguaDimension::Gen, checkpoint_content)
+            .with_energy(snapshot.system_load); // 使用系统负载作为能量值
+
+        palace.store(checkpoint_entry).await?;
+
+        // 3. 分析并存储趋势到巽卦（Xun - 趋势维度）
+        let trend = self.analyze_trend().await;
+        let trend_str = format!("{:?}", trend);
+
+        // 计算变化率（最近10个快照的阳能量活跃度）
+        let change_rate = self.calculate_activity_level().await;
+
+        let trend_content = MemoryContent::Trend {
+            pattern: trend_str,
+            frequency: self.state_history.read().await.len(),
+            change_rate,
+        };
+
+        let trend_entry = MemoryEntry::new(BaguaDimension::Xun, trend_content)
+            .with_energy(change_rate); // 使用变化率作为能量值
+
+        palace.store(trend_entry).await?;
+
+        Ok(())
+    }
+
+    /// 从八卦宫殿恢复状态
+    ///
+    /// ## 恢复策略
+    ///
+    /// - 从艮卦（Gen）读取最后的检查点
+    /// - 恢复太极、两仪、四象状态
+    /// - 恢复观测维度
+    ///
+    /// ## 使用示例
+    ///
+    /// ```ignore
+    /// let tracker = StateTracker::restore_from_bagua(&palace, config).await?;
+    /// ```
+    pub async fn restore_from_bagua(
+        palace: &BaguaMemoryPalace,
+        config: StateTrackerConfig,
+    ) -> anyhow::Result<Self> {
+        // 1. 从艮卦读取最后的检查点
+        let checkpoints = palace.retrieve(BaguaDimension::Gen, None).await?;
+
+        let checkpoint = checkpoints
+            .last()
+            .ok_or_else(|| anyhow::anyhow!("No checkpoint found in Gen dimension"))?;
+
+        // 2. 提取状态数据
+        let state_json = match &checkpoint.content {
+            MemoryContent::Checkpoint { state, .. } => state,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Invalid checkpoint format in Gen dimension"
+                ))
+            }
+        };
+
+        // 3. 恢复状态快照
+        let snapshot = StateSnapshot::from_checkpoint_state(state_json.as_str())?;
+
+        // 4. 创建新的追踪器并恢复状态
+        let tracker = Self::new(config);
+
+        // 恢复当前状态
+        *tracker.current_taiji.write().await = snapshot.taiji.clone();
+        *tracker.current_sixiang.write().await = snapshot.sixiang;
+
+        // 将恢复的快照添加到历史中
+        tracker.state_history.write().await.push_back(snapshot);
+
+        Ok(tracker)
+    }
+
+    /// 检查八卦宫殿中是否有可恢复的检查点
+    ///
+    /// 用于判断是否可以从八卦宫殿恢复状态
+    pub async fn has_checkpoint(palace: &BaguaMemoryPalace) -> bool {
+        palace.retrieve(BaguaDimension::Gen, Some(1))
+            .await
+            .map(|entries| !entries.is_empty())
+            .unwrap_or(false)
+    }
 }
 
 /// 状态趋势
@@ -651,5 +849,174 @@ mod tests {
         assert!(stats.volatility >= 0.0);
         assert!(stats.sixiang_change_rate >= 0.0);
         assert!(stats.sixiang_change_rate <= 1.0);
+    }
+
+    // ========== ✨ v1.10.0: 八卦宫殿集成测试 ==========
+
+    #[tokio::test]
+    async fn test_checkpoint_state_conversion() {
+        use crate::liangyyi::taiji::{Event, Taiji};
+        use crate::liangyyi::liangyyi::Liangyyi;
+        use crate::liangyyi::sixiang::Sixiang;
+
+        // 创建一个测试状态
+        let mut taiji = Taiji::new();
+        taiji.update_from_event(&Event::UserExecute);
+        taiji.update_from_event(&Event::UserExecute);
+
+        let liangyyi = Liangyyi::from_taiji(&taiji);
+        let sixiang = Sixiang::LaoYang;
+
+        let snapshot = StateSnapshot::from_current_state(taiji, liangyyi, sixiang);
+
+        // 测试序列化
+        let checkpoint_json = snapshot.to_checkpoint_state();
+        assert!(checkpoint_json.contains("yin_energy"));
+        assert!(checkpoint_json.contains("yang_energy"));
+        assert!(checkpoint_json.contains("context_intensity"));
+        assert!(checkpoint_json.contains("user_activity_level"));
+
+        // 测试反序列化
+        let restored = StateSnapshot::from_checkpoint_state(&checkpoint_json).unwrap();
+        assert!((restored.taiji.yin_energy - snapshot.taiji.yin_energy).abs() < 0.01);
+        assert!((restored.taiji.yang_energy - snapshot.taiji.yang_energy).abs() < 0.01);
+        assert_eq!(restored.liangyyi, snapshot.liangyyi);
+        assert_eq!(restored.sixiang, snapshot.sixiang);
+    }
+
+    #[tokio::test]
+    async fn test_sync_to_bagua() {
+        use crate::bagua::{BaguaDimension, BaguaMemoryPalace};
+
+        let tracker = StateTracker::with_default();
+
+        // 更新一些状态
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 创建八卦宫殿
+        let mut palace = BaguaMemoryPalace::new();
+
+        // 同步状态
+        tracker.sync_to_bagua(&mut palace).await.unwrap();
+
+        // 验证艮卦（检查点）有数据
+        let checkpoints = palace.retrieve(BaguaDimension::Gen, None).await.unwrap();
+        assert_eq!(checkpoints.len(), 1);
+
+        // 验证巽卦（趋势）有数据
+        let trends = palace.retrieve(BaguaDimension::Xun, None).await.unwrap();
+        assert_eq!(trends.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_restore_from_bagua() {
+        use crate::bagua::{BaguaDimension, BaguaMemoryPalace};
+
+        let tracker1 = StateTracker::with_default();
+
+        // 更新状态到特定值
+        for _ in 0..3 {
+            tracker1.update_from_event(Event::UserExecute).await;
+        }
+        for _ in 0..2 {
+            tracker1.update_from_event(Event::UserRead).await;
+        }
+
+        let original_state = tracker1.current_state().await;
+
+        // 同步到八卦宫殿
+        let mut palace = BaguaMemoryPalace::new();
+        tracker1.sync_to_bagua(&mut palace).await.unwrap();
+
+        // 从八卦宫殿恢复新的tracker
+        let tracker2 = StateTracker::restore_from_bagua(&palace, StateTrackerConfig::default())
+            .await
+            .unwrap();
+
+        let restored_state = tracker2.current_state().await;
+
+        // 验证关键状态被正确恢复
+        assert!(
+            (restored_state.taiji.yin_energy - original_state.taiji.yin_energy).abs() < 0.01,
+            "Yin energy should match"
+        );
+        assert!(
+            (restored_state.taiji.yang_energy - original_state.taiji.yang_energy).abs() < 0.01,
+            "Yang energy should match"
+        );
+        assert_eq!(
+            restored_state.liangyyi, original_state.liangyyi,
+            "Liangyyi should match"
+        );
+        assert_eq!(
+            restored_state.sixiang, original_state.sixiang,
+            "Sixiang should match"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_has_checkpoint() {
+        use crate::bagua::BaguaMemoryPalace;
+
+        // 空宫殿没有检查点
+        let empty_palace = BaguaMemoryPalace::new();
+        assert!(!StateTracker::has_checkpoint(&empty_palace).await);
+
+        // 同步后有检查点
+        let tracker = StateTracker::with_default();
+        tracker.update_from_event(Event::UserRead).await;
+
+        let mut palace = BaguaMemoryPalace::new();
+        tracker.sync_to_bagua(&mut palace).await.unwrap();
+
+        assert!(StateTracker::has_checkpoint(&palace).await);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_syncs() {
+        use crate::bagua::{BaguaDimension, BaguaMemoryPalace};
+
+        let tracker = StateTracker::with_default();
+        let mut palace = BaguaMemoryPalace::new();
+
+        // 多次同步
+        for i in 0..3 {
+            tracker.update_from_event(Event::UserExecute).await;
+            tracker.sync_to_bagua(&mut palace).await.unwrap();
+
+            // 验证艮卦记录累积
+            let checkpoints = palace.retrieve(BaguaDimension::Gen, None).await.unwrap();
+            assert_eq!(checkpoints.len(), i + 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_metadata() {
+        use crate::bagua::{BaguaDimension, BaguaMemoryPalace, MemoryContent};
+
+        let tracker = StateTracker::with_default();
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        let mut palace = BaguaMemoryPalace::new();
+        tracker.sync_to_bagua(&mut palace).await.unwrap();
+
+        let checkpoints = palace.retrieve(BaguaDimension::Gen, Some(1)).await.unwrap();
+        assert_eq!(checkpoints.len(), 1);
+
+        // 验证元数据格式
+        if let MemoryContent::Checkpoint { metadata, .. } = &checkpoints[0].content {
+            assert!(metadata.is_some());
+            let meta = metadata.as_ref().unwrap();
+            assert!(meta.contains("activity:"));
+            assert!(meta.contains("load:"));
+            assert!(meta.contains("efficiency:"));
+            assert!(meta.contains("confidence:"));
+        } else {
+            panic!("Expected Checkpoint content");
+        }
     }
 }
