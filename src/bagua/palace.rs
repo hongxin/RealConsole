@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+// ✨ v1.15.0 Phase 3: Tracer 集成
+use crate::tracer::{Dimension as TracerDimension, EntryType as TracerEntryType, Status, TraceEntry, UnifiedTracer};
+
 /// 八卦记忆宫殿
 ///
 /// 管理八维记忆空间的核心结构
@@ -22,6 +25,11 @@ pub struct BaguaMemoryPalace {
 
     /// 持久化存储 (✨ v1.8.4 Phase 4)
     storage: Option<Arc<BaguaStorage>>,
+
+    /// ✨ v1.15.0 Phase 3: 统一追踪器（可选）
+    ///
+    /// 用于记录记忆存储、炼化过程到 Memory 维度
+    tracer: Option<Arc<UnifiedTracer>>,
 }
 
 /// 宫殿配置
@@ -66,6 +74,7 @@ impl BaguaMemoryPalace {
             dimensions,
             config,
             storage: None,
+            tracer: None, // ✨ v1.15.0 Phase 3
         }
     }
 
@@ -82,12 +91,26 @@ impl BaguaMemoryPalace {
             dimensions,
             config,
             storage: Some(Arc::new(storage)),
+            tracer: None, // ✨ v1.15.0 Phase 3
         }
+    }
+
+    /// ✨ v1.15.0 Phase 3: 设置 Tracer
+    ///
+    /// 启用后，所有记忆操作将记录到 Tracer 的 Memory 维度
+    pub fn set_tracer(&mut self, tracer: Arc<UnifiedTracer>) {
+        self.tracer = Some(tracer);
+    }
+
+    /// ✨ v1.15.0 Phase 3: 检查是否启用了 Tracer
+    pub fn is_tracer_enabled(&self) -> bool {
+        self.tracer.is_some()
     }
 
     /// 存储记忆条目
     pub async fn store(&self, entry: MemoryEntry) -> Result<()> {
         let dimension = entry.dimension;
+        let mut was_pruned = false;
 
         if let Some(storage) = self.dimensions.get(&dimension) {
             let mut entries = storage.write().await;
@@ -96,13 +119,70 @@ impl BaguaMemoryPalace {
             // 如果超过最大数量，移除最旧的
             if entries.len() > self.config.max_entries_per_dimension {
                 entries.remove(0);
+                was_pruned = true;
             }
         }
 
         // ✨ v1.8.4 Phase 4: 同步持久化到磁盘
         self.save_dimension_to_storage(dimension, &entry).await?;
 
+        // ✨ v1.15.0 Phase 3: 记录存储事件到 Tracer
+        if let Some(tracer) = &self.tracer {
+            let content = format!(
+                "记忆存储: {} | {} | 能量={:.2}{}",
+                dimension,
+                Self::preview_content(&entry.content, 50),
+                entry.energy,
+                if was_pruned { " (淘汰旧记忆)" } else { "" }
+            );
+
+            let trace_entry = TraceEntry::new(
+                TracerDimension::Memory,
+                TracerEntryType::SystemEvent,
+                content,
+                Status::Success,
+            );
+
+            tracer.add_entry(trace_entry).await;
+        }
+
         Ok(())
+    }
+
+    /// ✨ v1.15.0 Phase 3: 辅助方法 - 预览记忆内容
+    fn preview_content(content: &MemoryContent, max_len: usize) -> String {
+        let text = match content {
+            MemoryContent::Intent { goal, .. } => format!("意图: {}", goal),
+            MemoryContent::Conversation { role, message, .. } => {
+                format!("{}: {}", role, message)
+            }
+            MemoryContent::Action { command, .. } => format!("命令: {}", command),
+            MemoryContent::Trend { pattern, .. } => format!("趋势: {}", pattern),
+            MemoryContent::Pattern { pattern_type, .. } => {
+                let desc = match pattern_type {
+                    super::entry::PatternType::Frequency { command, .. } => {
+                        format!("频率模式: {}", command)
+                    }
+                    super::entry::PatternType::Sequence { commands, .. } => {
+                        format!("序列模式: {} 命令", commands.len())
+                    }
+                    super::entry::PatternType::ErrorFix { error_pattern, .. } => {
+                        format!("修复模式: {}", error_pattern)
+                    }
+                };
+                desc
+            }
+            MemoryContent::Knowledge { fact, .. } => format!("知识: {}", fact),
+            MemoryContent::Checkpoint { state, .. } => format!("快照: {}", state),
+            MemoryContent::Feedback { action, .. } => format!("反馈: {}", action),
+        };
+
+        if text.len() > max_len {
+            let truncated = &text[..text.char_indices().nth(max_len).map(|(i, _)| i).unwrap_or(max_len)];
+            format!("{}...", truncated)
+        } else {
+            text
+        }
     }
 
     /// 从指定维度检索记忆
@@ -393,5 +473,83 @@ mod tests {
         assert_eq!(balance.kan_count, 2);
         // 离能量应该高于坎
         assert!(balance.balance > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_tracer_integration() {
+        use crate::tracer::{UnifiedTracer, Dimension as TracerDimension, EntryType as TracerEntryType};
+        use crate::config::ConversationConfig;
+        use crate::execution_logger::ExecutionLogger;
+        use crate::history::HistoryManager;
+        use crate::conversation::context_manager::ContextManager;
+
+        // 创建 Tracer 所需的依赖
+        let history = Arc::new(RwLock::new(HistoryManager::new("/tmp/test_bagua_history.json", 100)));
+        let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(100)));
+        let context = Arc::new(RwLock::new(ContextManager::new(ConversationConfig::default())));
+        let tracer = Arc::new(UnifiedTracer::new(history, exec_logger, None, context));
+
+        // 创建带 Tracer 的 Palace
+        let mut palace = BaguaMemoryPalace::new();
+        palace.set_tracer(tracer.clone());
+
+        assert!(palace.is_tracer_enabled(), "Tracer 应该已启用");
+
+        // 存储几个不同维度的记忆
+        let entries = vec![
+            MemoryEntry::new(
+                BaguaDimension::Qian,
+                MemoryContent::Intent {
+                    goal: "测试意图".to_string(),
+                    context: None,
+                    priority: 0.9,
+                },
+            ),
+            MemoryEntry::new(
+                BaguaDimension::Dui,
+                MemoryContent::Conversation {
+                    role: "user".to_string(),
+                    message: "你好".to_string(),
+                    session_id: None,
+                },
+            ),
+            MemoryEntry::new(
+                BaguaDimension::Li,
+                MemoryContent::Knowledge {
+                    fact: "重要知识点".to_string(),
+                    source: super::super::entry::KnowledgeSource::SystemObserved,
+                    confidence: 0.95,
+                },
+            ),
+        ];
+
+        for entry in entries {
+            palace.store(entry).await.unwrap();
+        }
+
+        // 验证 Tracer 记录了事件
+        let memory_entries = tracer
+            .query_by_dimension(TracerDimension::Memory, 10)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            memory_entries.len(),
+            3,
+            "应该有 3 条 Memory 维度的记录"
+        );
+
+        // 验证事件类型和内容
+        for trace_entry in &memory_entries {
+            assert_eq!(trace_entry.entry_type, TracerEntryType::SystemEvent);
+            assert!(trace_entry.content.contains("记忆存储:"));
+            assert!(trace_entry.content.contains("能量="));
+        }
+
+        // 验证不同维度的记录都被记录了（不关心顺序，因为是按时间倒序）
+        let all_content: String = memory_entries.iter().map(|e| e.content.clone()).collect();
+        assert!(all_content.contains("Qian"), "应该有 Qian 维度的记录");
+        assert!(all_content.contains("Dui"), "应该有 Dui 维度的记录");
+        assert!(all_content.contains("Li"), "应该有 Li 维度的记录");
     }
 }
