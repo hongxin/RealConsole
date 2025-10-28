@@ -266,12 +266,12 @@ async fn main() {
     // ✨ Phase 11: 初始化 i18n 系统
     // 语言选择优先级：命令行 > 配置文件 > 环境变量 > 系统语言 > 默认中文
     let selected_lang = if let Some(ref lang_str) = args.lang {
-        i18n::Language::from_str(lang_str).unwrap_or_else(|| {
+        lang_str.parse::<i18n::Language>().unwrap_or_else(|_| {
             eprintln!("⚠ 未知语言: {}，使用默认中文", lang_str);
             i18n::Language::ZhCn
         })
     } else if let Ok(lang_env) = std::env::var("REALCONSOLE_LANG") {
-        i18n::Language::from_str(&lang_env).unwrap_or_else(i18n::Language::from_system)
+        lang_env.parse::<i18n::Language>().unwrap_or_else(|_| i18n::Language::from_system())
     } else {
         i18n::Language::from_system()
     };

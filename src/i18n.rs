@@ -33,16 +33,19 @@ pub enum Language {
     EnUs,
 }
 
-impl Language {
-    /// 从字符串解析语言
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for Language {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "zh-cn" | "zh" | "chinese" | "中文" | "简体中文" => Some(Language::ZhCn),
-            "en-us" | "en" | "english" | "英文" => Some(Language::EnUs),
-            _ => None,
+            "zh-cn" | "zh" | "chinese" | "中文" | "简体中文" => Ok(Language::ZhCn),
+            "en-us" | "en" | "english" | "英文" => Ok(Language::EnUs),
+            _ => Err(format!("Unknown language: {}", s)),
         }
     }
+}
 
+impl Language {
     /// 转换为标准代码
     pub fn code(&self) -> &'static str {
         match self {
@@ -483,13 +486,13 @@ mod tests {
 
     #[test]
     fn test_language_from_str() {
-        assert_eq!(Language::from_str("zh-CN"), Some(Language::ZhCn));
-        assert_eq!(Language::from_str("zh"), Some(Language::ZhCn));
-        assert_eq!(Language::from_str("中文"), Some(Language::ZhCn));
-        assert_eq!(Language::from_str("en-US"), Some(Language::EnUs));
-        assert_eq!(Language::from_str("en"), Some(Language::EnUs));
-        assert_eq!(Language::from_str("english"), Some(Language::EnUs));
-        assert_eq!(Language::from_str("unknown"), None);
+        assert_eq!("zh-CN".parse::<Language>(), Ok(Language::ZhCn));
+        assert_eq!("zh".parse::<Language>(), Ok(Language::ZhCn));
+        assert_eq!("中文".parse::<Language>(), Ok(Language::ZhCn));
+        assert_eq!("en-US".parse::<Language>(), Ok(Language::EnUs));
+        assert_eq!("en".parse::<Language>(), Ok(Language::EnUs));
+        assert_eq!("english".parse::<Language>(), Ok(Language::EnUs));
+        assert!("unknown".parse::<Language>().is_err());
     }
 
     #[test]

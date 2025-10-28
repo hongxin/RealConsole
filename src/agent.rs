@@ -2986,7 +2986,7 @@ impl Agent {
         }
     }
 
-    /// Phase 2: 尝试使用 LLM 补充提取实体
+    // Phase 2: 尝试使用 LLM 补充提取实体
     // ✨ Phase 2.3 (v1.3.0): 清理未使用的辅助方法
     // 已删除：try_llm_extraction (29 lines)
     // 已删除：try_llm_validation (23 lines)

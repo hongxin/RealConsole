@@ -138,6 +138,22 @@ pub struct HistoryManager {
     auto_save: bool,
 }
 
+impl Default for HistoryManager {
+    /// 默认配置（使用 ~/.realconsole/history.json）
+    fn default() -> Self {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let config_dir = home.join(".realconsole");
+        let history_file = config_dir.join("history.json");
+
+        // 确保目录存在
+        if let Err(e) = fs::create_dir_all(&config_dir) {
+            eprintln!("警告: 创建配置目录失败: {}", e);
+        }
+
+        Self::new(history_file, 1000)
+    }
+}
+
 impl HistoryManager {
     /// 创建新的历史记录管理器
     ///
@@ -163,20 +179,6 @@ impl HistoryManager {
         }
 
         manager
-    }
-
-    /// 默认配置（使用 ~/.realconsole/history.json）
-    pub fn default() -> Self {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let config_dir = home.join(".realconsole");
-        let history_file = config_dir.join("history.json");
-
-        // 确保目录存在
-        if let Err(e) = fs::create_dir_all(&config_dir) {
-            eprintln!("警告: 创建配置目录失败: {}", e);
-        }
-
-        Self::new(history_file, 1000)
     }
 
     /// 添加命令到历史记录

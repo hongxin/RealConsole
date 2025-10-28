@@ -36,14 +36,15 @@ impl fmt::Display for NotificationMode {
     }
 }
 
-impl NotificationMode {
-    /// 从字符串解析
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for NotificationMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "minimal" => Some(Self::Minimal),
-            "prompt" => Some(Self::Prompt),
-            "none" => Some(Self::None),
-            _ => None,
+            "minimal" => Ok(Self::Minimal),
+            "prompt" => Ok(Self::Prompt),
+            "none" => Ok(Self::None),
+            _ => Err(format!("Unknown notification mode: {}", s)),
         }
     }
 }

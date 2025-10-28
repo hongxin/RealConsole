@@ -1,6 +1,6 @@
-///! 显示辅助工具
-///!
-///! 提供便捷的符号和格式化函数，根据配置自动选择 emoji 或纯文本
+//! 显示辅助工具
+//!
+//! 提供便捷的符号和格式化函数，根据配置自动选择 emoji 或纯文本
 
 use crate::config::DisplayConfig;
 use colored::Colorize;
@@ -10,17 +10,18 @@ pub struct DisplayHelper {
     use_emoji: bool,
 }
 
+impl Default for DisplayHelper {
+    fn default() -> Self {
+        Self { use_emoji: false }
+    }
+}
+
 impl DisplayHelper {
     /// 从配置创建
     pub fn from_config(config: &DisplayConfig) -> Self {
         Self {
             use_emoji: config.use_emoji,
         }
-    }
-
-    /// 创建一个默认的 helper（不使用 emoji）
-    pub fn default() -> Self {
-        Self { use_emoji: false }
     }
 
     /// 创建一个启用 emoji 的 helper

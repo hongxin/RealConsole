@@ -86,11 +86,12 @@ pub enum LogLevel {
     Unknown,
 }
 
-impl LogLevel {
-    /// 从字符串解析日志级别
-    pub fn from_str(s: &str) -> Self {
+impl std::str::FromStr for LogLevel {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s_lower = s.to_lowercase();
-        if s_lower.contains("error") || s_lower.contains("err") {
+        let level = if s_lower.contains("error") || s_lower.contains("err") {
             LogLevel::Error
         } else if s_lower.contains("warn") || s_lower.contains("warning") {
             LogLevel::Warn
@@ -102,9 +103,12 @@ impl LogLevel {
             LogLevel::Trace
         } else {
             LogLevel::Unknown
-        }
+        };
+        Ok(level)
     }
+}
 
+impl LogLevel {
     /// 转换为字符串
     pub fn as_str(&self) -> &str {
         match self {
@@ -542,10 +546,10 @@ mod tests {
 
     #[test]
     fn test_log_level_from_str() {
-        assert_eq!(LogLevel::from_str("ERROR"), LogLevel::Error);
-        assert_eq!(LogLevel::from_str("warn"), LogLevel::Warn);
-        assert_eq!(LogLevel::from_str("INFO"), LogLevel::Info);
-        assert_eq!(LogLevel::from_str("unknown"), LogLevel::Unknown);
+        assert_eq!("ERROR".parse::<LogLevel>().unwrap(), LogLevel::Error);
+        assert_eq!("warn".parse::<LogLevel>().unwrap(), LogLevel::Warn);
+        assert_eq!("INFO".parse::<LogLevel>().unwrap(), LogLevel::Info);
+        assert_eq!("unknown".parse::<LogLevel>().unwrap(), LogLevel::Unknown);
     }
 
     #[test]

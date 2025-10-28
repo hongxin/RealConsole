@@ -44,17 +44,20 @@ impl Default for DisplayMode {
     }
 }
 
-impl DisplayMode {
-    /// 从字符串解析
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for DisplayMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "minimal" | "min" => Some(Self::Minimal),
-            "standard" | "std" => Some(Self::Standard),
-            "debug" | "dbg" => Some(Self::Debug),
-            _ => None,
+            "minimal" | "min" => Ok(Self::Minimal),
+            "standard" | "std" => Ok(Self::Standard),
+            "debug" | "dbg" => Ok(Self::Debug),
+            _ => Err(format!("Unknown display mode: {}", s)),
         }
     }
+}
 
+impl DisplayMode {
     /// 是否显示启动信息
     pub fn show_startup(self) -> bool {
         matches!(self, Self::Standard | Self::Debug)
@@ -787,16 +790,13 @@ mod tests {
 
     #[test]
     fn test_display_mode_from_str() {
-        assert_eq!(DisplayMode::from_str("minimal"), Some(DisplayMode::Minimal));
-        assert_eq!(DisplayMode::from_str("min"), Some(DisplayMode::Minimal));
-        assert_eq!(
-            DisplayMode::from_str("standard"),
-            Some(DisplayMode::Standard)
-        );
-        assert_eq!(DisplayMode::from_str("std"), Some(DisplayMode::Standard));
-        assert_eq!(DisplayMode::from_str("debug"), Some(DisplayMode::Debug));
-        assert_eq!(DisplayMode::from_str("dbg"), Some(DisplayMode::Debug));
-        assert_eq!(DisplayMode::from_str("unknown"), None);
+        assert_eq!("minimal".parse::<DisplayMode>(), Ok(DisplayMode::Minimal));
+        assert_eq!("min".parse::<DisplayMode>(), Ok(DisplayMode::Minimal));
+        assert_eq!("standard".parse::<DisplayMode>(), Ok(DisplayMode::Standard));
+        assert_eq!("std".parse::<DisplayMode>(), Ok(DisplayMode::Standard));
+        assert_eq!("debug".parse::<DisplayMode>(), Ok(DisplayMode::Debug));
+        assert_eq!("dbg".parse::<DisplayMode>(), Ok(DisplayMode::Debug));
+        assert!("unknown".parse::<DisplayMode>().is_err());
     }
 
     #[test]
