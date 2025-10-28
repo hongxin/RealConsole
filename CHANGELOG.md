@@ -5,6 +5,84 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2025-10-28
+
+### Added
+
+- **[两仪系统] StatePredictor 状态预测系统（State Prediction System）**
+  - **StatePredictor 结构**（src/liangyyi/predictor.rs，420 行）：
+    - 基于历史 StateVector 序列预测未来状态
+    - 使用 `VecDeque` 管理历史队列，自动淘汰旧数据（FIFO）
+    - 支持动态调整历史窗口大小（推荐 5-20）
+  - **预测算法**（2 个）：
+    - `predict_linear()` - 线性趋势外推
+      - 计算平均变化率（斜率）
+      - 从最后观测外推 N 步
+      - 适合稳定的线性趋势
+    - `predict_ewma()` - 指数加权移动平均
+      - 近期观测权重更高
+      - 平滑处理，减少噪声
+      - 支持可调 alpha 参数（0.1-0.9）
+  - **趋势分析**：
+    - `analyze_trends()` - 分析所有维度的趋势
+    - `TrendDirection` 枚举：Rising（上升）/ Falling（下降）/ Stable（稳定）
+    - `DimensionTrend` 结构：包含方向、强度、变化率
+  - **异常检测**：
+    - `detect_anomaly()` - 检测预测值与实际值差异
+    - 基于距离阈值判断异常
+  - **数据管理**（5 个方法）：
+    - `add_observation()` - 添加观测值（自动淘汰）
+    - `clear()` - 清空历史
+    - `history_len()` - 获取历史长度
+    - `can_predict()` - 检查是否有足够数据
+  - **测试覆盖**：新增 10 个单元测试，liangyyi 模块从 60 增至 70 个测试，全部通过
+
+### Changed
+
+- **模块导出**（src/liangyyi/mod.rs）：新增 `pub use predictor::{DimensionTrend, StatePredictor, TrendDirection}`
+- **能力升级**：从被动观测进化到主动预测，实现"观往知来"
+
+### Design Philosophy
+
+- **观往知来**：分析历史 → 识别趋势 → 预测未来
+- **易经之易**：状态持续演化，预测就是模拟演化路径
+- **阴阳平衡**：上升（阳）vs 下降（阴）vs 稳定（平衡）
+- **双算法互补**：线性趋势（快速直观）+ EWMA（平滑稳定）
+
+### Use Cases
+
+```rust
+// 状态预警
+let mut predictor = StatePredictor::new(10);
+predictor.add_observation(current_state);
+
+if let Some(predicted) = predictor.predict_linear(1) {
+    if predicted.get("efficiency").unwrap() < 0.3 {
+        println!("预警：效率可能下降");
+    }
+}
+
+// 趋势监控
+let trends = predictor.analyze_trends();
+for trend in trends {
+    println!("{}: {:?} (强度 {:.2})",
+        trend.dimension, trend.direction, trend.strength);
+}
+
+// 异常检测
+if predictor.detect_anomaly(&actual, 0.15) {
+    println!("⚠ 异常：当前状态偏离预期");
+}
+```
+
+### Notes
+
+- ✅ 双算法支持：线性趋势 + EWMA，互补使用
+- ✅ 自动化设计：自动淘汰旧数据，自动计算指标
+- ✅ 高性能：所有操作在微秒级完成
+- ✅ 实用功能：趋势分析 + 异常检测
+- 📊 详细报告：见 `docs/04-reports/v1.12.0-state-prediction.md`
+
 ## [1.11.0] - 2025-10-28
 
 ### Added
