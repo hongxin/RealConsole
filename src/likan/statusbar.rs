@@ -55,6 +55,12 @@ pub struct LiKanStatusBar {
     last_rendered: Arc<RwLock<String>>,
 }
 
+impl Default for LiKanStatusBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LiKanStatusBar {
     /// 创建新的状态栏
     pub fn new() -> Self {

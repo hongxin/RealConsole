@@ -213,7 +213,7 @@ impl DisplayHelper {
 // 提供全局便捷函数（使用默认配置 - 不使用 emoji）
 use once_cell::sync::Lazy;
 
-static DEFAULT_HELPER: Lazy<DisplayHelper> = Lazy::new(|| DisplayHelper::default());
+static DEFAULT_HELPER: Lazy<DisplayHelper> = Lazy::new(DisplayHelper::default);
 
 /// 获取默认的 DisplayHelper
 pub fn default_helper() -> &'static DisplayHelper {

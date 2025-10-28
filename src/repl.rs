@@ -35,7 +35,7 @@ impl RealConsoleHelper {
             tokio::runtime::Handle::current().block_on(async {
                 // 从 llm_manager 获取 primary 客户端
                 let manager = agent.llm_manager.read().await;
-                manager.primary().map(|c| c.clone())
+                manager.primary().cloned()
             })
         });
 

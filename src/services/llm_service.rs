@@ -257,7 +257,7 @@ impl LlmService {
             .tool_executor
             .execute_iterative(llm_client.as_ref(), msgs, tool_schemas)
             .await
-            .map_err(|e| LlmError::ToolCallFailed(e))?;
+            .map_err(LlmError::ToolCallFailed)?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 

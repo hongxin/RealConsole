@@ -22,9 +22,11 @@ static I18N: OnceCell<RwLock<I18n>> = OnceCell::new();
 /// 支持的语言
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[derive(Default)]
 pub enum Language {
     /// 简体中文（中国）
     #[serde(rename = "zh-CN", alias = "zh", alias = "chinese", alias = "中文")]
+    #[default]
     ZhCn,
     /// 美式英语（美国）
     #[serde(rename = "en-US", alias = "en", alias = "english", alias = "英文")]
@@ -73,11 +75,6 @@ impl Language {
     }
 }
 
-impl Default for Language {
-    fn default() -> Self {
-        Language::ZhCn
-    }
-}
 
 impl std::fmt::Display for Language {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

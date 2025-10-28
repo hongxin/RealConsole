@@ -731,7 +731,7 @@ impl Agent {
         let llm_client = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let manager = self.llm_manager.read().await;
-                manager.primary().or(manager.fallback()).map(|c| c.clone())
+                manager.primary().or(manager.fallback()).cloned()
             })
         });
 
@@ -2108,7 +2108,7 @@ impl Agent {
         }
 
         // 按类别分组（可选，暂时不分组，保持简洁）
-        output.push_str("\n");
+        output.push('\n');
 
         for (i, suggestion) in suggestions.iter().enumerate() {
             let icon = suggestion.category.icon();
@@ -2136,7 +2136,7 @@ impl Agent {
             ));
 
             if i < suggestions.len() - 1 {
-                output.push_str("\n");
+                output.push('\n');
             }
         }
 
@@ -2333,7 +2333,7 @@ impl Agent {
         let spinner = Spinner::with_label(&simplify_model_name(&model_name));
 
         // 🔍 LLM Logger: 保存消息副本用于日志
-        let messages_for_log = messages.as_ref().map(|msgs| msgs.clone()).unwrap_or_else(|| {
+        let messages_for_log = messages.clone().unwrap_or_else(|| {
             vec![crate::llm::Message::user(text)]
         });
 
@@ -2376,7 +2376,7 @@ impl Agent {
                     // ✨ v1.5.1: 为每个工具调用创建 Tool Span
                     for round in &rounds {
                         for tool_call in &round.tool_calls {
-                            let (_tool_ctx, mut tool_span) = ctx.create_child(&format!("tool_{}", tool_call.name));
+                            let (_tool_ctx, mut tool_span) = ctx.create_child(format!("tool_{}", tool_call.name));
                             tool_span.span_type = SpanType::ToolCall;
                             tool_span.set_attribute("tool_name", serde_json::json!(&tool_call.name));
                             tool_span.set_attribute("arguments", serde_json::json!(&tool_call.arguments));

@@ -446,7 +446,7 @@ impl LlmLogger {
                                             // 关键词过滤
                                             let keyword_lower = keyword.to_lowercase();
                                             let matches = log.request.summary.to_lowercase().contains(&keyword_lower)
-                                                || log.response.as_ref().map_or(false, |r|
+                                                || log.response.as_ref().is_some_and(|r|
                                                     r.summary.to_lowercase().contains(&keyword_lower)
                                                 )
                                                 || log.model.to_lowercase().contains(&keyword_lower);
@@ -580,7 +580,7 @@ impl LlmLogger {
                                         let file_age_days = modified_dt.as_secs() / 86400;
                                         if file_age_days as u32 > days {
                                             // 删除文件
-                                            if let Ok(_) = std::fs::remove_file(&path) {
+                                            if std::fs::remove_file(&path).is_ok() {
                                                 deleted_files += 1;
                                                 freed_bytes += metadata.len();
                                             }
@@ -641,7 +641,7 @@ impl LlmLogger {
                     break;
                 }
 
-                if let Ok(_) = std::fs::remove_file(&path) {
+                if std::fs::remove_file(&path).is_ok() {
                     deleted_files += 1;
                     freed_bytes += size;
                     total_size -= size;
