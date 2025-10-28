@@ -5,6 +5,148 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2025-10-28
+
+### Added
+
+- **[两仪系统] AdaptiveSystem 自适应调整系统（Adaptive Adjustment System）**
+  - **TargetState 目标状态定义**（src/liangyyi/adaptive.rs，~100 行）：
+    - 使用 `HashMap<String, (f64, f64)>` 定义每个维度的目标范围（min, max）
+    - 三种预设目标状态：
+      - `balanced()` - 平衡态：所有维度均衡（0.5-0.7）
+      - `high_performance()` - 高性能态：高活跃度、高效率、高决策力
+      - `power_save()` - 节能态：低活动、低负载
+    - 核心方法：
+      - `distance_to()` - 计算当前状态到目标的距离
+      - `is_within()` - 检查是否在目标范围内
+      - `find_most_deviating_dimension()` - 查找偏离最严重的维度
+  - **Recommendation 建议系统**（~50 行）：
+    - `RecommendationAction` 枚举：Enhance（增强）/ Reduce（降低）/ Maintain（保持）
+    - 建议结构包含：维度、动作、当前值、目标范围、优先级、原因
+    - 基于偏离度自动计算优先级（偏离度 = 优先级）
+    - 自动生成建议原因的可读文本
+  - **AdaptiveStrategy 自适应策略**（~30 行）：
+    - 三种调整策略：
+      - `Aggressive` - 激进策略（步长 0.2）：快速调整
+      - `Balanced` - 平衡策略（步长 0.1）：稳健调整
+      - `Conservative` - 保守策略（步长 0.05）：缓慢调整
+    - 适用场景：启动期用激进，稳定期用平衡，生产环境用保守
+  - **AdaptiveSystem 核心系统**（~150 行）：
+    - 集成 `StatePredictor` 实现预测驱动的自适应
+    - 核心工作流程：
+      1. 使用 predictor 预测未来状态（1步）
+      2. 分析趋势（Rising/Falling/Stable）
+      3. 为每个维度生成建议
+      4. 按优先级排序
+    - 关键方法：
+      - `generate_recommendations()` - 生成调整建议（优先级排序）
+      - `calculate_adjustment()` - 计算调整向量
+      - `add_observation()` - 添加观测（委托给 predictor）
+      - `set_target()` / `with_strategy()` - 动态调整配置
+  - **测试覆盖**：新增 8 个单元测试，liangyyi 模块从 67 增至 75 个测试，全部通过
+
+### Changed
+
+- **模块导出**（src/liangyyi/mod.rs）：新增 `pub use adaptive::{AdaptiveStrategy, AdaptiveSystem, Recommendation, RecommendationAction, TargetState}`
+- **能力升级**：从被动预测进化到主动调整，实现完整的"观测-预测-调整"闭环
+
+### Design Philosophy
+
+- **道生一，一生二，二生三，三生万物**：
+  - v1.11.0 (一) → StateVector（多维状态空间）
+  - v1.12.0 (二) → StatePredictor（时序预测能力）
+  - v1.13.0 (三) → AdaptiveSystem（自我调整智慧）
+- **分离关注点**：
+  - TargetState → 定义"应该是什么"
+  - StatePredictor → 预测"将会是什么"
+  - Recommendation → 建议"需要做什么"
+  - AdaptiveStrategy → 决定"如何去做"
+- **OODA 循环**：Observe（观测）→ Orient（预测）→ Decide（建议）→ Act（调整）
+- **优先级驱动**：建议按偏离度自动排序，优先处理最紧急的调整
+
+### Use Cases
+
+```rust
+use realconsole::liangyyi::{AdaptiveSystem, StateVector, TargetState, AdaptiveStrategy};
+
+// 创建自适应系统
+let mut system = AdaptiveSystem::new(TargetState::balanced())
+    .with_strategy(AdaptiveStrategy::Balanced);
+
+// 添加历史观测
+for i in 0..10 {
+    system.add_observation(collect_state());
+}
+
+// 生成建议
+let recommendations = system.generate_recommendations();
+for rec in recommendations.iter().take(3) {
+    println!("🎯 {}: {} (优先级: {:.2})",
+        rec.dimension, rec.reason, rec.priority);
+}
+
+// 计算调整
+let current = collect_current_state();
+let adjusted = system.calculate_adjustment(&current);
+println!("📊 调整: {} → {}", current, adjusted);
+```
+
+输出示例：
+```
+🎯 efficiency: 当前值 0.45 低于目标范围 [0.60, 0.80] (优先级: 0.15)
+🎯 activity: 当前值 0.85 高于目标范围 [0.50, 0.70] (优先级: 0.15)
+🎯 load: 当前值 0.62 高于目标范围 [0.30, 0.50] (优先级: 0.12)
+```
+
+### Integration Points
+
+- **与 v1.12.0 StatePredictor 集成**：
+  ```rust
+  // AdaptiveSystem 直接使用 predictor 预测未来状态
+  let predicted = self.predictor.predict_linear(1)?;
+  let trends = self.predictor.analyze_trends();
+  ```
+
+- **与 v1.11.0 StateVector 集成**：
+  ```rust
+  // 使用 StateVector::evolve_towards 实现向量演化
+  adjusted.evolve_towards(&target_vector, step);
+  ```
+
+- **未来与 StateTracker 集成**：
+  ```rust
+  // StateTracker 可以使用 AdaptiveSystem 自动优化
+  impl StateTracker {
+      pub async fn auto_optimize(&mut self) -> anyhow::Result<()> {
+          let current = self.to_state_vector().await;
+          let adaptive = AdaptiveSystem::new(TargetState::balanced());
+          adaptive.add_observation(current);
+          let recommendations = adaptive.generate_recommendations();
+          self.apply_recommendations(&recommendations)?;
+          Ok(())
+      }
+  }
+  ```
+
+### Notes
+
+- ✅ 完整的目标状态定义系统（3 种预设）
+- ✅ 智能建议生成机制（优先级驱动）
+- ✅ 多策略自适应调整（3 种策略）
+- ✅ 与 StatePredictor 无缝集成
+- ✅ 清晰的关注点分离（Target/Predictor/Recommendation/Strategy）
+- 🔄 未来：执行层（apply_recommendations）实现闭环控制
+- 📚 完整文档：docs/04-reports/v1.13.0-adaptive-system.md (~950 行)
+
+### Evolution Path
+
+```
+v1.11.0: StateVector      → 状态空间化
+v1.12.0: StatePredictor   → 时序预测
+v1.13.0: AdaptiveSystem   → 自我调整  ⬅️ 当前
+v1.14.0: Execute Layer    → 闭环执行  (待规划)
+```
+
 ## [1.12.0] - 2025-10-28
 
 ### Added

@@ -52,6 +52,7 @@ pub mod taiji;
 pub mod tracker; // ✨ Phase 2: 状态追踪器
 pub mod state_vector; // ✨ v1.11.0: 多维状态空间
 pub mod predictor; // ✨ v1.12.0: 状态预测
+pub mod adaptive; // ✨ v1.13.0: 自适应系统
 
 // Re-exports
 pub use liangyyi::Liangyyi;
@@ -62,3 +63,4 @@ pub use tracker::{
 };
 pub use state_vector::StateVector; // ✨ v1.11.0
 pub use predictor::{DimensionTrend, StatePredictor, TrendDirection}; // ✨ v1.12.0
+pub use adaptive::{AdaptiveStrategy, AdaptiveSystem, Recommendation, RecommendationAction, TargetState}; // ✨ v1.13.0
