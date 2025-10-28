@@ -495,7 +495,15 @@ async fn main() {
     ));
     // ✨ v1.5.1: 传递 trace_store 到 trace 命令
     let trace_store_clone = Arc::clone(&agent.trace_store);
-    commands::register_trace_commands(&mut agent.registry, unified_tracer, trace_store_clone);
+    commands::register_trace_commands(&mut agent.registry, unified_tracer.clone(), trace_store_clone);
+
+    // ✨ v1.15.0 Phase 4: 注册统一Dashboard命令（三系协同）
+    commands::register_unified_dashboard_command(
+        &mut agent.registry,
+        agent.state_tracker.clone(),
+        Some(unified_tracer),
+        agent.bagua_palace.clone(),
+    );
 
     // ✨ 注册语音播报命令
     let voice_broadcaster = agent.voice_broadcaster.clone();

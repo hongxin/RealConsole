@@ -15,6 +15,7 @@ pub mod system_cmd; // ✨ Phase 6: 系统监控命令
 pub mod task_cmd; // ✨ Phase 10: 任务分解与规划命令
 pub mod tool;
 pub mod trace; // ✨ Phase 2 (Memory Redesign): 统一追踪命令
+pub mod unified_dashboard_cmd; // ✨ v1.15.0 Phase 4: 统一Dashboard命令
 pub mod voice_cmd; // ✨ 语音播报命令
 
 pub use context_cmd::register_context_commands;
@@ -34,4 +35,5 @@ pub use system_cmd::register_system_commands;
 pub use task_cmd::register_task_commands;
 pub use tool::register_tool_commands;
 pub use trace::register_trace_commands;
+pub use unified_dashboard_cmd::register_unified_dashboard_command;
 pub use voice_cmd::register_voice_commands;
