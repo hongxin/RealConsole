@@ -615,6 +615,30 @@ impl StateTracker {
             .map(|entries| !entries.is_empty())
             .unwrap_or(false)
     }
+
+    // ========== ✨ v1.11.0: StateVector 多维状态空间 ==========
+
+    /// 将当前状态导出为 StateVector
+    ///
+    /// ## 使用场景
+    ///
+    /// - 多维状态分析
+    /// - 状态距离计算
+    /// - 状态演化模拟
+    ///
+    /// ## 示例
+    ///
+    /// ```ignore
+    /// let vec1 = tracker.to_state_vector().await;
+    /// // ... 一段时间后 ...
+    /// let vec2 = tracker.to_state_vector().await;
+    /// let distance = vec1.distance_to(&vec2);
+    /// println!("状态变化距离: {:.3}", distance);
+    /// ```
+    pub async fn to_state_vector(&self) -> crate::liangyyi::StateVector {
+        let snapshot = self.current_state().await;
+        crate::liangyyi::StateVector::from_snapshot(&snapshot)
+    }
 }
 
 /// 状态趋势

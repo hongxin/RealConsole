@@ -50,6 +50,7 @@ pub mod liangyyi;
 pub mod sixiang;
 pub mod taiji;
 pub mod tracker; // ✨ Phase 2: 状态追踪器
+pub mod state_vector; // ✨ v1.11.0: 多维状态空间
 
 // Re-exports
 pub use liangyyi::Liangyyi;
@@ -58,3 +59,4 @@ pub use taiji::{EnergyType, Event, Taiji, TaijiContext};
 pub use tracker::{
     LearningPhase, StateSnapshot, StateStats, StateTracker, StateTrackerConfig, StateTrend,
 };
+pub use state_vector::StateVector; // ✨ v1.11.0
