@@ -12,7 +12,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -43,6 +43,12 @@ pub struct UnifiedTracer {
 
     /// 记忆维度 - ContextManager
     context: Arc<RwLock<ContextManager>>,
+
+    /// ✨ v1.15.0 Phase 2: 自定义事件存储
+    ///
+    /// 用于记录自适应优化、炼化等系统内部事件
+    /// LRU 策略，最多保留 200 条
+    custom_entries: Arc<RwLock<VecDeque<TraceEntry>>>,
 }
 
 impl UnifiedTracer {
@@ -65,6 +71,7 @@ impl UnifiedTracer {
             exec_logger,
             llm_logger,
             context,
+            custom_entries: Arc::new(RwLock::new(VecDeque::with_capacity(200))),
         }
     }
 
@@ -97,6 +104,10 @@ impl UnifiedTracer {
         all_entries.extend(llm_entries?);
         all_entries.extend(context_entries?);
 
+        // ✨ v1.15.0 Phase 2: 合并自定义事件
+        let custom = self.custom_entries.read().await;
+        all_entries.extend(custom.iter().cloned());
+
         // 按时间排序（最新优先）
         all_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
@@ -125,10 +136,59 @@ impl UnifiedTracer {
             Dimension::Memory => self.entries_from_context(limit).await?,
         };
 
+        // ✨ v1.15.0 Phase 2: 合并自定义事件（仅匹配维度的）
+        let custom = self.custom_entries.read().await;
+        entries.extend(
+            custom
+                .iter()
+                .filter(|e| e.dimension == dimension)
+                .cloned()
+        );
+
         // 按时间排序（最新优先）
         entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
         Ok(entries.into_iter().take(limit).collect())
+    }
+
+    /// ✨ v1.15.0 Phase 2: 添加自定义事件
+    ///
+    /// 用于记录系统内部事件（如自适应优化、炼化过程等）
+    ///
+    /// # 参数
+    ///
+    /// - `entry`: 要添加的追踪条目
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use realconsole::tracer::{TraceEntry, Dimension, EntryType, Status};
+    ///
+    /// let entry = TraceEntry::new(
+    ///     Dimension::Statistics,
+    ///     EntryType::Custom("adaptive_optimization".to_string()),
+    ///     "自动优化生成 7 条建议".to_string(),
+    ///     Status::Success,
+    /// );
+    ///
+    /// tracer.add_entry(entry).await;
+    /// ```
+    pub async fn add_entry(&self, entry: TraceEntry) {
+        let mut custom = self.custom_entries.write().await;
+
+        // LRU 策略：超过容量则移除最旧的
+        if custom.len() >= 200 {
+            custom.pop_front();
+        }
+
+        custom.push_back(entry);
+    }
+
+    /// ✨ v1.15.0 Phase 2: 获取自定义事件数量
+    ///
+    /// 用于统计和调试
+    pub async fn custom_entries_count(&self) -> usize {
+        self.custom_entries.read().await.len()
     }
 
     /// 按时间范围查询

@@ -133,6 +133,16 @@ pub enum EntryType {
 
     /// 上下文状态变更
     ContextStateChange,
+
+    // ━━━ v1.15.0 Phase 2: 系统内部事件 ━━━
+    /// 自适应优化事件
+    AdaptiveOptimization,
+
+    /// Bagua 炼化事件
+    BaguaRefinement,
+
+    /// 通用系统事件
+    SystemEvent,
 }
 
 impl fmt::Display for EntryType {
@@ -148,6 +158,9 @@ impl fmt::Display for EntryType {
             EntryType::ContextMessage => write!(f, "ContextMessage"),
             EntryType::ContextSwitch => write!(f, "ContextSwitch"),
             EntryType::ContextStateChange => write!(f, "ContextStateChange"),
+            EntryType::AdaptiveOptimization => write!(f, "AdaptiveOptimization"),
+            EntryType::BaguaRefinement => write!(f, "BaguaRefinement"),
+            EntryType::SystemEvent => write!(f, "SystemEvent"),
         }
     }
 }
@@ -166,6 +179,9 @@ impl EntryType {
             EntryType::ContextMessage => "💭",
             EntryType::ContextSwitch => "🔄",
             EntryType::ContextStateChange => "🔀",
+            EntryType::AdaptiveOptimization => "🎯",
+            EntryType::BaguaRefinement => "🌊",
+            EntryType::SystemEvent => "⚡",
         }
     }
 
@@ -182,6 +198,9 @@ impl EntryType {
             EntryType::ContextMessage => "对话消息",
             EntryType::ContextSwitch => "上下文切换",
             EntryType::ContextStateChange => "状态变更",
+            EntryType::AdaptiveOptimization => "自适应优化",
+            EntryType::BaguaRefinement => "八卦炼化",
+            EntryType::SystemEvent => "系统事件",
         }
     }
 }

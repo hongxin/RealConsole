@@ -1108,7 +1108,54 @@ impl StateTracker {
             if history.len() >= 100 {
                 history.pop_front();
             }
-            history.push_back(record);
+            history.push_back(record.clone());
+        }
+
+        // ✨ v1.15.0 Phase 2: 记录优化事件到 Tracer
+        if let Some(tracer) = &self.tracer {
+            // Statistics 维度：记录优化统计
+            let stats_content = format!(
+                "自动优化完成: {} 条建议 ({} 高优先级) | 耗时: {}ms | 状态: {}",
+                recommendations.len(),
+                high_priority_count,
+                duration.as_millis(),
+                if applied_successfully { "成功" } else { "失败" }
+            );
+
+            let stats_entry = TraceEntry::new(
+                TracerDimension::Statistics,
+                TracerEntryType::AdaptiveOptimization,
+                stats_content,
+                if applied_successfully {
+                    Status::Success
+                } else {
+                    Status::Failed("应用建议失败".to_string())
+                },
+            );
+
+            tracer.add_entry(stats_entry).await;
+
+            // BlackBox 维度：记录决策过程（前3条高优先级建议）
+            for rec in recommendations.iter().filter(|r| r.priority > 0.7).take(3) {
+                let decision_content = format!(
+                    "维度: {} | 动作: {:?} | 当前值: {:.2} | 目标范围: [{:.2}, {:.2}] | 原因: {}",
+                    rec.dimension,
+                    rec.action,
+                    rec.current_value,
+                    rec.target_range.0,
+                    rec.target_range.1,
+                    rec.reason
+                );
+
+                let decision_entry = TraceEntry::new(
+                    TracerDimension::BlackBox,
+                    TracerEntryType::AdaptiveOptimization,
+                    decision_content,
+                    Status::Success,
+                );
+
+                tracer.add_entry(decision_entry).await;
+            }
         }
 
         // 返回结果
@@ -2225,5 +2272,127 @@ mod tests {
         // 获取最近记录
         let last = tracker.get_last_optimization().await.unwrap();
         assert_eq!(last.recommendations_count, 7, "应该为7个标准维度生成建议");
+    }
+
+    // ========== ✨ v1.15.0 Phase 2: Tracer 集成测试 ==========
+
+    #[tokio::test]
+    async fn test_auto_optimize_records_to_tracer() {
+        use crate::tracer::UnifiedTracer;
+        use crate::history::HistoryManager;
+        use crate::execution_logger::ExecutionLogger;
+        use crate::conversation::context_manager::ContextManager;
+        use crate::config::ConversationConfig;
+
+        // 创建必要的组件
+        let history = Arc::new(RwLock::new(HistoryManager::new("/tmp/test_history.json", 100)));
+        let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(100)));
+        let context = Arc::new(RwLock::new(ContextManager::new(ConversationConfig::default())));
+        let tracer = Arc::new(UnifiedTracer::new(history, exec_logger, None, context));
+
+        // 创建 tracker 并设置 tracer
+        let mut tracker = StateTracker::with_default();
+        tracker.set_tracer(Arc::clone(&tracer));
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 初始 tracer 应该没有自定义事件
+        let initial_count = tracer.custom_entries_count().await;
+        assert_eq!(initial_count, 0, "初始应该没有自定义事件");
+
+        // 执行多次优化以确保生成建议
+        for i in 0..5 {
+            // 每次添加事件
+            for _ in 0..3 {
+                tracker.update_from_event(Event::UserExecute).await;
+            }
+
+            // 执行优化
+            let result = tracker.auto_optimize().await;
+            if i > 0 {
+                // 第二次之后应该能生成建议
+                assert!(result.is_ok(), "优化 {} 应该成功", i);
+            }
+        }
+
+        // 验证 tracer 有自定义事件
+        let count_after = tracer.custom_entries_count().await;
+        assert!(count_after > 0, "应该有自定义事件记录: count={}", count_after);
+
+        // 测试简化：只验证有自定义事件记录即可
+        // query_by_dimension 会合并底层数据源和自定义事件
+        // 由于测试环境没有实际的 history 数据，直接验证自定义事件数量
+        assert!(count_after >= 5, "应该至少有5次优化记录");
+    }
+
+    #[tokio::test]
+    async fn test_tracer_records_high_priority_recommendations() {
+        use crate::tracer::UnifiedTracer;
+        use crate::history::HistoryManager;
+        use crate::execution_logger::ExecutionLogger;
+        use crate::conversation::context_manager::ContextManager;
+        use crate::config::ConversationConfig;
+
+        let history = Arc::new(RwLock::new(HistoryManager::new("/tmp/test_history2.json", 100)));
+        let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(100)));
+        let context = Arc::new(RwLock::new(ContextManager::new(ConversationConfig::default())));
+        let tracer = Arc::new(UnifiedTracer::new(history, exec_logger, None, context));
+
+        let mut tracker = StateTracker::with_default();
+        tracker.set_tracer(Arc::clone(&tracer));
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 创造明显偏离目标的状态（会生成高优先级建议）
+        for _ in 0..20 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        let _ = tracker.auto_optimize().await;
+
+        for _ in 0..15 {
+            tracker.update_from_event(Event::SystemIdle).await;
+        }
+
+        let _ = tracker.auto_optimize().await;
+
+        // 查询所有维度
+        let all_entries = tracer.query_all(50).await.unwrap();
+
+        // 应该有自适应优化相关的条目
+        let adaptive_entries = all_entries.iter().filter(|e| matches!(
+            e.entry_type,
+            crate::tracer::EntryType::AdaptiveOptimization
+        )).count();
+
+        assert!(adaptive_entries >= 2, "应该至少有2条优化记录（Statistics统计）");
+    }
+
+    #[tokio::test]
+    async fn test_tracer_integration_without_tracer() {
+        // 测试没有 tracer 时，auto_optimize 仍然正常工作
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 没有设置 tracer
+        assert!(!tracker.is_tracer_enabled());
+
+        // 添加事件
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 第一次优化
+        let _ = tracker.auto_optimize().await;
+
+        for _ in 0..3 {
+            tracker.update_from_event(Event::UserWrite).await;
+        }
+
+        // 第二次优化应该正常工作
+        let result = tracker.auto_optimize().await;
+        assert!(result.is_ok(), "没有 tracer 时优化也应该成功");
+
+        // 应该有优化历史记录
+        let history = tracker.get_optimization_history().await;
+        assert_eq!(history.len(), 2, "应该有2条优化历史");
     }
 }
