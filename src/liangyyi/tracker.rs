@@ -1210,6 +1210,115 @@ impl StateTracker {
         history.back().cloned()
     }
 
+    /// ✨ v1.15.0 Phase 2: 格式化优化历史为可视化输出
+    ///
+    /// 生成优化历史的格式化视图，包括统计摘要和最近记录
+    ///
+    /// # 参数
+    ///
+    /// - `limit`: 显示最近多少条记录（默认10）
+    ///
+    /// # 返回
+    ///
+    /// 格式化的字符串，包含：
+    /// - 统计摘要（总优化次数、成功率、平均建议数、平均耗时）
+    /// - 最近的优化记录列表
+    pub async fn format_optimization_history(&self, limit: usize) -> String {
+        use colored::Colorize;
+
+        let stats = self.get_optimization_stats().await;
+        let history = self.get_optimization_history().await;
+
+        let mut output = vec![];
+
+        // 标题
+        output.push(format!("{}", "🎯 自适应优化历史".bold().cyan()));
+        output.push(String::new());
+
+        // 统计摘要
+        if stats.total_optimizations > 0 {
+            output.push(format!("{}", "📊 统计摘要".bold()));
+            output.push(format!(
+                "   {} {}",
+                "总优化次数:".dimmed(),
+                stats.total_optimizations.to_string().green()
+            ));
+            output.push(format!(
+                "   {} {}",
+                "成功/失败:".dimmed(),
+                format!("{} / {}", stats.successful_optimizations, stats.failed_optimizations).cyan()
+            ));
+            output.push(format!(
+                "   {} {:.1} 条/次",
+                "平均建议数:".dimmed(),
+                stats.avg_recommendations_per_run as f64
+            ));
+            output.push(format!(
+                "   {} {} ms",
+                "平均耗时:".dimmed(),
+                stats.avg_duration_ms.to_string().yellow()
+            ));
+            output.push(format!(
+                "   {} {}",
+                "高优先级建议:".dimmed(),
+                stats.total_high_priority_recommendations.to_string().red().bold()
+            ));
+            output.push(String::new());
+        } else {
+            output.push(format!("{}", "暂无优化记录".dimmed()));
+            return output.join("\n");
+        }
+
+        // 最近的优化记录
+        let recent_records: Vec<_> = history.iter().rev().take(limit).collect();
+        if !recent_records.is_empty() {
+            output.push(format!("{} (最近 {} 条)", "📝 优化记录".bold(), recent_records.len()));
+            output.push(String::new());
+
+            for (i, record) in recent_records.iter().enumerate() {
+                let status_icon = if record.applied_successfully { "✓".green() } else { "✗".red() };
+                let timestamp = record.timestamp.format("%m-%d %H:%M:%S");
+
+                // 记录标题行
+                output.push(format!(
+                    "  {} {} {} | {} 建议 ({} 高优) | {}ms",
+                    format!("#{}", recent_records.len() - i).dimmed(),
+                    status_icon,
+                    timestamp.to_string().cyan(),
+                    record.recommendations_count.to_string().green(),
+                    record.high_priority_count.to_string().red(),
+                    record.duration_ms.to_string().yellow()
+                ));
+
+                // 状态向量快照
+                if let (Some(eff), Some(act), Some(load)) = (
+                    record.state_before.get("efficiency"),
+                    record.state_before.get("activity"),
+                    record.state_before.get("load"),
+                ) {
+                    output.push(format!(
+                        "     状态: 效率={:.2} 活动={:.2} 负载={:.2}",
+                        eff, act, load
+                    ).dimmed().to_string());
+                }
+
+                // 前3条建议摘要
+                if !record.top_recommendations.is_empty() {
+                    output.push(format!("     建议:").dimmed().to_string());
+                    for (j, rec) in record.top_recommendations.iter().take(3).enumerate() {
+                        output.push(format!("       {}. {}", j + 1, rec).dimmed().to_string());
+                    }
+                }
+
+                if i < recent_records.len() - 1 {
+                    output.push(String::new());
+                }
+            }
+        }
+
+        output.join("\n")
+    }
+
     /// 获取优化统计信息
     ///
     /// 返回优化历史的统计摘要

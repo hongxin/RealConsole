@@ -73,8 +73,11 @@ impl LiangyiCommand {
             Some("stats") => self.show_stats().await,
             Some("history") => self.show_history().await,
             Some("trend") => self.show_trend().await,
+            Some("adaptive") | Some("opt") | Some("optimize") => {
+                self.show_adaptive_optimization().await
+            }
             Some(unknown) => Ok(format!(
-                "{} {}\n{}\n  - status (默认)\n  - stats\n  - history\n  - trend",
+                "{} {}\n{}\n  - status (默认)\n  - stats\n  - history\n  - trend\n  - adaptive (自适应优化历史)",
                 "❌ 未知子命令:".red(),
                 unknown,
                 "可用子命令:".yellow()
@@ -371,6 +374,51 @@ impl LiangyiCommand {
             "{}\n功能开发中，敬请期待...",
             "【趋势分析】".yellow().bold()
         ))
+    }
+
+    /// ✨ v1.15.0 Phase 2: 显示自适应优化历史
+    ///
+    /// 展示自适应系统的优化历史记录
+    async fn show_adaptive_optimization(&self) -> Result<String> {
+        // 检查是否启用了自适应系统
+        if !self.tracker.is_adaptive_enabled() {
+            return Ok(format!(
+                "{}\n\n提示：使用 /liangyyi 命令前，需要先通过 LLM 对话启用自适应系统",
+                "⚠️  自适应系统未启用".yellow()
+            ));
+        }
+
+        // 获取优化历史
+        let formatted = self.tracker.format_optimization_history(10).await;
+
+        let mut output = String::new();
+        output.push_str(&format!(
+            "{}\n",
+            "═══════════════════════════════════════════════════════════".bright_blue()
+        ));
+        output.push_str(&format!(
+            "  {}\n",
+            "两仪演化系统 - 自适应优化".bright_cyan().bold()
+        ));
+        output.push_str(&format!(
+            "{}\n\n",
+            "═══════════════════════════════════════════════════════════".bright_blue()
+        ));
+
+        output.push_str(&formatted);
+        output.push_str("\n\n");
+
+        // 提示信息
+        output.push_str(&format!(
+            "{}\n",
+            "───────────────────────────────────────────────────────────".bright_black()
+        ));
+        output.push_str(&format!(
+            "{}\n",
+            "提示：优化历史同时记录到 /trace 系统（Statistics + BlackBox 维度）".bright_black()
+        ));
+
+        Ok(output)
     }
 
     /// 生成能量条
