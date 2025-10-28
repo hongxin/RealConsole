@@ -5,6 +5,127 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2025-10-28
+
+### Added
+
+- **[两仪系统] StateVector 多维状态空间（Multi-dimensional State Space）**
+  - **StateVector 结构**（src/liangyyi/state_vector.rs，489 行）：
+    - 基于 `HashMap<String, f64>` 的灵活多维向量表示
+    - 7 个标准维度：`yin`, `yang`, `context`, `activity`, `load`, `efficiency`, `confidence`
+    - 每个维度值范围 [0.0, 1.0]，自动 clamp 防止越界
+    - 支持动态添加/删除维度，易于扩展
+  - **构造函数**（3 个）：
+    - `new()` - 创建空向量
+    - `standard()` - 创建标准维度向量（所有维度 = 0.5）
+    - `from_snapshot()` - 从 StateSnapshot 创建（自动映射 7 个维度）
+  - **维度访问**（4 个方法）：
+    - `get()` - 获取维度值
+    - `set()` - 设置维度值（自动 clamp）
+    - `dimension_names()` - 获取所有维度名称（排序）
+    - `dimension_count()` - 获取维度数量
+  - **向量运算**（4 个方法）：
+    - `distance_to()` - 欧几里得距离计算（只考虑共同维度）
+    - `evolve_towards()` - 状态演化模拟（向目标渐进）
+    - `add()` - 向量加法（逐维度，自动 clamp）
+    - `scale()` - 向量数乘（所有维度缩放）
+  - **分析方法**（5 个）：
+    - `norm()` - 欧几里得范数（sqrt(Σ value[i]²)）
+    - `mean()` - 平均值
+    - `max_dimension()` - 最大维度
+    - `min_dimension()` - 最小维度
+    - `is_balanced()` - 判断是否平衡（max - min <= threshold）
+  - **StateTracker 集成**（src/liangyyi/tracker.rs）：
+    - 新增方法 `to_state_vector()` - 便捷导出当前状态为 StateVector
+  - **测试覆盖**：新增 15 个单元测试，liangyyi 模块从 39 增至 60 个测试，全部通过
+
+### Changed
+
+- **模块导出**（src/liangyyi/mod.rs）：新增 `pub use state_vector::StateVector`
+- **状态表示升级**：从离散分类提升到连续多维向量空间
+
+### Design Philosophy
+
+- **一分为三**：状态不是"好/坏"二分，而是多维连续空间 [yin, yang, context, ...]
+- **易经之易**：`evolve_towards()` 实现状态的连续演化路径
+- **阴阳平衡**：多维度综合平衡判断（`is_balanced()`）
+- **体用不二**：抽象向量表示（体）+ 具体数学运算（用）
+
+### Use Cases
+
+```rust
+// 状态距离监控
+let vec1 = tracker.to_state_vector().await;
+// ... 一段时间后 ...
+let vec2 = tracker.to_state_vector().await;
+let distance = vec1.distance_to(&vec2);
+
+// 状态演化模拟
+let mut current = vec1.clone();
+current.evolve_towards(&target, 0.1); // 向目标移动 10%
+
+// 多维度分析
+if let Some((dim, value)) = vec.min_dimension() {
+    if value < 0.3 {
+        println!("警告：{} 维度过低", dim);
+    }
+}
+```
+
+### Notes
+
+- ✅ 无缝集成：单行转换 `tracker.to_state_vector().await`
+- ✅ 数学基础：坚实的欧几里得空间运算
+- ✅ 灵活扩展：HashMap 设计支持动态维度
+- ✅ 高性能：所有运算在微秒级完成
+- 📊 详细报告：见 `docs/04-reports/v1.11.0-state-vector.md`（665 行）
+
+## [1.10.0] - 2025-10-28
+
+### Added
+
+- **[系统架构] 两仪与八卦深度集成（Liangyyi-Bagua Deep Integration）**
+  - **StateSnapshot 存储转换**（src/liangyyi/tracker.rs）：
+    - 新增方法 `to_checkpoint_state()` - 将快照转换为 JSON 格式（轻量级，避免完整序列化）
+    - 新增方法 `from_checkpoint_state()` - 从 JSON 恢复快照（容错设计，支持部分数据恢复）
+  - **八卦宫殿集成**（src/liangyyi/tracker.rs，+370 行）：
+    - 新增方法 `sync_to_bagua()` - 同步状态到八卦宫殿
+      - 艮卦（Gen）：存储完整状态快照（Checkpoint），energy = system_load
+      - 巽卦（Xun）：存储状态趋势模式（Trend），energy = change_rate
+    - 新增静态方法 `restore_from_bagua()` - 从八卦宫殿恢复状态
+      - 读取艮卦最新检查点
+      - 重建 StateTracker 实例
+      - 恢复历史记录
+    - 新增静态方法 `has_checkpoint()` - 检测是否存在可恢复的检查点
+  - **测试覆盖**：新增 6 个集成测试，覆盖序列化、同步、恢复、多次同步、元数据等场景，全部通过（17/17）
+
+### Changed
+
+- **存储策略**：状态快照现在可以持久化到八卦宫殿，实现跨会话状态恢复
+- **体用合一**：两仪（时间维度）与八卦（空间维度）融合，实现"竖看"与"横看"的统一
+
+### Design Philosophy
+
+- **体用合一**：两仪（时间演化）+ 八卦（空间存储）= 时空融合
+- **渐进演化**：100% 向后兼容，无破坏性变更
+- **一分为三**：不是"保存/丢失"二分，而是"检查点-趋势-实时"三态
+
+### Storage Strategy
+
+| 八卦维度 | 存储内容         | Energy 映射      | 用途                 |
+|----------|------------------|------------------|----------------------|
+| 艮卦 Gen | StateSnapshot    | system_load      | 状态检查点（恢复点） |
+| 巽卦 Xun | Trend Pattern    | change_rate      | 趋势分析（历史模式） |
+
+### Notes
+
+- ✅ 轻量级设计：JSON 转换，避免完整 Serialize trait
+- ✅ 容错机制：部分数据丢失仍可恢复（使用默认值）
+- ✅ 能量映射：根据重要性分配 energy（system_load 和 change_rate）
+- ✅ 完整测试：6 个集成测试 + 完整手工测试指引
+- 📊 详细报告：见 `docs/04-reports/v1.10.0-liangyyi-bagua-integration.md`（~800 行）
+- 📋 测试指引：见 `docs/04-reports/v1.10.0-manual-testing-guide.md`（~400 行）
+
 ## [1.9.6] - 2025-10-28
 
 ### Added
