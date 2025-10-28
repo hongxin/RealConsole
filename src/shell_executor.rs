@@ -27,6 +27,24 @@ const MAX_OUTPUT_SIZE: usize = 100_000;
 /// 命令执行超时时间（秒）
 const COMMAND_TIMEOUT: u64 = 30;
 
+/// 交互式命令列表（需要接管终端的命令）
+const INTERACTIVE_COMMANDS: &[&str] = &[
+    // 编辑器
+    "vi", "vim", "nvim", "nano", "emacs", "joe", "pico",
+    // 分页器
+    "less", "more", "most",
+    // 系统监控
+    "top", "htop", "iotop", "iftop", "nethogs",
+    // 文件管理器
+    "mc", "ranger", "vifm",
+    // 其他交互式工具
+    "man", "info", "watch", "tmux", "screen",
+    // Git 交互式操作
+    "git add -i", "git add -p", "git rebase -i",
+    // 数据库客户端
+    "mysql", "psql", "sqlite3", "redis-cli", "mongo",
+];
+
 /// 危险命令模式（黑名单）
 const DANGEROUS_PATTERNS: &[&str] = &[
     r"rm\s+-rf\s+/",         // 删除根目录
@@ -44,6 +62,31 @@ const DANGEROUS_PATTERNS: &[&str] = &[
     r"init\s+6",             // 重启
     r">\s*/dev/sd[a-z]",     // 直接写磁盘（允许空格）
 ];
+
+/// 检查命令是否是交互式命令
+fn is_interactive_command(command: &str) -> bool {
+    let cmd_parts: Vec<&str> = command.trim().split_whitespace().collect();
+    if cmd_parts.is_empty() {
+        return false;
+    }
+
+    // 检查第一个单词（命令名）
+    let cmd_name = cmd_parts[0];
+
+    // 直接匹配命令名
+    if INTERACTIVE_COMMANDS.contains(&cmd_name) {
+        return true;
+    }
+
+    // 检查多词命令（如 "git add -i"）
+    for interactive_cmd in INTERACTIVE_COMMANDS {
+        if command.trim().starts_with(interactive_cmd) {
+            return true;
+        }
+    }
+
+    false
+}
 
 /// 检查命令是否安全
 fn is_safe_command(command: &str) -> Result<(), RealError> {
@@ -79,6 +122,68 @@ fn is_safe_command(command: &str) -> Result<(), RealError> {
     Ok(())
 }
 
+/// 执行交互式命令（接管终端）
+///
+/// # Arguments
+/// * `command` - 要执行的命令字符串
+///
+/// # Returns
+/// * `Ok(String)` - 简单的成功消息
+/// * `Err(RealError)` - 错误信息
+pub async fn execute_interactive(command: &str) -> Result<String, RealError> {
+    // 安全检查
+    is_safe_command(command)?;
+
+    // 根据操作系统选择 shell
+    #[cfg(unix)]
+    let (shell, flag) = ("/bin/sh", "-c");
+
+    #[cfg(windows)]
+    let (shell, flag) = ("cmd", "/C");
+
+    // 在阻塞线程中执行（因为需要与终端交互）
+    let command_str = command.to_string();
+    tokio::task::spawn_blocking(move || {
+        let status = Command::new(shell)
+            .arg(flag)
+            .arg(&command_str)
+            .stdin(Stdio::inherit())  // 接管标准输入
+            .stdout(Stdio::inherit()) // 接管标准输出
+            .stderr(Stdio::inherit()) // 接管标准错误
+            .status()
+            .map_err(|e| {
+                RealError::new(
+                    ErrorCode::ShellExecutionError,
+                    format!("命令执行失败: {}", e),
+                )
+                .with_suggestion(FixSuggestion::new("检查命令是否存在且可执行"))
+            })?;
+
+        if status.success() {
+            Ok(format!(
+                "✓ 交互式命令执行完成 (exit code: {})",
+                status.code().unwrap_or(0)
+            ))
+        } else {
+            Err(RealError::new(
+                ErrorCode::ShellExecutionError,
+                format!(
+                    "命令执行失败（退出码: {}）",
+                    status.code().unwrap_or(-1)
+                ),
+            )
+            .with_suggestion(FixSuggestion::new("检查命令参数和文件路径")))
+        }
+    })
+    .await
+    .map_err(|e| {
+        RealError::new(
+            ErrorCode::ShellExecutionError,
+            format!("任务执行失败: {}", e),
+        )
+    })?
+}
+
 /// 执行 shell 命令
 ///
 /// # Arguments
@@ -88,6 +193,10 @@ fn is_safe_command(command: &str) -> Result<(), RealError> {
 /// * `Ok(String)` - 命令输出（stdout + stderr）
 /// * `Err(RealError)` - 错误信息（包含错误代码和修复建议）
 pub async fn execute_shell(command: &str) -> Result<String, RealError> {
+    // 检查是否是交互式命令
+    if is_interactive_command(command) {
+        return execute_interactive(command).await;
+    }
     // 安全检查
     is_safe_command(command)?;
 
@@ -456,6 +565,32 @@ impl Default for ShellExecutorWithFixer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_interactive_command() {
+        // 交互式命令
+        assert!(is_interactive_command("vi test.txt"));
+        assert!(is_interactive_command("vim README.md"));
+        assert!(is_interactive_command("nano config.yaml"));
+        assert!(is_interactive_command("less file.log"));
+        assert!(is_interactive_command("more output.txt"));
+        assert!(is_interactive_command("top"));
+        assert!(is_interactive_command("htop"));
+        assert!(is_interactive_command("man ls"));
+        assert!(is_interactive_command("git add -i"));
+        assert!(is_interactive_command("git add -p"));
+
+        // 非交互式命令
+        assert!(!is_interactive_command("ls -la"));
+        assert!(!is_interactive_command("echo hello"));
+        assert!(!is_interactive_command("pwd"));
+        assert!(!is_interactive_command("git status"));
+        assert!(!is_interactive_command("cargo build"));
+
+        // 空命令
+        assert!(!is_interactive_command(""));
+        assert!(!is_interactive_command("   "));
+    }
 
     #[test]
     fn test_is_safe_command() {
