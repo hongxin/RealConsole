@@ -5,6 +5,49 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.6] - 2025-10-28
+
+### Added
+
+- **[两仪系统] 上下文强度与持续时间追踪（Context Intensity & Duration Tracking）**
+  - **Taiji 扩展**（src/liangyyi/taiji.rs）：
+    - 新增字段 `context_intensity: f64` - 上下文强度（0.0-1.0 连续值）
+    - 新增字段 `context_duration: Duration` - 上下文持续时间
+    - 新增构造函数 `with_context_and_intensity()` - 创建指定强度的上下文
+    - 新增方法 `switch_context()` - 切换上下文时自动重置强度和时间
+    - 新增方法 `enhance_context()` - 动态调整上下文强度
+    - 自动追踪：`update_from_event()` 现在会自动更新持续时间和强度
+  - **StateSnapshot 增强**（src/liangyyi/tracker.rs）：
+    - 新增观测维度 `user_activity_level` - 用户活跃度（基于 yang_energy）
+    - 新增观测维度 `system_load` - 系统负载（基于 context_intensity）
+    - 新增观测维度 `learning_efficiency` - 学习效率（基于 balance()）
+    - 新增观测维度 `decision_confidence` - 决策信心（基于 balance()）
+    - 新增构造函数 `from_current_state()` - 自动计算四个观测维度
+    - 新增方法 `overall_score()` - 综合评分（四维等权重）
+    - 新增方法 `is_optimal()` - 判断是否处于最优状态
+  - **测试覆盖**：新增 9 个测试，liangyyi 模块测试全部通过（39 passed, 0 failed）
+
+### Changed
+
+- **状态追踪自动化**：`current_state()` 和 `record_snapshot()` 使用新构造函数自动计算观测维度
+- **时间维度引入**：状态不再是静态的，而是随时间动态演化
+  - 上下文强度随持续时间自然增强（每分钟最多 +0.1）
+  - 空闲时上下文强度自然衰减（每次 -0.02）
+
+### Design Philosophy
+
+- **一分为三**：上下文不是"强/弱"二分，而是 [0.0, 1.0] 连续谱
+- **易经之易**：引入时间维度，状态随时间自然演化
+- **阴阳平衡**：空闲时自动向平衡态衰减
+- **体用不二**：底层连续（f64），表层离散（enum）
+
+### Notes
+
+- ✅ 100% 向后兼容：现有代码无需修改
+- ✅ 自动化设计：观测维度从 Taiji 状态自动派生
+- ✅ 扩展性强：为 v1.11.0 StateVector 多维状态空间打基础
+- 📊 详细报告：见 `docs/04-reports/v1.9.6-enhanced-state-snapshot.md`
+
 ## [1.9.5] - 2025-10-28
 
 ### Added

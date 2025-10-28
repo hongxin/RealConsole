@@ -26,12 +26,41 @@ pub struct StateTracker {
 }
 
 /// 状态快照
+///
+/// ## v1.9.6 扩展
+///
+/// 增加了更多观测维度，为多维状态空间打基础：
+/// - `user_activity_level`: 用户活跃度（基于阳能量）
+/// - `system_load`: 系统负载（基于上下文强度）
+/// - `learning_efficiency`: 学习效率（基于状态稳定性）
+/// - `decision_confidence`: 决策置信度（基于平衡度）
 #[derive(Debug, Clone)]
 pub struct StateSnapshot {
     pub taiji: Taiji,
     pub liangyyi: Liangyyi,
     pub sixiang: Sixiang,
     pub timestamp: DateTime<Utc>,
+
+    // ✨ v1.9.6: 新增观测维度
+    /// 用户活跃度（0.0-1.0）
+    ///
+    /// 基于阳能量计算，反映用户的交互强度
+    pub user_activity_level: f64,
+
+    /// 系统负载（0.0-1.0）
+    ///
+    /// 基于上下文强度，反映系统当前的工作负荷
+    pub system_load: f64,
+
+    /// 学习效率（0.0-1.0）
+    ///
+    /// 基于状态稳定性，稳定时学习效率更高
+    pub learning_efficiency: f64,
+
+    /// 决策置信度（0.0-1.0）
+    ///
+    /// 基于阴阳平衡度，越平衡决策越有信心
+    pub decision_confidence: f64,
 }
 
 /// 状态追踪器配置
@@ -90,6 +119,58 @@ impl Default for StateTrackerConfig {
     }
 }
 
+// ✨ v1.9.6: StateSnapshot 扩展方法
+impl StateSnapshot {
+    /// 从当前状态创建快照
+    ///
+    /// 自动计算所有观测维度
+    pub fn from_current_state(taiji: Taiji, liangyyi: Liangyyi, sixiang: Sixiang) -> Self {
+        // 计算用户活跃度（基于阳能量）
+        let user_activity_level = taiji.yang_energy;
+
+        // 计算系统负载（基于上下文强度）
+        let system_load = taiji.context_intensity;
+
+        // 计算学习效率（基于平衡度，平衡时学习效率高）
+        let learning_efficiency = taiji.balance();
+
+        // 计算决策置信度（也基于平衡度）
+        let decision_confidence = taiji.balance();
+
+        Self {
+            taiji,
+            liangyyi,
+            sixiang,
+            timestamp: Utc::now(),
+            user_activity_level,
+            system_load,
+            learning_efficiency,
+            decision_confidence,
+        }
+    }
+
+    /// 获取综合状态得分（0.0-1.0）
+    ///
+    /// 综合考虑所有维度
+    pub fn overall_score(&self) -> f64 {
+        (self.user_activity_level * 0.25
+            + self.system_load * 0.25
+            + self.learning_efficiency * 0.25
+            + self.decision_confidence * 0.25)
+            .clamp(0.0, 1.0)
+    }
+
+    /// 判断是否处于最佳状态
+    ///
+    /// 各维度都较高时为最佳状态
+    pub fn is_optimal(&self) -> bool {
+        self.user_activity_level > 0.7
+            && self.system_load < 0.8  // 负载不能太高
+            && self.learning_efficiency > 0.6
+            && self.decision_confidence > 0.6
+    }
+}
+
 impl StateTracker {
     /// 创建新的追踪器
     pub fn new(config: StateTrackerConfig) -> Self {
@@ -137,12 +218,8 @@ impl StateTracker {
         let sixiang = *self.current_sixiang.read().await;
         let liangyyi = Liangyyi::from_taiji(&taiji);
 
-        StateSnapshot {
-            taiji,
-            liangyyi,
-            sixiang,
-            timestamp: Utc::now(),
-        }
+        // ✨ v1.9.6: 使用新的构造函数，自动计算所有维度
+        StateSnapshot::from_current_state(taiji, liangyyi, sixiang)
     }
 
     /// 获取状态历史
@@ -187,12 +264,8 @@ impl StateTracker {
     async fn record_snapshot(&self, taiji: Taiji, liangyyi: Liangyyi, sixiang: Sixiang) {
         let mut history = self.state_history.write().await;
 
-        let snapshot = StateSnapshot {
-            taiji,
-            liangyyi,
-            sixiang,
-            timestamp: Utc::now(),
-        };
+        // ✨ v1.9.6: 使用新的构造函数，自动计算四个观测维度
+        let snapshot = StateSnapshot::from_current_state(taiji, liangyyi, sixiang);
 
         history.push_back(snapshot);
 
