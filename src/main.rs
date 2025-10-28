@@ -458,6 +458,9 @@ async fn main() {
         agent.likan_trigger.clone(),
     );
 
+    // ✨ v1.9.4: 注册两仪演化系统命令
+    commands::register_liangyyi_commands(&mut agent.registry, agent.state_tracker.clone());
+
     // 注册 LLM 命令（需要访问 agent 的 llm_manager）
     let llm_manager = agent.llm_manager();
     commands::register_llm_commands(&mut agent.registry, llm_manager);

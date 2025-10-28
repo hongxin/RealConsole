@@ -2064,6 +2064,13 @@ impl Agent {
                     ctx.current_sixiang = Some(format!("{:?}", state.sixiang));
                     ctx.energy_balance = Some(state.taiji.balance());
                     ctx.state_trend = Some(format!("{:?}", trend));
+
+                    // ✨ v1.9.4: 填充学习阶段信息
+                    let (learning_phase, volatility, change_rate) =
+                        tracker.detect_learning_phase().await;
+                    ctx.learning_phase = Some(format!("{:?}", learning_phase));
+                    ctx.volatility = Some(volatility);
+                    ctx.change_rate = Some(change_rate);
                 }
 
                 ctx

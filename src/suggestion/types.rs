@@ -241,6 +241,16 @@ pub struct SuggestionContext {
 
     /// 状态趋势（趋向阴/趋向阳/稳定）
     pub state_trend: Option<String>,
+
+    // ✨ v1.9.4: 学习阶段信息
+    /// 当前学习阶段（探索期/稳定期/转变期）
+    pub learning_phase: Option<String>,
+
+    /// 状态波动性 (0.0-1.0+)
+    pub volatility: Option<f64>,
+
+    /// 状态变化率 (0.0-1.0)
+    pub change_rate: Option<f64>,
 }
 
 impl SuggestionContext {
@@ -257,6 +267,10 @@ impl SuggestionContext {
             current_sixiang: None,
             energy_balance: None,
             state_trend: None,
+            // ✨ v1.9.4: 学习阶段信息（默认为 None）
+            learning_phase: None,
+            volatility: None,
+            change_rate: None,
         }
     }
 

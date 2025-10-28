@@ -165,7 +165,7 @@ impl StateTracker {
     }
 
     /// 计算活动水平（基于最近历史）
-    async fn calculate_activity_level(&self) -> f64 {
+    pub async fn calculate_activity_level(&self) -> f64 {
         let history = self.state_history.read().await;
         if history.is_empty() {
             return 0.5;
@@ -247,6 +247,65 @@ impl StateTracker {
         history.clear();
     }
 
+    /// 检测学习阶段
+    ///
+    /// 基于状态历史的波动性和变化率判断用户所处的学习阶段
+    pub async fn detect_learning_phase(&self) -> (LearningPhase, f64, f64) {
+        let history = self.state_history.read().await;
+
+        if history.len() < 10 {
+            // 数据不足，默认为探索期
+            return (LearningPhase::Exploration, 0.0, 0.0);
+        }
+
+        // 1. 计算能量波动性（使用增量的标准差，而非绝对值）
+        // 这能区分"稳定趋势"（低波动）和"无规律摆动"（高波动）
+        let energies: Vec<f64> = history
+            .iter()
+            .map(|s| s.taiji.yang_energy - s.taiji.yin_energy)
+            .collect();
+
+        // 计算相邻快照的能量差值变化（二阶导数）
+        let mut deltas = Vec::new();
+        for i in 1..energies.len() {
+            deltas.push(energies[i] - energies[i - 1]);
+        }
+
+        let volatility = if !deltas.is_empty() {
+            let mean_delta = deltas.iter().sum::<f64>() / deltas.len() as f64;
+            let variance: f64 = deltas
+                .iter()
+                .map(|d| (d - mean_delta).powi(2))
+                .sum::<f64>()
+                / deltas.len() as f64;
+            variance.sqrt()
+        } else {
+            0.0
+        };
+
+        // 2. 计算四象变化率
+        let recent: Vec<_> = history.iter().rev().take(20).collect();
+        let mut changes = 0;
+        for i in 0..recent.len() - 1 {
+            if recent[i].sixiang != recent[i + 1].sixiang {
+                changes += 1;
+            }
+        }
+        let change_rate = changes as f64 / (recent.len() - 1) as f64;
+
+        // 3. 判断学习阶段
+        // 调整阈值以更好地反映实际状态变化
+        let phase = if volatility > 0.12 || change_rate > 0.4 {
+            LearningPhase::Exploration
+        } else if volatility < 0.06 && change_rate < 0.2 {
+            LearningPhase::Stability
+        } else {
+            LearningPhase::Transition
+        };
+
+        (phase, volatility, change_rate)
+    }
+
     /// 统计信息
     pub async fn stats(&self) -> StateStats {
         let history = self.state_history.read().await;
@@ -266,13 +325,23 @@ impl StateTracker {
             current.taiji.balance()
         };
 
+        // 释放历史锁，避免死锁
+        drop(history);
+
+        // 检测学习阶段
+        let (learning_phase, volatility, sixiang_change_rate) =
+            self.detect_learning_phase().await;
+
         StateStats {
-            total_snapshots: history.len(),
+            total_snapshots: self.state_history.read().await.len(),
             current_sixiang: current.sixiang,
             sixiang_counts,
             avg_balance,
             current_yin_energy: current.taiji.yin_energy,
             current_yang_energy: current.taiji.yang_energy,
+            learning_phase,
+            volatility,
+            sixiang_change_rate,
         }
     }
 }
@@ -286,6 +355,17 @@ pub enum StateTrend {
     TowardYang,
     /// 稳定
     Stable,
+}
+
+/// 学习阶段
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LearningPhase {
+    /// 探索期：高波动性，用户在尝试新操作
+    Exploration,
+    /// 稳定期：低波动性，用户形成稳定的工作模式
+    Stability,
+    /// 转变期：中等波动性，工作模式正在改变
+    Transition,
 }
 
 /// 状态统计
@@ -308,6 +388,15 @@ pub struct StateStats {
 
     /// 当前阳能量
     pub current_yang_energy: f64,
+
+    /// 学习阶段
+    pub learning_phase: LearningPhase,
+
+    /// 波动性指标（标准差）
+    pub volatility: f64,
+
+    /// 四象变化率
+    pub sixiang_change_rate: f64,
 }
 
 #[cfg(test)]
@@ -412,5 +501,82 @@ mod tests {
 
         tracker.clear_history().await;
         assert_eq!(tracker.history().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_learning_phase_exploration() {
+        let tracker = StateTracker::with_default();
+
+        // 模拟探索期：交替执行和思考，创建大幅度能量摆动
+        // UserExecute: yang+0.08, yin-0.05 (向阳摆动)
+        // UserThink: yin+0.08, yang-0.05 (向阴摆动)
+        // 这会创建高波动性
+        for _ in 0..12 {
+            tracker.update_from_event(Event::UserExecute).await;
+            tracker.update_from_event(Event::UserThink).await;
+        }
+
+        let (phase, volatility, change_rate) = tracker.detect_learning_phase().await;
+
+        // 探索期应该有较高的波动性或变化率
+        assert!(
+            phase == LearningPhase::Exploration,
+            "Expected Exploration, got {:?} (volatility={:.3}, change_rate={:.3})",
+            phase,
+            volatility,
+            change_rate
+        );
+        assert!(
+            volatility > 0.08 || change_rate > 0.3,
+            "Expected high volatility or change_rate, got volatility={:.3}, change_rate={:.3}",
+            volatility,
+            change_rate
+        );
+    }
+
+    #[tokio::test]
+    async fn test_learning_phase_stability() {
+        let tracker = StateTracker::with_default();
+
+        // 模拟稳定期：重复相同操作，保持四象稳定
+        // UserRead: yin+0.05, yang-0.03
+        // 持续Read会让系统稳定在太阴-老阴状态
+        for _ in 0..24 {
+            tracker.update_from_event(Event::UserRead).await;
+        }
+
+        let (phase, volatility, change_rate) = tracker.detect_learning_phase().await;
+
+        // 稳定期应该有较低的波动性和变化率
+        assert!(
+            phase == LearningPhase::Stability,
+            "Expected Stability, got {:?} (volatility={:.3}, change_rate={:.3})",
+            phase,
+            volatility,
+            change_rate
+        );
+        assert!(
+            volatility < 0.08 && change_rate < 0.3,
+            "Expected low volatility and change_rate, got volatility={:.3}, change_rate={:.3}",
+            volatility,
+            change_rate
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stats_includes_learning_phase() {
+        let tracker = StateTracker::with_default();
+
+        // 添加一些事件
+        for _ in 0..10 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        let stats = tracker.stats().await;
+
+        // 验证stats包含学习阶段信息
+        assert!(stats.volatility >= 0.0);
+        assert!(stats.sixiang_change_rate >= 0.0);
+        assert!(stats.sixiang_change_rate <= 1.0);
     }
 }

@@ -55,4 +55,6 @@ pub mod tracker; // ✨ Phase 2: 状态追踪器
 pub use liangyyi::Liangyyi;
 pub use sixiang::Sixiang;
 pub use taiji::{EnergyType, Event, Taiji, TaijiContext};
-pub use tracker::{StateSnapshot, StateStats, StateTracker, StateTrackerConfig, StateTrend};
+pub use tracker::{
+    LearningPhase, StateSnapshot, StateStats, StateTracker, StateTrackerConfig, StateTrend,
+};

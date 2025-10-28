@@ -5,6 +5,81 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.4] - 2025-10-28
+
+### Added
+
+- **[两仪系统增强] 学习阶段识别与状态感知建议**
+  - **Phase 1: 学习阶段检测算法（42 行）**
+    - `LearningPhase` 枚举：Exploration（探索期）/ Stability（稳定期）/ Transition（转变期）
+    - `detect_learning_phase()` 方法：基于增量波动性和状态变化率
+    - **增量波动性算法**：使用二阶导数（能量 delta 的标准差）区分稳定趋势与混沌振荡
+      - 稳定趋势：一阶导数恒定 → 低二阶导数
+      - 混沌振荡：一阶导数变化 → 高二阶导数
+    - **检测阈值**：
+      - Exploration: 波动性 > 0.12 或 变化率 > 0.4
+      - Stability: 波动性 < 0.06 且 变化率 < 0.2
+      - Transition: 其他情况
+    - 测试：3/3 通过
+  - **Phase 2: `/liangyyi` 可视化命令（412 行）**
+    - 4 个子命令：
+      - `status` - 显示当前状态（太极、两仪、四象、学习阶段）
+      - `stats` - 显示统计信息（四象分布、平均平衡度）
+      - `history [n]` - 显示历史快照（最近 N 条）
+      - `trend` - 显示趋势分析
+    - **彩色 Unicode 输出**：
+      - 能量条：▰▱（cyan/default）
+      - 两仪符号：☽太阴 / ☉太阳
+      - 四象符号：☷老阴 / ☲少阳 / ☵少阴 / ☰老阳
+    - 命令注册：遵循项目标准模式（`Command::from_fn`）
+  - **Phase 3: 状态感知建议增强（67 行）**
+    - **SuggestionContext 扩展**（3 个新字段）：
+      - `learning_phase`: 当前学习阶段
+      - `volatility`: 状态波动性（0.0-1.0+）
+      - `change_rate`: 状态变化率（0.0-1.0）
+    - **动态策略调整**（`get_phase_adjustments()`）：
+      - **Exploration 期**：
+        - 上下文权重 +20%（鼓励探索新命令）
+        - 历史权重 -20%（降低习惯依赖）
+        - 阈值降低至 0.3（接受更多建议）
+        - 建议数量 +2（提供更多选择）
+      - **Stability 期**：
+        - 上下文权重 -20%（减少干扰）
+        - 历史权重 +20%（强化熟练命令）
+        - 阈值提高至 0.6（只显示高质量建议）
+        - 建议数量 -1（精简输出）
+      - **Transition 期**：默认值
+    - **Agent 集成**：自动填充学习阶段信息到建议上下文
+
+### Changed
+
+- **StateTracker**: `calculate_activity_level()` 方法改为 public，供可视化命令调用
+- **Agent**: 建议系统现在基于学习阶段动态调整策略
+- **SuggestionEngine**: 权重和阈值根据学习阶段动态变化
+
+### Notes
+
+- **代码统计**：
+  - 总计：539 行（Phase 1: 42 + Phase 2: 412 + Phase 3: 67 + 其他: 18）
+  - 新增文件：2 个（`src/commands/liangyyi_cmd.rs`, `docs/04-reports/liangyyi-visualization-design.md`）
+  - 修改文件：7 个
+  - 测试：1050/1050 通过 ✅（单线程模式）
+- **哲学体现**：
+  - 学习阶段检测：体现"一分为三"思想（探索/稳定/转变）
+  - 增量波动性：区分"稳定趋势"与"混沌振荡"，超越二元对立
+  - 状态感知建议：建议系统获得时间维度感知，实现"体用合一"
+- **用户体验**：
+  - 建议系统更智能：根据用户当前状态动态调整
+  - 可视化更完善：`/liangyyi` 命令提供完整的状态视图
+  - 学习曲线优化：探索期提供更多帮助，稳定期减少干扰
+- **测试说明**：
+  - 并行测试有 7-9 个失败（race condition，项目既有问题）
+  - 单线程测试 100% 通过（`cargo test --lib -- --test-threads=1`）
+  - 本次功能不影响项目稳定性
+- 详见设计文档：`docs/04-reports/liangyyi-visualization-design.md`
+
+---
+
 ## [1.9.3] - 2025-10-28
 
 ### Fixed

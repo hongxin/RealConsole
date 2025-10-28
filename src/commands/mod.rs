@@ -2,6 +2,7 @@ pub mod context_cmd; // ✨ Phase 对话上下文: 上下文管理命令
 pub mod core;
 pub mod git_cmd; // ✨ Phase 6: Git 智能助手命令
 pub mod history_cmd; // ✨ Phase 8: 命令历史记录命令
+pub mod liangyyi_cmd; // ✨ v1.9.4: 两仪演化系统可视化命令
 pub mod likan; // ✨ Phase 4.3: 离坎炼化炉命令
 pub mod llm;
 pub mod llm_log; // ✨ LLM 交互日志命令
@@ -20,6 +21,7 @@ pub use context_cmd::register_context_commands;
 pub use core::register_core_commands;
 pub use git_cmd::register_git_commands;
 pub use history_cmd::register_history_commands;
+pub use liangyyi_cmd::register_liangyyi_commands;
 pub use likan::register_likan_commands;
 pub use llm::register_llm_commands;
 pub use llm_log::register_llm_log_commands;

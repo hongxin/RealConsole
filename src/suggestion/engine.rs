@@ -89,19 +89,32 @@ impl SuggestionEngine {
     /// 1. 并行调用三个建议生成器
     /// 2. 收集所有建议
     /// 3. 通过排序器融合和排序
-    /// 4. ✨ 通过离增强器优化（炼化）
+    /// 4. ✨ v1.9.4: 根据学习阶段调整建议策略
+    /// 5. ✨ 通过离增强器优化（炼化）
     pub async fn suggest(&self, context: &SuggestionContext) -> Vec<Suggestion> {
         let mut all_suggestions = Vec::new();
 
+        // ✨ v1.9.4: 根据学习阶段调整建议权重
+        let (weight_context, weight_history, min_score_threshold, max_count) =
+            self.get_phase_adjustments(context);
+
         // 1. 上下文建议（如果启用）
         if self.config.enable_context {
-            let context_suggestions = self.context_suggester.suggest(context).await;
+            let mut context_suggestions = self.context_suggester.suggest(context).await;
+            // ✨ 应用学习阶段权重
+            for suggestion in &mut context_suggestions {
+                suggestion.score *= weight_context;
+            }
             all_suggestions.extend(context_suggestions);
         }
 
         // 2. 历史建议（如果启用）
         if self.config.enable_history {
-            let history_suggestions = self.history_suggester.suggest(context).await;
+            let mut history_suggestions = self.history_suggester.suggest(context).await;
+            // ✨ 应用学习阶段权重
+            for suggestion in &mut history_suggestions {
+                suggestion.score *= weight_history;
+            }
             all_suggestions.extend(history_suggestions);
         }
 
@@ -115,6 +128,9 @@ impl SuggestionEngine {
 
         // 4. 排序和融合
         let mut ranked_suggestions = self.ranker.rank(all_suggestions);
+
+        // ✨ v1.9.4: 应用学习阶段的分数阈值过滤
+        ranked_suggestions.retain(|s| s.score >= min_score_threshold);
 
         // 5. ✨ 离（☲火）增强：应用学习到的模式优化建议
         {
@@ -141,11 +157,46 @@ impl SuggestionEngine {
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
 
-            // 限制最终数量
-            ranked_suggestions.truncate(self.config.max_suggestions);
+            // ✨ v1.9.4: 根据学习阶段限制最终数量
+            ranked_suggestions.truncate(max_count);
         }
 
         ranked_suggestions
+    }
+
+    /// ✨ v1.9.4: 根据学习阶段获取调整参数
+    ///
+    /// 返回：(context_weight, history_weight, min_score_threshold, max_count)
+    fn get_phase_adjustments(&self, context: &SuggestionContext) -> (f64, f64, f64, usize) {
+        match context.learning_phase.as_deref() {
+            // 探索期：鼓励多样性，降低阈值
+            Some("Exploration") => {
+                (
+                    1.2,  // 提升上下文建议权重（探索新命令）
+                    0.8,  // 降低历史建议权重（避免重复）
+                    0.3,  // 降低分数阈值（允许更多建议）
+                    self.config.max_suggestions + 2, // 增加建议数量
+                )
+            }
+            // 稳定期：优先精准性，提高阈值
+            Some("Stability") => {
+                (
+                    0.8,  // 降低上下文建议权重
+                    1.2,  // 提升历史建议权重（熟悉的命令）
+                    0.6,  // 提高分数阈值（只保留高质量）
+                    self.config.max_suggestions.saturating_sub(1).max(3), // 减少建议数量
+                )
+            }
+            // 转变期或未知：使用默认配置
+            _ => {
+                (
+                    1.0,  // 默认上下文权重
+                    1.0,  // 默认历史权重
+                    self.config.min_score, // 使用配置的最小分数
+                    self.config.max_suggestions, // 使用配置的最大数量
+                )
+            }
+        }
     }
 
     /// 基于触发器生成建议
