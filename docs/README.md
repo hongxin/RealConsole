@@ -1,7 +1,7 @@
 # RealConsole 文档中心
 
-**当前版本**: v1.3.7
-**最后更新**: 2025-10-22
+**当前版本**: v1.9.5
+**最后更新**: 2025-10-28
 **文档哲学**: 极简主义 · 一分为三 · 持续演化
 
 欢迎来到 RealConsole 文档中心！本文档遵循"极简主义"设计理念，采用"五态架构"组织文档，确保清晰导航和高效查找。
@@ -11,6 +11,8 @@
 ## 📚 五态文档架构
 
 基于**"一分为三"**哲学扩展而来，RealConsole 文档分为五个演化态：
+
+> 🆕 **v1.9.5 更新**：新增交互式命令支持（vi/vim/nano等）、完善两仪演化系统、累计 49 个开发报告
 
 ### 00-core - 核心理念态
 
@@ -30,12 +32,14 @@
 
 > "理解层" - 深入理解系统设计和架构
 
-**设计文档**（7 个文档）:
+**设计文档**（9 个文档）:
 
 **核心设计**:
 - **[three-features-design.md](01-understanding/three-features-design.md)** - v1.3.7 三大功能设计
 - **[architecture.md](01-understanding/design/architecture.md)** - 系统架构设计
 - **[phase10-task-system-architecture.md](01-understanding/design/phase10-task-system-architecture.md)** - 任务系统架构 (已实现 ✅)
+- **[bagua-memory-palace-design.md](01-understanding/design/bagua-memory-palace-design.md)** - 八卦记忆宫殿设计 🆕
+- **[liangyyi-evolution-plan.md](01-understanding/design/liangyyi-evolution-plan.md)** - 两仪演化系统设计 🆕
 - **[error-handling.md](01-understanding/design/error-handling.md)** - 错误处理系统
 - **[security.md](01-understanding/design/security.md)** - 安全设计
 
@@ -87,7 +91,7 @@
 **演化文档**（8 个文档）:
 
 **主文档**:
-- **[version-history.md](03-evolution/version-history.md)** - 完整版本历史 (v0.1.0 ~ v1.3.7)
+- **[version-history.md](03-evolution/version-history.md)** - 完整版本历史 (v0.1.0 ~ v1.9.5)
 - **[README.md](03-evolution/README.md)** - 演化历程索引
 
 **归档故事** ([archives/](03-evolution/archives/)):
@@ -107,23 +111,50 @@
 
 ---
 
+### 04-reports - 报告态 🆕
+
+> "记录层" - 完整记录开发过程和技术报告
+
+**开发报告**（49 个报告）:
+
+**重要里程碑**:
+- **[comprehensive-retrospective-v1.9.5.md](04-reports/comprehensive-retrospective-v1.9.5.md)** - v1.9.5 全面复盘 ⭐
+- **[interactive-commands-feature.md](04-reports/interactive-commands-feature.md)** - 交互式命令支持 (v1.9.5)
+- **[v1.9.0-release-summary.md](04-reports/v1.9.0-release-summary.md)** - 两仪演化系统发布
+- **[trace-command-design.md](04-reports/trace-command-design.md)** - 统一追踪系统设计 (v1.5.0)
+- **[four-dimensions-philosophy.md](04-reports/four-dimensions-philosophy.md)** - 四维哲学理论
+
+**功能完成报告** (按功能分类):
+- **八卦记忆宫殿**: bagua-integration-phase1~4-completion.md, overall-summary.md
+- **两仪演化系统**: liangyyi-phase1~3-completion.md, gap-analysis.md
+- **主动建议系统**: phase-4.1~4.2 系列报告 (P0/P1/P2.1)
+- **统一追踪系统**: trace-implementation-plan.md, testing-completion.md
+- **其他功能**: tab-completion, terminal-crash-fix, utf8-bugfix 等
+
+**用途**: 追溯设计决策、学习实现细节、了解完整技术演化路径
+
+**价值**: 每个报告都是完整的技术文档，包含设计思路、实现细节、测试结果和经验总结
+
+---
+
 ## 📊 文档统计
 
 **活跃文档总览**:
 - 00-core (核心理念): 6 个文档（中英双语）
-- 01-understanding (理解态): 7 个文档
+- 01-understanding (理解态): 9 个文档 ⬆️
 - 02-practice (实践态): 19 个文档
 - 03-evolution (演化态): 8 个文档
+- 04-reports (报告态): 49 个报告 🆕
 
-**总计**: 40 个核心文档
+**总计**: 91 个文档（42 个核心文档 + 49 个开发报告）
 
-**优化成果**:
-- 简化 03-evolution: 21 files → 8 files (62% 减少)
-- 移除 04-reports: 5 files → 0 files (完全归档)
-- 修复 01-understanding: 删除过时文档，修复链接
-- 整理 02-practice: 修复导航，移除空目录
+**版本演化** (v1.3.7 → v1.9.5):
+- ✅ 新增 04-reports 目录：0 → 49 个开发报告
+- ✅ 扩充 01-understanding：7 → 9 个设计文档
+- ✅ 完善版本历史：v0.1.0 ~ v1.9.5 完整时间线
+- ✅ 新增重要特性：交互式命令、两仪演化、八卦记忆宫殿
 
-**文档质量**: 高质量、高相关性、零冗余
+**文档质量**: 高质量、高相关性、系统性强
 
 ---
 
@@ -141,9 +172,10 @@
 4. **工具开发**: [tool-development.md](02-practice/developer/tool-development.md) - 扩展开发
 
 ### 了解演化历程
-1. **版本历史**: [version-history.md](03-evolution/version-history.md) - v0.1.0 ~ v1.3.7 完整时间线
-2. **演化故事**: [03-evolution/README.md](03-evolution/README.md) - Vibe Coding 奇迹
-3. **技术路线**: [roadmap.md](00-core/roadmap.md) - 未来规划
+1. **版本历史**: [version-history.md](03-evolution/version-history.md) - v0.1.0 ~ v1.9.5 完整时间线
+2. **全面复盘**: [comprehensive-retrospective-v1.9.5.md](04-reports/comprehensive-retrospective-v1.9.5.md) - v1.9.5 复盘报告 ⭐
+3. **演化故事**: [03-evolution/README.md](03-evolution/README.md) - Vibe Coding 奇迹
+4. **技术路线**: [roadmap.md](00-core/roadmap.md) - 未来规划
 
 ### 问题排查
 1. **技术债务**: [technical-debt.md](01-understanding/analysis/technical-debt.md) - 已知问题
@@ -186,13 +218,22 @@ philosophy.en.md   # 英文版
 ## 🎯 Vibe Coding 的成就
 
 **RealConsole 的开发创造了惊人记录**:
-- ⚡ 开发周期: < 2 个月 (2025-09 ~ 2025-10-22)
+- ⚡ 开发周期: < 2 个月 (2025-09 ~ 2025-10-28)
 - 🔥 从零到生产: 仅 6 周
 - 📈 效率提升: 10 倍以上
-- 💻 代码产出: 15,000+ 行 Rust + 3,000+ 行测试
-- ✅ 质量保证: 78% 测试覆盖，96% 通过率，零警告
+- 💻 代码产出: 15,000+ 行 Rust + 4,000+ 行测试
+- ✅ 质量保证: 1057 个测试，100% 通过率，零警告
+- 📚 文档体系: 91 个文档（包括 49 个开发报告）
+- 🎨 哲学实践: 成功融合"一分为三"、易经、两仪演化等东方智慧
 
-**详见**: [03-evolution/README.md](03-evolution/README.md)
+**最新成就** (v1.9.5):
+- 🎨 两仪演化系统：体用合一的状态追踪（1152 行代码，24 个测试）
+- 🗄️ 八卦记忆宫殿：八维数据存储系统（1421 行代码，89% 测试覆盖）
+- 💡 主动建议系统：三源融合（Context + History + LLM）
+- 🔍 统一追踪系统：四维观测体系（History + Log + LLM-Log + Context）
+- 🖥️ 交互式命令：原生支持 31 种交互式工具（vi/vim/top/less等）
+
+**详见**: [03-evolution/README.md](03-evolution/README.md) | [comprehensive-retrospective-v1.9.5.md](04-reports/comprehensive-retrospective-v1.9.5.md)
 
 ---
 
@@ -205,8 +246,8 @@ philosophy.en.md   # 英文版
 
 ---
 
-**文档架构**: 五态系统 v3.0 (2025-10-22)
-**文档总数**: 40 个核心文档
-**最后优化**: 2025-10-22
+**文档架构**: 五态系统 v4.0 (2025-10-28)
+**文档总数**: 91 个文档（42 个核心文档 + 49 个开发报告）
+**最后优化**: 2025-10-28
 
 **欢迎探索 RealConsole 的文档世界！** 🚀
