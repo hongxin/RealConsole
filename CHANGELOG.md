@@ -5,6 +5,106 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2025-10-28
+
+### Added
+
+- **[两仪系统] 闭环自适应执行层（Execute Layer）**
+  - **StateTracker 自适应集成**（src/liangyyi/tracker.rs，+202 行）：
+    - 添加可选 `adaptive_system` 字段，支持运行时启用/禁用
+    - `config` 改为 `Arc<RwLock<StateTrackerConfig>>` 支持动态调整
+    - 核心方法：
+      - `enable_adaptive(target)` - 启用自适应，指定目标状态
+      - `is_adaptive_enabled()` - 检查是否启用
+      - `apply_recommendations(recs)` - 应用建议到配置
+      - `auto_optimize()` - 完整自动优化循环（观测→预测→建议→执行）
+      - `get_recommendations()` - 获取建议（不应用，用于预览）
+      - `get_config()` - 获取当前配置（只读）
+  - **维度到配置映射机制**：
+    - `efficiency` → `energy_decay_rate`：效率低时增加衰减率（快速重置）
+    - `activity` → `low/high_activity_threshold`：调整活动阈值
+    - `load` → `snapshot_interval`：负载高时减少间隔（更频繁观测）
+    - `context` → `history_size`：上下文高时增加历史大小
+  - **测试覆盖**：新增 8 个单元测试，liangyyi 模块从 75 增至 83 个测试，全部通过
+
+### Changed
+
+- **StateTracker 结构演进**：
+  - `config` 字段从直接存储改为 `Arc<RwLock<StateTrackerConfig>>`
+  - 添加 `adaptive_system: Option<Arc<RwLock<AdaptiveSystem>>>`
+  - 所有访问 config 的代码改为 async 读写
+
+### Design Philosophy
+
+- **闭环控制**：观测 → 预测 → 建议 → **执行** → 观测（形成完整闭环）
+- **OODA 循环完成**：
+  - Observe（观测）- StateVector
+  - Orient（预测）- StatePredictor
+  - Decide（建议）- AdaptiveSystem
+  - **Act（执行）- Execute Layer** ⬅️ v1.14.0
+- **无侵入设计**：通过 Option 字段可选启用，不影响现有代码
+- **双模式操作**：
+  - `auto_optimize()` - 自动应用调整
+  - `get_recommendations()` - 只获取建议不应用（用于分析/预览）
+
+### Use Cases
+
+```rust
+use realconsole::liangyyi::{StateTracker, StateTrackerConfig};
+use realconsole::liangyyi::adaptive::TargetState;
+
+// 创建并启用自适应
+let mut tracker = StateTracker::new(StateTrackerConfig::default());
+tracker.enable_adaptive(TargetState::balanced());
+
+// 定期自动优化
+loop {
+    let recommendations = tracker.auto_optimize().await?;
+    println!("应用了 {} 个优化建议", recommendations.len());
+    tokio::time::sleep(Duration::from_secs(60)).await;
+}
+
+// 或仅预览建议
+let recommendations = tracker.get_recommendations().await?;
+for rec in recommendations.iter().take(3) {
+    println!("🎯 {}: {}", rec.dimension, rec.reason);
+}
+```
+
+### Integration
+
+- **与 v1.13.0 AdaptiveSystem 集成**：
+  ```rust
+  // StateTracker 持有 AdaptiveSystem
+  // auto_optimize 内部调用 AdaptiveSystem::generate_recommendations
+  ```
+
+- **与 v1.12.0 StatePredictor 集成**：
+  ```rust
+  // AdaptiveSystem 内部使用 StatePredictor 预测
+  // 形成完整的预测-调整链条
+  ```
+
+### Notes
+
+- ✅ 完整的闭环自适应控制
+- ✅ 清晰的维度到配置映射规则
+- ✅ 线程安全（Arc<RwLock>）
+- ✅ 双模式操作（应用 vs 预览）
+- ✅ 无侵入集成（可选启用）
+- 📚 完整文档：docs/04-reports/v1.14.0-execute-layer.md
+
+### Evolution Path
+
+```
+v1.11.0: StateVector      → 状态空间化
+v1.12.0: StatePredictor   → 时序预测
+v1.13.0: AdaptiveSystem   → 自我调整
+v1.14.0: Execute Layer    → 闭环执行  ⬅️ 当前
+```
+
+**下一步**：多视角观测系统（回到 B - 原计划 v1.11.0 内容）
+
 ## [1.13.0] - 2025-10-28
 
 ### Added

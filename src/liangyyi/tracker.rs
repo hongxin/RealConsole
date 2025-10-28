@@ -14,6 +14,9 @@ use tokio::sync::RwLock;
 use crate::bagua::{BaguaDimension, BaguaMemoryPalace, MemoryContent, MemoryEntry};
 use uuid::Uuid;
 
+// ✨ v1.14.0: 自适应系统集成
+use super::adaptive::{AdaptiveSystem, Recommendation, RecommendationAction};
+
 /// 状态追踪器
 pub struct StateTracker {
     /// 当前太极状态
@@ -26,7 +29,12 @@ pub struct StateTracker {
     state_history: Arc<RwLock<VecDeque<StateSnapshot>>>,
 
     /// 配置
-    config: StateTrackerConfig,
+    config: Arc<RwLock<StateTrackerConfig>>,
+
+    /// ✨ v1.14.0: 自适应系统（可选）
+    ///
+    /// 启用后，系统可以根据状态预测自动调整配置参数
+    adaptive_system: Option<Arc<RwLock<AdaptiveSystem>>>,
 }
 
 /// 状态快照
@@ -255,13 +263,13 @@ impl StateSnapshot {
 impl StateTracker {
     /// 创建新的追踪器
     pub fn new(config: StateTrackerConfig) -> Self {
+        let history_size = config.history_size;
         Self {
             current_taiji: Arc::new(RwLock::new(Taiji::new())),
             current_sixiang: Arc::new(RwLock::new(Sixiang::LaoYin)),
-            state_history: Arc::new(RwLock::new(VecDeque::with_capacity(
-                config.history_size,
-            ))),
-            config,
+            state_history: Arc::new(RwLock::new(VecDeque::with_capacity(history_size))),
+            config: Arc::new(RwLock::new(config)),
+            adaptive_system: None,
         }
     }
 
@@ -351,7 +359,8 @@ impl StateTracker {
         history.push_back(snapshot);
 
         // 限制大小
-        if history.len() > self.config.history_size {
+        let config = self.config.read().await;
+        if history.len() > config.history_size {
             history.pop_front();
         }
     }
@@ -359,7 +368,8 @@ impl StateTracker {
     /// 应用能量衰减
     pub async fn apply_decay(&self) {
         let mut taiji = self.current_taiji.write().await;
-        taiji.decay_to_balance(self.config.energy_decay_rate);
+        let config = self.config.read().await;
+        taiji.decay_to_balance(config.energy_decay_rate);
     }
 
     /// 分析状态趋势
@@ -692,6 +702,208 @@ pub struct StateStats {
 
     /// 四象变化率
     pub sixiang_change_rate: f64,
+}
+
+// ========== ✨ v1.14.0: 自适应系统集成 ==========
+
+impl StateTracker {
+    /// 启用自适应优化
+    ///
+    /// 使用指定的目标状态启用自适应系统
+    ///
+    /// ## 示例
+    ///
+    /// ```rust,no_run
+    /// use realconsole::liangyyi::{StateTracker, StateTrackerConfig};
+    /// use realconsole::liangyyi::adaptive::TargetState;
+    ///
+    /// # tokio_test::block_on(async {
+    /// let mut tracker = StateTracker::new(StateTrackerConfig::default());
+    /// tracker.enable_adaptive(TargetState::balanced());
+    ///
+    /// // 系统将自动根据状态预测调整配置参数
+    /// tracker.auto_optimize().await.unwrap();
+    /// # });
+    /// ```
+    pub fn enable_adaptive(&mut self, target: super::adaptive::TargetState) {
+        let adaptive = AdaptiveSystem::new(target);
+        self.adaptive_system = Some(Arc::new(RwLock::new(adaptive)));
+    }
+
+    /// 检查是否启用了自适应
+    pub fn is_adaptive_enabled(&self) -> bool {
+        self.adaptive_system.is_some()
+    }
+
+    /// 应用建议到配置
+    ///
+    /// 根据建议调整 StateTrackerConfig 的参数
+    ///
+    /// ## 映射规则
+    ///
+    /// - `efficiency` → `energy_decay_rate`: 效率低时增加衰减率（快速重置）
+    /// - `activity` → `low/high_activity_threshold`: 调整活动阈值
+    /// - `load` → `snapshot_interval`: 负载高时减少间隔（更频繁观测）
+    /// - `context` → `history_size`: 上下文高时增加历史大小
+    pub async fn apply_recommendations(
+        &self,
+        recommendations: &[Recommendation],
+    ) -> anyhow::Result<()> {
+        let mut config = self.config.write().await;
+
+        for rec in recommendations {
+            match rec.dimension.as_str() {
+                "efficiency" => {
+                    // 效率低 → 增加衰减率（让系统更快重置）
+                    // 效率高 → 减少衰减率（保持状态稳定）
+                    match rec.action {
+                        RecommendationAction::Enhance => {
+                            // 需要提高效率 → 减少衰减
+                            config.energy_decay_rate =
+                                (config.energy_decay_rate * 0.9).max(0.005);
+                        }
+                        RecommendationAction::Reduce => {
+                            // 需要降低效率（实际是重置系统）→ 增加衰减
+                            config.energy_decay_rate =
+                                (config.energy_decay_rate * 1.1).min(0.05);
+                        }
+                        RecommendationAction::Maintain => {}
+                    }
+                }
+                "activity" => {
+                    // 活动低 → 降低阈值（更容易触发）
+                    // 活动高 → 提高阈值（保持高活动）
+                    match rec.action {
+                        RecommendationAction::Enhance => {
+                            // 需要提高活动 → 降低阈值
+                            config.low_activity_threshold =
+                                (config.low_activity_threshold * 0.9).max(0.1);
+                            config.high_activity_threshold =
+                                (config.high_activity_threshold * 0.95).max(0.5);
+                        }
+                        RecommendationAction::Reduce => {
+                            // 需要降低活动 → 提高阈值
+                            config.low_activity_threshold =
+                                (config.low_activity_threshold * 1.1).min(0.5);
+                            config.high_activity_threshold =
+                                (config.high_activity_threshold * 1.05).min(0.9);
+                        }
+                        RecommendationAction::Maintain => {}
+                    }
+                }
+                "load" => {
+                    // 负载低 → 增加间隔（节省资源）
+                    // 负载高 → 减少间隔（更频繁观测）
+                    match rec.action {
+                        RecommendationAction::Enhance => {
+                            // 需要提高负载处理能力 → 减少间隔
+                            config.snapshot_interval = (config.snapshot_interval * 9 / 10).max(10);
+                        }
+                        RecommendationAction::Reduce => {
+                            // 需要降低负载 → 增加间隔
+                            config.snapshot_interval =
+                                (config.snapshot_interval * 11 / 10).min(300);
+                        }
+                        RecommendationAction::Maintain => {}
+                    }
+                }
+                "context" => {
+                    // 上下文高 → 增加历史（保留更多上下文）
+                    // 上下文低 → 减少历史（减少内存）
+                    match rec.action {
+                        RecommendationAction::Enhance => {
+                            // 需要更多上下文 → 增加历史
+                            config.history_size = (config.history_size * 11 / 10).min(500);
+                        }
+                        RecommendationAction::Reduce => {
+                            // 需要减少上下文 → 减少历史
+                            config.history_size = (config.history_size * 9 / 10).max(20);
+                        }
+                        RecommendationAction::Maintain => {}
+                    }
+                }
+                _ => {
+                    // 其他维度（yin, yang, confidence）暂不映射到配置
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 自动优化配置
+    ///
+    /// 执行完整的自适应优化循环：
+    /// 1. 获取当前状态向量
+    /// 2. 添加到自适应系统观测
+    /// 3. 生成调整建议
+    /// 4. 应用建议到配置
+    ///
+    /// ## 返回
+    ///
+    /// 返回应用的建议列表
+    ///
+    /// ## 示例
+    ///
+    /// ```rust,no_run
+    /// use realconsole::liangyyi::{StateTracker, StateTrackerConfig};
+    /// use realconsole::liangyyi::adaptive::TargetState;
+    ///
+    /// # tokio_test::block_on(async {
+    /// let mut tracker = StateTracker::new(StateTrackerConfig::default());
+    /// tracker.enable_adaptive(TargetState::balanced());
+    ///
+    /// // 定期调用自动优化
+    /// let recommendations = tracker.auto_optimize().await.unwrap();
+    /// for rec in recommendations {
+    ///     println!("应用建议: {} - {}", rec.dimension, rec.reason);
+    /// }
+    /// # });
+    /// ```
+    pub async fn auto_optimize(&self) -> anyhow::Result<Vec<Recommendation>> {
+        let adaptive = self
+            .adaptive_system
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("自适应系统未启用，请先调用 enable_adaptive()"))?;
+
+        // 1. 获取当前状态向量
+        let state_vector = self.to_state_vector().await;
+
+        // 2. 添加观测
+        {
+            let mut adaptive = adaptive.write().await;
+            adaptive.add_observation(state_vector);
+        }
+
+        // 3. 生成建议
+        let recommendations = {
+            let adaptive = adaptive.read().await;
+            adaptive.generate_recommendations()
+        };
+
+        // 4. 应用建议
+        self.apply_recommendations(&recommendations).await?;
+
+        Ok(recommendations)
+    }
+
+    /// 获取自适应系统的建议（不应用）
+    ///
+    /// 生成建议但不修改配置，用于预览或分析
+    pub async fn get_recommendations(&self) -> anyhow::Result<Vec<Recommendation>> {
+        let adaptive = self
+            .adaptive_system
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("自适应系统未启用"))?;
+
+        let adaptive = adaptive.read().await;
+        Ok(adaptive.generate_recommendations())
+    }
+
+    /// 获取当前配置（只读）
+    pub async fn get_config(&self) -> StateTrackerConfig {
+        self.config.read().await.clone()
+    }
 }
 
 #[cfg(test)]
@@ -1041,6 +1253,191 @@ mod tests {
             assert!(meta.contains("confidence:"));
         } else {
             panic!("Expected Checkpoint content");
+        }
+    }
+
+    // ========== ✨ v1.14.0: 自适应系统测试 ==========
+
+    #[tokio::test]
+    async fn test_enable_adaptive() {
+        let mut tracker = StateTracker::with_default();
+        assert!(!tracker.is_adaptive_enabled());
+
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+        assert!(tracker.is_adaptive_enabled());
+    }
+
+    #[tokio::test]
+    async fn test_apply_recommendations_efficiency() {
+        let tracker = StateTracker::with_default();
+        let initial_decay = tracker.get_config().await.energy_decay_rate;
+
+        // 创建提高效率的建议
+        let recommendations = vec![crate::liangyyi::adaptive::Recommendation {
+            dimension: "efficiency".to_string(),
+            action: crate::liangyyi::adaptive::RecommendationAction::Enhance,
+            current_value: 0.3,
+            target_range: (0.6, 0.8),
+            priority: 0.3,
+            reason: "Test".to_string(),
+        }];
+
+        tracker.apply_recommendations(&recommendations).await.unwrap();
+
+        let new_decay = tracker.get_config().await.energy_decay_rate;
+        // 提高效率 → 减少衰减
+        assert!(new_decay < initial_decay);
+    }
+
+    #[tokio::test]
+    async fn test_apply_recommendations_activity() {
+        let tracker = StateTracker::with_default();
+        let initial_low = tracker.get_config().await.low_activity_threshold;
+
+        // 创建提高活动的建议
+        let recommendations = vec![crate::liangyyi::adaptive::Recommendation {
+            dimension: "activity".to_string(),
+            action: crate::liangyyi::adaptive::RecommendationAction::Enhance,
+            current_value: 0.2,
+            target_range: (0.5, 0.7),
+            priority: 0.3,
+            reason: "Test".to_string(),
+        }];
+
+        tracker.apply_recommendations(&recommendations).await.unwrap();
+
+        let new_low = tracker.get_config().await.low_activity_threshold;
+        // 提高活动 → 降低阈值
+        assert!(new_low < initial_low);
+    }
+
+    #[tokio::test]
+    async fn test_apply_recommendations_load() {
+        let tracker = StateTracker::with_default();
+        let initial_interval = tracker.get_config().await.snapshot_interval;
+
+        // 创建提高负载处理的建议
+        let recommendations = vec![crate::liangyyi::adaptive::Recommendation {
+            dimension: "load".to_string(),
+            action: crate::liangyyi::adaptive::RecommendationAction::Enhance,
+            current_value: 0.8,
+            target_range: (0.3, 0.5),
+            priority: 0.3,
+            reason: "Test".to_string(),
+        }];
+
+        tracker.apply_recommendations(&recommendations).await.unwrap();
+
+        let new_interval = tracker.get_config().await.snapshot_interval;
+        // 提高负载处理 → 减少间隔
+        assert!(new_interval < initial_interval);
+    }
+
+    #[tokio::test]
+    async fn test_apply_recommendations_context() {
+        let tracker = StateTracker::with_default();
+        let initial_history = tracker.get_config().await.history_size;
+
+        // 创建增加上下文的建议
+        let recommendations = vec![crate::liangyyi::adaptive::Recommendation {
+            dimension: "context".to_string(),
+            action: crate::liangyyi::adaptive::RecommendationAction::Enhance,
+            current_value: 0.3,
+            target_range: (0.5, 0.7),
+            priority: 0.2,
+            reason: "Test".to_string(),
+        }];
+
+        tracker.apply_recommendations(&recommendations).await.unwrap();
+
+        let new_history = tracker.get_config().await.history_size;
+        // 增加上下文 → 增加历史
+        assert!(new_history > initial_history);
+    }
+
+    #[tokio::test]
+    async fn test_auto_optimize_without_adaptive() {
+        let tracker = StateTracker::with_default();
+
+        // 未启用自适应系统时应该返回错误
+        let result = tracker.auto_optimize().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("未启用"));
+    }
+
+    #[tokio::test]
+    async fn test_auto_optimize_with_adaptive() {
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 添加多种不同的状态历史（创造偏离目标的情况）
+        for _ in 0..10 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+        // 添加一些 SystemIdle 事件来降低活动度
+        for _ in 0..5 {
+            tracker.update_from_event(Event::SystemIdle).await;
+        }
+
+        // 多次调用 auto_optimize 来累积观测（至少2次才能预测）
+        let result1 = tracker.auto_optimize().await;
+        assert!(result1.is_ok(), "第一次调用应该成功");
+
+        // 再次更新状态
+        for _ in 0..3 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 第二次调用应该能生成建议了
+        let recommendations = tracker.auto_optimize().await.unwrap();
+
+        // 验证生成了建议（所有7个标准维度都会生成）
+        assert_eq!(recommendations.len(), 7, "应该为所有7个标准维度生成建议");
+
+        // 验证建议包含优先级信息
+        for rec in &recommendations {
+            assert!(rec.priority >= 0.0 && rec.priority <= 1.0);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_recommendations() {
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 添加多种观测（创造偏离目标的情况）
+        for _ in 0..10 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+        for _ in 0..5 {
+            tracker.update_from_event(Event::SystemIdle).await;
+        }
+
+        // 需要多次添加观测才能预测（累积足够观测）
+        let _result1 = tracker.auto_optimize().await;
+        for _ in 0..3 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 再次调用 auto_optimize 以应用调整，然后获取基准配置
+        let _ = tracker.auto_optimize().await;
+
+        // 现在获取基准配置
+        let initial_config = tracker.get_config().await;
+
+        // 获取建议（不应用）- 这个方法不会修改配置
+        let recommendations = tracker.get_recommendations().await.unwrap();
+
+        // 配置不应改变（get_recommendations 不修改配置）
+        let final_config = tracker.get_config().await;
+        assert_eq!(initial_config.energy_decay_rate, final_config.energy_decay_rate);
+
+        // 应该有建议（所有7个标准维度）
+        assert_eq!(recommendations.len(), 7, "应该为所有7个标准维度生成建议");
+
+        // 验证建议包含优先级信息
+        for rec in &recommendations {
+            assert!(rec.priority >= 0.0 && rec.priority <= 1.0);
         }
     }
 }
