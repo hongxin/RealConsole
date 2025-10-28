@@ -1957,4 +1957,273 @@ mod tests {
         assert!(enhanced_vector.get("activity").is_some());
         assert!(enhanced_vector.get("load").is_some());
     }
+
+    // ========== ✨ v1.15.0 Phase 2: 优化历史测试 ==========
+
+    #[tokio::test]
+    async fn test_optimization_history_recording() {
+        // 测试优化历史记录功能
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 初始应该没有历史记录
+        let initial_history = tracker.get_optimization_history().await;
+        assert_eq!(initial_history.len(), 0, "初始历史应该为空");
+
+        // 添加事件并执行优化
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 第一次优化
+        let _ = tracker.auto_optimize().await;
+
+        // 应该有1条记录
+        let history1 = tracker.get_optimization_history().await;
+        assert_eq!(history1.len(), 1, "应该有1条优化记录");
+
+        // 添加更多事件
+        for _ in 0..3 {
+            tracker.update_from_event(Event::UserWrite).await;
+        }
+
+        // 第二次优化
+        let _ = tracker.auto_optimize().await;
+
+        // 应该有2条记录
+        let history2 = tracker.get_optimization_history().await;
+        assert_eq!(history2.len(), 2, "应该有2条优化记录");
+
+        // 验证记录时间顺序
+        assert!(history2[1].timestamp > history2[0].timestamp, "第二条记录应该晚于第一条");
+    }
+
+    #[tokio::test]
+    async fn test_optimization_history_lru() {
+        // 测试LRU淘汰机制（容量限制100条）
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 模拟大量优化（超过100次）
+        for i in 0..105 {
+            // 添加事件
+            tracker.update_from_event(Event::UserExecute).await;
+
+            // 第一次需要累积观测
+            if i == 0 {
+                let _ = tracker.auto_optimize().await;
+                tracker.update_from_event(Event::UserExecute).await;
+            }
+
+            // 执行优化
+            let _ = tracker.auto_optimize().await;
+        }
+
+        // 应该只保留最近100条
+        let history = tracker.get_optimization_history().await;
+        assert_eq!(history.len(), 100, "应该只保留最近100条记录");
+    }
+
+    #[tokio::test]
+    async fn test_get_last_optimization() {
+        // 测试获取最近一次优化
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 初始没有优化记录
+        let initial_last = tracker.get_last_optimization().await;
+        assert!(initial_last.is_none(), "初始应该没有优化记录");
+
+        // 执行一次优化
+        for _ in 0..3 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+        let _ = tracker.auto_optimize().await;
+
+        // 获取最近优化
+        let last1 = tracker.get_last_optimization().await;
+        assert!(last1.is_some(), "应该有最近优化记录");
+        let last1 = last1.unwrap();
+
+        // 再次优化
+        for _ in 0..2 {
+            tracker.update_from_event(Event::UserWrite).await;
+        }
+        let _ = tracker.auto_optimize().await;
+
+        // 最近记录应该更新
+        let last2 = tracker.get_last_optimization().await.unwrap();
+        assert!(last2.timestamp > last1.timestamp, "最近记录应该是最新的");
+    }
+
+    #[tokio::test]
+    async fn test_optimization_stats_calculation() {
+        // 测试统计信息计算
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 初始统计应该为空
+        let initial_stats = tracker.get_optimization_stats().await;
+        assert_eq!(initial_stats.total_optimizations, 0);
+
+        // 执行多次优化
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 第一次累积观测
+        let _ = tracker.auto_optimize().await;
+
+        // 执行更多优化
+        for _ in 0..3 {
+            for _ in 0..2 {
+                tracker.update_from_event(Event::UserWrite).await;
+            }
+            let _ = tracker.auto_optimize().await;
+        }
+
+        // 获取统计
+        let stats = tracker.get_optimization_stats().await;
+
+        // 验证统计数据
+        assert!(stats.total_optimizations >= 4, "应该有至少4次优化");
+        assert!(stats.successful_optimizations > 0, "应该有成功的优化");
+        assert_eq!(
+            stats.total_optimizations,
+            stats.successful_optimizations + stats.failed_optimizations,
+            "总数 = 成功 + 失败"
+        );
+        // avg_duration_ms 是 u64，总是 >= 0，所以不需要断言
+        assert!(stats.avg_recommendations_per_run > 0, "平均建议数应该 > 0");
+    }
+
+    #[tokio::test]
+    async fn test_optimization_record_content() {
+        // 测试优化记录的内容完整性
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 添加事件
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 第一次优化（累积观测）
+        let _ = tracker.auto_optimize().await;
+
+        // 添加更多事件
+        for _ in 0..3 {
+            tracker.update_from_event(Event::UserWrite).await;
+        }
+
+        // 第二次优化（现在有足够数据生成建议）
+        let _ = tracker.auto_optimize().await;
+
+        // 获取记录
+        let last = tracker.get_last_optimization().await.unwrap();
+
+        // 验证记录内容
+        assert!(last.recommendations_count > 0, "应该有建议");
+        // duration_ms 是 u64，总是 >= 0，所以只需要验证它存在即可
+        assert!(last.applied_successfully, "应该成功应用");
+
+        // 验证状态向量快照
+        assert!(last.state_before.get("efficiency").is_some());
+        assert!(last.state_before.get("activity").is_some());
+        assert!(last.state_before.get("load").is_some());
+
+        // 验证建议摘要
+        assert!(
+            last.top_recommendations.len() <= 3,
+            "最多保留3条建议摘要"
+        );
+        if last.recommendations_count > 0 {
+            assert!(!last.top_recommendations.is_empty(), "应该有建议摘要");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_optimization_history_concurrency() {
+        // 测试并发访问优化历史
+        use tokio::task::JoinSet;
+
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+        let tracker = Arc::new(tracker);
+
+        // 添加初始事件
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 第一次优化以累积观测
+        let _ = tracker.auto_optimize().await;
+
+        // 并发执行多次优化和查询
+        let mut tasks = JoinSet::new();
+
+        for _ in 0..5 {
+            let tracker_clone = Arc::clone(&tracker);
+            tasks.spawn(async move {
+                // 添加事件
+                tracker_clone.update_from_event(Event::UserWrite).await;
+                // 执行优化
+                let _ = tracker_clone.auto_optimize().await;
+            });
+        }
+
+        for _ in 0..5 {
+            let tracker_clone = Arc::clone(&tracker);
+            tasks.spawn(async move {
+                // 并发查询
+                let _ = tracker_clone.get_optimization_history().await;
+                let _ = tracker_clone.get_last_optimization().await;
+                let _ = tracker_clone.get_optimization_stats().await;
+            });
+        }
+
+        // 等待所有任务完成
+        while let Some(_) = tasks.join_next().await {}
+
+        // 验证历史记录数量合理
+        let history = tracker.get_optimization_history().await;
+        assert!(history.len() >= 5, "应该至少有5条记录");
+        assert!(history.len() <= 100, "不应超过100条记录");
+    }
+
+    #[tokio::test]
+    async fn test_optimization_high_priority_tracking() {
+        // 测试高优先级建议追踪
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 创建明显偏离目标的状态（会生成高优先级建议）
+        for _ in 0..20 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 第一次优化
+        let _ = tracker.auto_optimize().await;
+
+        // 继续偏离
+        for _ in 0..15 {
+            tracker.update_from_event(Event::SystemIdle).await;
+        }
+
+        // 第二次优化
+        let _ = tracker.auto_optimize().await;
+
+        // 获取统计
+        let stats = tracker.get_optimization_stats().await;
+
+        // 应该有一些高优先级建议
+        assert!(
+            stats.total_high_priority_recommendations > 0,
+            "偏离目标应该产生高优先级建议"
+        );
+
+        // 获取最近记录
+        let last = tracker.get_last_optimization().await.unwrap();
+        assert_eq!(last.recommendations_count, 7, "应该为7个标准维度生成建议");
+    }
 }
