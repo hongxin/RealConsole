@@ -987,16 +987,18 @@ impl Agent {
                                 use crate::likan::NotificationMode;
                                 match notification_mode {
                                     NotificationMode::Minimal => {
-                                        // 最小模式：输出简洁一行通知
-                                        eprintln!(
-                                            "🌊🔥 炼化完成: {} 模式{}",
-                                            report.patterns_found,
-                                            if report.high_confidence_patterns > 0 {
-                                                format!(" ({} ⭐)", report.high_confidence_patterns)
-                                            } else {
-                                                String::new()
-                                            }
-                                        );
+                                        // 最小模式：只在有炼化结果时输出
+                                        if report.patterns_found > 0 {
+                                            eprintln!(
+                                                "🌊🔥 炼化完成: {} 模式{}",
+                                                report.patterns_found,
+                                                if report.high_confidence_patterns > 0 {
+                                                    format!(" ({} ⭐)", report.high_confidence_patterns)
+                                                } else {
+                                                    String::new()
+                                                }
+                                            );
+                                        }
                                     }
                                     NotificationMode::Prompt => {
                                         // 提示符模式：更新状态栏（未来实现）

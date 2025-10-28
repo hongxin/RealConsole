@@ -17,6 +17,9 @@ use uuid::Uuid;
 // ✨ v1.14.0: 自适应系统集成
 use super::adaptive::{AdaptiveSystem, Recommendation, RecommendationAction};
 
+// ✨ v1.15.0: Tracer 观测系统集成
+use crate::tracer::{Dimension as TracerDimension, EntryType as TracerEntryType, Status, TraceEntry, UnifiedTracer};
+
 /// 状态追踪器
 pub struct StateTracker {
     /// 当前太极状态
@@ -35,6 +38,43 @@ pub struct StateTracker {
     ///
     /// 启用后，系统可以根据状态预测自动调整配置参数
     adaptive_system: Option<Arc<RwLock<AdaptiveSystem>>>,
+
+    /// ✨ v1.15.0: 统一追踪器（可选）
+    ///
+    /// 集成后，可以从四维观测数据增强状态向量
+    tracer: Option<Arc<UnifiedTracer>>,
+
+    /// ✨ v1.15.0 Phase 2: 优化历史记录（自适应系统行为追踪）
+    ///
+    /// 记录每次 auto_optimize 的执行情况，用于调试和分析
+    optimization_history: Arc<RwLock<VecDeque<OptimizationRecord>>>,
+}
+
+/// 优化记录
+///
+/// 记录一次自动优化的完整过程
+#[derive(Debug, Clone)]
+pub struct OptimizationRecord {
+    /// 优化时间
+    pub timestamp: DateTime<Utc>,
+
+    /// 触发时的状态向量快照
+    pub state_before: super::state_vector::StateVector,
+
+    /// 生成的建议数量
+    pub recommendations_count: usize,
+
+    /// 高优先级建议数量（priority > 0.7）
+    pub high_priority_count: usize,
+
+    /// 前3条建议摘要
+    pub top_recommendations: Vec<String>,
+
+    /// 是否成功应用
+    pub applied_successfully: bool,
+
+    /// 耗时（毫秒）
+    pub duration_ms: u64,
 }
 
 /// 状态快照
@@ -270,6 +310,8 @@ impl StateTracker {
             state_history: Arc::new(RwLock::new(VecDeque::with_capacity(history_size))),
             config: Arc::new(RwLock::new(config)),
             adaptive_system: None,
+            tracer: None,  // ✨ v1.15.0: 初始化为None
+            optimization_history: Arc::new(RwLock::new(VecDeque::with_capacity(100))),  // ✨ v1.15.0 Phase 2
         }
     }
 
@@ -735,6 +777,154 @@ impl StateTracker {
         self.adaptive_system.is_some()
     }
 
+    // ========== ✨ v1.15.0: Tracer 集成 ==========
+
+    /// 设置统一追踪器
+    ///
+    /// 集成后，`to_state_vector_enhanced()` 可以从 Tracer 获取增强数据
+    ///
+    /// ## 示例
+    ///
+    /// ```rust,ignore
+    /// let tracer = UnifiedTracer::new(...);
+    /// tracker.set_tracer(Arc::new(tracer));
+    ///
+    /// // 使用增强的状态向量
+    /// let enhanced_vector = tracker.to_state_vector_enhanced().await;
+    /// ```
+    pub fn set_tracer(&mut self, tracer: Arc<UnifiedTracer>) {
+        self.tracer = Some(tracer);
+    }
+
+    /// 检查是否启用了 Tracer
+    pub fn is_tracer_enabled(&self) -> bool {
+        self.tracer.is_some()
+    }
+
+    /// 生成增强的状态向量（从 Tracer 获取额外数据）
+    ///
+    /// 如果未启用 Tracer，则等同于 `to_state_vector()`
+    ///
+    /// ## 映射规则
+    ///
+    /// - **Statistics** 维度 → `efficiency`:
+    ///   - 成功率：Success 条目比例
+    ///   - 执行效率：近期操作频率
+    ///
+    /// - **Coordination** 维度 → `activity`:
+    ///   - 任务执行频率
+    ///   - 工具调用活跃度
+    ///
+    /// - **BlackBox** 维度 → `load`:
+    ///   - LLM 调用频率
+    ///   - Token 消耗水平
+    ///
+    /// - **Memory** 维度 → `context`:
+    ///   - 上下文切换频率
+    ///   - 记忆使用强度
+    ///
+    /// ## 示例
+    ///
+    /// ```rust,ignore
+    /// let enhanced_vector = tracker.to_state_vector_enhanced().await;
+    /// assert!(enhanced_vector.get("efficiency").unwrap() > 0.5);
+    /// ```
+    pub async fn to_state_vector_enhanced(&self) -> super::state_vector::StateVector {
+        // 首先获取基础状态向量
+        let mut vector = self.to_state_vector().await;
+
+        // 如果没有启用 Tracer，直接返回基础向量
+        let tracer = match &self.tracer {
+            Some(t) => t,
+            None => return vector,
+        };
+
+        // 从 Tracer 的四个维度获取增强数据（最近 20 条）
+        let stats_entries = tracer
+            .query_by_dimension(TracerDimension::Statistics, 20)
+            .await
+            .unwrap_or_default();
+
+        let coord_entries = tracer
+            .query_by_dimension(TracerDimension::Coordination, 20)
+            .await
+            .unwrap_or_default();
+
+        let blackbox_entries = tracer
+            .query_by_dimension(TracerDimension::BlackBox, 20)
+            .await
+            .unwrap_or_default();
+
+        let memory_entries = tracer
+            .query_by_dimension(TracerDimension::Memory, 20)
+            .await
+            .unwrap_or_default();
+
+        // 增强 efficiency（基于 Statistics 维度）
+        if !stats_entries.is_empty() {
+            let success_count = stats_entries
+                .iter()
+                .filter(|e| e.status.is_success())
+                .count() as f64;
+            let total = stats_entries.len() as f64;
+            let success_rate = success_count / total;
+
+            // 融合：基础 efficiency * 0.6 + success_rate * 0.4
+            let base_efficiency = vector.get("efficiency").unwrap_or(0.5);
+            let enhanced_efficiency = base_efficiency * 0.6 + success_rate * 0.4;
+            vector.set("efficiency", enhanced_efficiency);
+        }
+
+        // 增强 activity（基于 Coordination 维度）
+        if !coord_entries.is_empty() {
+            // 计算任务执行密度（条目数 / 时间跨度）
+            if coord_entries.len() > 1 {
+                let first = coord_entries.last().unwrap();
+                let last = coord_entries.first().unwrap();
+                let duration_secs = (last.timestamp - first.timestamp).num_seconds() as f64;
+
+                if duration_secs > 0.0 {
+                    // 活跃度 = 条目数 / 时间（秒），归一化到 0-1
+                    let activity_rate = (coord_entries.len() as f64 / duration_secs).min(1.0);
+
+                    // 融合：基础 activity * 0.5 + activity_rate * 0.5
+                    let base_activity = vector.get("activity").unwrap_or(0.5);
+                    let enhanced_activity = base_activity * 0.5 + activity_rate * 0.5;
+                    vector.set("activity", enhanced_activity.clamp(0.0, 1.0));
+                }
+            }
+        }
+
+        // 增强 load（基于 BlackBox 维度）
+        if !blackbox_entries.is_empty() {
+            // LLM 调用频率越高，load 越大
+            let llm_call_density = (blackbox_entries.len() as f64 / 20.0).min(1.0);
+
+            // 融合：基础 load * 0.6 + llm_call_density * 0.4
+            let base_load = vector.get("load").unwrap_or(0.5);
+            let enhanced_load = base_load * 0.6 + llm_call_density * 0.4;
+            vector.set("load", enhanced_load);
+        }
+
+        // 增强 context（基于 Memory 维度）
+        if !memory_entries.is_empty() {
+            // 上下文切换越多，context 强度越高
+            let context_switches = memory_entries
+                .iter()
+                .filter(|e| matches!(e.entry_type, crate::tracer::EntryType::ContextSwitch))
+                .count() as f64;
+
+            let context_intensity = (context_switches / memory_entries.len() as f64).min(1.0);
+
+            // 融合：基础 context * 0.5 + context_intensity * 0.5
+            let base_context = vector.get("context").unwrap_or(0.5);
+            let enhanced_context = base_context * 0.5 + context_intensity * 0.5;
+            vector.set("context", enhanced_context);
+        }
+
+        vector
+    }
+
     /// 应用建议到配置
     ///
     /// 根据建议调整 StateTrackerConfig 的参数
@@ -861,18 +1051,22 @@ impl StateTracker {
     /// # });
     /// ```
     pub async fn auto_optimize(&self) -> anyhow::Result<Vec<Recommendation>> {
+        // ✨ v1.15.0 Phase 2: 记录优化开始时间
+        let start_time = std::time::Instant::now();
+        let timestamp = Utc::now();
+
         let adaptive = self
             .adaptive_system
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("自适应系统未启用，请先调用 enable_adaptive()"))?;
 
-        // 1. 获取当前状态向量
+        // 1. 获取当前状态向量（记录优化前状态）
         let state_vector = self.to_state_vector().await;
 
         // 2. 添加观测
         {
             let mut adaptive = adaptive.write().await;
-            adaptive.add_observation(state_vector);
+            adaptive.add_observation(state_vector.clone());
         }
 
         // 3. 生成建议
@@ -882,8 +1076,43 @@ impl StateTracker {
         };
 
         // 4. 应用建议
-        self.apply_recommendations(&recommendations).await?;
+        let apply_result = self.apply_recommendations(&recommendations).await;
+        let applied_successfully = apply_result.is_ok();
 
+        // ✨ v1.15.0 Phase 2: 记录优化历史
+        let duration = start_time.elapsed();
+        let high_priority_count = recommendations
+            .iter()
+            .filter(|r| r.priority > 0.7)
+            .count();
+
+        let top_recommendations: Vec<String> = recommendations
+            .iter()
+            .take(3)
+            .map(|r| format!("{}: {} (优先级: {:.2})", r.dimension, r.reason, r.priority))
+            .collect();
+
+        let record = OptimizationRecord {
+            timestamp,
+            state_before: state_vector,
+            recommendations_count: recommendations.len(),
+            high_priority_count,
+            top_recommendations,
+            applied_successfully,
+            duration_ms: duration.as_millis() as u64,
+        };
+
+        // 添加到历史记录（保留最近 100 条）
+        {
+            let mut history = self.optimization_history.write().await;
+            if history.len() >= 100 {
+                history.pop_front();
+            }
+            history.push_back(record);
+        }
+
+        // 返回结果
+        apply_result?;
         Ok(recommendations)
     }
 
@@ -904,6 +1133,83 @@ impl StateTracker {
     pub async fn get_config(&self) -> StateTrackerConfig {
         self.config.read().await.clone()
     }
+
+    // ========== ✨ v1.15.0 Phase 2: 优化历史查询 ==========
+
+    /// 获取优化历史记录
+    ///
+    /// 返回最近的优化记录（最多 100 条）
+    ///
+    /// ## 示例
+    ///
+    /// ```rust,ignore
+    /// let history = tracker.get_optimization_history().await;
+    /// for record in history.iter().rev().take(5) {
+    ///     println!("{}: {} 条建议 ({} 高优先级)",
+    ///         record.timestamp.format("%H:%M:%S"),
+    ///         record.recommendations_count,
+    ///         record.high_priority_count
+    ///     );
+    /// }
+    /// ```
+    pub async fn get_optimization_history(&self) -> Vec<OptimizationRecord> {
+        let history = self.optimization_history.read().await;
+        history.iter().cloned().collect()
+    }
+
+    /// 获取最近一次优化记录
+    pub async fn get_last_optimization(&self) -> Option<OptimizationRecord> {
+        let history = self.optimization_history.read().await;
+        history.back().cloned()
+    }
+
+    /// 获取优化统计信息
+    ///
+    /// 返回优化历史的统计摘要
+    pub async fn get_optimization_stats(&self) -> OptimizationStats {
+        let history = self.optimization_history.read().await;
+
+        if history.is_empty() {
+            return OptimizationStats::default();
+        }
+
+        let total_count = history.len();
+        let successful_count = history.iter().filter(|r| r.applied_successfully).count();
+        let avg_duration_ms = history.iter().map(|r| r.duration_ms).sum::<u64>() / total_count as u64;
+        let avg_recommendations = history.iter().map(|r| r.recommendations_count).sum::<usize>() / total_count;
+        let total_high_priority = history.iter().map(|r| r.high_priority_count).sum::<usize>();
+
+        OptimizationStats {
+            total_optimizations: total_count,
+            successful_optimizations: successful_count,
+            failed_optimizations: total_count - successful_count,
+            avg_duration_ms,
+            avg_recommendations_per_run: avg_recommendations,
+            total_high_priority_recommendations: total_high_priority,
+        }
+    }
+}
+
+/// 优化统计信息
+#[derive(Debug, Clone, Default)]
+pub struct OptimizationStats {
+    /// 总优化次数
+    pub total_optimizations: usize,
+
+    /// 成功次数
+    pub successful_optimizations: usize,
+
+    /// 失败次数
+    pub failed_optimizations: usize,
+
+    /// 平均耗时（毫秒）
+    pub avg_duration_ms: u64,
+
+    /// 平均每次建议数量
+    pub avg_recommendations_per_run: usize,
+
+    /// 高优先级建议总数
+    pub total_high_priority_recommendations: usize,
 }
 
 #[cfg(test)]
@@ -1439,5 +1745,216 @@ mod tests {
         for rec in &recommendations {
             assert!(rec.priority >= 0.0 && rec.priority <= 1.0);
         }
+    }
+
+    // ========== ✨ v1.15.0: Tracer 集成测试 ==========
+
+    #[tokio::test]
+    async fn test_is_tracer_enabled_default() {
+        // 默认未启用 tracer
+        let tracker = StateTracker::with_default();
+        assert!(!tracker.is_tracer_enabled());
+    }
+
+    #[tokio::test]
+    async fn test_to_state_vector_enhanced_without_tracer() {
+        // 没有 tracer 时，enhanced vector 应该等同于 basic vector
+        let tracker = StateTracker::with_default();
+
+        let basic_vector = tracker.to_state_vector().await;
+        let enhanced_vector = tracker.to_state_vector_enhanced().await;
+
+        // 比较关键维度
+        assert_eq!(
+            basic_vector.get("efficiency"),
+            enhanced_vector.get("efficiency")
+        );
+        assert_eq!(basic_vector.get("activity"), enhanced_vector.get("activity"));
+        assert_eq!(basic_vector.get("load"), enhanced_vector.get("load"));
+        assert_eq!(basic_vector.get("context"), enhanced_vector.get("context"));
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_dimensions_valid_range() {
+        // 即使没有 tracer，增强向量的所有维度也应该在 [0, 1] 范围内
+        let mut tracker = StateTracker::with_default();
+
+        // 添加一些事件
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+        for _ in 0..3 {
+            tracker.update_from_event(Event::UserRead).await;
+        }
+
+        let enhanced_vector = tracker.to_state_vector_enhanced().await;
+
+        // 验证所有维度都在有效范围内
+        for dim in &["efficiency", "activity", "load", "context", "yin", "yang", "confidence"] {
+            if let Some(value) = enhanced_vector.get(dim) {
+                assert!(
+                    value >= 0.0 && value <= 1.0,
+                    "维度 {} 的值 {} 超出范围 [0, 1]",
+                    dim,
+                    value
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_with_activity() {
+        // 测试活跃状态下的增强向量
+        let mut tracker = StateTracker::with_default();
+
+        // 模拟高活动
+        for _ in 0..20 {
+            tracker.update_from_event(Event::UserExecute).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        }
+
+        let enhanced_vector = tracker.to_state_vector_enhanced().await;
+
+        // 验证 activity 维度应该较高
+        let activity = enhanced_vector.get("activity").unwrap();
+        assert!(
+            activity > 0.3,
+            "高活动情况下，activity 应该 > 0.3，实际: {}",
+            activity
+        );
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_with_idle() {
+        // 测试空闲状态下的增强向量
+        let mut tracker = StateTracker::with_default();
+
+        // 模拟低活动
+        for _ in 0..10 {
+            tracker.update_from_event(Event::SystemIdle).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+
+        let enhanced_vector = tracker.to_state_vector_enhanced().await;
+
+        // 验证向量仍然有效
+        let efficiency = enhanced_vector.get("efficiency").unwrap();
+        assert!(
+            efficiency >= 0.0 && efficiency <= 1.0,
+            "efficiency 应该在有效范围内，实际: {}",
+            efficiency
+        );
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_consistency() {
+        // 测试增强向量在相同状态下的一致性
+        let mut tracker = StateTracker::with_default();
+
+        // 添加固定的事件序列
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        let vector1 = tracker.to_state_vector_enhanced().await;
+        let vector2 = tracker.to_state_vector_enhanced().await;
+
+        // 在没有新事件的情况下，两次调用应该返回相同的值
+        assert_eq!(vector1.get("efficiency"), vector2.get("efficiency"));
+        assert_eq!(vector1.get("activity"), vector2.get("activity"));
+        assert_eq!(vector1.get("load"), vector2.get("load"));
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_evolution() {
+        // 测试增强向量随事件演化
+        let mut tracker = StateTracker::with_default();
+
+        let vector_initial = tracker.to_state_vector_enhanced().await;
+
+        // 添加事件
+        for _ in 0..10 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        let vector_after = tracker.to_state_vector_enhanced().await;
+
+        // activity 应该增加（因为有了 UserExecute 事件）
+        let activity_initial = vector_initial.get("activity").unwrap();
+        let activity_after = vector_after.get("activity").unwrap();
+
+        assert!(
+            activity_after >= activity_initial,
+            "活动后 activity 应该增加或保持: 初始 {}, 之后 {}",
+            activity_initial,
+            activity_after
+        );
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_all_dimensions_present() {
+        // 测试增强向量包含所有预期维度
+        let tracker = StateTracker::with_default();
+        let enhanced_vector = tracker.to_state_vector_enhanced().await;
+
+        // 验证所有标准维度都存在
+        let required_dims = ["yin", "yang", "context", "activity", "load", "efficiency", "confidence"];
+
+        for dim in &required_dims {
+            assert!(
+                enhanced_vector.get(dim).is_some(),
+                "增强向量缺少维度: {}",
+                dim
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_with_mixed_events() {
+        // 测试混合事件类型的增强向量
+        let mut tracker = StateTracker::with_default();
+
+        // 混合不同类型的事件
+        tracker.update_from_event(Event::UserRead).await;
+        tracker.update_from_event(Event::UserWrite).await;
+        tracker.update_from_event(Event::UserExecute).await;
+        tracker.update_from_event(Event::UserThink).await;
+        tracker.update_from_event(Event::SystemIdle).await;
+
+        let enhanced_vector = tracker.to_state_vector_enhanced().await;
+
+        // 验证所有维度都在有效范围内
+        for dim in &["efficiency", "activity", "load", "context"] {
+            let value = enhanced_vector.get(dim).unwrap();
+            assert!(
+                value >= 0.0 && value <= 1.0,
+                "维度 {} 在混合事件后超出范围: {}",
+                dim,
+                value
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_vector_integration_with_adaptive() {
+        // 测试增强向量与自适应系统的集成
+        let mut tracker = StateTracker::with_default();
+        tracker.enable_adaptive(crate::liangyyi::adaptive::TargetState::balanced());
+
+        // 添加事件
+        for _ in 0..5 {
+            tracker.update_from_event(Event::UserExecute).await;
+        }
+
+        // 自动优化（使用基础向量）
+        let _ = tracker.auto_optimize().await;
+
+        // 获取增强向量（应该与基础向量类似，因为没有 tracer）
+        let enhanced_vector = tracker.to_state_vector_enhanced().await;
+
+        // 验证增强向量有效
+        assert!(enhanced_vector.get("efficiency").is_some());
+        assert!(enhanced_vector.get("activity").is_some());
+        assert!(enhanced_vector.get("load").is_some());
     }
 }
