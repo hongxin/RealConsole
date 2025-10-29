@@ -137,6 +137,9 @@ impl ShellService {
             output: format!("执行任务失败: {}", e),
             error_analysis: None,
             fix_strategies: vec![],
+            risk_assessment: None,
+            next_steps: vec![],
+            suggestions: None,
         })
     }
 }

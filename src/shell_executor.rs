@@ -13,6 +13,8 @@ use crate::error::{ErrorCode, FixSuggestion, RealError};
 use crate::error_fixer::{
     ErrorAnalysis, ErrorAnalyzer, FeedbackLearner, FeedbackRecord, FeedbackType, FixOutcome,
     FixStrategy,
+    // Phase 2 导入
+    NextStep, NextStepPredictor, RiskAssessment, RiskAssessor, Suggestion, SuggestionList,
 };
 use crate::llm::LlmClient;
 use regex::Regex;
@@ -324,6 +326,16 @@ pub struct ExecutionResult {
 
     /// 建议的修复策略（如果有）
     pub fix_strategies: Vec<FixStrategy>,
+
+    // ===== Phase 2 新增字段 =====
+    /// 风险评估（Phase 2）
+    pub risk_assessment: Option<RiskAssessment>,
+
+    /// 下一步预测（Phase 2）
+    pub next_steps: Vec<NextStep>,
+
+    /// 多维度建议列表（Phase 2）
+    pub suggestions: Option<SuggestionList>,
 }
 
 impl ExecutionResult {
@@ -334,6 +346,9 @@ impl ExecutionResult {
             output,
             error_analysis: None,
             fix_strategies: Vec::new(),
+            risk_assessment: None,
+            next_steps: Vec::new(),
+            suggestions: None,
         }
     }
 
@@ -348,7 +363,28 @@ impl ExecutionResult {
             output,
             error_analysis,
             fix_strategies,
+            risk_assessment: None,
+            next_steps: Vec::new(),
+            suggestions: None,
         }
+    }
+
+    /// 设置风险评估（Phase 2）
+    pub fn with_risk_assessment(mut self, assessment: RiskAssessment) -> Self {
+        self.risk_assessment = Some(assessment);
+        self
+    }
+
+    /// 设置下一步预测（Phase 2）
+    pub fn with_next_steps(mut self, steps: Vec<NextStep>) -> Self {
+        self.next_steps = steps;
+        self
+    }
+
+    /// 设置多维度建议（Phase 2）
+    pub fn with_suggestions(mut self, suggestions: SuggestionList) -> Self {
+        self.suggestions = Some(suggestions);
+        self
     }
 }
 
@@ -360,6 +396,9 @@ impl ExecutionResult {
 /// - 生成修复建议（基于规则 + LLM）
 /// - 可选的自动修复应用
 /// - 用户反馈学习（Phase 9.1 Week 3）
+/// - 风险评估（Phase 2 / v1.16.0）
+/// - 下一步预测（Phase 2 / v1.16.0）
+/// - 多维度建议（Phase 2 / v1.16.0）
 pub struct ShellExecutorWithFixer {
     /// 错误分析器
     analyzer: ErrorAnalyzer,
@@ -372,6 +411,16 @@ pub struct ShellExecutorWithFixer {
 
     /// 反馈学习器（Week 3）
     feedback_learner: Arc<FeedbackLearner>,
+
+    // ===== Phase 2 新增组件 =====
+    /// 风险评估器（Phase 2）
+    risk_assessor: RiskAssessor,
+
+    /// 下一步预测器（Phase 2）
+    next_step_predictor: NextStepPredictor,
+
+    /// 是否启用 Phase 2 增强功能
+    enable_phase2_features: bool,
 }
 
 impl ShellExecutorWithFixer {
@@ -382,7 +431,22 @@ impl ShellExecutorWithFixer {
             llm: None,
             enable_llm_analysis: false,
             feedback_learner: Arc::new(FeedbackLearner::new()),
+            risk_assessor: RiskAssessor::new(),
+            next_step_predictor: NextStepPredictor::new(),
+            enable_phase2_features: true, // 默认启用 Phase 2 功能
         }
+    }
+
+    /// 启用 Phase 2 增强功能
+    pub fn enable_phase2(mut self) -> Self {
+        self.enable_phase2_features = true;
+        self
+    }
+
+    /// 禁用 Phase 2 增强功能
+    pub fn disable_phase2(mut self) -> Self {
+        self.enable_phase2_features = false;
+        self
     }
 
     /// 验证修复策略的安全性
@@ -434,9 +498,33 @@ impl ShellExecutorWithFixer {
     /// # Returns
     /// * `ExecutionResult` - 包含输出、错误分析和修复建议
     pub async fn execute_with_analysis(&self, command: &str) -> ExecutionResult {
+        // Phase 2: 执行前风险评估
+        let risk_assessment = if self.enable_phase2_features {
+            Some(self.risk_assessor.assess_command(command))
+        } else {
+            None
+        };
+
         // 执行命令
-        match execute_shell(command).await {
-            Ok(output) => ExecutionResult::success(output),
+        let execution_result = execute_shell(command).await;
+        let success = execution_result.is_ok();
+
+        // Phase 2: 记录命令并预测下一步
+        let next_steps = if self.enable_phase2_features {
+            let mut predictor = self.next_step_predictor.clone();
+            predictor.record_command(command);
+            predictor.predict(command, success)
+        } else {
+            Vec::new()
+        };
+
+        match execution_result {
+            Ok(output) => {
+                // 成功执行
+                ExecutionResult::success(output)
+                    .with_risk_assessment(risk_assessment.unwrap_or_else(|| RiskAssessment::safe()))
+                    .with_next_steps(next_steps)
+            }
             Err(err) => {
                 // 提取错误输出
                 let error_output = err.to_string();
@@ -484,8 +572,91 @@ impl ShellExecutorWithFixer {
                     .rerank_strategies(safe_strategies)
                     .await;
 
+                // Phase 2: 生成多维度建议
+                let suggestions = if self.enable_phase2_features {
+                    Some(self.generate_suggestions_from_strategies(&ranked_strategies, &analysis))
+                } else {
+                    None
+                };
+
                 ExecutionResult::failure(error_output, Some(analysis), ranked_strategies)
+                    .with_risk_assessment(risk_assessment.unwrap_or_else(|| RiskAssessment::safe()))
+                    .with_next_steps(next_steps)
+                    .with_suggestions(suggestions.unwrap_or_else(SuggestionList::new))
             }
+        }
+    }
+
+    /// 从修复策略生成多维度建议（Phase 2）
+    fn generate_suggestions_from_strategies(
+        &self,
+        strategies: &[FixStrategy],
+        analysis: &ErrorAnalysis,
+    ) -> SuggestionList {
+        use crate::error_fixer::SortDimension;
+
+        let mut suggestions = SuggestionList::new();
+
+        for strategy in strategies {
+            // 根据策略生成建议
+            let suggestion = Suggestion::new(&strategy.command, &strategy.description)
+                // 相关性：基于错误分类匹配度
+                .with_relevance(self.calculate_relevance(strategy, analysis))
+                // 可行性：基于策略历史成功率和风险等级
+                .with_feasibility(self.calculate_feasibility(strategy))
+                // 安全性：基于风险等级
+                .with_safety(self.calculate_safety(strategy))
+                // 学习价值：基于策略类型
+                .with_learning_value(self.calculate_learning_value(strategy));
+
+            suggestions.add(suggestion);
+        }
+
+        // 按综合评分排序
+        suggestions.sort_by_dimension(SortDimension::Overall);
+
+        // 标记最佳建议
+        suggestions.mark_best_as_recommended();
+
+        suggestions
+    }
+
+    /// 计算相关性分数
+    fn calculate_relevance(&self, _strategy: &FixStrategy, _analysis: &ErrorAnalysis) -> f64 {
+        // 简化实现：基于策略名称匹配
+        // 实际可以根据错误类别、策略类型等进行更精确的匹配
+        0.8
+    }
+
+    /// 计算可行性分数
+    fn calculate_feasibility(&self, strategy: &FixStrategy) -> f64 {
+        // 基于风险等级计算：风险越低，可行性越高
+        let risk_factor = (10 - strategy.risk_level) as f64 / 10.0;
+
+        // 如果需要确认，降低可行性
+        if strategy.requires_confirmation {
+            risk_factor * 0.8
+        } else {
+            risk_factor
+        }
+    }
+
+    /// 计算安全性分数
+    fn calculate_safety(&self, strategy: &FixStrategy) -> f64 {
+        // 安全性与风险等级成反比
+        (10 - strategy.risk_level) as f64 / 10.0
+    }
+
+    /// 计算学习价值分数
+    fn calculate_learning_value(&self, strategy: &FixStrategy) -> f64 {
+        // 如果策略描述包含解释性内容，学习价值更高
+        let desc_len = strategy.description.len();
+        if desc_len > 50 {
+            0.8
+        } else if desc_len > 20 {
+            0.6
+        } else {
+            0.4
         }
     }
 
