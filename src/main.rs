@@ -236,6 +236,40 @@ fn load_env_file(config_path: &str) {
     }
 }
 
+/// 设置 panic hook 以清理终端状态
+///
+/// 当程序 panic 时，确保终端状态被正确重置，避免终端挂死
+fn setup_panic_hook() {
+    use std::panic;
+
+    let default_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        // 尝试重置终端状态（使用 crossterm 的方式）
+        use crossterm::{
+            execute,
+            terminal::{Clear, ClearType, LeaveAlternateScreen},
+            cursor::Show,
+        };
+        use std::io::stderr;
+
+        let mut stderr = stderr();
+        // 尝试清理终端，但如果失败也不要再次 panic
+        let _ = execute!(
+            stderr,
+            LeaveAlternateScreen,
+            Clear(ClearType::All),
+            Show
+        );
+
+        // 打印原始的 panic 信息
+        eprintln!("\n{}", "程序发生错误，终端状态已重置".red());
+        default_hook(panic_info);
+
+        // 提示用户如果终端状态异常该如何处理
+        eprintln!("\n{}", "如果终端显示异常，请尝试运行: reset".yellow());
+    }));
+}
+
 /// 尝试加载 .env 文件
 fn try_load_dotenv(env_path: &std::path::Path) -> bool {
     match dotenvy::from_path(env_path) {
@@ -261,6 +295,9 @@ fn try_load_dotenv(env_path: &std::path::Path) -> bool {
 
 #[tokio::main]
 async fn main() {
+    // 设置 panic hook 来清理终端状态
+    setup_panic_hook();
+
     let args = Args::parse();
 
     // ✨ Phase 11: 初始化 i18n 系统

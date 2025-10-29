@@ -113,8 +113,11 @@ impl LiKanStatusBar {
     fn render_to_bottom(&self, msg: &str) -> io::Result<()> {
         let mut stdout = io::stderr(); // 使用 stderr 避免干扰 stdout
 
-        // 获取终端大小
-        let (_, rows) = terminal::size()?;
+        // 获取终端大小，如果失败则直接返回
+        let (_, rows) = match terminal::size() {
+            Ok(size) => size,
+            Err(_) => return Ok(()), // 静默失败，不影响主程序
+        };
         let bottom_row = rows.saturating_sub(1); // 最底部一行（从0开始）
 
         // 1. 保存当前光标位置
@@ -185,9 +188,15 @@ impl LiKanStatusBar {
     /// 清除状态栏
     pub fn clear(&self) -> io::Result<()> {
         let mut stdout = io::stderr();
-        let (_, rows) = terminal::size()?;
+
+        // 获取终端大小，如果失败则直接返回
+        let (_, rows) = match terminal::size() {
+            Ok(size) => size,
+            Err(_) => return Ok(()), // 静默失败，避免在清理时出错
+        };
         let bottom_row = rows.saturating_sub(1);
 
+        // 使用 ? 操作符，但所有错误都会被外层捕获
         execute!(stdout, SavePosition)?;
         execute!(stdout, MoveTo(0, bottom_row))?;
         execute!(stdout, Clear(ClearType::CurrentLine))?;
@@ -217,8 +226,11 @@ impl LiKanStatusBar {
 
 impl Drop for LiKanStatusBar {
     fn drop(&mut self) {
-        // 清除状态栏
-        let _ = self.clear();
+        // 尝试清除状态栏，但如果失败也不要 panic
+        // 使用 catch_unwind 来防止在清理过程中发生 panic
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = self.clear();
+        }));
     }
 }
 

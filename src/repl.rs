@@ -244,27 +244,15 @@ fn build_prompt(agent: &Agent) -> String {
 
 /// ✨ Phase 对话上下文: 构建上下文状态指示器（优化版 - 避免死锁）
 fn build_context_indicator(agent: &Agent) -> String {
-    // 使用 block_in_place 来访问异步的 ContextManager
-    // 但添加了 try_read 保护，避免在高负载时死锁
-    let snapshot_opt = tokio::task::block_in_place(|| {
-        let ctx_arc = agent.state_manager().conversation_context();
+    // 使用 try_read 直接在同步上下文中尝试获取锁
+    // 避免使用 block_in_place，减少性能开销
+    let ctx_arc = agent.state_manager().conversation_context();
 
-        tokio::runtime::Handle::current().block_on(async move {
-            // 使用 try_read 而不是 read().await
-            // 如果锁被占用（比如正在处理命令），直接返回 None
-            // 这样可以避免 REPL 循环被阻塞
-            match ctx_arc.try_read() {
-                Ok(manager) => Some(manager.snapshot()),
-                Err(_) => None,
-            }
-        })
-    });
-
-    // 如果无法获取锁，返回空字符串（安全降级）
-    // 下一次循环会重新尝试获取状态
-    let snapshot = match snapshot_opt {
-        Some(s) => s,
-        None => return String::new(),
+    // 使用 try_read 非阻塞地尝试获取锁
+    // 如果锁被占用，直接返回空字符串，不阻塞 REPL 循环
+    let snapshot = match ctx_arc.try_read() {
+        Ok(manager) => manager.snapshot(),
+        Err(_) => return String::new(), // 无法获取锁，安全降级
     };
 
     // 检查是否激活
