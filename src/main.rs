@@ -147,16 +147,16 @@ fn create_llm_client(
 
 /// 运行配置向导
 async fn run_wizard(quick: bool) {
-    use wizard::{ConfigWizard, WizardMode};
+    use config::{ConfigWizard, WizardMode};
 
     println!("\n{}\n", i18n::t("config.wizard_title").cyan().bold());
 
     let mode = if quick {
         println!("{}\n", i18n::t("config.mode_quick").dimmed());
-        WizardMode::Quick
+        WizardMode::Minimal
     } else {
         println!("{}\n", i18n::t("config.mode_complete").dimmed());
-        WizardMode::Complete
+        WizardMode::Standard
     };
 
     let wizard = ConfigWizard::new(mode);
