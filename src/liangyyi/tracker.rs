@@ -1304,7 +1304,7 @@ impl StateTracker {
 
                 // 前3条建议摘要
                 if !record.top_recommendations.is_empty() {
-                    output.push(format!("     建议:").dimmed().to_string());
+                    output.push("     建议:".to_string().dimmed().to_string());
                     for (j, rec) in record.top_recommendations.iter().take(3).enumerate() {
                         output.push(format!("       {}. {}", j + 1, rec).dimmed().to_string());
                     }

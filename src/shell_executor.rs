@@ -65,7 +65,7 @@ const DANGEROUS_PATTERNS: &[&str] = &[
 
 /// 检查命令是否是交互式命令
 fn is_interactive_command(command: &str) -> bool {
-    let cmd_parts: Vec<&str> = command.trim().split_whitespace().collect();
+    let cmd_parts: Vec<&str> = command.split_whitespace().collect();
     if cmd_parts.is_empty() {
         return false;
     }

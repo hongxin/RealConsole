@@ -361,7 +361,7 @@ impl AdaptiveSystem {
                         format!("当前偏低且趋势下降（强度 {:.2}），需要紧急干预", t.strength)
                     }
                     TrendDirection::Stable => {
-                        format!("当前偏低但趋势稳定，建议适度增强")
+                        "当前偏低但趋势稳定，建议适度增强".to_string()
                     }
                     TrendDirection::Rising => {
                         format!("当前偏低但趋势上升（强度 {:.2}），可能自然恢复", t.strength)
@@ -383,7 +383,7 @@ impl AdaptiveSystem {
                         format!("当前偏高且趋势上升（强度 {:.2}），需要紧急控制", t.strength)
                     }
                     TrendDirection::Stable => {
-                        format!("当前偏高但趋势稳定，建议适度减少")
+                        "当前偏高但趋势稳定，建议适度减少".to_string()
                     }
                     TrendDirection::Falling => {
                         format!("当前偏高但趋势下降（强度 {:.2}），可能自然回落", t.strength)

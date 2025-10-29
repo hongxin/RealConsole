@@ -112,7 +112,7 @@ impl Taiji {
 
     /// ✨ v1.9.6: 更新上下文持续时间
     fn update_context_duration(&mut self, elapsed: Duration) {
-        self.context_duration = self.context_duration + elapsed;
+        self.context_duration += elapsed;
     }
 
     /// 更新能量（基于事件）

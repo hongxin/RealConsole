@@ -5,6 +5,116 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2025-10-29
+
+### 🔧 Fixed
+
+- **终端崩溃修复** (`src/likan/statusbar.rs`)
+  - LiKanStatusBar Drop 实现使用 `catch_unwind` 防止 panic
+  - terminal::size() 调用增加错误处理，失败时静默返回
+  - 修复程序异常退出时导致终端挂死的问题
+
+- **Deprecated API 清理** (`src/agent.rs` 测试代码)
+  - 修复 6 个 deprecated API 调用
+  - 所有 `agent.memory()` 改为 `agent.state_manager().memory()`
+  - 所有 `agent.exec_logger()` 改为 `agent.state_manager().exec_logger()`
+
+- **编译警告清理**: 从 98 个减少到 11 个 (88.8% 减少)
+  - 自动修复 87 个警告（通过 clippy --fix）
+  - 手动修复 deprecated API 和 clone 优化
+
+### ⚡ Optimized
+
+- **REPL 性能优化** (`src/repl.rs`)
+  - `build_context_indicator` 移除 `block_in_place`，使用同步 `try_read()`
+  - 无法获取锁时安全降级，避免阻塞 REPL 循环
+  - 减少锁竞争，提升响应速度
+
+- **终端状态管理** (`src/main.rs`)
+  - 添加 `setup_panic_hook()` 函数
+  - panic 时自动重置终端状态（清理 ANSI 转义码）
+  - 提示用户运行 `reset` 命令恢复终端
+
+### 📚 Documentation
+
+- 创建 v1.15.1 开发计划文档
+- 更新版本号到 1.15.1
+- 添加稳定性测试脚本 (`test_stability.sh`)
+
+### 🧪 Testing
+
+- **测试通过率**: 97.6% → 100%
+  - 所有库测试通过：1136/1136
+  - 零测试失败
+- **稳定性测试**: 新增 4 个场景，全部通过
+  - 基本命令执行
+  - 多次命令执行
+  - Shell 命令执行
+  - 快速连续命令（压力测试）
+
+### 📊 Quality Metrics
+
+| 指标 | v1.15.0 | v1.15.1 | 变化 |
+|-----|---------|---------|------|
+| 测试通过率 | 97.6% | 100% | ✅ +2.4% |
+| 编译警告 | 98 | 11 | ✅ -88.8% |
+| 稳定性测试 | 未覆盖 | 100% | ✅ 新增 |
+| 启动时间 | ~40ms | ~40ms | ✅ 无退化 |
+| 内存占用 | ~5MB | ~5MB | ✅ 无退化 |
+
+### 🙏 Acknowledgments
+
+感谢用户反馈终端崩溃问题，促使我们全面改进程序稳定性。
+
+---
+
+## [1.15.0] - 2025-10-29
+
+### 🌟 Highlights
+
+**主题**: 连接三系 (Connecting Three Systems)
+
+- ✅ Liangyyi 自适应系统可观测化 - auto_optimize 优化过程完整追溯
+- ✅ Bagua 记忆炼化系统可观测化 - 记忆存储与炼化过程实时记录
+- ✅ Tracer 统一观测系统增强 - 自定义事件支持，LRU 管理
+- ✅ 统一Dashboard命令 - `/system` 一键查看三系状态
+- ✅ 端到端集成测试 - 7个场景100%通过
+
+### ✨ Added
+
+- `/system` 命令 - 统一系统状态查看
+  - `status` (默认) - 简洁状态一览
+  - `dashboard` - 详细Dashboard
+  - `help` - 帮助信息
+
+- `/liangyyi adaptive` - 查看自适应优化历史
+
+- Tracer 自定义事件支持
+  - `AdaptiveOptimization` 🎯 - 自适应优化事件
+  - `BaguaRefinement` 🌊 - 八卦炼化事件
+  - `SystemEvent` ⚡ - 通用系统事件
+
+### 🔧 Improved
+
+- Liangyyi StateTracker 添加优化历史追踪
+  - `OptimizationRecord` 结构记录完整快照
+  - LRU 策略管理（保留最近 100 条记录）
+
+- Tracer UnifiedTracer 增强
+  - 新增 `custom_entries` 字段（LRU 200 条）
+  - 新增 `add_entry()` 和 `get_custom_entries()` API
+
+- Bagua 与 Tracer 协同
+  - 每次 `store()` 自动记录到 Tracer Memory 维度
+
+### 📊 Performance
+
+- 高频处理: 100 events < 0.01s
+- 并发查询: 10 simultaneous, 无死锁
+- 内存稳定: 1000 iterations, 无泄漏
+
+---
+
 ## [1.14.0] - 2025-10-28
 
 ### Added

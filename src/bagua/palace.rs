@@ -325,7 +325,7 @@ impl BaguaMemoryPalace {
         entry: &MemoryEntry,
     ) -> Result<()> {
         if let Some(ref storage) = self.storage {
-            storage.append_dimension(dimension, &[entry.clone()]).await?;
+            storage.append_dimension(dimension, std::slice::from_ref(entry)).await?;
         }
         Ok(())
     }

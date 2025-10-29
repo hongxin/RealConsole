@@ -138,7 +138,7 @@ impl UnifiedDashboard {
         }
 
         // 2. Tracer 观测系统
-        output.push_str("\n");
+        output.push('\n');
         if let Some(tracer) = &self.tracer {
             let stats = tracer.stats().await?;
 
@@ -160,7 +160,7 @@ impl UnifiedDashboard {
         }
 
         // 3. Bagua 炼化系统
-        output.push_str("\n");
+        output.push('\n');
         if let Some(bagua_lock) = &self.bagua {
             let bagua = bagua_lock.read().await;
             let tracer_enabled = bagua.is_tracer_enabled();
@@ -190,7 +190,7 @@ impl UnifiedDashboard {
         }
 
         // 系统协同状态
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(&format!("{}\n", "🔗 系统协同".cyan().bold()));
         let integration_count = [
             self.tracker.is_some(),
@@ -294,7 +294,7 @@ impl UnifiedDashboard {
                 ));
             }
 
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // === 2. Tracer 观测系统详情 ===
@@ -364,7 +364,7 @@ impl UnifiedDashboard {
                 tracer.custom_entries_count().await
             ));
 
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // === 3. Bagua 炼化系统详情 ===
@@ -418,7 +418,7 @@ impl UnifiedDashboard {
                 ));
             }
 
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // 系统协同总结

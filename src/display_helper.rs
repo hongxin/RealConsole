@@ -6,15 +6,11 @@ use crate::config::DisplayConfig;
 use colored::Colorize;
 
 /// 显示符号辅助器
+#[derive(Default)]
 pub struct DisplayHelper {
     use_emoji: bool,
 }
 
-impl Default for DisplayHelper {
-    fn default() -> Self {
-        Self { use_emoji: false }
-    }
-}
 
 impl DisplayHelper {
     /// 从配置创建

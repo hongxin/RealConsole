@@ -3707,7 +3707,7 @@ mod tests {
         agent.handle("/nonexistent");
 
         // 检查记忆系统是否记录了输入
-        let memory = agent.memory();
+        let memory = agent.state_manager().memory();
         let memory_guard = memory.read().await;
         assert!(!memory_guard.is_empty());
     }
@@ -3724,7 +3724,7 @@ mod tests {
         agent.handle("/test");
 
         // 检查执行日志
-        let logger = agent.exec_logger();
+        let logger = agent.state_manager().exec_logger();
         let logger_guard = logger.read().await;
         let stats = logger_guard.stats();
 
@@ -3936,7 +3936,7 @@ mod tests {
         agent.handle("/longtest");
 
         // 检查记忆系统中的内容是否被截断
-        let memory = agent.memory();
+        let memory = agent.state_manager().memory();
         let memory_guard = memory.read().await;
         let recent = memory_guard.recent(1);
 
@@ -3967,7 +3967,7 @@ mod tests {
         assert_eq!(result2, "output2");
 
         // 检查执行日志记录了两次
-        let logger = agent.exec_logger();
+        let logger = agent.state_manager().exec_logger();
         let logger_guard = logger.read().await;
         let stats = logger_guard.stats();
 
@@ -4175,7 +4175,7 @@ mod tests {
         agent.handle("/help");
 
         // 记忆应该正常工作（即使没有持久化）
-        let memory = agent.memory();
+        let memory = agent.state_manager().memory();
         let memory_guard = memory.read().await;
         assert!(!memory_guard.is_empty());
     }
@@ -4202,7 +4202,7 @@ mod tests {
         agent.handle("/error_cmd");
 
         // 检查执行日志统计
-        let logger = agent.exec_logger();
+        let logger = agent.state_manager().exec_logger();
         let logger_guard = logger.read().await;
         let stats = logger_guard.stats();
 

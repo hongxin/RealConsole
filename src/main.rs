@@ -224,11 +224,10 @@ fn load_env_file(config_path: &str) {
         .unwrap_or_else(|| std::path::Path::new("."));
     let env_in_config_dir = config_dir.join(".env");
 
-    if env_in_config_dir.exists() {
-        if try_load_dotenv(&env_in_config_dir) {
+    if env_in_config_dir.exists()
+        && try_load_dotenv(&env_in_config_dir) {
             return;
         }
-    }
 
     // 策略 2 & 3: 使用 PathResolver 搜索 .env 文件
     if let Some(env_path) = PathResolver::resolve(".env") {
