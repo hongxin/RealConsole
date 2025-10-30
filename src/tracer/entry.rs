@@ -2,7 +2,7 @@
 //!
 //! `TraceEntry` 是四维观测体系的统一数据抽象
 
-use super::types::{Dimension, EntryType, Status};
+use super::types::{Dimension, EntryType, Importance, Status};
 use chrono::{DateTime, Utc};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -62,6 +62,29 @@ pub struct TraceEntry {
     /// - BlackBox: {"model": "deepseek-chat", "tokens": 500}
     /// - Memory: {"role": "user", "context_id": "abc123"}
     pub metadata: HashMap<String, serde_json::Value>,
+
+    // ━━━━━ Memory 维度专属字段 (v1.16.0 Phase 3) ━━━━━
+    /// 重要性级别（仅 Memory 维度使用）
+    ///
+    /// 用于标记记忆条目的重要程度，影响淡忘策略：
+    /// - Low: 可以快速淡忘
+    /// - Normal: 默认级别
+    /// - Important: 需要长期保留
+    /// - Critical: 永久保留
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub importance: Option<Importance>,
+
+    /// 标签列表（仅 Memory 维度使用）
+    ///
+    /// 用于分类和检索记忆条目，如：["project:realconsole", "lang:rust"]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+
+    /// 工作上下文 ID（仅 Memory 维度使用）
+    ///
+    /// 关联相关的记忆条目，用于追踪对话或任务上下文
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_id: Option<String>,
 }
 
 impl TraceEntry {
@@ -93,6 +116,9 @@ impl TraceEntry {
             content,
             status,
             metadata: HashMap::new(),
+            importance: None,
+            tags: Vec::new(),
+            context_id: None,
         }
     }
 
@@ -131,6 +157,9 @@ impl TraceEntry {
             content,
             status,
             metadata,
+            importance: None,
+            tags: Vec::new(),
+            context_id: None,
         }
     }
 
@@ -142,6 +171,83 @@ impl TraceEntry {
     /// 获取元数据字段
     pub fn get_metadata(&self, key: &str) -> Option<&serde_json::Value> {
         self.metadata.get(key)
+    }
+
+    // ━━━━━ Memory 维度专属方法 (v1.16.0 Phase 3) ━━━━━
+
+    /// 设置重要性级别（仅 Memory 维度）
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use realconsole::tracer::{TraceEntry, Dimension, EntryType, Status, Importance};
+    ///
+    /// let mut entry = TraceEntry::new(
+    ///     Dimension::Memory,
+    ///     EntryType::ContextMessage,
+    ///     "重要对话".to_string(),
+    ///     Status::Success,
+    /// );
+    ///
+    /// entry.set_importance(Importance::Critical);
+    /// ```
+    pub fn set_importance(&mut self, importance: Importance) {
+        self.importance = Some(importance);
+    }
+
+    /// 获取重要性级别
+    pub fn get_importance(&self) -> Option<Importance> {
+        self.importance
+    }
+
+    /// 添加标签
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use realconsole::tracer::{TraceEntry, Dimension, EntryType, Status};
+    ///
+    /// let mut entry = TraceEntry::new(
+    ///     Dimension::Memory,
+    ///     EntryType::ContextMessage,
+    ///     "Rust 学习笔记".to_string(),
+    ///     Status::Success,
+    /// );
+    ///
+    /// entry.add_tag("lang:rust".to_string());
+    /// entry.add_tag("learning".to_string());
+    /// ```
+    pub fn add_tag(&mut self, tag: String) {
+        if !self.tags.contains(&tag) {
+            self.tags.push(tag);
+        }
+    }
+
+    /// 批量添加标签
+    pub fn add_tags(&mut self, tags: Vec<String>) {
+        for tag in tags {
+            self.add_tag(tag);
+        }
+    }
+
+    /// 获取所有标签
+    pub fn get_tags(&self) -> &[String] {
+        &self.tags
+    }
+
+    /// 检查是否包含指定标签
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    /// 设置上下文 ID
+    pub fn set_context_id(&mut self, context_id: String) {
+        self.context_id = Some(context_id);
+    }
+
+    /// 获取上下文 ID
+    pub fn get_context_id(&self) -> Option<&str> {
+        self.context_id.as_deref()
     }
 
     /// 格式化输出（彩色，完整信息）
@@ -172,6 +278,34 @@ impl TraceEntry {
         } else {
             for line in content_lines {
                 lines.push(format!("   {}", line.dimmed()));
+            }
+        }
+
+        // Memory 维度专属字段
+        if self.dimension == Dimension::Memory {
+            // 重要性
+            if let Some(importance) = self.importance {
+                lines.push(format!(
+                    "   {}: {} {}",
+                    "Importance".dimmed(),
+                    importance.icon(),
+                    format!("{}", importance).yellow()
+                ));
+            }
+
+            // 标签
+            if !self.tags.is_empty() {
+                let tags_str = self.tags.join(", ");
+                lines.push(format!("   {}: {}", "Tags".dimmed(), tags_str.cyan()));
+            }
+
+            // 上下文 ID
+            if let Some(context_id) = &self.context_id {
+                lines.push(format!(
+                    "   {}: {}",
+                    "Context".dimmed(),
+                    context_id.dimmed()
+                ));
             }
         }
 
@@ -498,5 +632,187 @@ mod tests {
         assert_eq!(entry.dimension, deserialized.dimension);
         assert_eq!(entry.entry_type, deserialized.entry_type);
         assert_eq!(entry.content, deserialized.content);
+    }
+
+    // ━━━━━ v1.16.0 Phase 3: Memory 维度专属字段测试 ━━━━━
+
+    #[test]
+    fn test_set_and_get_importance() {
+        let mut entry = TraceEntry::new(
+            Dimension::Memory,
+            EntryType::ContextMessage,
+            "重要对话".to_string(),
+            Status::Success,
+        );
+
+        // 初始状态应该为 None
+        assert_eq!(entry.get_importance(), None);
+
+        // 设置重要性
+        entry.set_importance(Importance::Critical);
+        assert_eq!(entry.get_importance(), Some(Importance::Critical));
+
+        // 修改重要性
+        entry.set_importance(Importance::Low);
+        assert_eq!(entry.get_importance(), Some(Importance::Low));
+    }
+
+    #[test]
+    fn test_add_tag() {
+        let mut entry = TraceEntry::new(
+            Dimension::Memory,
+            EntryType::ContextMessage,
+            "学习笔记".to_string(),
+            Status::Success,
+        );
+
+        // 初始状态应该为空
+        assert_eq!(entry.get_tags(), &[] as &[String]);
+
+        // 添加标签
+        entry.add_tag("rust".to_string());
+        assert_eq!(entry.get_tags(), &["rust"]);
+        assert!(entry.has_tag("rust"));
+        assert!(!entry.has_tag("python"));
+
+        // 添加重复标签应该被忽略
+        entry.add_tag("rust".to_string());
+        assert_eq!(entry.get_tags(), &["rust"]);
+
+        // 添加更多标签
+        entry.add_tag("learning".to_string());
+        assert_eq!(entry.get_tags().len(), 2);
+        assert!(entry.has_tag("rust"));
+        assert!(entry.has_tag("learning"));
+    }
+
+    #[test]
+    fn test_add_tags_batch() {
+        let mut entry = TraceEntry::new(
+            Dimension::Memory,
+            EntryType::ContextMessage,
+            "项目讨论".to_string(),
+            Status::Success,
+        );
+
+        let tags = vec![
+            "project:realconsole".to_string(),
+            "lang:rust".to_string(),
+            "priority:high".to_string(),
+        ];
+
+        entry.add_tags(tags);
+        assert_eq!(entry.get_tags().len(), 3);
+        assert!(entry.has_tag("project:realconsole"));
+        assert!(entry.has_tag("lang:rust"));
+        assert!(entry.has_tag("priority:high"));
+    }
+
+    #[test]
+    fn test_set_and_get_context_id() {
+        let mut entry = TraceEntry::new(
+            Dimension::Memory,
+            EntryType::ContextMessage,
+            "对话内容".to_string(),
+            Status::Success,
+        );
+
+        // 初始状态应该为 None
+        assert_eq!(entry.get_context_id(), None);
+
+        // 设置上下文 ID
+        entry.set_context_id("ctx_123".to_string());
+        assert_eq!(entry.get_context_id(), Some("ctx_123"));
+
+        // 修改上下文 ID
+        entry.set_context_id("ctx_456".to_string());
+        assert_eq!(entry.get_context_id(), Some("ctx_456"));
+    }
+
+    #[test]
+    fn test_memory_entry_format() {
+        let mut entry = TraceEntry::new(
+            Dimension::Memory,
+            EntryType::ContextMessage,
+            "测试内容".to_string(),
+            Status::Success,
+        );
+
+        entry.set_importance(Importance::Important);
+        entry.add_tag("test".to_string());
+        entry.set_context_id("ctx_test".to_string());
+
+        let formatted = entry.format();
+
+        // 验证包含 Memory 维度标记
+        assert!(formatted.contains("💭"));
+        assert!(formatted.contains("Memory"));
+
+        // 验证包含内容
+        assert!(formatted.contains("测试内容"));
+
+        // 验证包含重要性（通过图标或文本）
+        assert!(formatted.contains("Importance") || formatted.contains("●"));
+
+        // 验证包含标签
+        assert!(formatted.contains("Tags") || formatted.contains("test"));
+
+        // 验证包含上下文 ID
+        assert!(formatted.contains("Context") || formatted.contains("ctx_test"));
+    }
+
+    #[test]
+    fn test_memory_serialization_with_fields() {
+        let mut entry = TraceEntry::new(
+            Dimension::Memory,
+            EntryType::ContextMessage,
+            "测试序列化".to_string(),
+            Status::Success,
+        );
+
+        entry.set_importance(Importance::Critical);
+        entry.add_tags(vec!["tag1".to_string(), "tag2".to_string()]);
+        entry.set_context_id("ctx_123".to_string());
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let deserialized: TraceEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(entry.id, deserialized.id);
+        assert_eq!(entry.dimension, deserialized.dimension);
+        assert_eq!(entry.get_importance(), deserialized.get_importance());
+        assert_eq!(entry.get_tags(), deserialized.get_tags());
+        assert_eq!(entry.get_context_id(), deserialized.get_context_id());
+    }
+
+    #[test]
+    fn test_memory_serialization_skip_empty_fields() {
+        let entry = TraceEntry::new(
+            Dimension::Memory,
+            EntryType::ContextMessage,
+            "空字段测试".to_string(),
+            Status::Success,
+        );
+
+        let json = serde_json::to_string(&entry).unwrap();
+
+        // 空字段应该被跳过，不包含在 JSON 中
+        assert!(!json.contains("\"importance\""));
+        assert!(!json.contains("\"context_id\""));
+        // tags 使用 default，可能序列化为空数组
+    }
+
+    #[test]
+    fn test_non_memory_dimension_fields_remain_empty() {
+        let entry = TraceEntry::new(
+            Dimension::Statistics,
+            EntryType::ShellCommand,
+            "ls -la".to_string(),
+            Status::Success,
+        );
+
+        // 非 Memory 维度的条目，Memory 字段应该保持默认值
+        assert_eq!(entry.get_importance(), None);
+        assert_eq!(entry.get_tags(), &[] as &[String]);
+        assert_eq!(entry.get_context_id(), None);
     }
 }

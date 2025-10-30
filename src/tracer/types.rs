@@ -205,6 +205,74 @@ impl EntryType {
     }
 }
 
+/// 记忆重要性级别（Memory 维度专用）
+///
+/// 用于标记 Memory 维度条目的重要程度
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Importance {
+    /// 低重要性 - 可以快速淡忘
+    Low,
+
+    /// 普通重要性 - 默认级别
+    Normal,
+
+    /// 重要 - 需要长期保留
+    Important,
+
+    /// 关键 - 永久保留
+    Critical,
+}
+
+impl fmt::Display for Importance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Importance::Low => write!(f, "Low"),
+            Importance::Normal => write!(f, "Normal"),
+            Importance::Important => write!(f, "Important"),
+            Importance::Critical => write!(f, "Critical"),
+        }
+    }
+}
+
+impl Importance {
+    /// 获取重要性标记符号
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            Importance::Low => "",
+            Importance::Normal => "",
+            Importance::Important => "[*]",
+            Importance::Critical => "[**]",
+        }
+    }
+
+    /// 获取重要性对应的图标
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Importance::Low => "·",
+            Importance::Normal => "○",
+            Importance::Important => "●",
+            Importance::Critical => "⭐",
+        }
+    }
+
+    /// 获取重要性的中文名称
+    pub fn chinese_name(&self) -> &'static str {
+        match self {
+            Importance::Low => "低",
+            Importance::Normal => "普通",
+            Importance::Important => "重要",
+            Importance::Critical => "关键",
+        }
+    }
+}
+
+impl Default for Importance {
+    fn default() -> Self {
+        Importance::Normal
+    }
+}
+
 /// 执行状态
 ///
 /// 记录条目的执行结果
