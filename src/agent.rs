@@ -3734,6 +3734,7 @@ mod tests {
     // ========== handle_cd_command 测试 ==========
 
     #[tokio::test(flavor = "multi_thread")]
+    #[serial_test::serial]
     async fn test_handle_cd_to_tmp() {
         use std::env;
 
@@ -3774,6 +3775,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[serial_test::serial]
     async fn test_handle_cd_home() {
         use std::env;
 
@@ -3796,6 +3798,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[serial_test::serial]
     async fn test_handle_cd_tilde_expansion() {
         use std::env;
 
@@ -4140,6 +4143,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[serial_test::serial]
     async fn test_cd_with_trailing_slash() {
         use std::env;
 

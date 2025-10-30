@@ -61,6 +61,7 @@ assert_cmd = "2.0"  # CLI testing
 predicates = "3.0"  # Assertions for CLI output
 tempfile = "3.8"  # Temporary files for testing
 criterion = { version = "0.5", features = ["html_reports"] }  # Performance benchmarking
+serial_test = "3.0"  # Serialize concurrent tests that share global state
 
 [lib]
 name = "realconsole"
