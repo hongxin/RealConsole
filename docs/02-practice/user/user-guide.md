@@ -16,6 +16,7 @@
 6. [故障排除](#故障排除)
 7. [最佳实践](#最佳实践)
 8. [附录](#附录)
+9. [📦 数据迁移](#数据迁移) ⭐ v1.16.0 新增
 
 ---
 
@@ -1263,6 +1264,57 @@ features:
 - **Issue 跟踪**: https://github.com/your-repo/realconsole/issues
 - **Deepseek API**: https://platform.deepseek.com/
 - **Ollama**: https://ollama.ai/
+
+---
+
+## 数据迁移
+
+### 📦 v1.16.0 Memory 数据迁移
+
+**重要提示**: 如果你从旧版本（< v1.16.0）升级，需要迁移 Memory 数据到新的统一存储架构。
+
+#### 快速链接
+
+📖 **完整迁移指南**: [Memory 数据迁移指南](memory-migration-guide.md)
+
+#### 迁移概述
+
+v1.16.0 将 Memory 模块重构为统一的 UnifiedTracer 架构：
+
+**变更内容**:
+- ✅ 统一的四维观测体系（Statistics、Coordination、BlackBox、Memory）
+- ✅ 所有 Memory API 改为异步（需添加 `.await`）
+- ✅ 新增功能：标签、重要性、上下文关联
+- ✅ 多线程性能提升 2-4x
+
+**迁移步骤**:
+
+1. **备份数据**（重要！）
+   ```bash
+   cp ~/.realconsole/memory/memory.jsonl ~/.realconsole/memory/memory.jsonl.backup
+   ```
+
+2. **使用迁移工具**
+   ```bash
+   cargo run --bin migrate_memory
+   ```
+
+3. **验证迁移**
+   ```bash
+   realconsole
+   > /memory stats
+   ```
+
+#### 详细文档
+
+完整的迁移指南包含：
+- 迁移前准备和检查清单
+- 三种迁移方法（自动/手动/批量）
+- 数据验证步骤
+- 常见问题解答（FAQ）
+- 回滚方案
+
+**立即查看**: [📖 Memory 数据迁移指南](memory-migration-guide.md)
 
 ---
 
