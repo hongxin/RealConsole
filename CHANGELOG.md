@@ -5,6 +5,196 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2025-10-31
+
+### 🌟 Highlights
+
+**主题**: Memory 模块统一重构 (Memory Module Unified Refactoring)
+
+- ✅ Memory 统一到 UnifiedTracer - 四维观测体系完成
+- ✅ 异步 Memory API - 全面支持 async/await
+- ✅ 增强功能 - tags、importance、context_id
+- ✅ 并发性能提升 - 多线程场景 2-4x 性能提升
+- ✅ 完整迁移方案 - 一键迁移工具 + 详细指南
+
+### ✨ Added
+
+**Phase 3: Memory 模块重构**
+
+- **UnifiedTracer 扩展** (`src/tracer/`)
+  - `Importance` 枚举 - 4 级重要性（Low/Normal/Important/Critical）
+  - TraceEntry 新增字段：`importance`、`tags`、`context_id`
+  - 9 个 Memory 专用方法：set_importance、add_tag、has_tag 等
+
+- **MemoryManager 适配层** (`src/memory/manager.rs` - 449 行)
+  - 保持原有 Memory API 兼容（添加 async）
+  - 14 个异步方法：add、search、recent、dump 等
+  - 3 个增强查询：search_by_tag、find_important、find_by_context
+  - 完整的类型转换系统：MemoryEntry ↔ TraceEntry
+
+- **数据迁移工具** (`src/memory/migration.rs` - 398 行)
+  - `MemoryMigrator` - JSONL 文件迁移
+  - `MigrationReport` - 详细迁移报告（成功率、错误详情）
+  - 容错设计 - 单条失败不影响整体迁移
+
+**Phase 4: 优化与完善**
+
+- **Bug 修复**
+  - 修复 ContextMessage 类型映射丢失问题
+  - Assistant 消息类型往返转换完全保留
+  - 使用 metadata 存储原始类型
+
+- **并发安全性测试** (3 个)
+  - test_concurrent_add - 100 线程并发写入
+  - test_concurrent_read_write - 100 线程读写混合
+  - test_concurrent_search - 20 线程并发搜索
+
+- **类型保留测试** (2 个)
+  - test_assistant_message_type_preservation
+  - test_all_entry_types_roundtrip
+
+### 🔧 Fixed
+
+- **类型映射语义丢失** (Phase 4 Task A.1)
+  - 问题：Assistant 消息在 dump() 后变成 User
+  - 修复：在 metadata 中保存原始 MemoryEntryType
+  - 影响：所有 5 种类型（User/Assistant/System/Shell/Tool）完全保留
+
+- **并发测试问题** (Phase 3 Part A)
+  - 修复 cd 命令测试的竞争条件
+  - 使用 serial_test crate 串行化测试
+  - 4 个 cd 测试添加 `#[serial]` 属性
+
+### ⚡ Improved
+
+- **Memory 性能**
+  - 单线程：2-4x 慢但仍在微秒级（可接受）
+  - 多线程：2-4x 快（异步优势明显）✅
+  - 并发安全：Arc + RwLock 确保线程安全
+
+- **Memory API**
+  - 全部改为异步方法（需添加 `.await`）
+  - 支持 tags 标签系统
+  - 支持 importance 重要性标记
+  - 支持 context_id 上下文关联
+
+### 📚 Documentation
+
+**Phase 3 文档**
+- v1.16.0-phase3-progress.md - 详细进度追踪（808 行）
+- v1.16.0-phase3-performance-analysis.md - 性能分析报告
+- v1.16.0-phase3-code-review.md - 代码审查报告（586 行，4.4/5.0 评分）
+
+**Phase 4 文档**
+- v1.16.0-phase4-implementation-plan.md - 实施计划
+- v1.16.0-phase4-progress.md - 进度报告
+- memory-migration-guide.md - 用户迁移指南（693 行，9 章节）
+- user-guide.md - 新增数据迁移章节
+
+### 🧪 Testing
+
+**测试增长**:
+- Phase 3: +21 个测试（TraceEntry: 9, MemoryManager: 5, Migrator: 7）
+- Phase 4: +5 个测试（类型保留: 2, 并发: 3）
+- 总增长: +26 个测试
+
+**测试结果**:
+- 全量测试：1199/1199 通过（100%）
+- 并发场景：200+ 线程无死锁/数据丢失
+- 类型往返：5 种类型 100% 保留
+
+### 📊 Quality Metrics
+
+| 指标 | v1.15.1 | v1.16.0 | 变化 |
+|-----|---------|---------|------|
+| 测试数量 | 1173 | 1199 | ✅ +26 (+2.2%) |
+| 测试通过率 | 100% | 100% | ✅ 保持 |
+| 代码行数 | - | +1788 | ✅ 新增 |
+| 文档行数 | - | +2337 | ✅ 新增 |
+| 代码评分 | - | 4.4/5.0 | ✅ 优秀 |
+
+**代码变更统计**:
+- Phase 3: +1660 lines (代码 + 测试)
+- Phase 4: +128 lines (Bug 修复 + 测试)
+- 总计: +1788 lines
+
+**文档统计**:
+- Phase 3: 3 个报告（~1400 行）
+- Phase 4: 4 个文档（~937 行）
+- 总计: +2337 lines
+
+### 🔄 Migration Guide
+
+**重要提示**: 从 v1.15.x 升级需要迁移 Memory 数据
+
+**快速迁移**:
+```bash
+# 1. 备份数据
+cp ~/.realconsole/memory/memory.jsonl ~/.realconsole/memory/memory.jsonl.backup
+
+# 2. 运行迁移工具
+cargo run --bin migrate_memory
+
+# 3. 验证迁移
+realconsole
+> /memory stats
+```
+
+**详细指南**: [Memory 数据迁移指南](docs/02-practice/user/memory-migration-guide.md)
+
+### 💡 Technical Highlights
+
+**1. 类型保留方案**
+```rust
+// 保存原始类型
+trace_entry.add_metadata("original_memory_type", json!(type));
+
+// 优先恢复
+entry.get_metadata("original_memory_type")
+    .and_then(|v| EntryType::from_str(v).ok())
+    .unwrap_or(fallback)
+```
+
+**2. 并发测试模式**
+```rust
+let manager = Arc::new(MemoryManager::new(tracer, 100));
+for i in 0..100 {
+    tokio::spawn(async move { mgr.add(/*...*/).await; })
+}
+```
+
+**3. 迁移报告**
+```
+━━━━━ Memory 数据迁移报告 ━━━━━
+总条目数: 1523
+✅ 成功迁移: 1520
+成功率: 99.8%
+━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### 🎯 Breaking Changes
+
+⚠️ **API 变更**:
+- 所有 Memory 方法改为 `async fn`（需添加 `.await`）
+- Memory 数据需要迁移到 UnifiedTracer 存储
+
+**迁移示例**:
+```rust
+// 旧代码 (v1.15.x)
+manager.add("Hello".to_string(), EntryType::User);
+let recent = manager.recent(10)?;
+
+// 新代码 (v1.16.0)
+manager.add("Hello".to_string(), EntryType::User).await;
+let recent = manager.recent(10).await?;
+```
+
+### 🙏 Acknowledgments
+
+感谢 Phase 3 代码审查发现的关键问题，促使我们在 Phase 4 完善了类型保留机制和并发安全性。
+
+---
+
 ## [1.15.1] - 2025-10-29
 
 ### 🔧 Fixed
