@@ -56,6 +56,21 @@ impl std::fmt::Display for EntryType {
     }
 }
 
+impl std::str::FromStr for EntryType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "USER" => Ok(EntryType::User),
+            "ASSISTANT" => Ok(EntryType::Assistant),
+            "SYSTEM" => Ok(EntryType::System),
+            "SHELL" => Ok(EntryType::Shell),
+            "TOOL" => Ok(EntryType::Tool),
+            _ => Err(format!("无法识别的 EntryType: {}", s)),
+        }
+    }
+}
+
 impl Importance {
     /// 获取重要性标记符号
     pub fn symbol(&self) -> &str {

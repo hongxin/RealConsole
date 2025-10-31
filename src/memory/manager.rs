@@ -279,12 +279,29 @@ impl MemoryManager {
         let importance = self.memory_importance_to_trace(entry.importance);
         trace_entry.set_importance(importance);
 
+        // 在 metadata 中保存原始 MemoryEntryType（v1.16.0 Phase 4 修复）
+        // 避免 ContextMessage 映射时丢失 User/Assistant 区分
+        trace_entry.add_metadata(
+            "original_memory_type".to_string(),
+            serde_json::json!(entry.entry_type.to_string()),
+        );
+
         trace_entry
     }
 
     /// TraceEntry 转换为 MemoryEntry
     fn trace_to_memory_entry(&self, entry: &TraceEntry) -> MemoryEntry {
-        let memory_type = self.trace_type_to_memory_type(&entry.entry_type);
+        // v1.16.0 Phase 4 修复：优先从 metadata 恢复原始类型
+        // 避免 ContextMessage → User 映射时丢失 Assistant 类型
+        let memory_type = entry
+            .get_metadata("original_memory_type")
+            .and_then(|v| v.as_str())
+            .and_then(|s| {
+                use std::str::FromStr;
+                MemoryEntryType::from_str(s).ok()
+            })
+            .unwrap_or_else(|| self.trace_type_to_memory_type(&entry.entry_type));
+
         let importance = entry
             .importance
             .map(|i| self.trace_importance_to_memory(i))
@@ -452,5 +469,83 @@ mod tests {
 
         let important = manager.find_important().await.unwrap();
         assert_eq!(important.len(), 2);
+    }
+
+    // ━━━━━ v1.16.0 Phase 4: Bug 修复测试 ━━━━━
+
+    #[tokio::test]
+    async fn test_assistant_message_type_preservation() {
+        let tracer = create_test_tracer();
+        let manager = MemoryManager::new(tracer, 100);
+
+        // 添加不同类型的消息
+        manager
+            .add("用户问题".to_string(), MemoryEntryType::User)
+            .await;
+        manager
+            .add("AI 回复".to_string(), MemoryEntryType::Assistant)
+            .await;
+        manager
+            .add("系统消息".to_string(), MemoryEntryType::System)
+            .await;
+
+        // 通过 dump 读回（会经过 TraceEntry 转换）
+        let entries = manager.dump().await.unwrap();
+
+        // 验证类型保留正确（dump 返回按时间倒序，最新的在前）
+        assert_eq!(entries.len(), 3);
+
+        // 最新的条目（系统消息）
+        assert_eq!(entries[0].entry_type, MemoryEntryType::System);
+        assert_eq!(entries[0].content, "系统消息");
+
+        // 第二新的条目（AI 回复）
+        assert_eq!(entries[1].entry_type, MemoryEntryType::Assistant); // Phase 4 修复：不再变成 User
+        assert_eq!(entries[1].content, "AI 回复");
+
+        // 最早的条目（用户问题）
+        assert_eq!(entries[2].entry_type, MemoryEntryType::User);
+        assert_eq!(entries[2].content, "用户问题");
+    }
+
+    #[tokio::test]
+    async fn test_all_entry_types_roundtrip() {
+        let tracer = create_test_tracer();
+        let manager = MemoryManager::new(tracer, 100);
+
+        // 添加所有类型的消息
+        let types = vec![
+            (MemoryEntryType::User, "用户输入"),
+            (MemoryEntryType::Assistant, "助手响应"),
+            (MemoryEntryType::System, "系统消息"),
+            (MemoryEntryType::Shell, "Shell 命令"),
+            (MemoryEntryType::Tool, "工具调用"),
+        ];
+
+        for (entry_type, content) in &types {
+            manager.add(content.to_string(), *entry_type).await;
+        }
+
+        // 读回并验证类型完全保留（返回顺序是倒序）
+        let entries = manager.dump().await.unwrap();
+        assert_eq!(entries.len(), 5);
+
+        // dump() 返回倒序，所以需要反转预期顺序
+        let types_reversed: Vec<_> = types.iter().rev().collect();
+
+        for (i, (expected_type, expected_content)) in types_reversed.iter().enumerate() {
+            assert_eq!(
+                entries[i].entry_type, *expected_type,
+                "位置 {} 的类型 {:?} 未正确保留，实际是 {:?}",
+                i,
+                expected_type,
+                entries[i].entry_type
+            );
+            assert_eq!(
+                entries[i].content, *expected_content,
+                "位置 {} 的内容不匹配",
+                i
+            );
+        }
     }
 }
