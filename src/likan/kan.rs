@@ -316,6 +316,9 @@ mod tests {
             content: command.to_string(), // 使用 content 字段
             status,
             metadata: HashMap::new(),
+            importance: None,
+            tags: Vec::new(),
+            context_id: None,
         }
     }
 

@@ -51,7 +51,7 @@ mod benchmarks;
 // 重新导出核心类型，方便使用
 pub use dashboard::{Dashboard, DashboardConfig, HealthScore};
 pub use entry::TraceEntry;
-pub use types::{Dimension, EntryType, Status};
+pub use types::{Dimension, EntryType, Importance, Status};
 pub use unified_tracer::{TraceStats, UnifiedTracer};
 
 #[cfg(test)]
