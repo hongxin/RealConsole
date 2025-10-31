@@ -1,6 +1,51 @@
-//! 统一追踪器实现
+//! 统一追踪器实现 (v1.16.5)
 //!
 //! `UnifiedTracer` 聚合四个观测维度，提供统一查询接口
+//!
+//! # 四维观测体系
+//!
+//! - **Statistics**: 统计维度 - HistoryManager
+//! - **Coordination**: 协同维度 - ExecutionLogger
+//! - **BlackBox**: 黑盒维度 - LlmLogger (可选)
+//! - **Memory**: 记忆维度 - 自定义事件存储
+//!
+//! # v1.16.5 更新
+//!
+//! - ✨ **可配置容量**: 新增 `with_custom_capacity()` 方法
+//! - ✨ **自定义事件**: custom_entries 容量可配置（默认 200）
+//! - ✨ **Memory 支持**: 为 MemoryManager 提供底层存储
+//! - ✨ **大规模测试**: 支持 10,000+ 条目的压力测试
+//!
+//! # 使用示例
+//!
+//! ```rust,no_run
+//! use realconsole::tracer::UnifiedTracer;
+//! use std::sync::Arc;
+//! use tokio::sync::RwLock;
+//!
+//! # async fn example() {
+//! # use realconsole::history::HistoryManager;
+//! # use realconsole::execution_logger::ExecutionLogger;
+//! # use realconsole::conversation::context_manager::ContextManager;
+//! # use realconsole::config::settings::ConversationConfig;
+//! # use std::path::PathBuf;
+//! // 创建带自定义容量的追踪器
+//! let history = Arc::new(RwLock::new(HistoryManager::new(PathBuf::from("history.jsonl"), 1000)));
+//! let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(1000)));
+//! let context = Arc::new(RwLock::new(ContextManager::new(ConversationConfig::default())));
+//!
+//! let tracer = UnifiedTracer::with_custom_capacity(
+//!     history,
+//!     exec_logger,
+//!     None,
+//!     context,
+//!     2000,  // 自定义事件容量
+//! );
+//!
+//! // 查询所有维度
+//! let entries = tracer.query_all(20).await.unwrap();
+//! # }
+//! ```
 
 use super::entry::TraceEntry;
 use super::types::{Dimension, EntryType, Status};
@@ -47,8 +92,11 @@ pub struct UnifiedTracer {
     /// ✨ v1.15.0 Phase 2: 自定义事件存储
     ///
     /// 用于记录自适应优化、炼化等系统内部事件
-    /// LRU 策略，最多保留 200 条
+    /// LRU 策略，容量可配置（默认 200 条）
     custom_entries: Arc<RwLock<VecDeque<TraceEntry>>>,
+
+    /// ✨ v1.16.5: 自定义事件容量
+    custom_capacity: usize,
 }
 
 impl UnifiedTracer {
@@ -66,12 +114,32 @@ impl UnifiedTracer {
         llm_logger: Option<Arc<LlmLogger>>,
         context: Arc<RwLock<ContextManager>>,
     ) -> Self {
+        Self::with_custom_capacity(history, exec_logger, llm_logger, context, 200)
+    }
+
+    /// 创建新的统一追踪器（指定自定义事件容量）
+    ///
+    /// # 参数
+    ///
+    /// - `history`: History 管理器
+    /// - `exec_logger`: 执行日志管理器
+    /// - `llm_logger`: LLM 日志管理器（可选）
+    /// - `context`: Context 管理器
+    /// - `custom_capacity`: 自定义事件容量（默认 200）
+    pub fn with_custom_capacity(
+        history: Arc<RwLock<HistoryManager>>,
+        exec_logger: Arc<RwLock<ExecutionLogger>>,
+        llm_logger: Option<Arc<LlmLogger>>,
+        context: Arc<RwLock<ContextManager>>,
+        custom_capacity: usize,
+    ) -> Self {
         Self {
             history,
             exec_logger,
             llm_logger,
             context,
-            custom_entries: Arc::new(RwLock::new(VecDeque::with_capacity(200))),
+            custom_entries: Arc::new(RwLock::new(VecDeque::with_capacity(custom_capacity))),
+            custom_capacity,
         }
     }
 
@@ -177,7 +245,7 @@ impl UnifiedTracer {
         let mut custom = self.custom_entries.write().await;
 
         // LRU 策略：超过容量则移除最旧的
-        if custom.len() >= 200 {
+        if custom.len() >= self.custom_capacity {
             custom.pop_front();
         }
 

@@ -275,17 +275,27 @@ mod tests {
     use tokio::sync::RwLock;
 
     fn create_test_manager() -> MemoryManager {
+        create_test_manager_with_capacity(100)
+    }
+
+    fn create_test_manager_with_capacity(capacity: usize) -> MemoryManager {
         let history = Arc::new(RwLock::new(HistoryManager::new(
-            PathBuf::from("/tmp/test_history.jsonl"),
-            100,
+            PathBuf::from("/tmp/test_migration_history.jsonl"),
+            capacity,
         )));
-        let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(100)));
+        let exec_logger = Arc::new(RwLock::new(ExecutionLogger::new(capacity)));
         let context = Arc::new(RwLock::new(ContextManager::new(
             ConversationConfig::default(),
         )));
 
-        let tracer = Arc::new(UnifiedTracer::new(history, exec_logger, None, context));
-        MemoryManager::new(tracer, 100)
+        let tracer = Arc::new(UnifiedTracer::with_custom_capacity(
+            history,
+            exec_logger,
+            None,
+            context,
+            capacity,
+        ));
+        MemoryManager::new(tracer, capacity)
     }
 
     #[test]
@@ -395,5 +405,120 @@ mod tests {
         assert!(formatted.contains("成功迁移: 2"));
         assert!(formatted.contains("失败: 1"));
         assert!(formatted.contains("test error"));
+    }
+
+    // ━━━━━ v1.16.5 Phase 4 Task B.3: 压力测试 ━━━━━
+
+    #[tokio::test]
+    async fn test_large_file_migration() {
+        let manager = create_test_manager_with_capacity(12000);
+        let migrator = MemoryMigrator::new(manager);
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+
+        // 写入 10,000 条数据
+        for i in 0..10_000 {
+            let entry = MemoryEntry::new(
+                format!("Test entry {} with some content for testing", i),
+                EntryType::User,
+            );
+            writeln!(temp_file, "{}", serde_json::to_string(&entry).unwrap()).unwrap();
+        }
+        temp_file.flush().unwrap();
+
+        // 执行迁移并测量时间
+        let start = std::time::Instant::now();
+        let report = migrator
+            .migrate_from_file(temp_file.path())
+            .await
+            .unwrap();
+        let duration = start.elapsed();
+
+        assert_eq!(report.total, 10_000);
+        assert_eq!(report.migrated, 10_000);
+        assert_eq!(report.failed, 0);
+        assert!(
+            duration.as_secs() < 10,
+            "迁移耗时过长: {:?}",
+            duration
+        );
+    }
+
+    #[tokio::test]
+    async fn test_migration_error_recovery() {
+        let manager = create_test_manager_with_capacity(200);
+        let migrator = MemoryMigrator::new(manager);
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+
+        // 写入 100 条数据，其中 10 条无效
+        for i in 0..100 {
+            if i % 10 == 0 {
+                writeln!(temp_file, "{{invalid json}}").unwrap();
+            } else {
+                let entry = MemoryEntry::new(
+                    format!("Entry {}", i),
+                    EntryType::User,
+                );
+                writeln!(temp_file, "{}", serde_json::to_string(&entry).unwrap()).unwrap();
+            }
+        }
+        temp_file.flush().unwrap();
+
+        let report = migrator
+            .migrate_from_file(temp_file.path())
+            .await
+            .unwrap();
+
+        assert_eq!(report.total, 100);
+        assert_eq!(report.migrated, 90);
+        assert_eq!(report.failed, 10);
+        assert!((report.success_rate() - 90.0).abs() < 0.1);
+    }
+
+    #[tokio::test]
+    async fn test_migration_performance_benchmark() {
+        let manager = create_test_manager_with_capacity(5500);
+        let migrator = MemoryMigrator::new(manager);
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+
+        // 写入 5,000 条数据
+        for i in 0..5_000 {
+            let entry = MemoryEntry::new(
+                format!("Entry {} - Lorem ipsum dolor sit amet", i),
+                if i % 3 == 0 {
+                    EntryType::Assistant
+                } else {
+                    EntryType::User
+                },
+            );
+            writeln!(temp_file, "{}", serde_json::to_string(&entry).unwrap()).unwrap();
+        }
+        temp_file.flush().unwrap();
+
+        // 性能基准测试
+        let start = std::time::Instant::now();
+        let report = migrator
+            .migrate_from_file(temp_file.path())
+            .await
+            .unwrap();
+        let duration = start.elapsed();
+
+        assert_eq!(report.total, 5_000);
+        assert_eq!(report.migrated, 5_000);
+
+        // 计算吞吐量
+        let throughput = report.migrated as f64 / duration.as_secs_f64();
+
+        println!("迁移性能: {:.0} entries/sec", throughput);
+        println!("总耗时: {:?}", duration);
+
+        // 应该能够达到至少 500 entries/sec
+        assert!(
+            throughput > 500.0,
+            "迁移吞吐量过低: {:.0} entries/sec",
+            throughput
+        );
     }
 }
