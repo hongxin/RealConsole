@@ -471,6 +471,111 @@ mod tests {
         assert_eq!(important.len(), 2);
     }
 
+    // ━━━━━ v1.16.0 Phase 4: 并发安全性测试 ━━━━━
+
+    #[tokio::test]
+    async fn test_concurrent_add() {
+        let tracer = create_test_tracer();
+        let manager = Arc::new(MemoryManager::new(tracer, 100));
+
+        let handles: Vec<_> = (0..100)
+            .map(|i| {
+                let mgr = manager.clone();
+                tokio::spawn(async move {
+                    mgr.add(format!("Entry {}", i), MemoryEntryType::User)
+                        .await;
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        assert_eq!(manager.len().await, 100);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_read_write() {
+        let tracer = create_test_tracer();
+        let manager = Arc::new(MemoryManager::new(tracer, 100));
+
+        // 预填充数据
+        for i in 0..50 {
+            manager
+                .add(format!("Initial {}", i), MemoryEntryType::User)
+                .await;
+        }
+
+        // 并发读写
+        let write_handles: Vec<_> = (50..100)
+            .map(|i| {
+                let mgr = manager.clone();
+                tokio::spawn(async move {
+                    mgr.add(format!("New {}", i), MemoryEntryType::User).await;
+                })
+            })
+            .collect();
+
+        let read_handles: Vec<_> = (0..50)
+            .map(|_| {
+                let mgr = manager.clone();
+                tokio::spawn(async move {
+                    let _ = mgr.recent(10).await;
+                })
+            })
+            .collect();
+
+        // 等待所有任务完成
+        for handle in write_handles.into_iter().chain(read_handles) {
+            handle.await.unwrap();
+        }
+
+        assert_eq!(manager.len().await, 100);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_search() {
+        let tracer = create_test_tracer();
+        let manager = Arc::new(MemoryManager::new(tracer, 1000));
+
+        // 添加测试数据
+        for i in 0..100 {
+            manager
+                .add(
+                    format!("item_{} with searchable content", i),
+                    MemoryEntryType::User,
+                )
+                .await;
+        }
+
+        // 验证数据已添加
+        assert_eq!(manager.len().await, 100);
+
+        // 并发搜索 - 验证线程安全性（不会 panic 或死锁）
+        let handles: Vec<_> = (0..20)
+            .map(|i| {
+                let mgr = manager.clone();
+                tokio::spawn(async move {
+                    // 不同的搜索关键词
+                    let keyword = if i % 2 == 0 {
+                        "item_"
+                    } else {
+                        "searchable"
+                    };
+                    let results = mgr.search(keyword).await.unwrap();
+                    // 只要不 panic 且返回结果即可（验证并发安全性）
+                    assert!(!results.is_empty(), "搜索应该返回结果");
+                })
+            })
+            .collect();
+
+        // 所有搜索都应该成功完成
+        for handle in handles {
+            handle.await.unwrap();
+        }
+    }
+
     // ━━━━━ v1.16.0 Phase 4: Bug 修复测试 ━━━━━
 
     #[tokio::test]
