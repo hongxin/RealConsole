@@ -8,6 +8,7 @@
 pub mod context_tracker;
 pub mod manager; // v1.16.0 Phase 3
 pub mod memory_core;
+pub mod migration; // v1.16.0 Phase 3
 
 // 导出 memory_core 的所有公共类型
 #[allow(unused_imports)]
@@ -19,5 +20,6 @@ pub use memory_core::{EntryType, Importance, Memory, MemoryStats};
 pub use context_tracker::{ContextStats, Entity, EntityType, ReferenceRecord, WorkingContext};
 pub use context_tracker::{ContextTracker, WorkingContextUpdate};
 
-// v1.16.0 Phase 3: 导出 MemoryManager
+// v1.16.0 Phase 3: 导出 MemoryManager 和迁移工具
 pub use manager::MemoryManager;
+pub use migration::{MemoryMigrator, MigrationReport};
