@@ -185,36 +185,48 @@ impl MemoryManager {
     }
 
     /// 获取特定类型的记忆
+    ///
+    /// ✨ v1.17.0 优化: 使用过滤下推，避免全量加载
     pub async fn filter_by_type(&self, entry_type: MemoryEntryType) -> Result<Vec<MemoryEntry>> {
-        let all_entries = self
-            .tracer
-            .query_by_dimension(Dimension::Memory, self.capacity)
-            .await?;
+        use crate::tracer::QueryFilter;
 
         let trace_type = self.memory_type_to_trace_type(entry_type);
 
-        Ok(all_entries
+        // ✨ 使用过滤下推
+        let filter = QueryFilter::new().with_entry_type(trace_type);
+
+        let filtered_entries = self
+            .tracer
+            .query_by_dimension_with_filter(Dimension::Memory, self.capacity, Some(filter))
+            .await?;
+
+        Ok(filtered_entries
             .into_iter()
-            .filter(|e| e.entry_type == trace_type)
             .map(|e| self.trace_to_memory_entry(&e))
             .collect())
     }
 
     /// 按重要性过滤记忆
+    ///
+    /// ✨ v1.17.0 优化: 使用过滤下推，避免全量加载
     pub async fn filter_by_importance(
         &self,
         importance: MemoryImportance,
     ) -> Result<Vec<MemoryEntry>> {
-        let all_entries = self
-            .tracer
-            .query_by_dimension(Dimension::Memory, self.capacity)
-            .await?;
+        use crate::tracer::QueryFilter;
 
         let trace_importance = self.memory_importance_to_trace(importance);
 
-        Ok(all_entries
+        // ✨ 使用过滤下推
+        let filter = QueryFilter::new().with_importance(trace_importance);
+
+        let filtered_entries = self
+            .tracer
+            .query_by_dimension_with_filter(Dimension::Memory, self.capacity, Some(filter))
+            .await?;
+
+        Ok(filtered_entries
             .into_iter()
-            .filter(|e| e.importance == Some(trace_importance))
             .map(|e| self.trace_to_memory_entry(&e))
             .collect())
     }

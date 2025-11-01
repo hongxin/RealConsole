@@ -208,7 +208,7 @@ impl EntryType {
 /// 记忆重要性级别（Memory 维度专用）
 ///
 /// 用于标记 Memory 维度条目的重要程度
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Importance {
     /// 低重要性 - 可以快速淡忘
@@ -330,6 +330,79 @@ impl Status {
         } else {
             None
         }
+    }
+}
+
+// ━━━━━ v1.17.0 Phase 5: 查询过滤 ━━━━━
+
+/// 查询过滤条件
+///
+/// 用于在 UnifiedTracer 层进行过滤下推，避免全量加载后过滤
+///
+/// # 示例
+///
+/// ```rust,no_run
+/// use realconsole::tracer::types::{QueryFilter, EntryType, Importance};
+///
+/// // 查询重要的用户消息
+/// let filter = QueryFilter {
+///     entry_type: Some(EntryType::ContextMessage),
+///     importance: Some(Importance::Important),
+///     tags: None,
+///     context_id: None,
+/// };
+/// ```
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct QueryFilter {
+    /// 按条目类型过滤
+    pub entry_type: Option<EntryType>,
+
+    /// 按重要性过滤
+    pub importance: Option<Importance>,
+
+    /// 按标签过滤（包含任一标签即匹配）
+    pub tags: Option<Vec<String>>,
+
+    /// 按上下文 ID 过滤
+    pub context_id: Option<String>,
+}
+
+impl QueryFilter {
+    /// 创建新的空过滤器
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 按条目类型过滤
+    pub fn with_entry_type(mut self, entry_type: EntryType) -> Self {
+        self.entry_type = Some(entry_type);
+        self
+    }
+
+    /// 按重要性过滤
+    pub fn with_importance(mut self, importance: Importance) -> Self {
+        self.importance = Some(importance);
+        self
+    }
+
+    /// 按标签过滤
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = Some(tags);
+        self
+    }
+
+    /// 按上下文 ID 过滤
+    pub fn with_context_id(mut self, context_id: String) -> Self {
+        self.context_id = Some(context_id);
+        self
+    }
+
+    /// 判断是否为空过滤器（无任何条件）
+    pub fn is_empty(&self) -> bool {
+        self.entry_type.is_none()
+            && self.importance.is_none()
+            && self.tags.is_none()
+            && self.context_id.is_none()
     }
 }
 

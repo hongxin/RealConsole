@@ -402,6 +402,58 @@ impl TraceEntry {
     pub fn dedup_key(&self) -> String {
         format!("{}_{}", self.content_hash(), self.time_bucket())
     }
+
+    // ━━━━━ v1.17.0 Phase 5: 查询过滤 ━━━━━
+
+    /// 判断是否匹配查询过滤器
+    ///
+    /// 所有非 None 的过滤条件都需要匹配才返回 true
+    ///
+    /// # 参数
+    ///
+    /// - `filter`: 查询过滤器
+    ///
+    /// # 返回
+    ///
+    /// 如果所有条件都匹配返回 true，否则返回 false
+    pub fn matches_filter(&self, filter: &super::types::QueryFilter) -> bool {
+        // 检查条目类型
+        if let Some(ref entry_type) = filter.entry_type {
+            if &self.entry_type != entry_type {
+                return false;
+            }
+        }
+
+        // 检查重要性
+        if let Some(ref importance) = filter.importance {
+            match &self.importance {
+                Some(self_importance) if self_importance == importance => {}
+                _ => return false,
+            }
+        }
+
+        // 检查标签（包含任一标签即匹配）
+        if let Some(ref filter_tags) = filter.tags {
+            if filter_tags.is_empty() {
+                // 空标签列表视为不过滤
+            } else {
+                let has_match = filter_tags.iter().any(|tag| self.tags.contains(tag));
+                if !has_match {
+                    return false;
+                }
+            }
+        }
+
+        // 检查上下文 ID
+        if let Some(ref context_id) = filter.context_id {
+            match &self.context_id {
+                Some(self_context_id) if self_context_id == context_id => {}
+                _ => return false,
+            }
+        }
+
+        true
+    }
 }
 
 impl PartialEq for TraceEntry {

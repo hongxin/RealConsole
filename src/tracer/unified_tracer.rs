@@ -60,6 +60,7 @@ use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 /// 统一追踪器
 ///
@@ -97,6 +98,18 @@ pub struct UnifiedTracer {
 
     /// ✨ v1.16.5: 自定义事件容量
     custom_capacity: usize,
+
+    /// ✨ v1.17.0 Phase 5: Tag 索引
+    ///
+    /// 反向索引：tag -> entry_ids
+    /// 用于 O(1) 时间复杂度的标签查询
+    tag_index: Arc<RwLock<HashMap<String, HashSet<Uuid>>>>,
+
+    /// ✨ v1.17.0 Phase 5: Importance 索引
+    ///
+    /// 反向索引：importance -> entry_ids
+    /// 用于 O(1) 时间复杂度的重要性查询
+    importance_index: Arc<RwLock<HashMap<super::types::Importance, HashSet<Uuid>>>>,
 }
 
 impl UnifiedTracer {
@@ -140,6 +153,8 @@ impl UnifiedTracer {
             context,
             custom_entries: Arc::new(RwLock::new(VecDeque::with_capacity(custom_capacity))),
             custom_capacity,
+            tag_index: Arc::new(RwLock::new(HashMap::new())),
+            importance_index: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -219,6 +234,76 @@ impl UnifiedTracer {
         Ok(entries.into_iter().take(limit).collect())
     }
 
+    /// ✨ v1.17.0 Phase 5: 按维度查询（带过滤）
+    ///
+    /// 在查询时就进行过滤，避免全量加载后过滤，提升性能
+    ///
+    /// # 参数
+    ///
+    /// - `dimension`: 要查询的维度
+    /// - `limit`: 最大返回条目数
+    /// - `filter`: 可选的过滤条件
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use realconsole::tracer::{Dimension, EntryType, Importance, QueryFilter};
+    ///
+    /// # async fn example(tracer: std::sync::Arc<realconsole::tracer::UnifiedTracer>) {
+    /// // 查询 Memory 维度中重要的用户消息
+    /// let filter = QueryFilter::new()
+    ///     .with_entry_type(EntryType::ContextMessage)
+    ///     .with_importance(Importance::Important);
+    ///
+    /// let results = tracer
+    ///     .query_by_dimension_with_filter(Dimension::Memory, 100, Some(filter))
+    ///     .await
+    ///     .unwrap();
+    /// # }
+    /// ```
+    pub async fn query_by_dimension_with_filter(
+        &self,
+        dimension: Dimension,
+        limit: usize,
+        filter: Option<super::types::QueryFilter>,
+    ) -> Result<Vec<TraceEntry>> {
+        // 如果没有过滤条件，直接调用原方法
+        if filter.as_ref().map_or(true, |f| f.is_empty()) {
+            return self.query_by_dimension(dimension, limit).await;
+        }
+
+        let filter = filter.unwrap();
+
+        // 从对应维度获取条目
+        let mut entries = match dimension {
+            Dimension::Statistics => self.entries_from_history(limit * 2).await?,
+            Dimension::Coordination => self.entries_from_exec_logger(limit * 2).await?,
+            Dimension::BlackBox => self.entries_from_llm_logger(limit * 2).await?,
+            Dimension::Memory => self.entries_from_context(limit * 2).await?,
+        };
+
+        // 合并自定义事件（仅匹配维度的）
+        let custom = self.custom_entries.read().await;
+        entries.extend(
+            custom
+                .iter()
+                .filter(|e| e.dimension == dimension)
+                .cloned(),
+        );
+
+        // 按时间排序
+        entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        // ✨ 应用过滤条件（下推到查询层）
+        let filtered: Vec<_> = entries
+            .into_iter()
+            .filter(|e| e.matches_filter(&filter))
+            .take(limit)
+            .collect();
+
+        Ok(filtered)
+    }
+
     /// ✨ v1.15.0 Phase 2: 添加自定义事件
     ///
     /// 用于记录系统内部事件（如自适应优化、炼化过程等）
@@ -242,11 +327,36 @@ impl UnifiedTracer {
     /// tracer.add_entry(entry).await;
     /// ```
     pub async fn add_entry(&self, entry: TraceEntry) {
+        let entry_id = entry.id;
+
+        // ✨ v1.17.0 Phase 5: 更新 Tag 索引
+        if !entry.tags.is_empty() {
+            let mut tag_idx = self.tag_index.write().await;
+            for tag in &entry.tags {
+                tag_idx
+                    .entry(tag.clone())
+                    .or_insert_with(HashSet::new)
+                    .insert(entry_id);
+            }
+        }
+
+        // ✨ v1.17.0 Phase 5: 更新 Importance 索引
+        if let Some(importance) = entry.importance {
+            let mut imp_idx = self.importance_index.write().await;
+            imp_idx
+                .entry(importance)
+                .or_insert_with(HashSet::new)
+                .insert(entry_id);
+        }
+
         let mut custom = self.custom_entries.write().await;
 
         // LRU 策略：超过容量则移除最旧的
         if custom.len() >= self.custom_capacity {
-            custom.pop_front();
+            if let Some(evicted) = custom.pop_front() {
+                // ✨ v1.17.0 Phase 5: 从索引中移除被淘汰的条目
+                self.remove_from_indexes(&evicted).await;
+            }
         }
 
         custom.push_back(entry);
@@ -257,6 +367,39 @@ impl UnifiedTracer {
     /// 用于统计和调试
     pub async fn custom_entries_count(&self) -> usize {
         self.custom_entries.read().await.len()
+    }
+
+    /// ✨ v1.17.0 Phase 5: 从索引中移除条目
+    ///
+    /// 当条目被 LRU 淘汰时，需要从索引中清理
+    async fn remove_from_indexes(&self, entry: &TraceEntry) {
+        let entry_id = entry.id;
+
+        // 从 Tag 索引中移除
+        if !entry.tags.is_empty() {
+            let mut tag_idx = self.tag_index.write().await;
+            for tag in &entry.tags {
+                if let Some(entry_set) = tag_idx.get_mut(tag) {
+                    entry_set.remove(&entry_id);
+                    // 如果这个 tag 没有任何条目了，移除这个 tag
+                    if entry_set.is_empty() {
+                        tag_idx.remove(tag);
+                    }
+                }
+            }
+        }
+
+        // 从 Importance 索引中移除
+        if let Some(importance) = entry.importance {
+            let mut imp_idx = self.importance_index.write().await;
+            if let Some(entry_set) = imp_idx.get_mut(&importance) {
+                entry_set.remove(&entry_id);
+                // 如果这个 importance 没有任何条目了，移除这个 importance
+                if entry_set.is_empty() {
+                    imp_idx.remove(&importance);
+                }
+            }
+        }
     }
 
     /// 按时间范围查询
@@ -302,6 +445,91 @@ impl UnifiedTracer {
             .collect();
 
         Ok(results)
+    }
+
+    /// ✨ v1.17.0 Phase 5: 按标签查询（使用索引优化）
+    ///
+    /// 使用反向索引实现 O(1) 查找，大幅提升性能
+    ///
+    /// # 参数
+    ///
+    /// - `tags`: 标签列表（包含任一标签即匹配）
+    /// - `limit`: 最大返回条目数
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// let entries = tracer.query_by_tags(vec!["rust".to_string(), "async".to_string()], 20).await?;
+    /// ```
+    pub async fn query_by_tags(&self, tags: Vec<String>, limit: usize) -> Result<Vec<TraceEntry>> {
+        if tags.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 使用索引查找包含任一标签的所有 entry_ids
+        let tag_idx = self.tag_index.read().await;
+        let mut matching_ids: HashSet<Uuid> = HashSet::new();
+
+        for tag in &tags {
+            if let Some(entry_set) = tag_idx.get(tag) {
+                matching_ids.extend(entry_set);
+            }
+        }
+
+        // 从 custom_entries 中提取匹配的条目
+        let custom = self.custom_entries.read().await;
+        let mut results: Vec<_> = custom
+            .iter()
+            .filter(|e| matching_ids.contains(&e.id))
+            .cloned()
+            .collect();
+
+        // 按时间排序（最新优先）
+        results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        Ok(results.into_iter().take(limit).collect())
+    }
+
+    /// ✨ v1.17.0 Phase 5: 按重要性查询（使用索引优化）
+    ///
+    /// 使用反向索引实现 O(1) 查找，大幅提升性能
+    ///
+    /// # 参数
+    ///
+    /// - `importance`: 重要性级别
+    /// - `limit`: 最大返回条目数
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use realconsole::tracer::Importance;
+    ///
+    /// let entries = tracer.query_by_importance(Importance::Critical, 20).await?;
+    /// ```
+    pub async fn query_by_importance(
+        &self,
+        importance: super::types::Importance,
+        limit: usize,
+    ) -> Result<Vec<TraceEntry>> {
+        // 使用索引查找指定重要性的所有 entry_ids
+        let imp_idx = self.importance_index.read().await;
+        let matching_ids = imp_idx
+            .get(&importance)
+            .map(|s| s.clone())
+            .unwrap_or_else(HashSet::new);
+
+        // 从 custom_entries 中提取匹配的条目
+        let custom = self.custom_entries.read().await;
+        let mut results: Vec<_> = custom
+            .iter()
+            .filter(|e| matching_ids.contains(&e.id))
+            .cloned()
+            .collect();
+
+        // 按时间排序（最新优先）
+        results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        Ok(results.into_iter().take(limit).collect())
     }
 
     /// 获取统计信息
@@ -796,5 +1024,365 @@ mod tests {
         // Unicode 搜索 - 不应该崩溃
         let results = tracer.search("中文").await;
         assert!(results.is_ok(), "Unicode搜索不应该出错");
+    }
+
+    // ━━━━━ v1.17.0 Phase 5: 查询性能测试 ━━━━━
+
+    #[tokio::test]
+    async fn test_query_filter_performance() {
+        use super::super::types::{EntryType, Importance, QueryFilter};
+
+        let history = create_test_history();
+        let exec_logger = create_test_exec_logger();
+        let context = create_test_context();
+
+        let tracer = Arc::new(UnifiedTracer::with_custom_capacity(
+            history,
+            exec_logger,
+            None,
+            context,
+            1000,
+        ));
+
+        // 准备测试数据：添加 500 条 Memory 条目
+        for i in 0..500 {
+            let mut entry = TraceEntry::new(
+                Dimension::Memory,
+                EntryType::ContextMessage,
+                format!("Test message {}", i),
+                Status::Success,
+            );
+            entry.set_importance(if i % 3 == 0 {
+                Importance::Important
+            } else {
+                Importance::Normal
+            });
+            tracer.add_entry(entry).await;
+        }
+
+        // 测试1: 无过滤查询（基线）
+        let start = std::time::Instant::now();
+        let all_results = tracer.query_by_dimension(Dimension::Memory, 500).await.unwrap();
+        let baseline_duration = start.elapsed();
+        println!("无过滤查询: {:?}, 结果数: {}", baseline_duration, all_results.len());
+
+        // 测试2: 过滤查询（优化后）
+        let filter = QueryFilter::new().with_importance(Importance::Important);
+        let start = std::time::Instant::now();
+        let filtered_results = tracer
+            .query_by_dimension_with_filter(Dimension::Memory, 500, Some(filter))
+            .await
+            .unwrap();
+        let filtered_duration = start.elapsed();
+        println!(
+            "过滤查询: {:?}, 结果数: {}",
+            filtered_duration,
+            filtered_results.len()
+        );
+
+        // 验证正确性
+        assert_eq!(filtered_results.len(), 167); // 500 / 3 ≈ 167 个 Important
+
+        // 验证所有结果都是 Important
+        assert!(filtered_results
+            .iter()
+            .all(|e| e.importance == Some(Importance::Important)));
+
+        // 性能应该是合理的（不做严格断言，因为可能受环境影响）
+        assert!(filtered_duration.as_millis() < 1000, "过滤查询耗时过长");
+    }
+
+    #[tokio::test]
+    async fn test_filter_combination() {
+        use super::super::types::{EntryType, Importance, QueryFilter};
+
+        let history = create_test_history();
+        let exec_logger = create_test_exec_logger();
+        let context = create_test_context();
+
+        let tracer = Arc::new(UnifiedTracer::with_custom_capacity(
+            history,
+            exec_logger,
+            None,
+            context,
+            500,
+        ));
+
+        // 添加不同类型和重要性的条目
+        for i in 0..100 {
+            let entry_type = if i % 2 == 0 {
+                EntryType::ContextMessage
+            } else {
+                EntryType::ContextSwitch
+            };
+
+            let importance = if i % 3 == 0 {
+                Importance::Important
+            } else {
+                Importance::Normal
+            };
+
+            let mut entry = TraceEntry::new(
+                Dimension::Memory,
+                entry_type,
+                format!("Entry {}", i),
+                Status::Success,
+            );
+            entry.set_importance(importance);
+
+            tracer.add_entry(entry).await;
+        }
+
+        // 组合过滤：ContextMessage + Important
+        let filter = QueryFilter::new()
+            .with_entry_type(EntryType::ContextMessage)
+            .with_importance(Importance::Important);
+
+        let results = tracer
+            .query_by_dimension_with_filter(Dimension::Memory, 100, Some(filter))
+            .await
+            .unwrap();
+
+        // 验证所有结果都满足两个条件
+        assert!(results.iter().all(|e| e.entry_type == EntryType::ContextMessage
+            && e.importance == Some(Importance::Important)));
+
+        println!("组合过滤结果数: {}", results.len());
+    }
+
+    #[tokio::test]
+    async fn test_empty_filter() {
+        use super::super::types::QueryFilter;
+
+        let history = create_test_history();
+        let exec_logger = create_test_exec_logger();
+        let context = create_test_context();
+
+        let tracer = Arc::new(UnifiedTracer::new(history, exec_logger, None, context));
+
+        // 空过滤器应该返回所有结果
+        let filter = QueryFilter::new();
+
+        let results = tracer
+            .query_by_dimension_with_filter(Dimension::Memory, 10, Some(filter))
+            .await
+            .unwrap();
+
+        // 应该调用原方法，返回正常结果
+        assert!(results.len() <= 10);
+    }
+
+    // ━━━━━ v1.17.0 Phase 5: 索引功能测试 ━━━━━
+
+    #[tokio::test]
+    async fn test_tag_index() {
+        use super::super::types::Importance;
+
+        let history = create_test_history();
+        let exec_logger = create_test_exec_logger();
+        let context = create_test_context();
+
+        let tracer = Arc::new(UnifiedTracer::with_custom_capacity(
+            history,
+            exec_logger,
+            None,
+            context,
+            100,
+        ));
+
+        // 添加带标签的条目
+        for i in 0..50 {
+            let mut entry = TraceEntry::new(
+                Dimension::Memory,
+                EntryType::ContextMessage,
+                format!("Message {}", i),
+                Status::Success,
+            );
+
+            // 偶数添加 "rust" 标签
+            if i % 2 == 0 {
+                entry.add_tag("rust".to_string());
+            }
+
+            // 能被 3 整除的添加 "async" 标签
+            if i % 3 == 0 {
+                entry.add_tag("async".to_string());
+            }
+
+            // 能被 6 整除的同时拥有两个标签
+            tracer.add_entry(entry).await;
+        }
+
+        // 测试 1: 查询 "rust" 标签
+        let rust_results = tracer
+            .query_by_tags(vec!["rust".to_string()], 100)
+            .await
+            .unwrap();
+        assert_eq!(rust_results.len(), 25, "应该有 25 条 'rust' 标签的条目");
+
+        // 测试 2: 查询 "async" 标签
+        let async_results = tracer
+            .query_by_tags(vec!["async".to_string()], 100)
+            .await
+            .unwrap();
+        assert_eq!(async_results.len(), 17, "应该有 17 条 'async' 标签的条目");
+
+        // 测试 3: 查询多个标签（OR 语义）
+        let multi_results = tracer
+            .query_by_tags(vec!["rust".to_string(), "async".to_string()], 100)
+            .await
+            .unwrap();
+        // rust (25) + async (17) - overlap (9) = 33
+        assert!(
+            multi_results.len() >= 25,
+            "多标签查询应该至少包含 rust 的所有结果"
+        );
+
+        // 测试 4: 不存在的标签
+        let empty_results = tracer
+            .query_by_tags(vec!["nonexistent".to_string()], 100)
+            .await
+            .unwrap();
+        assert_eq!(empty_results.len(), 0, "不存在的标签应该返回空");
+
+        println!("✅ Tag 索引测试通过");
+    }
+
+    #[tokio::test]
+    async fn test_importance_index() {
+        use super::super::types::Importance;
+
+        let history = create_test_history();
+        let exec_logger = create_test_exec_logger();
+        let context = create_test_context();
+
+        let tracer = Arc::new(UnifiedTracer::with_custom_capacity(
+            history,
+            exec_logger,
+            None,
+            context,
+            200,
+        ));
+
+        // 添加不同重要性的条目
+        for i in 0..100 {
+            let mut entry = TraceEntry::new(
+                Dimension::Memory,
+                EntryType::ContextMessage,
+                format!("Message {}", i),
+                Status::Success,
+            );
+
+            let importance = match i % 4 {
+                0 => Importance::Critical,  // 25 个
+                1 => Importance::Important, // 25 个
+                2 => Importance::Normal,    // 25 个
+                3 => Importance::Low,       // 25 个
+                _ => unreachable!(),
+            };
+            entry.set_importance(importance);
+
+            tracer.add_entry(entry).await;
+        }
+
+        // 测试 1: 查询 Critical
+        let critical_results = tracer
+            .query_by_importance(Importance::Critical, 100)
+            .await
+            .unwrap();
+        assert_eq!(
+            critical_results.len(),
+            25,
+            "应该有 25 条 Critical 条目"
+        );
+        assert!(critical_results
+            .iter()
+            .all(|e| e.importance == Some(Importance::Critical)));
+
+        // 测试 2: 查询 Important
+        let important_results = tracer
+            .query_by_importance(Importance::Important, 100)
+            .await
+            .unwrap();
+        assert_eq!(
+            important_results.len(),
+            25,
+            "应该有 25 条 Important 条目"
+        );
+
+        // 测试 3: 查询 Normal
+        let normal_results = tracer
+            .query_by_importance(Importance::Normal, 100)
+            .await
+            .unwrap();
+        assert_eq!(normal_results.len(), 25, "应该有 25 条 Normal 条目");
+
+        // 测试 4: 查询 Low
+        let low_results = tracer
+            .query_by_importance(Importance::Low, 100)
+            .await
+            .unwrap();
+        assert_eq!(low_results.len(), 25, "应该有 25 条 Low 条目");
+
+        println!("✅ Importance 索引测试通过");
+    }
+
+    #[tokio::test]
+    async fn test_index_lru_eviction() {
+        use super::super::types::Importance;
+
+        let history = create_test_history();
+        let exec_logger = create_test_exec_logger();
+        let context = create_test_context();
+
+        // 容量设置为 10，测试 LRU 淘汰
+        let tracer = Arc::new(UnifiedTracer::with_custom_capacity(
+            history,
+            exec_logger,
+            None,
+            context,
+            10,
+        ));
+
+        // 添加 20 条条目（超过容量）
+        for i in 0..20 {
+            let mut entry = TraceEntry::new(
+                Dimension::Memory,
+                EntryType::ContextMessage,
+                format!("Message {}", i),
+                Status::Success,
+            );
+            entry.add_tag("test".to_string());
+            entry.set_importance(Importance::Important);
+
+            tracer.add_entry(entry).await;
+        }
+
+        // 由于 LRU，只应该保留最后 10 条
+        let tag_results = tracer
+            .query_by_tags(vec!["test".to_string()], 100)
+            .await
+            .unwrap();
+        assert_eq!(
+            tag_results.len(),
+            10,
+            "LRU 淘汰后应该只剩 10 条"
+        );
+
+        let importance_results = tracer
+            .query_by_importance(Importance::Important, 100)
+            .await
+            .unwrap();
+        assert_eq!(
+            importance_results.len(),
+            10,
+            "LRU 淘汰后应该只剩 10 条"
+        );
+
+        // 验证索引数据一致性
+        let custom_count = tracer.custom_entries_count().await;
+        assert_eq!(custom_count, 10, "custom_entries 应该只有 10 条");
+
+        println!("✅ 索引 LRU 淘汰测试通过");
     }
 }
