@@ -168,24 +168,185 @@ impl TaskExecutor {
     }
 
     /// 串行执行阶段
+    ///
+    /// v1.20.0: 支持环境变量共享 - 将同一 Stage 内的任务合并为一个 shell 命令执行
     async fn execute_sequential(&self, stage: &ExecutionStage) -> TaskOpResult<Vec<TaskResult>> {
-        let mut results = Vec::new();
-
-        for task in &stage.tasks {
-            let result = self.execute_task(task).await;
-            results.push(result);
+        // 如果只有一个任务，使用旧逻辑（优化）
+        if stage.tasks.len() == 1 {
+            let result = self.execute_task(&stage.tasks[0]).await;
 
             // 更新状态
             {
                 let mut state = self.state.write().await;
                 state.completed_tasks += 1;
             }
+            self.report_progress().await;
 
-            // 报告进度
+            return Ok(vec![result]);
+        }
+
+        // 多任务场景：合并执行以支持环境变量共享
+        self.execute_merged_tasks(&stage.tasks).await
+    }
+
+    /// 合并执行多个任务（环境变量共享）
+    ///
+    /// 将多个任务的命令合并为一个 shell 脚本，在同一进程中执行
+    async fn execute_merged_tasks(&self, tasks: &[SubTask]) -> TaskOpResult<Vec<TaskResult>> {
+
+        // 1. 构建合并后的命令
+        let merged_command = self.build_merged_command(tasks);
+
+        // 2. 执行合并后的命令
+        let exec_start = Utc::now();
+        let (global_success, merged_output, global_error) =
+            self.execute_with_retry_merged(&merged_command, tasks).await;
+        let exec_end = Utc::now();
+
+        // 3. 拆分输出并创建每个任务的结果
+        let task_outputs = self.split_merged_output(&merged_output, tasks.len());
+        let mut results = Vec::new();
+
+        for (idx, task) in tasks.iter().enumerate() {
+            let output = task_outputs.get(idx).cloned().unwrap_or_default();
+
+            // 判断此任务是否成功
+            let (status, error) = if !global_success {
+                // 如果合并命令失败，判断是哪个任务失败
+                // 策略：如果后续任务没有输出，说明当前任务失败导致链断裂
+                let has_subsequent_output = (idx + 1..tasks.len())
+                    .any(|i| task_outputs.get(i).is_some_and(|s| !s.trim().is_empty()));
+
+                if !has_subsequent_output {
+                    // 当前或之后的任务失败
+                    (TaskStatus::Failed, global_error.clone())
+                } else {
+                    // 之前的任务已成功，当前任务也成功
+                    (TaskStatus::Success, None)
+                }
+            } else {
+                (TaskStatus::Success, None)
+            };
+
+            let result = TaskResult {
+                task: task.clone(),
+                status,
+                output,
+                error,
+                start_time: exec_start,
+                end_time: exec_end,
+                duration: (exec_end - exec_start).num_seconds() as u32,
+            };
+
+            results.push(result);
+
+            // 更新状态和进度
+            {
+                let mut state = self.state.write().await;
+                state.completed_tasks += 1;
+                state.current_task = task.name.clone();
+            }
             self.report_progress().await;
         }
 
         Ok(results)
+    }
+
+    /// 构建合并后的命令
+    ///
+    /// 使用 && 连接所有命令，并在每个任务后插入分隔符
+    fn build_merged_command(&self, tasks: &[SubTask]) -> String {
+        let mut merged = String::new();
+
+        for (idx, task) in tasks.iter().enumerate() {
+            // 添加任务命令
+            merged.push_str(&task.command);
+
+            // 添加分隔符（用于输出拆分）
+            // 使用唯一标记避免与用户输出冲突
+            merged.push_str(&format!(" ; echo '__REALCONSOLE_TASK_{}_END__'", idx));
+
+            // 添加连接符（除了最后一个任务）
+            if idx < tasks.len() - 1 {
+                merged.push_str(" && ");
+            }
+        }
+
+        merged
+    }
+
+    /// 拆分合并后的输出
+    ///
+    /// 根据分隔符将输出分配给每个任务
+    fn split_merged_output(&self, output: &str, task_count: usize) -> Vec<String> {
+        let mut outputs = Vec::new();
+        let mut current = String::new();
+
+        for line in output.lines() {
+            // 检查是否是分隔符
+            if line.starts_with("__REALCONSOLE_TASK_") && line.ends_with("_END__") {
+                outputs.push(current.trim_end().to_string());
+                current.clear();
+            } else {
+                if !current.is_empty() {
+                    current.push('\n');
+                }
+                current.push_str(line);
+            }
+        }
+
+        // 添加最后一个任务的输出
+        if !current.is_empty() {
+            outputs.push(current.trim_end().to_string());
+        }
+
+        // 确保返回的数组长度匹配任务数量
+        while outputs.len() < task_count {
+            outputs.push(String::new());
+        }
+
+        outputs
+    }
+
+    /// 执行合并后的命令（带重试）
+    async fn execute_with_retry_merged(
+        &self,
+        command: &str,
+        tasks: &[SubTask],
+    ) -> (bool, String, Option<String>) {
+        // 使用第一个任务的重试策略（或默认策略）
+        let default_policy = RetryPolicy::simple(3);
+        let retry_policy = tasks
+            .first()
+            .and_then(|t| t.retry_policy.as_ref())
+            .unwrap_or(&default_policy);
+
+        for attempt in 0..=retry_policy.max_retries {
+            if attempt > 0 {
+                let delay = if retry_policy.exponential_backoff {
+                    retry_policy.retry_interval * (2_u32.pow(attempt - 1))
+                } else {
+                    retry_policy.retry_interval
+                };
+                sleep(Duration::from_secs(delay as u64)).await;
+            }
+
+            // 执行合并后的命令
+            let result = self.execute_command(command).await;
+
+            match result {
+                Ok(output) => {
+                    return (true, output, None);
+                }
+                Err(error) => {
+                    if attempt == retry_policy.max_retries {
+                        return (false, String::new(), Some(error.to_string()));
+                    }
+                }
+            }
+        }
+
+        (false, String::new(), Some("重试次数用尽".to_string()))
     }
 
     /// 并行执行阶段
