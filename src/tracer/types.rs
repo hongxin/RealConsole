@@ -208,13 +208,14 @@ impl EntryType {
 /// 记忆重要性级别（Memory 维度专用）
 ///
 /// 用于标记 Memory 维度条目的重要程度
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Importance {
     /// 低重要性 - 可以快速淡忘
     Low,
 
     /// 普通重要性 - 默认级别
+    #[default]
     Normal,
 
     /// 重要 - 需要长期保留
@@ -264,12 +265,6 @@ impl Importance {
             Importance::Important => "重要",
             Importance::Critical => "关键",
         }
-    }
-}
-
-impl Default for Importance {
-    fn default() -> Self {
-        Importance::Normal
     }
 }
 

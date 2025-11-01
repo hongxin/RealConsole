@@ -268,7 +268,7 @@ impl UnifiedTracer {
         filter: Option<super::types::QueryFilter>,
     ) -> Result<Vec<TraceEntry>> {
         // 如果没有过滤条件，直接调用原方法
-        if filter.as_ref().map_or(true, |f| f.is_empty()) {
+        if filter.as_ref().is_none_or(|f| f.is_empty()) {
             return self.query_by_dimension(dimension, limit).await;
         }
 
@@ -515,7 +515,7 @@ impl UnifiedTracer {
         let imp_idx = self.importance_index.read().await;
         let matching_ids = imp_idx
             .get(&importance)
-            .map(|s| s.clone())
+            .cloned()
             .unwrap_or_else(HashSet::new);
 
         // 从 custom_entries 中提取匹配的条目
