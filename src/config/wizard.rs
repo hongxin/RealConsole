@@ -225,7 +225,7 @@ impl ConfigWizard {
         &self,
         recommendation: &super::recommender::LlmRecommendation,
     ) -> Result<(String, Option<String>, Option<String>, Option<String>)> {
-        println!("\n{} {}", "📝 步骤 1/5:".bold(), "LLM 后端选择");
+        println!("\n{} LLM 后端选择", "📝 步骤 1/5:".bold());
         println!("\n{}", format!("💡 推荐: {} (置信度: {:.0}%)",
             recommendation.provider, recommendation.confidence * 100.0).cyan());
         println!("   {}", recommendation.reason.dimmed());
@@ -346,7 +346,7 @@ impl ConfigWizard {
 
     /// 提示建议频率
     fn prompt_suggestion_frequency(&self, recommended: &str) -> Result<String> {
-        println!("\n{} {}", "📝 步骤 2/5:".bold(), "主动建议频率");
+        println!("\n{} 主动建议频率", "📝 步骤 2/5:".bold());
         println!("{}", format!("💡 推荐: {}", recommended).cyan());
 
         let choices = vec![
@@ -379,7 +379,7 @@ impl ConfigWizard {
 
     /// 提示安全级别
     fn prompt_safety_level(&self, recommended: &str) -> Result<String> {
-        println!("\n{} {}", "📝 步骤 3/5:".bold(), "安全级别");
+        println!("\n{} 安全级别", "📝 步骤 3/5:".bold());
         println!("{}", format!("💡 推荐: {}", recommended).cyan());
 
         let choices = vec![
@@ -412,7 +412,7 @@ impl ConfigWizard {
 
     /// 提示数据收集
     fn prompt_data_collection(&self) -> Result<String> {
-        println!("\n{} {}", "📝 步骤 4/5:".bold(), "数据收集");
+        println!("\n{} 数据收集", "📝 步骤 4/5:".bold());
 
         let choices = vec![
             "完全启用 (帮助改进产品)",
@@ -437,7 +437,7 @@ impl ConfigWizard {
 
     /// 提示快捷键设置
     fn prompt_keyboard_shortcuts(&self) -> Result<String> {
-        println!("\n{} {}", "📝 步骤 5/5:".bold(), "快捷键设置");
+        println!("\n{} 快捷键设置", "📝 步骤 5/5:".bold());
 
         let choices = vec![
             "使用默认快捷键 (推荐)",

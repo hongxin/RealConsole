@@ -98,7 +98,7 @@ impl StatePredictor {
     }
 
     /// 使用默认参数创建（历史长度 = 10）
-    pub fn default() -> Self {
+    pub fn with_default_capacity() -> Self {
         Self::new(10)
     }
 

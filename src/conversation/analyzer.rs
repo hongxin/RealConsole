@@ -254,7 +254,7 @@ impl ParameterAnalyzer {
             // 查找参数规格
             if let Some(spec) = parameter_specs.iter().find(|s| s.name == name) {
                 // 根据类型转换值
-                let param_value = self.convert_to_parameter_value(&value, &spec.param_type)?;
+                let param_value = Self::convert_to_parameter_value(&value, &spec.param_type)?;
                 extracted.push((name, param_value));
             }
         }
@@ -264,7 +264,6 @@ impl ParameterAnalyzer {
 
     /// 将 JSON 值转换为 ParameterValue
     fn convert_to_parameter_value(
-        &self,
         value: &serde_json::Value,
         param_type: &ParameterType,
     ) -> Result<ParameterValue, String> {
@@ -315,7 +314,7 @@ impl ParameterAnalyzer {
                 if let Some(arr) = value.as_array() {
                     let mut values = Vec::new();
                     for item in arr {
-                        values.push(self.convert_to_parameter_value(item, inner_type)?);
+                        values.push(Self::convert_to_parameter_value(item, inner_type)?);
                     }
                     Ok(ParameterValue::List(values))
                 } else {
@@ -397,29 +396,25 @@ mod tests {
 
         // 测试字符串转换
         let json_value = serde_json::json!("test_string");
-        let result = analyzer
-            .convert_to_parameter_value(&json_value, &ParameterType::String)
+        let result = ParameterAnalyzer::convert_to_parameter_value(&json_value, &ParameterType::String)
             .unwrap();
         assert_eq!(result, ParameterValue::String("test_string".to_string()));
 
         // 测试整数转换
         let json_value = serde_json::json!(42);
-        let result = analyzer
-            .convert_to_parameter_value(&json_value, &ParameterType::Integer)
+        let result = ParameterAnalyzer::convert_to_parameter_value(&json_value, &ParameterType::Integer)
             .unwrap();
         assert_eq!(result, ParameterValue::Integer(42));
 
         // 测试浮点数转换
         let json_value = serde_json::json!(3.14);
-        let result = analyzer
-            .convert_to_parameter_value(&json_value, &ParameterType::Float)
+        let result = ParameterAnalyzer::convert_to_parameter_value(&json_value, &ParameterType::Float)
             .unwrap();
         assert_eq!(result, ParameterValue::Float(3.14));
 
         // 测试布尔转换
         let json_value = serde_json::json!(true);
-        let result = analyzer
-            .convert_to_parameter_value(&json_value, &ParameterType::Boolean)
+        let result = ParameterAnalyzer::convert_to_parameter_value(&json_value, &ParameterType::Boolean)
             .unwrap();
         assert_eq!(result, ParameterValue::Boolean(true));
     }

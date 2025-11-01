@@ -144,6 +144,18 @@ pub struct CallContext {
     pub tool_results_summary: Option<String>,
 }
 
+/// log_interaction 函数的参数封装
+pub struct LogInteractionParams<'a> {
+    pub session_id: String,
+    pub model: String,
+    pub messages: &'a [Message],
+    pub response_content: Option<String>,
+    pub start_time: Instant,
+    pub is_streaming: bool,
+    pub error: Option<String>,
+    pub context: Option<CallContext>,
+}
+
 /// LLM 日志配置
 #[derive(Debug, Clone)]
 pub struct LlmLoggerConfig {
@@ -228,28 +240,22 @@ impl LlmLogger {
     /// 记录 LLM 交互
     ///
     /// # 参数
-    /// - `session_id`: 会话 ID
-    /// - `model`: 模型名称
-    /// - `messages`: 请求消息
-    /// - `response_content`: 响应内容
-    /// - `start_time`: 开始时间
-    /// - `is_streaming`: 是否为流式
-    /// - `error`: 错误信息（如果有）
-    /// - `context`: 调用上下文（可选）
-    pub async fn log_interaction(
-        &self,
-        session_id: String,
-        model: String,
-        messages: &[Message],
-        response_content: Option<String>,
-        start_time: Instant,
-        is_streaming: bool,
-        error: Option<String>,
-        context: Option<CallContext>,
-    ) {
+    /// - `params`: 日志交互参数（封装了所有必要的参数）
+    pub async fn log_interaction(&self, params: LogInteractionParams<'_>) {
         if !self.config.enabled {
             return;
         }
+
+        let LogInteractionParams {
+            session_id,
+            model,
+            messages,
+            response_content,
+            start_time,
+            is_streaming,
+            error,
+            context,
+        } = params;
 
         let latency_ms = start_time.elapsed().as_millis() as u64;
         let now = Utc::now();
@@ -878,16 +884,16 @@ mod tests {
         let (session_id, start_time) = logger.start_logging("test-model");
 
         logger
-            .log_interaction(
+            .log_interaction(LogInteractionParams {
                 session_id,
-                "test-model".to_string(),
-                &messages,
-                Some("Hi there!".to_string()),
+                model: "test-model".to_string(),
+                messages: &messages,
+                response_content: Some("Hi there!".to_string()),
                 start_time,
-                false,
-                None,
-                None, // context
-            )
+                is_streaming: false,
+                error: None,
+                context: None,
+            })
             .await;
 
         // 验证日志文件是否创建

@@ -46,7 +46,7 @@
 //! println!("{} {} {}", taiji.balance(), liangyyi.symbol(), sixiang.symbol());
 //! ```
 
-pub mod liangyyi;
+pub mod types;
 pub mod sixiang;
 pub mod taiji;
 pub mod tracker; // ✨ Phase 2: 状态追踪器
@@ -55,7 +55,7 @@ pub mod predictor; // ✨ v1.12.0: 状态预测
 pub mod adaptive; // ✨ v1.13.0: 自适应系统
 
 // Re-exports
-pub use liangyyi::Liangyyi;
+pub use types::Liangyyi;
 pub use sixiang::Sixiang;
 pub use taiji::{EnergyType, Event, Taiji, TaijiContext};
 pub use tracker::{

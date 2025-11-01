@@ -10,10 +10,10 @@
 
 mod generator;
 mod validator;
-mod wizard;
+mod core;
 
-pub use wizard::{ConfigWizard, WizardMode};
+pub use core::{ConfigWizard, WizardMode};
 
 // WizardConfig 仅用于内部，不导出
 #[allow(unused_imports)]
-pub(crate) use wizard::WizardConfig;
+pub(crate) use core::WizardConfig;

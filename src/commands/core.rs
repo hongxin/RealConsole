@@ -71,6 +71,13 @@ fn cmd_help(arg: &str) -> String {
 
 /// 快速帮助（简洁版）
 fn cmd_help_quick() -> String {
+    let version_str = format!("v{}", VERSION);
+    let header = format!(
+        " {} {}",
+        "RealConsole".bold().cyan(),
+        version_str.dimmed()
+    );
+
     format!(
         r#"{}
 
@@ -105,11 +112,7 @@ fn cmd_help_quick() -> String {
   使用 {} 查看命令详情
   系统自动识别命令类型，使用 {} 查看路由说明
 "#,
-        format!(
-            " {} {}",
-            "RealConsole".bold().cyan(),
-            format!("v{}", VERSION).dimmed()
-        ),
+        header,
         "💬 智能对话:".bold(),
         "示例:".dimmed(),
         "示例:".dimmed(),
@@ -138,6 +141,8 @@ fn cmd_help_quick() -> String {
 
 /// 详细帮助（完整文档）
 fn cmd_help_all() -> String {
+    let title = format!("{} - 完整命令参考", "RealConsole".bold().cyan());
+
     format!(
         r#"{}
 
@@ -176,7 +181,7 @@ fn cmd_help_all() -> String {
 
 更多: {} | {} | {}
 "#,
-        format!("{} - 完整命令参考", "RealConsole".bold().cyan()),
+        title,
         "核心命令".bold(),
         "/help".green(),
         "/quit".green(),

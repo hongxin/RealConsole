@@ -2503,16 +2503,16 @@ impl Agent {
                             tool_results_summary,
                         });
 
-                        logger.log_interaction(
+                        logger.log_interaction(crate::llm::logger::LogInteractionParams {
                             session_id,
-                            model_name_clone,
-                            &messages_clone,
-                            Some(response_clone),
+                            model: model_name_clone,
+                            messages: &messages_clone,
+                            response_content: Some(response_clone),
                             start_time,
-                            false, // is_streaming
-                            None,  // no error
+                            is_streaming: false,
+                            error: None,
                             context,
-                        ).await;
+                        }).await;
                     });
                 }
 
@@ -2616,16 +2616,16 @@ impl Agent {
                             tool_results_summary,
                         });
 
-                        logger.log_interaction(
+                        logger.log_interaction(crate::llm::logger::LogInteractionParams {
                             session_id,
-                            model_name_clone,
-                            &messages_clone,
-                            None, // no response
+                            model: model_name_clone,
+                            messages: &messages_clone,
+                            response_content: None,
                             start_time,
-                            false, // is_streaming
-                            Some(error_clone),
+                            is_streaming: false,
+                            error: Some(error_clone),
                             context,
-                        ).await;
+                        }).await;
                     });
                 }
 
@@ -2753,16 +2753,16 @@ impl Agent {
                         });
 
                         logger_clone
-                            .log_interaction(
-                                session_id_clone,
-                                model_name_clone,
-                                &messages_clone,
-                                Some(response_clone),
-                                start_clone,
-                                true, // is_streaming
-                                None, // no error
+                            .log_interaction(crate::llm::logger::LogInteractionParams {
+                                session_id: session_id_clone,
+                                model: model_name_clone,
+                                messages: &messages_clone,
+                                response_content: Some(response_clone),
+                                start_time: start_clone,
+                                is_streaming: true,
+                                error: None,
                                 context,
-                            )
+                            })
                             .await;
                     });
                 }
@@ -2834,16 +2834,16 @@ impl Agent {
                         });
 
                         logger_clone
-                            .log_interaction(
-                                session_id_clone,
-                                model_name_clone,
-                                &messages_clone,
-                                None,                  // no response
-                                start_clone,
-                                true,                  // is_streaming
-                                Some(error_msg_clone), // error
+                            .log_interaction(crate::llm::logger::LogInteractionParams {
+                                session_id: session_id_clone,
+                                model: model_name_clone,
+                                messages: &messages_clone,
+                                response_content: None,
+                                start_time: start_clone,
+                                is_streaming: true,
+                                error: Some(error_msg_clone),
                                 context,
-                            )
+                            })
                             .await;
                     });
                 }

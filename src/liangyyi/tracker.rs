@@ -2,7 +2,7 @@
 //!
 //! 追踪系统状态的演化历史
 
-use super::liangyyi::Liangyyi;
+use super::types::Liangyyi;
 use super::sixiang::Sixiang;
 use super::taiji::{Event, Taiji};
 use chrono::{DateTime, Utc};
@@ -1554,7 +1554,7 @@ mod tests {
     #[tokio::test]
     async fn test_checkpoint_state_conversion() {
         use crate::liangyyi::taiji::{Event, Taiji};
-        use crate::liangyyi::liangyyi::Liangyyi;
+        use crate::liangyyi::types::Liangyyi;
         use crate::liangyyi::sixiang::Sixiang;
 
         // 创建一个测试状态

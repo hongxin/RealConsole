@@ -6,7 +6,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use super::wizard::{LlmProviderChoice, WizardConfig};
+use super::core::{LlmProviderChoice, WizardConfig};
 
 /// 配置文件生成器
 pub struct ConfigGenerator;

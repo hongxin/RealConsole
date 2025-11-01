@@ -522,7 +522,7 @@ impl ShellExecutorWithFixer {
             Ok(output) => {
                 // 成功执行
                 ExecutionResult::success(output)
-                    .with_risk_assessment(risk_assessment.unwrap_or_else(|| RiskAssessment::safe()))
+                    .with_risk_assessment(risk_assessment.unwrap_or_else(RiskAssessment::safe))
                     .with_next_steps(next_steps)
             }
             Err(err) => {
@@ -580,7 +580,7 @@ impl ShellExecutorWithFixer {
                 };
 
                 ExecutionResult::failure(error_output, Some(analysis), ranked_strategies)
-                    .with_risk_assessment(risk_assessment.unwrap_or_else(|| RiskAssessment::safe()))
+                    .with_risk_assessment(risk_assessment.unwrap_or_else(RiskAssessment::safe))
                     .with_next_steps(next_steps)
                     .with_suggestions(suggestions.unwrap_or_else(SuggestionList::new))
             }

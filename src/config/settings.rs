@@ -761,19 +761,22 @@ impl Config {
     /// let config = Config::smart_defaults();
     /// ```
     pub fn smart_defaults() -> Self {
-        let mut config = Self::default();
+        let default = Self::default();
 
         // 智能检测 LLM 配置
-        config.llm = LlmConfig::detect_from_env();
+        let llm = LlmConfig::detect_from_env();
 
-        // 启用常用功能
-        config.features.tool_calling_enabled = Some(true);
-        config.features.auto_suggest = Some(true);
-
-        // 启用离坎炼化炉（自主学习）
-        config.likan = Some(crate::likan::FurnaceConfig::default());
-
-        config
+        // 构建配置
+        Self {
+            llm,
+            features: FeaturesConfig {
+                tool_calling_enabled: Some(true),
+                auto_suggest: Some(true),
+                ..default.features
+            },
+            likan: Some(crate::likan::FurnaceConfig::default()),
+            ..default
+        }
     }
 
     /// 从 YAML 文件加载配置（支持多路径搜索）

@@ -2,7 +2,7 @@
 //!
 //! 两仪分化为四象，体现阴阳动静的四种状态
 
-use super::liangyyi::Liangyyi;
+use super::types::Liangyyi;
 
 /// 四象：老阴、少阳、少阴、老阳
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

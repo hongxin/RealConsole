@@ -760,14 +760,12 @@ fn handle_replay(args: &str, logger: Option<Arc<LlmLogger>>) -> String {
 fn format_number(n: u64) -> String {
     let s = n.to_string();
     let mut result = String::new();
-    let mut count = 0;
 
-    for c in s.chars().rev() {
+    for (count, c) in s.chars().rev().enumerate() {
         if count > 0 && count % 3 == 0 {
             result.push(',');
         }
         result.push(c);
-        count += 1;
     }
 
     result.chars().rev().collect()

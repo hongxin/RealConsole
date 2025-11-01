@@ -23,6 +23,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// 缓存类型：存储键值对和时间戳
+type CacheMap = HashMap<String, (String, std::time::Instant)>;
+
 /// 工作流步骤类型
 ///
 /// 定义了工作流中可以执行的操作类型
@@ -158,7 +161,7 @@ pub struct WorkflowExecutor {
     llm_manager: Option<Arc<RwLock<crate::llm_manager::LlmManager>>>,
 
     /// 缓存（可选）
-    cache: Option<Arc<RwLock<HashMap<String, (String, std::time::Instant)>>>>,
+    cache: Option<Arc<RwLock<CacheMap>>>,
 }
 
 impl WorkflowIntent {
