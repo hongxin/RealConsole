@@ -112,6 +112,17 @@ voice:
   max_broadcast_length: 200        # 最大播报长度/字符（默认 200）
   filter_code_blocks: true         # 过滤代码块（默认 true）
 
+# ✨ v1.21.0: 任务系统配置
+task:
+  display:
+    show_task_output: true         # 是否在 Standard 模式下显示任务输出（默认 true）
+    max_output_lines: 50           # 输出最大行数，0 表示不限制（默认 50）
+    highlight_numbers: true        # 是否高亮数字（识别计算结果，默认 true）
+    show_task_duration: true       # 是否显示任务执行时间（默认 true）
+  execution:
+    merge_stages: true             # 是否合并 Stage 执行（支持环境变量共享，默认 true）
+    max_merged_tasks: 20           # 合并执行的最大任务数（默认 20）
+
 # 离坎炼化炉配置 (v1.8.2+ Phase 4.3)
 # 自主学习循环系统：从交互中提取模式，持续优化建议质量
 likan:

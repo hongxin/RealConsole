@@ -556,10 +556,13 @@ impl Display {
     /// - Minimal: 一行摘要
     /// - Standard: 摘要 + 失败任务列表
     /// - Debug: 完整执行计划结构 + 所有任务详情 + 输出内容 + 时间统计
+    ///
+    /// ✨ v1.21.0: 支持 TaskDisplayConfig 配置
     pub fn task_execution_result(
         mode: DisplayMode,
         result: &ExecutionResult,
         plan: Option<&ExecutionPlan>,
+        config: &crate::config::Config,
     ) {
         // 状态图标
         let status_icon = if result.is_success() {
@@ -599,10 +602,11 @@ impl Display {
             );
 
             // ✨ v1.19.0: 显示所有任务的输出（不只是失败的）
-            if !result.task_results.is_empty() {
+            // ✨ v1.21.0: 支持配置控制
+            if config.task.display.show_task_output && !result.task_results.is_empty() {
                 println!(); // 空行分隔
 
-                for task_result in &result.task_results {
+                for (task_idx, task_result) in result.task_results.iter().enumerate() {
                     // 任务状态图标
                     let task_icon = match task_result.status {
                         TaskStatus::Success => "✓".green(),
@@ -615,8 +619,13 @@ impl Display {
                     // 任务名称
                     println!("  {} {}", task_icon, task_result.task.name);
 
-                    // 显示输出内容（限制 50 行）
-                    let max_lines = 50;
+                    // 显示输出内容（使用配置的行数限制）
+                    let max_lines = if config.task.display.max_output_lines == 0 {
+                        usize::MAX // 0 表示不限制
+                    } else {
+                        config.task.display.max_output_lines
+                    };
+
                     if !task_result.output.trim().is_empty() {
                         let lines: Vec<&str> = task_result.output.lines().collect();
                         let display_lines = lines.iter().take(max_lines);
@@ -628,9 +637,10 @@ impl Display {
                         // 如果输出超过限制，显示提示
                         if lines.len() > max_lines {
                             println!(
-                                "    {} (省略 {} 行)",
+                                "    {} (省略 {} 行，使用 /task_output {} 查看完整输出)",
                                 "...".dimmed(),
-                                lines.len() - max_lines
+                                lines.len() - max_lines,
+                                task_idx
                             );
                         }
                     }

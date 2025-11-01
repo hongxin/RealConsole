@@ -334,7 +334,8 @@ async fn execute_tasks_command(
     }
 
     // 5. 使用统一的显示方法（根据 DisplayMode 显示不同详细程度）
-    Display::task_execution_result(config.display.mode, &result, Some(&plan));
+    // ✨ v1.21.0: 添加 config 参数以支持 TaskDisplayConfig
+    Display::task_execution_result(config.display.mode, &result, Some(&plan), config);
 
     // 返回空字符串（显示已经通过 Display 完成）
     String::new()

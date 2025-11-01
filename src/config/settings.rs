@@ -50,6 +50,10 @@ pub struct Config {
     #[serde(default)]
     pub voice: VoiceConfig,
 
+    /// ✨ v1.21.0: 任务系统配置
+    #[serde(default)]
+    pub task: TaskConfig,
+
     /// 离坎炼化炉配置
     #[serde(default)]
     pub likan: Option<crate::likan::FurnaceConfig>,
@@ -663,6 +667,82 @@ impl Default for VoiceConfig {
     }
 }
 
+/// ✨ v1.21.0: 任务系统配置
+///
+/// 控制任务执行和显示的行为
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskConfig {
+    /// 任务显示配置
+    #[serde(default)]
+    pub display: TaskDisplayConfig,
+
+    /// 任务执行配置
+    #[serde(default)]
+    pub execution: TaskExecutionConfig,
+}
+
+/// 任务显示配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDisplayConfig {
+    /// 是否在 Standard 模式下显示任务输出（默认 true）
+    #[serde(default = "default_true")]
+    pub show_task_output: bool,
+
+    /// 输出最大行数（Standard 模式，默认 50）
+    /// 0 表示不限制（等同于 Debug 模式）
+    #[serde(default = "default_max_output_lines")]
+    pub max_output_lines: usize,
+
+    /// 是否高亮数字（识别计算结果，默认 true）
+    #[serde(default = "default_true")]
+    pub highlight_numbers: bool,
+
+    /// 是否显示任务执行时间（默认 true）
+    #[serde(default = "default_true")]
+    pub show_task_duration: bool,
+}
+
+/// 任务执行配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskExecutionConfig {
+    /// 是否合并 Stage 执行（支持环境变量共享，默认 true）
+    #[serde(default = "default_true")]
+    pub merge_stages: bool,
+
+    /// 合并执行的最大任务数（默认 20）
+    /// 超过此数量的任务计划将不合并（防止命令过长）
+    #[serde(default = "default_max_merged_tasks")]
+    pub max_merged_tasks: usize,
+}
+
+fn default_max_output_lines() -> usize {
+    50
+}
+
+fn default_max_merged_tasks() -> usize {
+    20
+}
+
+impl Default for TaskDisplayConfig {
+    fn default() -> Self {
+        Self {
+            show_task_output: true,
+            max_output_lines: 50,
+            highlight_numbers: true,
+            show_task_duration: true,
+        }
+    }
+}
+
+impl Default for TaskExecutionConfig {
+    fn default() -> Self {
+        Self {
+            merge_stages: true,
+            max_merged_tasks: 20,
+        }
+    }
+}
+
 /// ✨ 八卦记忆宫配置（v1.8.4+）
 ///
 /// 基于易经八卦哲学的多维记忆系统
@@ -735,6 +815,7 @@ impl Default for Config {
             display: DisplayConfig::default(),
             conversation: ConversationConfig::default(),
             voice: VoiceConfig::default(),
+            task: TaskConfig::default(), // ✨ v1.21.0: 任务系统配置
             likan: None, // 默认使用 None，从配置文件加载
             bagua: None, // ✨ 八卦记忆宫，默认关闭
             liangyyi: None, // ✨ v1.9.1: 两仪演化系统，默认使用默认配置
@@ -1140,5 +1221,67 @@ features:
         // 验证使用默认值（关闭模式）
         assert_eq!(config.conversation.mode, ContextMode::Disabled);
         assert_eq!(config.conversation.max_turns, 10);
+    }
+
+    #[test]
+    fn test_task_config_default() {
+        // 测试 TaskConfig 默认值
+        let config = TaskConfig::default();
+
+        assert!(config.display.show_task_output);
+        assert_eq!(config.display.max_output_lines, 50);
+        assert!(config.display.highlight_numbers);
+        assert!(config.display.show_task_duration);
+
+        assert!(config.execution.merge_stages);
+        assert_eq!(config.execution.max_merged_tasks, 20);
+    }
+
+    #[test]
+    fn test_task_config_from_yaml() {
+        // 测试从 YAML 加载 TaskConfig
+        let yaml = r#"
+prefix: "/"
+task:
+  display:
+    show_task_output: false
+    max_output_lines: 100
+    highlight_numbers: false
+    show_task_duration: false
+  execution:
+    merge_stages: false
+    max_merged_tasks: 50
+"#;
+        let config: Config = serde_yml::from_str(yaml).unwrap();
+
+        assert!(!config.task.display.show_task_output);
+        assert_eq!(config.task.display.max_output_lines, 100);
+        assert!(!config.task.display.highlight_numbers);
+        assert!(!config.task.display.show_task_duration);
+
+        assert!(!config.task.execution.merge_stages);
+        assert_eq!(config.task.execution.max_merged_tasks, 50);
+    }
+
+    #[test]
+    fn test_task_config_partial() {
+        // 测试部分配置（其他使用默认值）
+        let yaml = r#"
+prefix: "/"
+task:
+  display:
+    max_output_lines: 0
+"#;
+        let config: Config = serde_yml::from_str(yaml).unwrap();
+
+        // 明确配置的值
+        assert_eq!(config.task.display.max_output_lines, 0); // 0 表示不限制
+
+        // 使用默认值的字段
+        assert!(config.task.display.show_task_output); // 默认 true
+        assert!(config.task.display.highlight_numbers); // 默认 true
+        assert!(config.task.display.show_task_duration); // 默认 true
+        assert!(config.task.execution.merge_stages); // 默认 true
+        assert_eq!(config.task.execution.max_merged_tasks, 20); // 默认 20
     }
 }
