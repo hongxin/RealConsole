@@ -588,7 +588,7 @@ impl Display {
             return;
         }
 
-        // === Standard 模式：摘要 + 失败任务详情 ===
+        // === Standard 模式：摘要 + 所有任务输出 ===
         if !mode.show_debug() {
             println!(
                 "\n{} {} · {} · {}秒",
@@ -598,19 +598,46 @@ impl Display {
                 result.total_time
             );
 
-            // 仅显示失败任务的详情
-            if result.failed_tasks > 0 {
+            // ✨ v1.19.0: 显示所有任务的输出（不只是失败的）
+            if !result.task_results.is_empty() {
+                println!(); // 空行分隔
+
                 for task_result in &result.task_results {
-                    if matches!(task_result.status, TaskStatus::Failed) {
-                        println!(
-                            "  {} {} {}",
-                            "✗".red(),
-                            task_result.task.name,
-                            format!("$ {}", task_result.task.command).dimmed()
-                        );
-                        if let Some(error) = &task_result.error {
-                            println!("    {}", error.red());
+                    // 任务状态图标
+                    let task_icon = match task_result.status {
+                        TaskStatus::Success => "✓".green(),
+                        TaskStatus::Failed => "✗".red(),
+                        TaskStatus::Skipped => "⊘".yellow(),
+                        TaskStatus::Cancelled => "⊗".dimmed(),
+                        _ => "•".dimmed(),
+                    };
+
+                    // 任务名称
+                    println!("  {} {}", task_icon, task_result.task.name);
+
+                    // 显示输出内容（限制 50 行）
+                    let max_lines = 50;
+                    if !task_result.output.trim().is_empty() {
+                        let lines: Vec<&str> = task_result.output.lines().collect();
+                        let display_lines = lines.iter().take(max_lines);
+
+                        for line in display_lines {
+                            println!("    {}", line.dimmed());
                         }
+
+                        // 如果输出超过限制，显示提示
+                        if lines.len() > max_lines {
+                            println!(
+                                "    {} (省略 {} 行)",
+                                "...".dimmed(),
+                                lines.len() - max_lines
+                            );
+                        }
+                    }
+
+                    // 失败时显示错误信息
+                    if let Some(error) = &task_result.error {
+                        println!("    {} {}", "错误:".red(), error.red());
                     }
                 }
             }
