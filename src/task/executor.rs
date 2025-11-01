@@ -114,29 +114,47 @@ impl TaskExecutor {
         let start_time = Instant::now();
         let mut all_results = Vec::new();
 
-        // 逐阶段执行
-        for (stage_idx, stage) in plan.stages.iter().enumerate() {
-            // 检查是否被取消
-            if self.is_cancelled().await {
-                return Err(TaskError::ExecutionCancelled);
+        // v1.20.0: 合并执行以支持跨 Stage 的环境变量共享
+        //
+        // 策略：无论是否有并行 Stage，都尝试在同一个 shell 会话中执行
+        // - 对于串行 Stage：按顺序执行任务
+        // - 对于并行 Stage：由于环境变量共享的复杂性，暂时也串行执行
+        //   （未来可以使用 & + wait 实现真正的并行）
+        if plan.stages.len() > 1 {
+            // 合并所有 Stage 的所有任务到一个命令中执行（忽略执行模式）
+            let all_tasks: Vec<SubTask> = plan
+                .stages
+                .iter()
+                .flat_map(|s| s.tasks.clone())
+                .collect();
+
+            let results = self.execute_merged_tasks(&all_tasks).await?;
+            all_results = results;
+        } else {
+            // 逐阶段执行（原有逻辑）
+            for (stage_idx, stage) in plan.stages.iter().enumerate() {
+                // 检查是否被取消
+                if self.is_cancelled().await {
+                    return Err(TaskError::ExecutionCancelled);
+                }
+
+                // 更新当前阶段
+                {
+                    let mut state = self.state.write().await;
+                    state.current_stage = stage_idx;
+                }
+
+                // 报告进度
+                self.report_progress().await;
+
+                // 根据执行模式执行任务
+                let stage_results = match stage.execution_mode {
+                    ExecutionMode::Sequential => self.execute_sequential(stage).await?,
+                    ExecutionMode::Parallel => self.execute_parallel(stage).await?,
+                };
+
+                all_results.extend(stage_results);
             }
-
-            // 更新当前阶段
-            {
-                let mut state = self.state.write().await;
-                state.current_stage = stage_idx;
-            }
-
-            // 报告进度
-            self.report_progress().await;
-
-            // 根据执行模式执行任务
-            let stage_results = match stage.execution_mode {
-                ExecutionMode::Sequential => self.execute_sequential(stage).await?,
-                ExecutionMode::Parallel => self.execute_parallel(stage).await?,
-            };
-
-            all_results.extend(stage_results);
         }
 
         let elapsed = start_time.elapsed().as_secs() as u32;
