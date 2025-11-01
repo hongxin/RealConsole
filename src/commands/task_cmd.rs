@@ -9,8 +9,10 @@ use crate::config::Config;
 use crate::display::Display;
 use crate::spinner::Spinner;
 use crate::task::{
-    ExecutionContext, ExecutionPlan, ExecutionResult, TaskDecomposer, TaskExecutor, TaskPlanner,
+    ExecutionContext, ExecutionPlan, ExecutionResult, SubTask, TaskDecomposer, TaskExecutionResult,
+    TaskExecutor, TaskPlanner, TaskStatus,
 };
+use chrono::Utc;
 use colored::Colorize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -165,6 +167,26 @@ pub fn register_task_commands(
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current()
                         .block_on(async { view_task_status_command(&manager).await })
+                })
+            },
+        ));
+    }
+
+    // ✨ v1.21.0 Phase 2: /task_output 命令 - 查看完整任务输出
+    {
+        let manager = Arc::clone(&task_manager);
+        let config = Arc::clone(&config);
+
+        registry.register(Command::from_fn(
+            "task_output",
+            "查看完整任务输出",
+            move |arg: &str| {
+                let manager = Arc::clone(&manager);
+                let config = Arc::clone(&config);
+
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(async { view_task_output_command(&manager, &config, arg).await })
                 })
             },
         ));
@@ -452,6 +474,111 @@ async fn view_task_status_command(manager: &Arc<RwLock<TaskManager>>) -> String 
     }
 }
 
+/// ✨ v1.21.0 Phase 2: 执行 /task_output 命令 - 查看完整任务输出
+async fn view_task_output_command(
+    manager: &Arc<RwLock<TaskManager>>,
+    config: &Arc<Config>,
+    arg: &str,
+) -> String {
+    let mgr = manager.read().await;
+
+    // 1. 获取最近的执行结果
+    let result = match mgr.get_last_result() {
+        Some(r) => r,
+        None => {
+            return format!(
+                "{}\n{}",
+                "[ERROR] 没有可用的任务执行结果".red(),
+                "提示: 请先使用 /execute 执行任务".dimmed()
+            );
+        }
+    };
+
+    // 2. 解析任务 ID
+    let task_id_str = arg.trim();
+    if task_id_str.is_empty() {
+        return format!(
+            "{}\n使用方式: /task_output <id>",
+            "[ERROR] 请提供任务 ID".red()
+        );
+    }
+
+    let task_id: usize = match task_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            return format!(
+                "{}\n使用方式: /task_output <id>",
+                format!("[ERROR] 无效的任务 ID: {}", task_id_str).red()
+            );
+        }
+    };
+
+    // 3. 验证任务 ID 有效性
+    if task_id >= result.task_results.len() {
+        return format!(
+            "{}\n有效范围: 0-{}",
+            format!("[ERROR] 任务 ID {} 不存在", task_id).red(),
+            result.task_results.len() - 1
+        );
+    }
+
+    // 4. 获取任务结果
+    let task_result = &result.task_results[task_id];
+
+    // 5. 显示完整输出
+    let mut output = String::new();
+
+    // 分隔线
+    output.push_str(&format!("\n{}\n", "=".repeat(80).dimmed()));
+
+    // 任务状态和名称
+    let task_icon = match task_result.status {
+        TaskStatus::Success => "✓".green(),
+        TaskStatus::Failed => "✗".red(),
+        TaskStatus::Skipped => "⊘".yellow(),
+        TaskStatus::Cancelled => "⊗".dimmed(),
+        _ => "•".dimmed(),
+    };
+
+    output.push_str(&format!(
+        "{} {} {}\n",
+        task_icon,
+        task_result.task.name.bold(),
+        format!("(ID: {})", task_id).dimmed()
+    ));
+
+    // 执行时间（如果配置启用）
+    if config.task.display.show_task_duration {
+        output.push_str(&format!(
+            "  {} {}s\n",
+            "执行时间:".dimmed(),
+            task_result.duration
+        ));
+    }
+
+    output.push_str(&format!("{}\n", "=".repeat(80).dimmed()));
+
+    // 输出内容（完整，无行数限制）
+    if !task_result.output.trim().is_empty() {
+        output.push('\n');
+        output.push_str(&task_result.output);
+        output.push('\n');
+    } else {
+        output.push_str(&format!("\n{}\n", "（无输出）".dimmed()));
+    }
+
+    // 错误信息
+    if let Some(error) = &task_result.error {
+        output.push('\n');
+        output.push_str(&format!("{} {}\n", "错误:".red().bold(), error.red()));
+    }
+
+    // 底部分隔线
+    output.push_str(&format!("\n{}\n", "=".repeat(80).dimmed()));
+
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472,5 +599,192 @@ mod tests {
 
         manager.save_plan(plan);
         assert!(manager.current_plan.is_some());
+    }
+
+    // ============================================================================
+    // ✨ v1.21.0 Phase 2: /task_output 命令测试
+    // ============================================================================
+
+    #[tokio::test]
+    async fn test_view_task_output_no_result() {
+        // 测试：没有执行结果时的错误处理
+        let manager = Arc::new(RwLock::new(TaskManager::new()));
+        let config = Arc::new(crate::config::Config::default());
+
+        let output = view_task_output_command(&manager, &config, "0").await;
+
+        assert!(output.contains("ERROR"));
+        assert!(output.contains("没有可用的任务执行结果"));
+    }
+
+    #[tokio::test]
+    async fn test_view_task_output_invalid_id_format() {
+        // 测试：无效的任务 ID 格式
+        let manager = Arc::new(RwLock::new(TaskManager::new()));
+        let config = Arc::new(crate::config::Config::default());
+
+        // 创建一个测试结果
+        let mut mgr = manager.write().await;
+        let plan = crate::task::ExecutionPlan::new("test", vec![]);
+        let result = crate::task::ExecutionResult {
+            plan_id: "test-plan".to_string(),
+            total_tasks: 0,
+            completed_tasks: 0,
+            failed_tasks: 0,
+            skipped_tasks: 0,
+            total_time: 0,
+            task_results: vec![],
+        };
+        mgr.save_plan(plan);
+        mgr.save_result(result);
+        drop(mgr);
+
+        let output = view_task_output_command(&manager, &config, "abc").await;
+
+        assert!(output.contains("ERROR"));
+        assert!(output.contains("无效的任务 ID"));
+    }
+
+    #[tokio::test]
+    async fn test_view_task_output_id_out_of_range() {
+        // 测试：任务 ID 超出范围
+        let manager = Arc::new(RwLock::new(TaskManager::new()));
+        let config = Arc::new(crate::config::Config::default());
+
+        // 创建一个包含 2 个任务的结果
+        let mut mgr = manager.write().await;
+        let plan = crate::task::ExecutionPlan::new("test", vec![]);
+        let now = Utc::now();
+        let task1 = TaskExecutionResult {
+            task: SubTask::new("t1", "Task 1", "echo 'test1'"),
+            status: TaskStatus::Success,
+            output: "test1".to_string(),
+            error: None,
+            start_time: now,
+            end_time: now,
+            duration: 0,
+        };
+        let task2 = TaskExecutionResult {
+            task: SubTask::new("t2", "Task 2", "echo 'test2'"),
+            status: TaskStatus::Success,
+            output: "test2".to_string(),
+            error: None,
+            start_time: now,
+            end_time: now,
+            duration: 0,
+        };
+        let result = crate::task::ExecutionResult {
+            plan_id: "test-plan".to_string(),
+            total_tasks: 2,
+            completed_tasks: 2,
+            failed_tasks: 0,
+            skipped_tasks: 0,
+            total_time: 0,
+            task_results: vec![task1, task2],
+        };
+        mgr.save_plan(plan);
+        mgr.save_result(result);
+        drop(mgr);
+
+        let output = view_task_output_command(&manager, &config, "5").await;
+
+        assert!(output.contains("ERROR"));
+        assert!(output.contains("任务 ID 5 不存在"));
+        assert!(output.contains("有效范围: 0-1"));
+    }
+
+    #[tokio::test]
+    async fn test_view_task_output_success() {
+        // 测试：正常查看任务输出
+        let manager = Arc::new(RwLock::new(TaskManager::new()));
+        let config = Arc::new(crate::config::Config::default());
+
+        // 创建一个包含 2 个任务的结果
+        let mut mgr = manager.write().await;
+        let plan = crate::task::ExecutionPlan::new("test goal", vec![]);
+        let now = Utc::now();
+        let task1 = TaskExecutionResult {
+            task: SubTask::new("t1", "Calculate Sum", "echo 'Sum: 55'"),
+            status: TaskStatus::Success,
+            output: "Sum: 55".to_string(),
+            error: None,
+            start_time: now,
+            end_time: now,
+            duration: 0,
+        };
+        let task2 = TaskExecutionResult {
+            task: SubTask::new("t2", "Multiply", "echo 'Result: 110'"),
+            status: TaskStatus::Failed,
+            output: "Result: 110".to_string(),
+            error: Some("Command failed with exit code 1".to_string()),
+            start_time: now,
+            end_time: now,
+            duration: 0,
+        };
+        let result = crate::task::ExecutionResult {
+            plan_id: "test-plan".to_string(),
+            total_tasks: 2,
+            completed_tasks: 1,
+            failed_tasks: 1,
+            skipped_tasks: 0,
+            total_time: 0,
+            task_results: vec![task1, task2],
+        };
+        mgr.save_plan(plan);
+        mgr.save_result(result);
+        drop(mgr);
+
+        // 测试查看第一个任务
+        let output1 = view_task_output_command(&manager, &config, "0").await;
+        assert!(output1.contains("Calculate Sum"));
+        assert!(output1.contains("ID: 0"));
+        assert!(output1.contains("Sum: 55"));
+        assert!(output1.contains("0s"));
+
+        // 测试查看第二个任务
+        let output2 = view_task_output_command(&manager, &config, "1").await;
+        assert!(output2.contains("Multiply"));
+        assert!(output2.contains("ID: 1"));
+        assert!(output2.contains("Result: 110"));
+        assert!(output2.contains("0s"));
+        assert!(output2.contains("错误"));
+        assert!(output2.contains("Command failed with exit code 1"));
+    }
+
+    #[tokio::test]
+    async fn test_view_task_output_empty_output() {
+        // 测试：任务没有输出的情况
+        let manager = Arc::new(RwLock::new(TaskManager::new()));
+        let config = Arc::new(crate::config::Config::default());
+
+        let mut mgr = manager.write().await;
+        let plan = crate::task::ExecutionPlan::new("test", vec![]);
+        let now = Utc::now();
+        let task = TaskExecutionResult {
+            task: SubTask::new("t1", "Empty Task", "true"),
+            status: TaskStatus::Success,
+            output: "".to_string(),
+            error: None,
+            start_time: now,
+            end_time: now,
+            duration: 0,
+        };
+        let result = crate::task::ExecutionResult {
+            plan_id: "test-plan".to_string(),
+            total_tasks: 1,
+            completed_tasks: 1,
+            failed_tasks: 0,
+            skipped_tasks: 0,
+            total_time: 0,
+            task_results: vec![task],
+        };
+        mgr.save_plan(plan);
+        mgr.save_result(result);
+        drop(mgr);
+
+        let output = view_task_output_command(&manager, &config, "0").await;
+
+        assert!(output.contains("Empty Task"));
+        assert!(output.contains("（无输出）"));
     }
 }
