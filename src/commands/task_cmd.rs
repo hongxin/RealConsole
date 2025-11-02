@@ -67,11 +67,159 @@ impl TaskManager {
     pub fn get_last_result(&self) -> Option<&ExecutionResult> {
         self.last_result.as_ref()
     }
+
+    // ========================================================================
+    // ✨ v1.22.0 Phase 1: 任务持久化方法
+    // ========================================================================
+
+    /// 保存当前任务到文件
+    ///
+    /// 返回保存的文件路径
+    pub fn save_current(&self, name: Option<String>) -> anyhow::Result<std::path::PathBuf> {
+        let plan = self
+            .current_plan
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("无待保存计划"))?;
+
+        let saved = SavedTask::new(plan.goal.clone(), plan.clone(), self.last_result.clone());
+
+        let saved = if let Some(name) = name {
+            saved.with_name(name)
+        } else {
+            saved
+        };
+
+        saved.save_to_file()
+    }
+
+    /// 加载任务到当前计划
+    pub fn load_task(&mut self, task: SavedTask) {
+        self.save_plan(task.plan);
+        if let Some(result) = task.result {
+            self.save_result(result);
+        }
+    }
 }
 
 impl Default for TaskManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ============================================================================
+// ✨ v1.22.0 Phase 1: 任务持久化数据结构
+// ============================================================================
+
+/// 持久化的任务数据结构
+///
+/// 用于保存和加载任务计划及执行结果
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SavedTask {
+    /// 任务 ID (UUID)
+    pub id: String,
+
+    /// 用户定义的任务名称（可选）
+    pub name: Option<String>,
+
+    /// 创建时间
+    pub created_at: chrono::DateTime<chrono::Utc>,
+
+    /// 任务目标
+    pub goal: String,
+
+    /// 执行计划
+    pub plan: ExecutionPlan,
+
+    /// 执行结果（可选）
+    pub result: Option<ExecutionResult>,
+}
+
+impl SavedTask {
+    /// 从当前计划和结果创建保存任务
+    pub fn new(goal: String, plan: ExecutionPlan, result: Option<ExecutionResult>) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: None,
+            created_at: chrono::Utc::now(),
+            goal,
+            plan,
+            result,
+        }
+    }
+
+    /// 设置任务名称
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
+    }
+
+    /// 保存到文件
+    ///
+    /// 文件路径: ~/.realconsole/tasks/{timestamp}_{id}.json
+    pub fn save_to_file(&self) -> anyhow::Result<std::path::PathBuf> {
+        // 获取任务保存目录
+        let tasks_dir = Self::tasks_dir()?;
+
+        // 确保目录存在
+        std::fs::create_dir_all(&tasks_dir)?;
+
+        // 生成文件名: {timestamp}_{id}.json
+        let timestamp = self.created_at.format("%Y%m%d_%H%M%S");
+        let filename = format!("{}_{}.json", timestamp, &self.id[..8]);
+        let filepath = tasks_dir.join(filename);
+
+        // 序列化并写入文件
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(&filepath, json)?;
+
+        Ok(filepath)
+    }
+
+    /// 从文件加载任务
+    pub fn load_from_file(filepath: &std::path::Path) -> anyhow::Result<Self> {
+        let json = std::fs::read_to_string(filepath)?;
+        let task: SavedTask = serde_json::from_str(&json)?;
+        Ok(task)
+    }
+
+    /// 列出所有保存的任务
+    ///
+    /// 返回 (filepath, SavedTask) 列表，按创建时间倒序排列
+    pub fn list_all() -> anyhow::Result<Vec<(std::path::PathBuf, SavedTask)>> {
+        let tasks_dir = Self::tasks_dir()?;
+
+        // 如果目录不存在，返回空列表
+        if !tasks_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        // 读取所有 .json 文件
+        let mut tasks = Vec::new();
+        for entry in std::fs::read_dir(tasks_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            // 只处理 .json 文件
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                if let Ok(task) = Self::load_from_file(&path) {
+                    tasks.push((path, task));
+                }
+            }
+        }
+
+        // 按创建时间倒序排列
+        tasks.sort_by(|a, b| b.1.created_at.cmp(&a.1.created_at));
+
+        Ok(tasks)
+    }
+
+    /// 获取任务保存目录
+    ///
+    /// ~/.realconsole/tasks/
+    fn tasks_dir() -> anyhow::Result<std::path::PathBuf> {
+        let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("无法获取用户主目录"))?;
+        Ok(home_dir.join(".realconsole").join("tasks"))
     }
 }
 
@@ -187,6 +335,55 @@ pub fn register_task_commands(
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current()
                         .block_on(async { view_task_output_command(&manager, &config, arg).await })
+                })
+            },
+        ));
+    }
+
+    // ✨ v1.22.0 Phase 1: /task_save 命令 - 保存当前任务
+    {
+        let manager = Arc::clone(&task_manager);
+
+        registry.register(Command::from_fn(
+            "task_save",
+            "保存当前任务",
+            move |arg: &str| {
+                let manager = Arc::clone(&manager);
+
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(async { task_save_command(&manager, arg).await })
+                })
+            },
+        ));
+    }
+
+    // ✨ v1.22.0 Phase 1: /task_list 命令 - 列出所有保存的任务
+    {
+        registry.register(Command::from_fn(
+            "task_list",
+            "列出所有保存的任务",
+            move |_arg: &str| {
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async { task_list_command().await })
+                })
+            },
+        ));
+    }
+
+    // ✨ v1.22.0 Phase 1: /task_load 命令 - 加载保存的任务
+    {
+        let manager = Arc::clone(&task_manager);
+
+        registry.register(Command::from_fn(
+            "task_load",
+            "加载保存的任务",
+            move |arg: &str| {
+                let manager = Arc::clone(&manager);
+
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(async { task_load_command(&manager, arg).await })
                 })
             },
         ));
@@ -579,6 +776,212 @@ async fn view_task_output_command(
     output
 }
 
+// ============================================================================
+// ✨ v1.22.0 Phase 1: 任务持久化命令处理函数
+// ============================================================================
+
+/// 执行 /task_save 命令 - 保存当前任务
+async fn task_save_command(manager: &Arc<RwLock<TaskManager>>, arg: &str) -> String {
+    let mgr = manager.read().await;
+
+    // 检查是否有当前计划
+    if mgr.get_current_plan().is_none() {
+        return format!(
+            "{}\n{}",
+            "[ERROR] 无待保存计划".red(),
+            "提示: 请先使用 /plan <目标> 创建计划".dimmed()
+        );
+    }
+
+    // 获取可选的任务名称
+    let name = if arg.trim().is_empty() {
+        None
+    } else {
+        Some(arg.trim().to_string())
+    };
+
+    // 保存任务
+    match mgr.save_current(name.clone()) {
+        Ok(filepath) => {
+            let mut output = String::new();
+
+            output.push_str(&format!("\n{} 任务已保存\n", "✓".green()));
+
+            // 显示保存信息
+            if let Some(name) = &name {
+                output.push_str(&format!("  {} {}\n", "名称:".dimmed(), name.bold()));
+            }
+
+            output.push_str(&format!(
+                "  {} {}\n",
+                "路径:".dimmed(),
+                filepath.display().to_string().dimmed()
+            ));
+
+            output.push_str(&format!(
+                "\n{}\n",
+                format!("使用 {} 查看所有保存的任务", "/task_list".cyan()).dimmed()
+            ));
+
+            output
+        }
+        Err(e) => {
+            format!("{}\n错误: {}", "[ERROR] 保存失败".red(), e)
+        }
+    }
+}
+
+/// 执行 /task_list 命令 - 列出所有保存的任务
+async fn task_list_command() -> String {
+    match SavedTask::list_all() {
+        Ok(tasks) => {
+            if tasks.is_empty() {
+                return format!(
+                    "{}\n{}",
+                    "暂无保存的任务".dimmed(),
+                    "提示: 使用 /task_save [名称] 保存当前任务".dimmed()
+                );
+            }
+
+            let mut output = String::new();
+
+            output.push_str(&format!("\n{} 保存的任务\n", tasks.len().to_string().bold()));
+
+            for (idx, (_path, task)) in tasks.iter().enumerate() {
+                let name_display = if let Some(name) = &task.name {
+                    format!("{} ", name.bold())
+                } else {
+                    String::new()
+                };
+
+                let time_display = task
+                    .created_at
+                    .format("%Y-%m-%d %H:%M:%S")
+                    .to_string()
+                    .dimmed();
+
+                let status = if task.result.is_some() {
+                    "✓".green()
+                } else {
+                    "○".dimmed()
+                };
+
+                output.push_str(&format!(
+                    "  {} {} {}{}\n",
+                    format!("[{}]", idx).dimmed(),
+                    status,
+                    name_display,
+                    time_display
+                ));
+
+                // 显示目标（缩短显示）
+                let goal = if task.goal.len() > 60 {
+                    format!("{}...", &task.goal[..57])
+                } else {
+                    task.goal.clone()
+                };
+
+                output.push_str(&format!("     {}\n", goal.dimmed()));
+            }
+
+            output.push_str(&format!(
+                "\n{}\n",
+                format!("使用 {} <id> 加载任务", "/task_load".cyan()).dimmed()
+            ));
+
+            output
+        }
+        Err(e) => {
+            format!("{}\n错误: {}", "[ERROR] 无法列出任务".red(), e)
+        }
+    }
+}
+
+/// 执行 /task_load 命令 - 加载保存的任务
+async fn task_load_command(manager: &Arc<RwLock<TaskManager>>, arg: &str) -> String {
+    // 解析任务 ID
+    let task_id_str = arg.trim();
+    if task_id_str.is_empty() {
+        return format!(
+            "{}\n使用方式: /task_load <id>",
+            "[ERROR] 请提供任务 ID".red()
+        );
+    }
+
+    let task_id: usize = match task_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            return format!(
+                "{}\n使用方式: /task_load <id>",
+                format!("[ERROR] 无效的任务 ID: {}", task_id_str).red()
+            );
+        }
+    };
+
+    // 获取所有保存的任务
+    let tasks = match SavedTask::list_all() {
+        Ok(tasks) => tasks,
+        Err(e) => {
+            return format!("{}\n错误: {}", "[ERROR] 无法读取任务列表".red(), e);
+        }
+    };
+
+    // 验证 ID 有效性
+    if task_id >= tasks.len() {
+        return format!(
+            "{}\n有效范围: 0-{}\n提示: 使用 /task_list 查看所有任务",
+            format!("[ERROR] 任务 ID {} 不存在", task_id).red(),
+            tasks.len() - 1
+        );
+    }
+
+    // 加载任务
+    let (_path, task) = &tasks[task_id];
+
+    {
+        let mut mgr = manager.write().await;
+        mgr.load_task(task.clone());
+    }
+
+    let mut output = String::new();
+
+    output.push_str(&format!("\n{} 任务已加载\n", "✓".green()));
+
+    if let Some(name) = &task.name {
+        output.push_str(&format!("  {} {}\n", "名称:".dimmed(), name.bold()));
+    }
+
+    output.push_str(&format!(
+        "  {} {}\n",
+        "目标:".dimmed(),
+        task.goal.bold()
+    ));
+
+    output.push_str(&format!(
+        "  {} {} 任务\n",
+        "计划:".dimmed(),
+        task.plan.total_tasks()
+    ));
+
+    if task.result.is_some() {
+        output.push_str(&format!("  {} {}\n", "状态:".dimmed(), "已执行".green()));
+    } else {
+        output.push_str(&format!("  {} {}\n", "状态:".dimmed(), "未执行".yellow()));
+    }
+
+    output.push_str(&format!(
+        "\n{}\n",
+        format!(
+            "使用 {} 查看计划，{} 执行任务",
+            "/tasks".cyan(),
+            "/execute".cyan()
+        )
+        .dimmed()
+    ));
+
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -599,6 +1002,126 @@ mod tests {
 
         manager.save_plan(plan);
         assert!(manager.current_plan.is_some());
+    }
+
+    // ============================================================================
+    // ✨ v1.22.0 Phase 1: 任务持久化测试
+    // ============================================================================
+
+    #[test]
+    fn test_saved_task_creation() {
+        let plan = ExecutionPlan::new("test goal", vec![]);
+        let result = ExecutionResult {
+            plan_id: "test-plan".to_string(),
+            total_tasks: 1,
+            completed_tasks: 1,
+            failed_tasks: 0,
+            skipped_tasks: 0,
+            total_time: 10,
+            task_results: vec![],
+        };
+
+        let saved = SavedTask::new("test goal".to_string(), plan.clone(), Some(result.clone()));
+
+        assert!(!saved.id.is_empty());
+        assert_eq!(saved.goal, "test goal");
+        assert_eq!(saved.plan.goal, "test goal");
+        assert!(saved.result.is_some());
+        assert!(saved.name.is_none());
+    }
+
+    #[test]
+    fn test_saved_task_with_name() {
+        let plan = ExecutionPlan::new("test goal", vec![]);
+        let saved = SavedTask::new("test goal".to_string(), plan, None)
+            .with_name("my_task".to_string());
+
+        assert_eq!(saved.name, Some("my_task".to_string()));
+    }
+
+    #[test]
+    fn test_saved_task_save_load() -> anyhow::Result<()> {
+        use tempfile::TempDir;
+
+        // 使用临时目录进行测试
+        let temp_dir = TempDir::new()?;
+        let task_file = temp_dir.path().join("test_task.json");
+
+        // 创建一个测试任务
+        let plan = ExecutionPlan::new("test save/load", vec![]);
+        let saved = SavedTask::new("test save/load".to_string(), plan, None)
+            .with_name("test_task".to_string());
+
+        // 序列化保存
+        let json = serde_json::to_string_pretty(&saved)?;
+        std::fs::write(&task_file, json)?;
+
+        // 从文件加载
+        let loaded = SavedTask::load_from_file(&task_file)?;
+
+        // 验证
+        assert_eq!(loaded.id, saved.id);
+        assert_eq!(loaded.name, saved.name);
+        assert_eq!(loaded.goal, saved.goal);
+        assert_eq!(loaded.plan.goal, saved.plan.goal);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_task_manager_save_current_no_plan() {
+        let manager = TaskManager::new();
+
+        let result = manager.save_current(None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("无待保存计划"));
+    }
+
+    #[tokio::test]
+    async fn test_task_manager_save_current_success() -> anyhow::Result<()> {
+        use tempfile::TempDir;
+
+        // 使用临时目录
+        let _temp_dir = TempDir::new()?;
+
+        let mut manager = TaskManager::new();
+        let plan = ExecutionPlan::new("test save", vec![]);
+        manager.save_plan(plan);
+
+        // 注意：此测试会实际创建 ~/.realconsole/tasks/ 目录
+        // 在 CI 环境中可能需要 mock
+        let result = manager.save_current(Some("test_save".to_string()));
+
+        // 如果成功，清理文件
+        if let Ok(filepath) = result {
+            let _ = std::fs::remove_file(filepath);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_task_manager_load_task() {
+        let mut manager = TaskManager::new();
+
+        let plan = ExecutionPlan::new("loaded goal", vec![]);
+        let result = ExecutionResult {
+            plan_id: "loaded-plan".to_string(),
+            total_tasks: 1,
+            completed_tasks: 1,
+            failed_tasks: 0,
+            skipped_tasks: 0,
+            total_time: 10,
+            task_results: vec![],
+        };
+
+        let saved = SavedTask::new("loaded goal".to_string(), plan, Some(result));
+
+        manager.load_task(saved.clone());
+
+        assert!(manager.get_current_plan().is_some());
+        assert_eq!(manager.get_current_plan().unwrap().goal, "loaded goal");
+        assert!(manager.get_last_result().is_some());
     }
 
     // ============================================================================

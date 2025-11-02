@@ -151,7 +151,7 @@ impl RetryPolicy {
 /// 执行计划
 ///
 /// 包含任务的执行顺序和并行策略
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionPlan {
     /// 计划ID
     pub id: String,
@@ -200,7 +200,7 @@ impl ExecutionPlan {
 /// 执行阶段
 ///
 /// 代表可以同时执行的一组任务
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionStage {
     /// 阶段编号
     pub stage_num: usize,
@@ -230,7 +230,7 @@ impl ExecutionStage {
 }
 
 /// 执行模式
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExecutionMode {
     /// 串行执行
     Sequential,
@@ -239,7 +239,7 @@ pub enum ExecutionMode {
 }
 
 /// 任务执行结果
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskResult {
     /// 任务信息
     pub task: SubTask,
@@ -296,7 +296,7 @@ impl TaskStatus {
 }
 
 /// 执行结果汇总
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionResult {
     /// 计划ID
     pub plan_id: String,

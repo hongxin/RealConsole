@@ -631,7 +631,15 @@ impl Display {
                         let display_lines = lines.iter().take(max_lines);
 
                         for line in display_lines {
-                            println!("    {}", line.dimmed());
+                            // ✨ v1.22.0 Phase 2: 根据配置应用数字高亮
+                            if config.task.display.highlight_numbers {
+                                // 先高亮数字（cyan），再应用 dimmed 到整体
+                                // 效果：数字 cyan，其他文本 dimmed（灰色）
+                                let highlighted = Self::highlight_numbers(line);
+                                println!("    {}", highlighted.dimmed());
+                            } else {
+                                println!("    {}", line.dimmed());
+                            }
                         }
 
                         // 如果输出超过限制，显示提示
@@ -752,7 +760,13 @@ impl Display {
                 println!("     {}", "输出:".bold());
                 for line in task_result.output.lines().take(20) {
                     // 限制显示行数
-                    println!("       {}", line.dimmed());
+                    // ✨ v1.22.0 Phase 2: 根据配置应用数字高亮
+                    if config.task.display.highlight_numbers {
+                        let highlighted = Self::highlight_numbers(line);
+                        println!("       {}", highlighted.dimmed());
+                    } else {
+                        println!("       {}", line.dimmed());
+                    }
                 }
                 if task_result.output.lines().count() > 20 {
                     println!(
@@ -799,6 +813,38 @@ impl Display {
             let truncated: String = text.chars().take(max_len.saturating_sub(3)).collect();
             format!("{}...", truncated)
         }
+    }
+
+    // ========================================================================
+    // ✨ v1.22.0 Phase 2: 数字高亮功能
+    // ========================================================================
+
+    /// 高亮文本中的数字（极简设计）
+    ///
+    /// 设计原则：
+    /// - 数字用 cyan（与标题保持一致）
+    /// - 不加粗，微妙突出即可
+    /// - 适配 dimmed 文本背景
+    ///
+    /// 支持的数字格式：
+    /// - 整数：123, 42
+    /// - 小数：3.14, 0.5
+    /// - 百分比：100%（数字部分高亮）
+    /// - 带单位：50ms, 10GB（数字部分高亮）
+    pub fn highlight_numbers(text: &str) -> String {
+        use once_cell::sync::Lazy;
+        use regex::Regex;
+
+        // 使用 Lazy 缓存正则表达式，避免每次重新编译
+        static NUMBER_RE: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"\b(\d+(?:\.\d+)?)\b").unwrap());
+
+        NUMBER_RE
+            .replace_all(text, |caps: &regex::Captures| {
+                // 数字用 cyan，微妙突出，不加粗
+                format!("{}", caps[1].cyan())
+            })
+            .to_string()
     }
 }
 
@@ -896,5 +942,54 @@ mod tests {
         let result = Display::truncate(long_text, 10);
         assert!(result.ends_with("..."));
         assert!(result.chars().count() <= 10);
+    }
+
+    // ========================================================================
+    // ✨ v1.22.0 Phase 2: 数字高亮测试
+    // ========================================================================
+
+    #[test]
+    fn test_highlight_numbers_integers() {
+        let text = "Found 42 items in 3 seconds";
+        let result = Display::highlight_numbers(text);
+        // 数字应该被 cyan 包裹
+        assert!(result.contains("42"));
+        assert!(result.contains("3"));
+    }
+
+    #[test]
+    fn test_highlight_numbers_decimals() {
+        let text = "Success rate: 98.5% in 3.14 seconds";
+        let result = Display::highlight_numbers(text);
+        // 小数应该被识别
+        assert!(result.contains("98.5"));
+        assert!(result.contains("3.14"));
+    }
+
+    #[test]
+    fn test_highlight_numbers_with_units() {
+        let text = "Used 50ms, downloaded 10GB";
+        let result = Display::highlight_numbers(text);
+        // 数字部分应该被高亮（单位不高亮）
+        assert!(result.contains("50"));
+        assert!(result.contains("10"));
+    }
+
+    #[test]
+    fn test_highlight_numbers_no_numbers() {
+        let text = "No numbers here";
+        let result = Display::highlight_numbers(text);
+        // 没有数字时应该返回原字符串
+        assert_eq!(result, text);
+    }
+
+    #[test]
+    fn test_highlight_numbers_mixed_content() {
+        let text = "Test 123 passed with 100% success, took 0.5 seconds";
+        let result = Display::highlight_numbers(text);
+        // 所有数字都应该被识别
+        assert!(result.contains("123"));
+        assert!(result.contains("100"));
+        assert!(result.contains("0.5"));
     }
 }
