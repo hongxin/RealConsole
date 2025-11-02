@@ -5,6 +5,78 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.1] - 2025-11-02
+
+### 🎯 Highlights
+
+**主题**: 任务命令统一重构 (Task Command Unification)
+
+- ✅ 极简主义 - 3 个独立命令合并为 1 个统一入口（-66%）
+- ✅ 易变哲学 - 枚举架构，易于扩展新子命令
+- ✅ 向后兼容 - 旧命令保留，显示废弃警告
+- ✅ 新增功能 - delete、show、help 子命令
+
+### ♻️ Refactored
+
+**统一的任务命令架构**
+
+- **Before**: `/task_save`, `/task_list`, `/task_load` (3 个顶层命令)
+- **After**: `/task <subcommand>` (1 个统一入口)
+
+- **TaskSubcommand 枚举** (`src/commands/task_cmd.rs` - lines 20-134)
+  - 类型安全的子命令系统
+  - 优雅的参数解析和错误处理
+  - 自动帮助提示引导
+
+- **统一命令入口** (`src/commands/task_cmd.rs` - lines 909-943)
+  - `task_command()` - 统一的子命令分发器
+  - 清晰的 match 模式匹配
+  - 委托给现有处理函数（代码复用）
+
+### ✨ Added
+
+**新增子命令** (3 个)
+
+- `/task delete <id>` - 删除保存的任务，显示删除详情
+- `/task show` - 显示当前任务详情（等同于 `/tasks`）
+- `/task help` - 显示帮助信息（格式化输出）
+
+**完整子命令列表**:
+```bash
+/task save [name]     # 保存当前任务
+/task list            # 列出所有任务
+/task load <id>       # 加载任务
+/task delete <id>     # 删除任务（新增）
+/task show            # 显示当前任务（新增）
+/task help            # 显示帮助（新增）
+```
+
+### 🔄 Deprecated
+
+**向后兼容命令** (保留但显示警告)
+
+- `/task_save` → 建议使用 `/task save`
+- `/task_list` → 建议使用 `/task list`
+- `/task_load` → 建议使用 `/task load`
+
+**迁移计划**:
+- v1.22.1: 新旧命令共存，旧命令显示黄色警告
+- v1.23.0: 移除旧命令，仅保留 `/task` 子命令
+
+### 📊 Quality
+
+- ✅ 测试: 13/13 通过（100%）
+- ✅ 编译: 无错误，无警告
+- ✅ 架构: 类型安全，易扩展
+- ✅ 文档: 设计文档 + 完成报告
+
+### 📚 Documentation
+
+- 新增: `docs/04-reports/v1.22.1-task-command-refactoring.md` - 详细设计文档
+- 新增: `docs/04-reports/v1.22.1-completion.md` - 完成报告
+
+---
+
 ## [1.22.0] - 2025-11-02
 
 ### 🌟 Highlights

@@ -17,6 +17,126 @@ use colored::Colorize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+// ============================================================================
+// ✨ v1.22.1: 子命令架构 - 极简主义 + 易变哲学
+// ============================================================================
+
+/// 任务管理子命令
+///
+/// 设计原则：
+/// - 极简主义：统一到 /task 命令下
+/// - 易变哲学：易于扩展新的子命令
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskSubcommand {
+    /// 保存当前任务
+    Save { name: Option<String> },
+
+    /// 列出所有保存的任务
+    List,
+
+    /// 加载任务
+    Load { id: usize },
+
+    /// 显示当前任务详情
+    Show,
+
+    /// 删除保存的任务
+    Delete { id: usize },
+
+    /// 显示帮助
+    Help,
+}
+
+impl TaskSubcommand {
+    /// 解析子命令
+    ///
+    /// 示例:
+    /// - "save" -> Save { name: None }
+    /// - "save my_task" -> Save { name: Some("my_task") }
+    /// - "load 0" -> Load { id: 0 }
+    pub fn parse(input: &str) -> Result<Self, String> {
+        let parts: Vec<&str> = input.trim().split_whitespace().collect();
+
+        if parts.is_empty() {
+            return Ok(Self::Help);
+        }
+
+        match parts[0] {
+            "save" => {
+                let name = if parts.len() > 1 {
+                    Some(parts[1..].join(" "))
+                } else {
+                    None
+                };
+                Ok(Self::Save { name })
+            }
+            "list" => Ok(Self::List),
+            "load" => {
+                let id = parts
+                    .get(1)
+                    .ok_or_else(|| "缺少任务 ID。用法: /task load <id>".to_string())?
+                    .parse()
+                    .map_err(|_| "无效的任务 ID，请输入数字".to_string())?;
+                Ok(Self::Load { id })
+            }
+            "show" => Ok(Self::Show),
+            "delete" => {
+                let id = parts
+                    .get(1)
+                    .ok_or_else(|| "缺少任务 ID。用法: /task delete <id>".to_string())?
+                    .parse()
+                    .map_err(|_| "无效的任务 ID，请输入数字".to_string())?;
+                Ok(Self::Delete { id })
+            }
+            "help" | "-h" | "--help" => Ok(Self::Help),
+            cmd => Err(format!(
+                "未知子命令: {}。使用 '/task help' 查看可用命令",
+                cmd
+            )),
+        }
+    }
+
+    /// 打印帮助信息
+    pub fn print_help() {
+        println!();
+        println!("{}", "任务管理命令".cyan().bold());
+        println!();
+        println!("{}:", "用法".yellow());
+        println!("  {} <subcommand> [args]", "/task".green());
+        println!();
+        println!("{}:", "子命令".yellow());
+        println!(
+            "  {:<20} {}",
+            "save [name]".green(),
+            "保存当前任务（可选命名）"
+        );
+        println!("  {:<20} {}", "list".green(), "列出所有保存的任务");
+        println!(
+            "  {:<20} {}",
+            "load <id>".green(),
+            "加载任务到当前会话"
+        );
+        println!("  {:<20} {}", "show".green(), "显示当前任务详情");
+        println!(
+            "  {:<20} {}",
+            "delete <id>".green(),
+            "删除保存的任务"
+        );
+        println!("  {:<20} {}", "help".green(), "显示此帮助信息");
+        println!();
+        println!("{}:", "示例".yellow());
+        println!("  /task save my_build");
+        println!("  /task list");
+        println!("  /task load 0");
+        println!("  /task delete 2");
+        println!();
+    }
+}
+
+// ============================================================================
+// 任务管理器
+// ============================================================================
+
 /// 任务管理器状态
 ///
 /// 保存当前的任务计划和执行结果
@@ -340,16 +460,46 @@ pub fn register_task_commands(
         ));
     }
 
-    // ✨ v1.22.0 Phase 1: /task_save 命令 - 保存当前任务
+    // ========================================================================
+    // ✨ v1.22.1: 统一的 /task 命令 - 子命令架构
+    // ========================================================================
+    {
+        let manager = Arc::clone(&task_manager);
+        let config = Arc::clone(&config);
+
+        registry.register(Command::from_fn(
+            "task",
+            "任务管理（save/list/load/delete/show/help）",
+            move |arg: &str| {
+                let manager = Arc::clone(&manager);
+                let config = Arc::clone(&config);
+
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(async { task_command(&manager, &config, arg).await })
+                })
+            },
+        ));
+    }
+
+    // ========================================================================
+    // ✨ v1.22.1: 向后兼容别名 (Deprecated - 将在 v1.23.0 移除)
+    // ========================================================================
+
+    // [已废弃] /task_save -> /task save
     {
         let manager = Arc::clone(&task_manager);
 
         registry.register(Command::from_fn(
             "task_save",
-            "保存当前任务",
+            "[已废弃] 请使用 /task save",
             move |arg: &str| {
                 let manager = Arc::clone(&manager);
 
+                println!(
+                    "{}",
+                    "⚠ 警告: /task_save 已废弃，请使用 /task save".yellow()
+                );
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current()
                         .block_on(async { task_save_command(&manager, arg).await })
@@ -358,12 +508,16 @@ pub fn register_task_commands(
         ));
     }
 
-    // ✨ v1.22.0 Phase 1: /task_list 命令 - 列出所有保存的任务
+    // [已废弃] /task_list -> /task list
     {
         registry.register(Command::from_fn(
             "task_list",
-            "列出所有保存的任务",
+            "[已废弃] 请使用 /task list",
             move |_arg: &str| {
+                println!(
+                    "{}",
+                    "⚠ 警告: /task_list 已废弃，请使用 /task list".yellow()
+                );
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async { task_list_command().await })
                 })
@@ -371,16 +525,20 @@ pub fn register_task_commands(
         ));
     }
 
-    // ✨ v1.22.0 Phase 1: /task_load 命令 - 加载保存的任务
+    // [已废弃] /task_load -> /task load
     {
         let manager = Arc::clone(&task_manager);
 
         registry.register(Command::from_fn(
             "task_load",
-            "加载保存的任务",
+            "[已废弃] 请使用 /task load",
             move |arg: &str| {
                 let manager = Arc::clone(&manager);
 
+                println!(
+                    "{}",
+                    "⚠ 警告: /task_load 已废弃，请使用 /task load".yellow()
+                );
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current()
                         .block_on(async { task_load_command(&manager, arg).await })
@@ -783,6 +941,46 @@ async fn view_task_output_command(
 }
 
 // ============================================================================
+// ✨ v1.22.1: 统一的任务命令处理函数 - 子命令架构
+// ============================================================================
+
+/// 统一的 /task 命令处理函数
+///
+/// 根据子命令分发到具体的处理逻辑
+pub async fn task_command(
+    manager: &Arc<RwLock<TaskManager>>,
+    config: &Arc<Config>,
+    arg: &str,
+) -> String {
+    // 解析子命令
+    let subcommand = match TaskSubcommand::parse(arg) {
+        Ok(cmd) => cmd,
+        Err(err) => {
+            return format!("{} {}\n", "✗ 错误:".red(), err);
+        }
+    };
+
+    // 分发处理
+    match subcommand {
+        TaskSubcommand::Save { name } => {
+            let name_str = name.as_deref().unwrap_or("");
+            task_save_command(manager, name_str).await
+        }
+        TaskSubcommand::List => task_list_command().await,
+        TaskSubcommand::Load { id } => {
+            let id_str = id.to_string();
+            task_load_command(manager, &id_str).await
+        }
+        TaskSubcommand::Show => show_tasks_command(manager, config).await,
+        TaskSubcommand::Delete { id } => task_delete_command(id).await,
+        TaskSubcommand::Help => {
+            TaskSubcommand::print_help();
+            String::new()
+        }
+    }
+}
+
+// ============================================================================
 // ✨ v1.22.0 Phase 1: 任务持久化命令处理函数
 // ============================================================================
 
@@ -986,6 +1184,74 @@ async fn task_load_command(manager: &Arc<RwLock<TaskManager>>, arg: &str) -> Str
     ));
 
     output
+}
+
+// ============================================================================
+// ✨ v1.22.1: 新增子命令处理函数
+// ============================================================================
+
+/// 执行 /task delete 命令 - 删除保存的任务
+async fn task_delete_command(task_id: usize) -> String {
+    // 获取所有保存的任务
+    let tasks = match SavedTask::list_all() {
+        Ok(tasks) => tasks,
+        Err(e) => {
+            return format!("{}\n错误: {}", "[ERROR] 无法读取任务列表".red(), e);
+        }
+    };
+
+    // 验证 ID 有效性
+    if task_id >= tasks.len() {
+        return format!(
+            "{}\n有效范围: 0-{}\n提示: 使用 /task list 查看所有任务",
+            format!("[ERROR] 任务 ID {} 不存在", task_id).red(),
+            tasks.len() - 1
+        );
+    }
+
+    // 删除任务文件
+    let (path, task) = &tasks[task_id];
+
+    match std::fs::remove_file(path) {
+        Ok(_) => {
+            let mut output = String::new();
+            output.push_str(&format!("\n{} 任务已删除\n", "✓".green()));
+
+            if let Some(name) = &task.name {
+                output.push_str(&format!("  {} {}\n", "名称:".dimmed(), name.bold()));
+            }
+
+            output.push_str(&format!(
+                "  {} {}\n",
+                "目标:".dimmed(),
+                task.goal.bold()
+            ));
+
+            output.push_str(&format!(
+                "  {} {}\n",
+                "文件:".dimmed(),
+                path.display().to_string().dimmed()
+            ));
+
+            output
+        }
+        Err(e) => {
+            format!(
+                "{}\n错误: {}",
+                format!("[ERROR] 删除任务 {} 失败", task_id).red(),
+                e
+            )
+        }
+    }
+}
+
+/// 执行 /task show 命令 - 显示当前任务详情（等同于 /tasks）
+async fn show_tasks_command(
+    manager: &Arc<RwLock<TaskManager>>,
+    _config: &Arc<Config>,
+) -> String {
+    // 直接委托给 view_tasks_command，实现与 /tasks 命令相同的功能
+    view_tasks_command(manager).await
 }
 
 #[cfg(test)]
