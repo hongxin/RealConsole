@@ -244,7 +244,95 @@ realconsole
 - **Suggestion Engine**：三源融合（Context + History + LLM）
 - **Tracer**：四维观测系统
 
-## v1.9.0 新特性 ⭐
+## 最新特性
+
+### v1.22.1 - 任务命令统一重构 🎯
+
+**极简主义 + 易变哲学的完美实践**
+
+#### 统一的子命令架构
+
+将 3 个独立命令合并为 1 个统一入口（-66%），践行极简主义设计理念：
+
+**重构前**:
+```bash
+/task_save [name]
+/task_list
+/task_load <id>
+```
+
+**重构后**:
+```bash
+/task <subcommand> [args]
+
+子命令:
+  save [name]     # 保存当前任务
+  list            # 列出所有任务
+  load <id>       # 加载任务
+  delete <id>     # 删除任务（新增）
+  show            # 显示当前任务（新增）
+  help            # 显示帮助（新增）
+```
+
+#### 核心特性
+
+- ✅ **类型安全**：TaskSubcommand 枚举，编译时检查
+- ✅ **易于扩展**：新增子命令只需添加枚举变体
+- ✅ **向后兼容**：旧命令保留，显示废弃警告
+- ✅ **友好错误**：自动帮助提示，清晰的错误消息
+
+📖 **详细信息**：[完成报告](docs/04-reports/v1.22.1-completion.md) | [设计文档](docs/04-reports/v1.22.1-task-command-refactoring.md)
+
+---
+
+### v1.22.0 - 任务系统三重增强 ⚡
+
+**跨会话任务管理 + 极简美学 + 灵活配置**
+
+#### 1. 任务持久化
+
+跨会话保存和加载任务计划：
+
+```bash
+% /plan 编译并测试项目
+% /execute
+% /task save my_build        # 保存任务
+% /task list                  # 列出所有任务
+% /task load 0                # 加载任务
+```
+
+- JSON 格式存储（`~/.realconsole/tasks/`）
+- UUID 自动生成 + 可选命名
+- 完整的计划和结果保存
+
+#### 2. 数字高亮
+
+极简美学，数字自动高亮显示：
+
+- Cyan 配色（与标题一致）
+- 识别整数、小数、百分比、带单位数字
+- 性能优化（正则缓存）
+
+#### 3. 执行器配置
+
+动态控制任务合并策略：
+
+```yaml
+task:
+  execution:
+    merge_stages: true        # 启用任务合并
+    max_merged_tasks: 20      # 最大合并数
+```
+
+- 配置驱动的执行策略
+- 环境变量跨任务共享
+- 防止命令过长
+
+📖 **详细信息**：[v1.22.0 总结](docs/04-reports/v1.22.0-summary.md)
+
+---
+
+## v1.9.0 新特性
 
 ### 两仪演化系统 - 体用合一
 

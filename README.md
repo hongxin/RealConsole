@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1000%2B-green.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.22.1-blue.svg)](CHANGELOG.md)
 
 English | **[中文](README.cn.md)**
 
@@ -248,9 +248,95 @@ Smart Router ──┬── Shell Execution (! prefix or auto-detected)
 - **Suggestion Engine**: Three-source fusion (Context + History + LLM)
 - **Tracer**: Four-dimensional observation system
 
-## What's New in v1.8.0
+## What's New
 
-### Proactive Suggestion System
+### v1.22.1 - Task Command Unification 🎯
+
+**Perfect Practice of Minimalism + Flexibility Philosophy**
+
+#### Unified Subcommand Architecture
+
+Merge 3 independent commands into 1 unified entry point (-66%), practicing minimalist design:
+
+**Before**:
+```bash
+/task_save [name]
+/task_list
+/task_load <id>
+```
+
+**After**:
+```bash
+/task <subcommand> [args]
+
+Subcommands:
+  save [name]     # Save current task
+  list            # List all tasks
+  load <id>       # Load task
+  delete <id>     # Delete task (NEW)
+  show            # Show current task (NEW)
+  help            # Show help (NEW)
+```
+
+#### Key Features
+
+- ✅ **Type-Safe**: TaskSubcommand enum, compile-time checks
+- ✅ **Easy to Extend**: Add new subcommands by adding enum variants
+- ✅ **Backward Compatible**: Old commands preserved with deprecation warnings
+- ✅ **User-Friendly**: Auto help hints, clear error messages
+
+📖 **Details**: [Completion Report](docs/04-reports/v1.22.1-completion.md) | [Design Document](docs/04-reports/v1.22.1-task-command-refactoring.md)
+
+---
+
+### v1.22.0 - Task System Triple Enhancement ⚡
+
+**Cross-Session Task Management + Minimalist Aesthetics + Flexible Configuration**
+
+#### 1. Task Persistence
+
+Save and load task plans across sessions:
+
+```bash
+% /plan compile and test project
+% /execute
+% /task save my_build        # Save task
+% /task list                  # List all tasks
+% /task load 0                # Load task
+```
+
+- JSON format storage (`~/.realconsole/tasks/`)
+- UUID auto-generation + optional naming
+- Complete plan and result preservation
+
+#### 2. Number Highlighting
+
+Minimalist aesthetics with automatic number highlighting:
+
+- Cyan color scheme (consistent with titles)
+- Recognizes integers, decimals, percentages, numbers with units
+- Performance optimized (regex caching)
+
+#### 3. Executor Configuration
+
+Dynamic control of task merging strategy:
+
+```yaml
+task:
+  execution:
+    merge_stages: true        # Enable task merging
+    max_merged_tasks: 20      # Maximum merge count
+```
+
+- Configuration-driven execution strategy
+- Environment variable sharing across tasks
+- Prevent command line overflow
+
+📖 **Details**: [v1.22.0 Summary](docs/04-reports/v1.22.0-summary.md)
+
+---
+
+### v1.8.0 - Proactive Suggestion System
 
 **Phase 4.2 Complete** - Three major features:
 
