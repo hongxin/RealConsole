@@ -331,7 +331,9 @@ impl ExecutionResult {
         if self.total_tasks == 0 {
             return 1.0;
         }
-        (self.completed_tasks - self.failed_tasks) as f64 / self.total_tasks as f64
+        // 使用 saturating_sub 防止下溢
+        let success_count = self.completed_tasks.saturating_sub(self.failed_tasks);
+        success_count as f64 / self.total_tasks as f64
     }
 }
 

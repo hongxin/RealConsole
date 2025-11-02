@@ -404,14 +404,16 @@ pub fn register_task_commands(
         ));
     }
 
-    // /tasks 命令 - 查看当前任务计划
+    // /tasks 命令 - 查看当前任务计划（已废弃，请使用 /task show）
     {
         let manager = Arc::clone(&task_manager);
 
         registry.register(Command::from_fn(
             "tasks",
-            "查看当前任务计划",
+            "[已废弃] 请使用 /task show",
             move |_arg: &str| {
+                println!("{}", "⚠ 警告: /tasks 已废弃，请使用 /task show".yellow());
+
                 let manager = Arc::clone(&manager);
 
                 tokio::task::block_in_place(|| {
@@ -1090,7 +1092,7 @@ async fn task_list_command() -> String {
 
             output.push_str(&format!(
                 "\n{}\n",
-                format!("使用 {} <id> 加载任务", "/task_load".cyan()).dimmed()
+                format!("使用 {} 加载任务", "/task load <id>".cyan()).dimmed()
             ));
 
             output
@@ -1133,9 +1135,10 @@ async fn task_load_command(manager: &Arc<RwLock<TaskManager>>, arg: &str) -> Str
     // 验证 ID 有效性
     if task_id >= tasks.len() {
         return format!(
-            "{}\n有效范围: 0-{}\n提示: 使用 /task_list 查看所有任务",
+            "{}\n有效范围: 0-{}\n提示: 使用 {} 查看所有任务",
             format!("[ERROR] 任务 ID {} 不存在", task_id).red(),
-            tasks.len() - 1
+            tasks.len() - 1,
+            "/task list".cyan()
         );
     }
 
@@ -1177,7 +1180,7 @@ async fn task_load_command(manager: &Arc<RwLock<TaskManager>>, arg: &str) -> Str
         "\n{}\n",
         format!(
             "使用 {} 查看计划，{} 执行任务",
-            "/tasks".cyan(),
+            "/task show".cyan(),
             "/execute".cyan()
         )
         .dimmed()
