@@ -536,7 +536,13 @@ async fn execute_tasks_command(
     };
 
     // 2. 创建执行器
-    let executor = TaskExecutor::new(Arc::clone(shell_executor)).with_timeout(300);
+    // ✨ v1.22.0 Phase 3: 应用配置
+    let executor = TaskExecutor::new(Arc::clone(shell_executor))
+        .with_timeout(300)
+        .with_merge_config(
+            config.task.execution.merge_stages,
+            config.task.execution.max_merged_tasks,
+        );
 
     // 3. 执行计划
     let result = match executor.execute(plan.clone()).await {

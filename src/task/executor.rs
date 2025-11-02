@@ -34,6 +34,15 @@ pub struct TaskExecutor {
 
     /// 超时设置（秒）
     timeout: Option<u64>,
+
+    // ========================================================================
+    // ✨ v1.22.0 Phase 3: Executor 配置
+    // ========================================================================
+    /// 是否合并 Stage 执行（支持环境变量共享）
+    merge_stages: bool,
+
+    /// 合并执行的最大任务数（防止命令过长）
+    max_merged_tasks: usize,
 }
 
 /// 执行器内部状态
@@ -77,13 +86,24 @@ impl ExecutorState {
 
 impl TaskExecutor {
     /// 创建新的任务执行器
+    ///
+    /// ✨ v1.22.0 Phase 3: 添加配置参数
     pub fn new(shell_executor: Arc<ShellExecutorWithFixer>) -> Self {
         Self {
             shell_executor,
             progress_callback: None,
             state: Arc::new(RwLock::new(ExecutorState::new())),
             timeout: None,
+            merge_stages: true,        // 默认启用合并（保持向后兼容）
+            max_merged_tasks: 20,      // 默认最大 20 个任务
         }
+    }
+
+    /// ✨ v1.22.0 Phase 3: 设置合并策略
+    pub fn with_merge_config(mut self, merge_stages: bool, max_merged_tasks: usize) -> Self {
+        self.merge_stages = merge_stages;
+        self.max_merged_tasks = max_merged_tasks;
+        self
     }
 
     /// 设置进度回调
@@ -115,12 +135,22 @@ impl TaskExecutor {
         let mut all_results = Vec::new();
 
         // v1.20.0: 合并执行以支持跨 Stage 的环境变量共享
+        // ✨ v1.22.0 Phase 3: 根据配置决定是否合并
         //
         // 策略：无论是否有并行 Stage，都尝试在同一个 shell 会话中执行
         // - 对于串行 Stage：按顺序执行任务
         // - 对于并行 Stage：由于环境变量共享的复杂性，暂时也串行执行
         //   （未来可以使用 & + wait 实现真正的并行）
-        if plan.stages.len() > 1 {
+        //
+        // ✨ v1.22.0: 新增配置控制
+        // - merge_stages: 是否启用合并（默认 true）
+        // - max_merged_tasks: 最大合并任务数（默认 20）
+        let total_tasks = plan.total_tasks();
+        let should_merge = self.merge_stages
+            && plan.stages.len() > 1
+            && total_tasks <= self.max_merged_tasks;
+
+        if should_merge {
             // 合并所有 Stage 的所有任务到一个命令中执行（忽略执行模式）
             let all_tasks: Vec<SubTask> = plan
                 .stages
@@ -188,6 +218,7 @@ impl TaskExecutor {
     /// 串行执行阶段
     ///
     /// v1.20.0: 支持环境变量共享 - 将同一 Stage 内的任务合并为一个 shell 命令执行
+    /// ✨ v1.22.0 Phase 3: 应用 max_merged_tasks 限制
     async fn execute_sequential(&self, stage: &ExecutionStage) -> TaskOpResult<Vec<TaskResult>> {
         // 如果只有一个任务，使用旧逻辑（优化）
         if stage.tasks.len() == 1 {
@@ -201,6 +232,24 @@ impl TaskExecutor {
             self.report_progress().await;
 
             return Ok(vec![result]);
+        }
+
+        // ✨ v1.22.0 Phase 3: 检查任务数是否超过限制
+        // 如果任务数超过 max_merged_tasks，逐个执行而不合并
+        if stage.tasks.len() > self.max_merged_tasks {
+            let mut results = Vec::new();
+            for task in &stage.tasks {
+                let result = self.execute_task(task).await;
+                results.push(result);
+
+                // 更新状态
+                {
+                    let mut state = self.state.write().await;
+                    state.completed_tasks += 1;
+                }
+                self.report_progress().await;
+            }
+            return Ok(results);
         }
 
         // 多任务场景：合并执行以支持环境变量共享
@@ -597,6 +646,8 @@ impl TaskExecutor {
             progress_callback: self.progress_callback.clone(),
             state: Arc::clone(&self.state),
             timeout: self.timeout,
+            merge_stages: self.merge_stages,
+            max_merged_tasks: self.max_merged_tasks,
         }
     }
 }
@@ -1063,5 +1114,125 @@ mod tests {
             assert_eq!(result.status, TaskStatus::Success);
             assert!(!result.output.is_empty(), "Task {} should have output", i);
         }
+    }
+
+    // ============================================================================
+    // ✨ v1.22.0 Phase 3: 配置测试
+    // ============================================================================
+
+    #[tokio::test]
+    async fn test_merge_stages_disabled() {
+        // 测试禁用 merge_stages 时不合并阶段
+        let shell_executor = Arc::new(ShellExecutorWithFixer::new());
+        let executor = TaskExecutor::new(shell_executor).with_merge_config(false, 20);
+
+        // 创建多阶段计划
+        let tasks = vec![
+            SubTask::new("t1", "Task 1", "echo 'A'"),
+            SubTask::new("t2", "Task 2", "echo 'B'"),
+        ];
+        let stages = vec![
+            ExecutionStage::new(0, vec![tasks[0].clone()], ExecutionMode::Sequential),
+            ExecutionStage::new(1, vec![tasks[1].clone()], ExecutionMode::Sequential),
+        ];
+        let plan = ExecutionPlan::new("test merge disabled", stages);
+
+        let result = executor.execute(plan).await.unwrap();
+
+        // 应该成功执行所有任务
+        assert_eq!(result.completed_tasks, 2);
+        assert_eq!(result.failed_tasks, 0);
+    }
+
+    #[tokio::test]
+    async fn test_max_merged_tasks_limit() {
+        // 测试 max_merged_tasks 限制
+        let shell_executor = Arc::new(ShellExecutorWithFixer::new());
+        // 设置最大合并任务数为 2
+        let executor = TaskExecutor::new(shell_executor).with_merge_config(true, 2);
+
+        // 创建 3 个任务（超过限制）
+        let tasks = vec![
+            SubTask::new("t1", "Task 1", "echo 'A'"),
+            SubTask::new("t2", "Task 2", "echo 'B'"),
+            SubTask::new("t3", "Task 3", "echo 'C'"),
+        ];
+        let stages = vec![ExecutionStage::new(0, tasks, ExecutionMode::Sequential)];
+        let plan = ExecutionPlan::new("test max tasks", stages);
+
+        let result = executor.execute(plan).await.unwrap();
+
+        // 应该逐个执行（不合并）
+        assert_eq!(result.completed_tasks, 3);
+        assert_eq!(result.failed_tasks, 0);
+    }
+
+    #[tokio::test]
+    async fn test_with_merge_config_builder() {
+        // 测试 with_merge_config 构建器方法
+        let shell_executor = Arc::new(ShellExecutorWithFixer::new());
+        let executor = TaskExecutor::new(shell_executor).with_merge_config(true, 10);
+
+        // 创建简单计划
+        let tasks = vec![SubTask::new("t1", "Test", "echo 'test'")];
+        let plan = create_test_plan(tasks);
+
+        let result = executor.execute(plan).await.unwrap();
+
+        assert_eq!(result.completed_tasks, 1);
+    }
+
+    #[tokio::test]
+    async fn test_default_merge_config() {
+        // 测试默认配置（merge_stages: true, max_merged_tasks: 20）
+        let executor = create_test_executor();
+
+        // 创建 5 个任务（少于默认限制 20）
+        let tasks = vec![
+            SubTask::new("t1", "Task 1", "echo '1'"),
+            SubTask::new("t2", "Task 2", "echo '2'"),
+            SubTask::new("t3", "Task 3", "echo '3'"),
+            SubTask::new("t4", "Task 4", "echo '4'"),
+            SubTask::new("t5", "Task 5", "echo '5'"),
+        ];
+        let stages = vec![ExecutionStage::new(0, tasks, ExecutionMode::Sequential)];
+        let plan = ExecutionPlan::new("test default config", stages);
+
+        let result = executor.execute(plan).await.unwrap();
+
+        // 默认应该合并执行
+        assert_eq!(result.completed_tasks, 5);
+        assert_eq!(result.failed_tasks, 0);
+    }
+
+    #[tokio::test]
+    async fn test_merge_stages_single_stage() {
+        // 测试单阶段计划不触发合并逻辑
+        let shell_executor = Arc::new(ShellExecutorWithFixer::new());
+        let executor = TaskExecutor::new(shell_executor).with_merge_config(true, 20);
+
+        // 单阶段计划
+        let tasks = vec![SubTask::new("t1", "Single task", "echo 'single'")];
+        let plan = create_test_plan(tasks);
+
+        let result = executor.execute(plan).await.unwrap();
+
+        assert_eq!(result.completed_tasks, 1);
+    }
+
+    #[tokio::test]
+    async fn test_merge_config_with_timeout() {
+        // 测试配置与超时同时使用
+        let shell_executor = Arc::new(ShellExecutorWithFixer::new());
+        let executor = TaskExecutor::new(shell_executor)
+            .with_merge_config(true, 10)
+            .with_timeout(60);
+
+        let tasks = vec![SubTask::new("t1", "Quick task", "echo 'done'")];
+        let plan = create_test_plan(tasks);
+
+        let result = executor.execute(plan).await.unwrap();
+
+        assert_eq!(result.completed_tasks, 1);
     }
 }
