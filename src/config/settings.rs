@@ -931,7 +931,7 @@ impl Config {
         let expanded = Self::expand_env_vars(&content);
 
         // 解析 YAML
-        let config: Config = serde_yml::from_str(&expanded).map_err(|e| {
+        let config: Config = serde_yaml_ng::from_str(&expanded).map_err(|e| {
             RealError::new(
                 ErrorCode::ConfigParseError,
                 format!("配置文件解析失败: {}", resolved_path.display()),
@@ -1147,7 +1147,7 @@ features:
   max_tool_iterations: 10
   max_tools_per_round: 5
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
         assert_eq!(config.features.max_tool_iterations, 10);
         assert_eq!(config.features.max_tools_per_round, 5);
     }
@@ -1162,7 +1162,7 @@ features:
   shell_timeout: 10
   tool_calling_enabled: false
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         // 验证旧字段正常工作
         assert_eq!(config.prefix, "/");
@@ -1188,7 +1188,7 @@ features:
   workflow_cache_enabled: true
   workflow_cache_ttl_default: 600
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         // 验证 Workflow 配置正确解析
         assert_eq!(config.features.workflow_enabled, Some(true));
@@ -1224,7 +1224,7 @@ conversation:
   auto_clear:
     enabled: false
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         assert_eq!(config.conversation.mode, ContextMode::Manual);
         assert_eq!(config.conversation.max_turns, 20);
@@ -1250,7 +1250,7 @@ conversation:
     shell_output: false
     errors: true
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         assert_eq!(config.conversation.mode, ContextMode::Auto);
         assert_eq!(config.conversation.max_turns, 5);
@@ -1272,7 +1272,7 @@ features:
   shell_enabled: true
   shell_timeout: 10
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         // 验证使用默认值（关闭模式）
         assert_eq!(config.conversation.mode, ContextMode::Disabled);
@@ -1308,7 +1308,7 @@ task:
     merge_stages: false
     max_merged_tasks: 50
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         assert!(!config.task.display.show_task_output);
         assert_eq!(config.task.display.max_output_lines, 100);
@@ -1328,7 +1328,7 @@ task:
   display:
     max_output_lines: 0
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         // 明确配置的值
         assert_eq!(config.task.display.max_output_lines, 0); // 0 表示不限制

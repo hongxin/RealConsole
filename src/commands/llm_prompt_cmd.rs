@@ -139,9 +139,8 @@ fn handle_show_prompt(
                             "使用 /set-prompt <prompt> 可临时覆盖".dimmed()
                         )
                     } else {
-                        let default_prompt = "你是一个有用的智能助手。你可以使用提供的工具来帮助用户完成任务。\n\
-                            请直接、自然地回答用户的问题，不要过度客套。\n\
-                            当用户询问事实性问题时，请提供准确、详细的信息。";
+                        // 从 i18n 读取默认提示词（支持多语言）
+                        let default_prompt = crate::i18n::t("prompts.llm.default_system");
 
                         format!(
                             "{}\n\n{}\n{}\n\n{}\n{}\n\n{}\n  {}",

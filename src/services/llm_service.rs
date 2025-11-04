@@ -259,12 +259,10 @@ impl LlmService {
 
         // 构建消息列表（如果有历史上下文则使用，否则创建新的）
         let msgs = messages.unwrap_or_else(|| {
-            // 内置默认提示词
-            let default_system_prompt = "你是一个有用的智能助手。你可以使用提供的工具来帮助用户完成任务。\n\
-                请直接、自然地回答用户的问题，不要过度客套。\n\
-                当用户询问事实性问题时，请提供准确、详细的信息。";
+            // 从 i18n 读取默认提示词（支持多语言）
+            let default_system_prompt = crate::i18n::t("prompts.llm.default_system");
 
-            // 系统提示词优先级：运行时 > 配置文件 > 内置默认
+            // 系统提示词优先级：运行时 > 配置文件 > i18n 默认
             // 注意：这里使用阻塞调用是安全的，因为我们已经在 tokio 运行时中
             let runtime_prompt = tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
@@ -275,7 +273,7 @@ impl LlmService {
             let system_prompt = runtime_prompt
                 .as_deref()
                 .or(self.config_system_prompt.as_deref())
-                .unwrap_or(default_system_prompt);
+                .unwrap_or(&default_system_prompt);
 
             vec![
                 crate::llm::Message::system(system_prompt),

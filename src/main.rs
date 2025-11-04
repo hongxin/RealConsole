@@ -331,11 +331,11 @@ fn setup_panic_hook() {
         );
 
         // 打印原始的 panic 信息
-        eprintln!("\n{}", "程序发生错误，终端状态已重置".red());
+        eprintln!("\n{}", i18n::t("cli.panic.reset_message").red());
         default_hook(panic_info);
 
         // 提示用户如果终端状态异常该如何处理
-        eprintln!("\n{}", "如果终端显示异常，请尝试运行: reset".yellow());
+        eprintln!("\n{}", i18n::t("cli.panic.recovery_hint").yellow());
     }));
 }
 
@@ -373,8 +373,9 @@ async fn main() {
     // 语言选择优先级：命令行 > 配置文件 > 环境变量 > 系统语言 > 默认中文
     let selected_lang = if let Some(ref lang_str) = args.lang {
         lang_str.parse::<i18n::Language>().unwrap_or_else(|_| {
-            eprintln!("⚠ 未知语言: {}，使用默认中文", lang_str);
-            i18n::Language::ZhCn
+            // Note: This warning is printed BEFORE i18n is initialized, so we can't use i18n::t() here
+            eprintln!("⚠ Unknown language: {}, using system default", lang_str);
+            i18n::Language::from_system()
         })
     } else if let Ok(lang_env) = std::env::var("REALCONSOLE_LANG") {
         lang_env.parse::<i18n::Language>().unwrap_or_else(|_| i18n::Language::from_system())

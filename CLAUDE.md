@@ -37,6 +37,7 @@
 - `src/i18n.rs` - 国际化系统
 - `scripts/` - Shell 脚本集合（test/ 按功能分类的测试脚本，utils/ 发布等工具）
 - `docs/` - 五态架构文档（00-core/01-understanding/02-practice/03-evolution/04-reports）
+- `scripts/` - 测试脚本目录
 
 ## 开发规范
 

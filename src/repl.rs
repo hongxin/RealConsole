@@ -267,19 +267,31 @@ fn build_context_indicator(agent: &Agent) -> String {
         // 即将超时：显示警告
         format!(
             " {}",
-            format!("[上下文: {}轮 | {}分钟前]", snapshot.turn_count, idle_minutes).yellow()
+            i18n::t_with_args(
+                "cli.context.warning",
+                &[
+                    ("turns", &snapshot.turn_count.to_string()),
+                    ("minutes", &idle_minutes.to_string())
+                ]
+            ).yellow()
         )
     } else if snapshot.idle_seconds > 60 {
         // 空闲超过 1 分钟：显示空闲时间
         format!(
             " {}",
-            format!("[上下文: {}轮 | {}分钟前]", snapshot.turn_count, idle_minutes).dimmed()
+            i18n::t_with_args(
+                "cli.context.idle",
+                &[
+                    ("turns", &snapshot.turn_count.to_string()),
+                    ("minutes", &idle_minutes.to_string())
+                ]
+            ).dimmed()
         )
     } else {
         // 正常激活：只显示轮次
         format!(
             " {}",
-            format!("[上下文: {}轮]", snapshot.turn_count).green()
+            i18n::t_with_args("cli.context.active", &[("turns", &snapshot.turn_count.to_string())]).green()
         )
     }
 }

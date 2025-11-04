@@ -4341,7 +4341,7 @@ features:
   shell_enabled: true
   shell_timeout: 10
 "#;
-        let config: Config = serde_yml::from_str(yaml).unwrap();
+        let config: Config = serde_yaml_ng::from_str(yaml).unwrap();
 
         // 验证新字段有默认值
         assert_eq!(config.features.workflow_enabled, Some(false));

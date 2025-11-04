@@ -6,6 +6,7 @@
 //! - /version - 显示版本信息
 
 use crate::command::{Command, CommandRegistry};
+use crate::i18n;
 use colored::Colorize;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -13,36 +14,36 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 注册核心命令
 pub fn register_core_commands(registry: &mut CommandRegistry) {
     // /help 命令
-    let help_cmd = Command::from_fn("help", "显示帮助信息", cmd_help)
+    let help_cmd = Command::from_fn("help", &i18n::t("cli.cmd.help.desc"), cmd_help)
         .with_aliases(vec!["h".to_string(), "?".to_string()])
         .with_group("core");
     registry.register(help_cmd);
 
     // /quit 命令
-    let quit_cmd = Command::from_fn("quit", "退出程序", cmd_quit)
+    let quit_cmd = Command::from_fn("quit", &i18n::t("cli.cmd.quit.desc"), cmd_quit)
         .with_aliases(vec!["q".to_string(), "exit".to_string()])
         .with_group("core");
     registry.register(quit_cmd);
 
     // /version 命令
-    let version_cmd = Command::from_fn("version", "显示版本信息", cmd_version)
+    let version_cmd = Command::from_fn("version", &i18n::t("cli.cmd.version.desc"), cmd_version)
         .with_aliases(vec!["v".to_string()])
         .with_group("core");
     registry.register(version_cmd);
 
     // /commands 命令（列出所有命令）
     let commands_cmd =
-        Command::from_fn("commands", "列出所有可用命令", cmd_commands).with_group("core");
+        Command::from_fn("commands", &i18n::t("cli.cmd.commands.desc"), cmd_commands).with_group("core");
     registry.register(commands_cmd);
 
     // /examples 命令（使用示例）
-    let examples_cmd = Command::from_fn("examples", "查看使用示例", cmd_examples)
+    let examples_cmd = Command::from_fn("examples", &i18n::t("cli.cmd.examples.desc"), cmd_examples)
         .with_aliases(vec!["ex".to_string()])
         .with_group("core");
     registry.register(examples_cmd);
 
     // /quickref 命令（快速参考）
-    let quickref_cmd = Command::from_fn("quickref", "快速参考卡片", cmd_quickref)
+    let quickref_cmd = Command::from_fn("quickref", &i18n::t("cli.cmd.quickref.desc"), cmd_quickref)
         .with_aliases(vec!["qr".to_string()])
         .with_group("core");
     registry.register(quickref_cmd);
@@ -61,20 +62,19 @@ fn cmd_help(arg: &str) -> String {
         "log" => cmd_help_log(),
         "shell" => cmd_help_shell(),
         _ => format!(
-            "{} 未知的帮助主题: {}\n使用 {} 查看可用主题",
-            "✗".red(),
-            arg.yellow(),
-            "/help".cyan()
+            "{}\n{}",
+            i18n::t_with_args("cli.help.unknown_topic", &[("topic", arg)]).yellow(),
+            i18n::t_with_args("cli.help.unknown_hint", &[("cmd", "/help")]).cyan()
         ),
     }
 }
 
 /// 快速帮助（简洁版）
 fn cmd_help_quick() -> String {
-    let version_str = format!("v{}", VERSION);
+    let version_str = i18n::t_with_args("cli.help.quick.version", &[("version", VERSION)]);
     let header = format!(
         " {} {}",
-        "RealConsole".bold().cyan(),
+        i18n::t("cli.help.quick.header").bold().cyan(),
         version_str.dimmed()
     );
 
@@ -82,133 +82,155 @@ fn cmd_help_quick() -> String {
         r#"{}
 
 {}
-  直接输入问题即可，无需命令前缀
-  {} 计算 2 的 10 次方
-  {} 用 Rust 写一个 hello world
+  {}
+  {} {}
+  {} {}
 
 {}
-  常见命令可直接输入，无需前缀（智能识别）
-  {}         列出文件（自动识别）
-  {}         显示当前目录
-  {}   查看Git状态
-  {}        强制Shell执行
+  {}
+  {}         {}
+  {}         {}
+  {}   {}
+  {}        {}
 
 {}
-  {}      显示此帮助
-  {}  显示所有命令（详细）
-  {}   查看使用示例
-  {}   快速参考卡片
-  {}      退出程序
+  {}      {}
+  {}  {}
+  {}   {}
+  {}   {}
+  {}      {}
 
 {}
-  {}        列出所有工具
-  {}   调用工具
+  {}        {}
+  {}   {}
 
 {}
-  {}    查看最近对话
-  {}        查看执行统计
+  {}    {}
+  {}        {}
 
 {}
-  使用 {} 查看命令详情
-  系统自动识别命令类型，使用 {} 查看路由说明
+  {}
+  {}
 "#,
         header,
-        "💬 智能对话:".bold(),
-        "示例:".dimmed(),
-        "示例:".dimmed(),
-        "[>>] 智能命令路由:".bold(),
-        "ls".green(),
-        "pwd".green(),
-        "git status".green(),
-        "!ls -la".green(),
-        "[>] 快速命令:".bold(),
-        "/help".green(),
-        "/help all".green(),
-        "/examples".green(),
-        "/quickref".green(),
-        "/quit".green(),
-        "🛠️ 工具调用:".bold(),
-        "/tools".green(),
-        "/tools call <name> <args>".green(),
-        "💾 记忆与日志:".bold(),
-        "/memory recent".green(),
-        "/log stats".green(),
-        "提示:".bold(),
-        "/help <命令>".cyan(),
-        "/help shell".cyan()
+        i18n::t("cli.help.quick.chat_title").bold(),
+        i18n::t("cli.help.quick.chat_desc"),
+        i18n::t("cli.help.quick.chat_example1").dimmed(),
+        i18n::t("cli.help.quick.chat_example1_text"),
+        i18n::t("cli.help.quick.chat_example2").dimmed(),
+        i18n::t("cli.help.quick.chat_example2_text"),
+        i18n::t("cli.help.quick.routing_title").bold(),
+        i18n::t("cli.help.quick.routing_desc"),
+        i18n::t("cli.help.quick.routing_ls").green(),
+        i18n::t("cli.help.quick.routing_ls_desc"),
+        i18n::t("cli.help.quick.routing_pwd").green(),
+        i18n::t("cli.help.quick.routing_pwd_desc"),
+        i18n::t("cli.help.quick.routing_git").green(),
+        i18n::t("cli.help.quick.routing_git_desc"),
+        i18n::t("cli.help.quick.routing_shell").green(),
+        i18n::t("cli.help.quick.routing_shell_desc"),
+        i18n::t("cli.help.quick.commands_title").bold(),
+        i18n::t("cli.help.quick.cmd_help").green(),
+        i18n::t("cli.help.quick.cmd_help_desc"),
+        i18n::t("cli.help.quick.cmd_help_all").green(),
+        i18n::t("cli.help.quick.cmd_help_all_desc"),
+        i18n::t("cli.help.quick.cmd_examples").green(),
+        i18n::t("cli.help.quick.cmd_examples_desc"),
+        i18n::t("cli.help.quick.cmd_quickref").green(),
+        i18n::t("cli.help.quick.cmd_quickref_desc"),
+        i18n::t("cli.help.quick.cmd_quit").green(),
+        i18n::t("cli.help.quick.cmd_quit_desc"),
+        i18n::t("cli.help.quick.tools_title").bold(),
+        i18n::t("cli.help.quick.tools_list").green(),
+        i18n::t("cli.help.quick.tools_list_desc"),
+        i18n::t("cli.help.quick.tools_call").green(),
+        i18n::t("cli.help.quick.tools_call_desc"),
+        i18n::t("cli.help.quick.memory_title").bold(),
+        i18n::t("cli.help.quick.memory_recent").green(),
+        i18n::t("cli.help.quick.memory_recent_desc"),
+        i18n::t("cli.help.quick.log_stats").green(),
+        i18n::t("cli.help.quick.log_stats_desc"),
+        i18n::t("cli.help.quick.tips_title").bold(),
+        i18n::t_with_args("cli.help.quick.tips_detail", &[("cmd", "/help <命令>")]).cyan(),
+        i18n::t_with_args("cli.help.quick.tips_routing", &[("cmd", "/help shell")]).cyan()
     )
 }
 
 /// 详细帮助（完整文档）
 fn cmd_help_all() -> String {
-    let title = format!("{} - 完整命令参考", "RealConsole".bold().cyan());
+    let title = format!("{}", i18n::t("cli.help.all.title").bold().cyan());
 
     format!(
         r#"{}
 
 {}
-  {} [主题]  显示帮助 (别名: /h, /?)  主题: all, tools, memory, log, shell
-  {}         退出程序 (别名: /q, /exit)
-  {}      显示版本信息 (别名: /v)
-  {}      列出所有可用命令
+  {}
+  {}
+  {}
+  {}
 
 {}
-  {}          显示 LLM 状态
-  {} <问题>   直接提问（使用 fallback）
+  {}
+  {}
 
 {}
-  {}                    列出所有工具
-  {} <name>        查看工具详情
-  {} <name> <args> 调用工具
-  示例: /tools call calculator {{"expression": "10+5"}}
+  {}
+  {}
+  {}
+  {}
 
 {}
-  {} [n]        显示最近 n 条对话（默认5）
-  {} <关键词>   搜索对话历史
-  {}             清空记忆
-  {} [文件]       保存到文件
+  {}
+  {}
+  {}
+  {}
 
 {}
-  {} [n]           显示最近 n 条日志
-  {} <关键词>      搜索日志
-  {}                显示统计信息
-  {}               显示失败记录
+  {}
+  {}
+  {}
+  {}
 
 {}
-  {}              执行 shell 命令
-  安全限制: 禁止 rm -rf /, sudo, shutdown 等危险命令 | 超时: 30秒
-  示例: !ls -la  !pwd  !echo "hello"
+  {}
+  {}
+  {}
 
-更多: {} | {} | {}
+{}
 "#,
         title,
-        "核心命令".bold(),
-        "/help".green(),
-        "/quit".green(),
-        "/version".green(),
-        "/commands".green(),
-        "LLM 命令".bold(),
-        "/llm".green(),
-        "/ask".green(),
-        "工具管理".bold(),
-        "/tools".green(),
-        "/tools info".green(),
-        "/tools call".green(),
-        "记忆系统".bold(),
-        "/memory recent".green(),
-        "/memory search".green(),
-        "/memory clear".green(),
-        "/memory save".green(),
-        "执行日志".bold(),
-        "/log recent".green(),
-        "/log search".green(),
-        "/log stats".green(),
-        "/log failed".green(),
-        "Shell 执行".bold(),
-        "!<命令>".yellow(),
-        "/examples".cyan(),
-        "/help tools".cyan(),
-        "/quickref".cyan()
+        i18n::t("cli.help.all.core_title").bold(),
+        i18n::t("cli.help.all.core_help").green(),
+        i18n::t("cli.help.all.core_quit").green(),
+        i18n::t("cli.help.all.core_version").green(),
+        i18n::t("cli.help.all.core_commands").green(),
+        i18n::t("cli.help.all.llm_title").bold(),
+        i18n::t("cli.help.all.llm_status").green(),
+        i18n::t("cli.help.all.llm_ask").green(),
+        i18n::t("cli.help.all.tools_title").bold(),
+        i18n::t("cli.help.all.tools_list").green(),
+        i18n::t("cli.help.all.tools_info").green(),
+        i18n::t("cli.help.all.tools_call").green(),
+        i18n::t("cli.help.all.tools_example"),
+        i18n::t("cli.help.all.memory_title").bold(),
+        i18n::t("cli.help.all.memory_recent").green(),
+        i18n::t("cli.help.all.memory_search").green(),
+        i18n::t("cli.help.all.memory_clear").green(),
+        i18n::t("cli.help.all.memory_save").green(),
+        i18n::t("cli.help.all.log_title").bold(),
+        i18n::t("cli.help.all.log_recent").green(),
+        i18n::t("cli.help.all.log_search").green(),
+        i18n::t("cli.help.all.log_stats").green(),
+        i18n::t("cli.help.all.log_failed").green(),
+        i18n::t("cli.help.all.shell_title").bold(),
+        i18n::t("cli.help.all.shell_prefix").yellow(),
+        i18n::t("cli.help.all.shell_safety"),
+        i18n::t("cli.help.all.shell_example"),
+        i18n::t_with_args("cli.help.all.more", &[
+            ("examples", "/examples"),
+            ("help_tools", "/help tools"),
+            ("quickref", "/quickref")
+        ]).cyan()
     )
 }
 
@@ -217,51 +239,80 @@ fn cmd_help_tools() -> String {
     format!(
         r#"{}
 
-用法:
-  {}                     列出所有可用工具
-  {}                同上
-  {} <工具名>       查看工具详细信息
-  {} <工具名> <JSON参数>  调用工具
+{}
+  {}
+  {}
+  {}
+  {}
 
-可用工具 (14个):
-  基础工具 (5个):
-    • calculator      - 数学计算
-    • datetime        - 日期时间
-    • uuid_generator  - UUID 生成
-    • base64          - Base64 编解码
-    • random          - 随机数生成
+{}
+  {}
+    {}
+    {}
+    {}
+    {}
+    {}
 
-  高级工具 (9个):
-    • http_get        - HTTP GET 请求
-    • http_post       - HTTP POST 请求
-    • json_parse      - JSON 解析
-    • json_query      - JSON 查询 (JQ)
-    • text_search     - 文本搜索
-    • text_replace    - 文本替换
-    • file_read       - 文件读取
-    • file_write      - 文件写入
-    • sys_info        - 系统信息
+  {}
+    {}
+    {}
+    {}
+    {}
+    {}
+    {}
+    {}
+    {}
+    {}
 
-示例:
-  # 计算数学表达式
-  /tools call calculator {{"expression": "2^10"}}
+{}
+  {}
+  {}
 
-  # 获取网页内容
-  /tools call http_get {{"url": "https://httpbin.org/get"}}
+  {}
+  {}
 
-  # 解析 JSON
-  /tools call json_parse {{"text": "{{\"name\": \"John\"}}"}}
+  {}
+  {}
 
-提示:
-  • 工具调用支持迭代模式（最多5轮）
-  • 每轮最多调用3个工具（并行）
-  • 在配置文件中可调整限制
+{}
+  {}
+  {}
+  {}
 "#,
-        "🛠️ 工具管理命令".bold(),
-        "/tools".green(),
-        "/tools list".green(),
-        "/tools info".green(),
-        "/tools call".green()
+        i18n::t("cli.help.tools.title").bold(),
+        i18n::t("cli.help.tools.usage_title"),
+        i18n::t("cli.help.tools.usage_list1").green(),
+        i18n::t("cli.help.tools.usage_list2").green(),
+        i18n::t("cli.help.tools.usage_info").green(),
+        i18n::t("cli.help.tools.usage_call").green(),
+        i18n::t("cli.help.tools.available"),
+        i18n::t("cli.help.tools.basic_title"),
+        i18n::t("cli.help.tools.basic_calculator"),
+        i18n::t("cli.help.tools.basic_datetime"),
+        i18n::t("cli.help.tools.basic_uuid"),
+        i18n::t("cli.help.tools.basic_base64"),
+        i18n::t("cli.help.tools.basic_random"),
+        i18n::t("cli.help.tools.advanced_title"),
+        i18n::t("cli.help.tools.advanced_http_get"),
+        i18n::t("cli.help.tools.advanced_http_post"),
+        i18n::t("cli.help.tools.advanced_json_parse"),
+        i18n::t("cli.help.tools.advanced_json_query"),
+        i18n::t("cli.help.tools.advanced_text_search"),
+        i18n::t("cli.help.tools.advanced_text_replace"),
+        i18n::t("cli.help.tools.advanced_file_read"),
+        i18n::t("cli.help.tools.advanced_file_write"),
+        i18n::t("cli.help.tools.advanced_sys_info"),
+        i18n::t("cli.help.tools.examples_title"),
+        i18n::t("cli.help.tools.example1_comment"),
+        i18n::t("cli.help.tools.example1_cmd"),
+        i18n::t("cli.help.tools.example2_comment"),
+        i18n::t("cli.help.tools.example2_cmd"),
+        i18n::t("cli.help.tools.example3_comment"),
+        i18n::t("cli.help.tools.example3_cmd"),
+        i18n::t("cli.help.tools.tips_title"),
+        i18n::t("cli.help.tools.tip1"),
+        i18n::t("cli.help.tools.tip2"),
+        i18n::t("cli.help.tools.tip3")
     )
 }
 
@@ -270,27 +321,36 @@ fn cmd_help_memory() -> String {
     format!(
         r#"{}
 
-用法:
-  {} [数量]        显示最近 n 条对话（默认5）
-  {} <关键词>   搜索包含关键词的对话
-  {}             清空所有记忆
-  {} [文件]       保存记忆到文件（默认 memory.json）
+{}
+  {}
+  {}
+  {}
+  {}
 
-示例:
-  /memory recent 10       # 显示最近10条
-  /memory search "Rust"   # 搜索包含 Rust 的对话
-  /memory save history.json  # 保存到指定文件
+{}
+  {}
+  {}
+  {}
 
-提示:
-  • 记忆容量默认100条（环形缓冲区）
-  • 可在配置文件中调整容量
-  • 支持持久化到文件
+{}
+  {}
+  {}
+  {}
 "#,
-        "💾 记忆系统命令".bold(),
-        "/memory recent".green(),
-        "/memory search".green(),
-        "/memory clear".green(),
-        "/memory save".green()
+        i18n::t("cli.help.memory.title").bold(),
+        i18n::t("cli.help.memory.usage_title"),
+        i18n::t("cli.help.memory.usage_recent").green(),
+        i18n::t("cli.help.memory.usage_search").green(),
+        i18n::t("cli.help.memory.usage_clear").green(),
+        i18n::t("cli.help.memory.usage_save").green(),
+        i18n::t("cli.help.memory.examples_title"),
+        i18n::t("cli.help.memory.example1"),
+        i18n::t("cli.help.memory.example2"),
+        i18n::t("cli.help.memory.example3"),
+        i18n::t("cli.help.memory.tips_title"),
+        i18n::t("cli.help.memory.tip1"),
+        i18n::t("cli.help.memory.tip2"),
+        i18n::t("cli.help.memory.tip3")
     )
 }
 
@@ -299,28 +359,38 @@ fn cmd_help_log() -> String {
     format!(
         r#"{}
 
-用法:
-  {} [数量]           显示最近 n 条日志（默认10）
-  {} <关键词>      搜索包含关键词的日志
-  {}                显示统计信息（总数、成功率等）
-  {}               显示所有失败的命令
+{}
+  {}
+  {}
+  {}
+  {}
 
-示例:
-  /log recent 20          # 显示最近20条
-  /log search "error"     # 搜索错误日志
-  /log stats              # 查看统计
-  /log failed             # 查看失败记录
+{}
+  {}
+  {}
+  {}
+  {}
 
-提示:
-  • 日志包含命令、类型、耗时、状态
-  • 日志容量默认1000条
-  • 用于分析命令执行情况
+{}
+  {}
+  {}
+  {}
 "#,
-        "[LOG] 执行日志命令".bold(),
-        "/log recent".green(),
-        "/log search".green(),
-        "/log stats".green(),
-        "/log failed".green()
+        i18n::t("cli.help.log.title").bold(),
+        i18n::t("cli.help.log.usage_title"),
+        i18n::t("cli.help.log.usage_recent").green(),
+        i18n::t("cli.help.log.usage_search").green(),
+        i18n::t("cli.help.log.usage_stats").green(),
+        i18n::t("cli.help.log.usage_failed").green(),
+        i18n::t("cli.help.log.examples_title"),
+        i18n::t("cli.help.log.example1"),
+        i18n::t("cli.help.log.example2"),
+        i18n::t("cli.help.log.example3"),
+        i18n::t("cli.help.log.example4"),
+        i18n::t("cli.help.log.tips_title"),
+        i18n::t("cli.help.log.tip1"),
+        i18n::t("cli.help.log.tip2"),
+        i18n::t("cli.help.log.tip3")
     )
 }
 
@@ -329,61 +399,97 @@ fn cmd_help_shell() -> String {
     format!(
         r#"{}
 
-[>>] 智能命令路由 (Phase 10.1):
-  RealConsole 现在支持智能识别常见命令，无需 ! 前缀
+{}
+  {}
 
-  ✓ 直接输入常见命令（80+ 支持）:
-    {}                  自动识别为 shell 命令
-    {}                 自动识别
-    {}         自动识别
-    {}         自动识别
-    {}       自动识别
+  {}
+    {}                  {}
+    {}                 {}
+    {}         {}
+    {}         {}
+    {}       {}
 
-  ✓ 强制 Shell 执行（! 前缀）:
-    {}             强制作为 shell 命令执行
+  {}
+    {}             {}
 
-  ✓ 系统命令（/ 前缀）:
-    {}             执行系统内置命令
+  {}
+    {}             {}
 
-  ✓ 自然语言（智能识别）:
-    {}           自动路由到 LLM
-    {}       自动路由到 LLM
+  {}
+    {}           {}
+    {}       {}
 
-路由优先级:
-  1. 强制 Shell (!) - 最高优先级
-  2. 系统命令 (/) - 次高优先级
-  3. 常见 Shell - 智能识别（80+ 命令）
-  4. 自然语言 - 兜底处理
+{}
+  {}
+  {}
+  {}
+  {}
 
-安全限制:
-  以下命令被禁止执行（黑名单）：
-    • rm -rf /           - 删除根目录
-    • sudo <任意命令>     - 权限提升
-    • shutdown/reboot    - 系统关机/重启
-    • mkfs               - 格式化磁盘
-    • dd if=/dev/*       - 直接写磁盘
-    • > /dev/sd*         - 写入设备文件
+{}
+  {}
+    {}
+    {}
+    {}
+    {}
+    {}
+    {}
 
-执行限制:
-  • 超时时间: 30 秒
-  • 输出限制: 100 KB
-  • 跨平台: Unix(/bin/sh) 和 Windows(cmd)
+{}
+  {}
+  {}
+  {}
 
-提示:
-  • 系统会自动识别命令类型，无需记忆前缀
-  • 危险命令会被拒绝并显示详细错误
-  • 中文疑问句自动识别为自然语言
+{}
+  {}
+  {}
+  {}
 "#,
-        "[SHELL] Shell 执行 & 智能路由".bold(),
-        "ls".green(),
-        "pwd".green(),
-        "git status".green(),
-        "docker ps".green(),
-        "cargo build".green(),
-        "!ls -la".yellow(),
-        "/help".cyan(),
-        "你好".dimmed(),
-        "帮我分析这个错误".dimmed()
+        i18n::t("cli.help.shell.title").bold(),
+        i18n::t("cli.help.shell.routing_title"),
+        i18n::t("cli.help.shell.routing_intro"),
+        i18n::t("cli.help.shell.direct_commands"),
+        i18n::t("cli.help.shell.direct_ls").green(),
+        i18n::t("cli.help.shell.direct_ls_desc"),
+        i18n::t("cli.help.shell.direct_pwd").green(),
+        i18n::t("cli.help.shell.direct_pwd_desc"),
+        i18n::t("cli.help.shell.direct_git").green(),
+        i18n::t("cli.help.shell.direct_git_desc"),
+        i18n::t("cli.help.shell.direct_docker").green(),
+        i18n::t("cli.help.shell.direct_docker_desc"),
+        i18n::t("cli.help.shell.direct_cargo").green(),
+        i18n::t("cli.help.shell.direct_cargo_desc"),
+        i18n::t("cli.help.shell.force_shell"),
+        i18n::t("cli.help.shell.force_example").yellow(),
+        i18n::t("cli.help.shell.force_desc"),
+        i18n::t("cli.help.shell.system_cmd"),
+        i18n::t("cli.help.shell.system_example").cyan(),
+        i18n::t("cli.help.shell.system_desc"),
+        i18n::t("cli.help.shell.natural_lang"),
+        i18n::t("cli.help.shell.natural_example1").dimmed(),
+        i18n::t("cli.help.shell.natural_desc1"),
+        i18n::t("cli.help.shell.natural_example2").dimmed(),
+        i18n::t("cli.help.shell.natural_desc2"),
+        i18n::t("cli.help.shell.priority_title"),
+        i18n::t("cli.help.shell.priority1"),
+        i18n::t("cli.help.shell.priority2"),
+        i18n::t("cli.help.shell.priority3"),
+        i18n::t("cli.help.shell.priority4"),
+        i18n::t("cli.help.shell.safety_title"),
+        i18n::t("cli.help.shell.safety_intro"),
+        i18n::t("cli.help.shell.safety_rm"),
+        i18n::t("cli.help.shell.safety_sudo"),
+        i18n::t("cli.help.shell.safety_shutdown"),
+        i18n::t("cli.help.shell.safety_mkfs"),
+        i18n::t("cli.help.shell.safety_dd"),
+        i18n::t("cli.help.shell.safety_dev"),
+        i18n::t("cli.help.shell.limits_title"),
+        i18n::t("cli.help.shell.limits_timeout"),
+        i18n::t("cli.help.shell.limits_output"),
+        i18n::t("cli.help.shell.limits_platform"),
+        i18n::t("cli.help.shell.tips_title"),
+        i18n::t("cli.help.shell.tip1"),
+        i18n::t("cli.help.shell.tip2"),
+        i18n::t("cli.help.shell.tip3")
     )
 }
 
@@ -397,19 +503,19 @@ fn cmd_quit(_arg: &str) -> String {
 fn cmd_version(_arg: &str) -> String {
     format!(
         "{} {}\n{}\n\n{}\n{}\n{}\n{}\n{}\n{}\n\n{}\n  {}\n  {}\n  {}",
-        "RealConsole".bold(),
+        i18n::t("cli.version.app_name").bold(),
         VERSION.cyan(),
-        "融合东方哲学智慧的智能 CLI Agent (Rust 实现)".dimmed(),
-        "✓ Phase 1: 最小内核".green(),
-        "✓ Phase 2: 流式输出 + Shell 执行".green(),
-        "✓ Phase 3: Intent DSL + 实体提取".green(),
-        "✓ Phase 4: 工具调用系统 + 记忆/日志".green(),
-        "✓ Phase 5: 增强工具系统 + 性能优化".green(),
-        "226 tests passing ✓".dimmed(),
-        "功能特性:".bold(),
-        "🛠️ 工具调用 (14 个工具: 5 基础 + 9 高级)".yellow(),
-        "🧠 Intent DSL (16 个内置意图)".yellow(),
-        "💾 记忆系统 + 执行日志".yellow()
+        i18n::t("cli.version.tagline").dimmed(),
+        i18n::t("cli.version.phase1").green(),
+        i18n::t("cli.version.phase2").green(),
+        i18n::t("cli.version.phase3").green(),
+        i18n::t("cli.version.phase4").green(),
+        i18n::t("cli.version.phase5").green(),
+        i18n::t("cli.version.tests").dimmed(),
+        i18n::t("cli.version.features").bold(),
+        i18n::t("cli.version.feature_tools").yellow(),
+        i18n::t("cli.version.feature_intent").yellow(),
+        i18n::t("cli.version.feature_memory").yellow()
     )
 }
 
@@ -417,11 +523,10 @@ fn cmd_version(_arg: &str) -> String {
 fn cmd_commands(_arg: &str) -> String {
     // 这个命令需要访问 registry，暂时返回占位符
     // 实际实现需要在运行时注入 registry 引用
-    format!(
-        "使用 {} 或 {} 查看所有可用命令",
-        "/help".cyan(),
-        "/help all".cyan()
-    )
+    i18n::t_with_args("cli.commands.hint", &[
+        ("help", "/help"),
+        ("help_all", "/help all")
+    ])
 }
 
 /// /examples 命令处理器
@@ -430,51 +535,74 @@ fn cmd_examples(_arg: &str) -> String {
         r#"{}
 
 {}
-  计算 2 的 10 次方
-  用 Rust 写一个 hello world
-  解释一下什么是闭包
-  推荐一些 Rust 学习资源
+  {}
+  {}
+  {}
+  {}
 
 {}
-  ls                           # 自动识别为 shell 命令
-  pwd                          # 无需 ! 前缀
-  git status                   # 常见命令直接执行
-  docker ps -a                 # 80+ 命令自动识别
-  cargo build --release        # 开发工具命令
-  !custom_script.sh            # 强制 shell 执行
+  {}
+  {}
+  {}
+  {}
+  {}
+  {}
 
 {}
-  /tools call calculator {{"expression": "sqrt(144)"}}
-  /tools call datetime {{"format": "RFC3339"}}
-  /tools call http_get {{"url": "https://api.github.com/users/octocat"}}
-  /tools call json_parse {{"text": "{{\"name\": \"John\", \"age\": 30}}"}}
-  /tools call base64 {{"operation": "encode", "text": "Hello World"}}
+  {}
+  {}
+  {}
+  {}
+  {}
 
 {}
-  /memory recent 10
-  /memory search "Rust"
-  /memory save my_history.json
+  {}
+  {}
+  {}
 
 {}
-  /log stats
-  /log failed
-  /log recent 20
-  /log search "error"
+  {}
+  {}
+  {}
+  {}
 
 {}
-  复制任意示例直接粘贴即可使用
-  使用 {} 查看各命令详细说明
-  使用 {} 查看智能路由说明
+  {}
+  {}
+  {}
 "#,
-        "[TIP] RealConsole 使用示例".bold(),
-        "智能对话".bold(),
-        "智能命令路由 (新!)".bold(),
-        "工具调用".bold(),
-        "记忆查询".bold(),
-        "日志分析".bold(),
-        "提示:".bold().dimmed(),
-        "/help <命令>".cyan(),
-        "/help shell".cyan()
+        i18n::t("cli.examples.title").bold(),
+        i18n::t("cli.examples.chat_title").bold(),
+        i18n::t("cli.examples.chat1"),
+        i18n::t("cli.examples.chat2"),
+        i18n::t("cli.examples.chat3"),
+        i18n::t("cli.examples.chat4"),
+        i18n::t("cli.examples.routing_title").bold(),
+        i18n::t("cli.examples.routing1"),
+        i18n::t("cli.examples.routing2"),
+        i18n::t("cli.examples.routing3"),
+        i18n::t("cli.examples.routing4"),
+        i18n::t("cli.examples.routing5"),
+        i18n::t("cli.examples.routing6"),
+        i18n::t("cli.examples.tools_title").bold(),
+        i18n::t("cli.examples.tools1"),
+        i18n::t("cli.examples.tools2"),
+        i18n::t("cli.examples.tools3"),
+        i18n::t("cli.examples.tools4"),
+        i18n::t("cli.examples.tools5"),
+        i18n::t("cli.examples.memory_title").bold(),
+        i18n::t("cli.examples.memory1"),
+        i18n::t("cli.examples.memory2"),
+        i18n::t("cli.examples.memory3"),
+        i18n::t("cli.examples.log_title").bold(),
+        i18n::t("cli.examples.log1"),
+        i18n::t("cli.examples.log2"),
+        i18n::t("cli.examples.log3"),
+        i18n::t("cli.examples.log4"),
+        i18n::t("cli.examples.tips_title").bold().dimmed(),
+        i18n::t("cli.examples.tip1"),
+        i18n::t_with_args("cli.examples.tip2", &[("help_cmd", "/help <命令>")]).cyan(),
+        i18n::t_with_args("cli.examples.tip3", &[("help_shell", "/help shell")]).cyan()
     )
 }
 
@@ -484,42 +612,56 @@ fn cmd_quickref(_arg: &str) -> String {
         r#"{}
 
 {}
-  直接输入问题                    {}  你好
-  执行 Shell 命令                 {}  ls
-  系统命令                        {}  /help
+  {}                    {}  {}
+  {}                 {}  {}
+  {}                        {}  {}
 
 {}
-  {}       帮助
-  {}      工具列表
-  {}     记忆管理
-  {}        日志查询
-  {}       退出
+  {}       {}
+  {}      {}
+  {}     {}
+  {}        {}
+  {}       {}
 
 {}
-  {}      取消当前操作
-  {}      退出程序
-  {}        历史命令
+  {}      {}
+  {}      {}
+  {}        {}
 
 {}: {} | {}
 "#,
-        "RealConsole 快速参考".bold().cyan(),
-        "基本用法".bold(),
-        "示例:".dimmed(),
-        "示例:".dimmed(),
-        "示例:".dimmed(),
-        "常用命令".bold(),
-        "/help".green(),
-        "/tools".green(),
-        "/memory".green(),
-        "/log".green(),
-        "/quit".green(),
-        "快捷键".bold(),
-        "Ctrl+C".yellow(),
-        "Ctrl+D".yellow(),
-        "↑/↓".yellow(),
-        "更多".bold(),
-        "/help all".cyan(),
-        "/examples".cyan()
+        i18n::t("cli.quickref.title").bold().cyan(),
+        i18n::t("cli.quickref.basic_usage").bold(),
+        i18n::t("cli.quickref.usage_chat"),
+        i18n::t("cli.quickref.usage_chat_example").dimmed(),
+        i18n::t("cli.quickref.usage_chat_text"),
+        i18n::t("cli.quickref.usage_shell"),
+        i18n::t("cli.quickref.usage_shell_example").dimmed(),
+        i18n::t("cli.quickref.usage_shell_text"),
+        i18n::t("cli.quickref.usage_system"),
+        i18n::t("cli.quickref.usage_system_example").dimmed(),
+        i18n::t("cli.quickref.usage_system_text"),
+        i18n::t("cli.quickref.common_cmds").bold(),
+        i18n::t("cli.quickref.cmd_help").green(),
+        i18n::t("cli.quickref.cmd_help_desc"),
+        i18n::t("cli.quickref.cmd_tools").green(),
+        i18n::t("cli.quickref.cmd_tools_desc"),
+        i18n::t("cli.quickref.cmd_memory").green(),
+        i18n::t("cli.quickref.cmd_memory_desc"),
+        i18n::t("cli.quickref.cmd_log").green(),
+        i18n::t("cli.quickref.cmd_log_desc"),
+        i18n::t("cli.quickref.cmd_quit").green(),
+        i18n::t("cli.quickref.cmd_quit_desc"),
+        i18n::t("cli.quickref.shortcuts").bold(),
+        i18n::t("cli.quickref.shortcut_cancel").yellow(),
+        i18n::t("cli.quickref.shortcut_cancel_desc"),
+        i18n::t("cli.quickref.shortcut_exit").yellow(),
+        i18n::t("cli.quickref.shortcut_exit_desc"),
+        i18n::t("cli.quickref.shortcut_history").yellow(),
+        i18n::t("cli.quickref.shortcut_history_desc"),
+        i18n::t("cli.quickref.more").bold(),
+        i18n::t("cli.quickref.more_help_all").cyan(),
+        i18n::t("cli.quickref.more_examples").cyan()
     )
 }
 
@@ -527,8 +669,21 @@ fn cmd_quickref(_arg: &str) -> String {
 mod tests {
     use super::*;
 
+    /// 初始化 i18n 用于测试
+    /// 使用 std::panic::catch_unwind 捕获可能的 panic
+    fn init_i18n() {
+        use crate::i18n::Language;
+        use std::panic;
+
+        // 尝试初始化，如果失败则忽略（测试环境可能找不到 locale 文件）
+        let _ = panic::catch_unwind(|| {
+            crate::i18n::init(Language::ZhCn);
+        });
+    }
+
     #[test]
     fn test_help_command() {
+        init_i18n();
         let output = cmd_help("");
         assert!(output.contains("RealConsole"));
         assert!(output.contains("/help"));
@@ -537,6 +692,7 @@ mod tests {
 
     #[test]
     fn test_help_all() {
+        init_i18n();
         let output = cmd_help("all");
         assert!(output.contains("完整命令参考"));
         assert!(output.contains("/tools"));
@@ -545,6 +701,7 @@ mod tests {
 
     #[test]
     fn test_help_tools() {
+        init_i18n();
         let output = cmd_help("tools");
         assert!(output.contains("工具管理命令"));
         assert!(output.contains("calculator"));
@@ -552,6 +709,7 @@ mod tests {
 
     #[test]
     fn test_examples_command() {
+        init_i18n();
         let output = cmd_examples("");
         assert!(output.contains("使用示例"));
         assert!(output.contains("智能对话"));
@@ -559,6 +717,7 @@ mod tests {
 
     #[test]
     fn test_quickref_command() {
+        init_i18n();
         let output = cmd_quickref("");
         assert!(output.contains("快速参考"));
         assert!(output.contains("/help"));
@@ -572,6 +731,7 @@ mod tests {
 
     #[test]
     fn test_version_command() {
+        init_i18n();
         let output = cmd_version("");
         assert!(output.contains("RealConsole"));
         assert!(output.contains(VERSION));
@@ -579,6 +739,7 @@ mod tests {
 
     #[test]
     fn test_register_core_commands() {
+        init_i18n();
         let mut registry = CommandRegistry::new();
         register_core_commands(&mut registry);
 

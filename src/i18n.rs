@@ -115,37 +115,84 @@ impl I18n {
     /// 加载语言文件（支持多路径搜索）
     ///
     /// # 搜索策略
-    /// 1. 当前目录 locales/{lang}.yaml
-    /// 2. 用户配置目录 ~/.realconsole/locales/{lang}.yaml
-    /// 3. 如果都不存在，使用内置翻译（硬编码）
+    /// 1. 当前目录 locales/{lang}.yaml (基础翻译 - Web)
+    /// 2. 当前目录 locales/{lang}-cli.yaml (CLI 翻译)
+    /// 3. 用户配置目录 ~/.realconsole/locales/{lang}.yaml
+    /// 4. 用户配置目录 ~/.realconsole/locales/{lang}-cli.yaml
+    /// 5. 如果都不存在，使用内置翻译（硬编码）
+    ///
+    /// # 文件合并策略
+    /// - 先加载基础文件（Web 翻译）
+    /// - 再加载 CLI 文件（CLI 翻译）
+    /// - CLI 文件中的键会覆盖基础文件中的同名键
+    /// - 如果 CLI 文件不存在，只使用基础文件（向后兼容）
     fn load_language(&mut self, lang: Language) {
-        let locale_filename = format!("locales/{}.yaml", lang.code());
+        let base_filename = format!("locales/{}.yaml", lang.code());
+        let cli_filename = format!("locales/{}-cli.yaml", lang.code());
+        let prompts_filename = format!("locales/{}-prompts.yaml", lang.code());
 
-        // 使用 PathResolver 搜索语言文件
-        let locale_path = match PathResolver::resolve(&locale_filename) {
-            Some(path) => path,
-            None => {
-                // 未找到文件，使用内置翻译
-                self.load_builtin_translations(lang);
-                return;
-            }
-        };
+        let mut translations = HashMap::new();
+        let mut loaded_any = false;
 
-        // 尝试读取和解析文件
-        match fs::read_to_string(&locale_path) {
-            Ok(content) => match serde_yml::from_str::<HashMap<String, String>>(&content) {
-                Ok(translations) => {
-                    self.translations.insert(lang, translations);
-                }
+        // 1. 加载基础文件（Web 翻译）
+        if let Some(base_path) = PathResolver::resolve(&base_filename) {
+            match fs::read_to_string(&base_path) {
+                Ok(content) => match serde_yaml_ng::from_str::<HashMap<String, String>>(&content) {
+                    Ok(base_trans) => {
+                        translations.extend(base_trans);
+                        loaded_any = true;
+                    }
+                    Err(e) => {
+                        eprintln!("⚠ 解析基础语言文件 {} 失败: {}", base_path.display(), e);
+                    }
+                },
                 Err(e) => {
-                    eprintln!("⚠ 解析语言文件 {} 失败: {}", locale_path.display(), e);
-                    self.load_builtin_translations(lang);
+                    eprintln!("⚠ 读取基础语言文件 {} 失败: {}", base_path.display(), e);
                 }
-            },
-            Err(e) => {
-                eprintln!("⚠ 读取语言文件 {} 失败: {}", locale_path.display(), e);
-                self.load_builtin_translations(lang);
             }
+        }
+
+        // 2. 加载 CLI 文件（CLI 翻译）- 可选，用于向后兼容
+        if let Some(cli_path) = PathResolver::resolve(&cli_filename) {
+            match fs::read_to_string(&cli_path) {
+                Ok(content) => match serde_yaml_ng::from_str::<HashMap<String, String>>(&content) {
+                    Ok(cli_trans) => {
+                        translations.extend(cli_trans);
+                        loaded_any = true;
+                    }
+                    Err(e) => {
+                        eprintln!("⚠ 解析 CLI 语言文件 {} 失败: {}", cli_path.display(), e);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠ 读取 CLI 语言文件 {} 失败: {}", cli_path.display(), e);
+                }
+            }
+        }
+
+        // 3. 加载 Prompts 文件（LLM 提示词翻译）- 可选
+        if let Some(prompts_path) = PathResolver::resolve(&prompts_filename) {
+            match fs::read_to_string(&prompts_path) {
+                Ok(content) => match serde_yaml_ng::from_str::<HashMap<String, String>>(&content) {
+                    Ok(prompts_trans) => {
+                        translations.extend(prompts_trans);
+                        loaded_any = true;
+                    }
+                    Err(e) => {
+                        eprintln!("⚠ 解析 Prompts 语言文件 {} 失败: {}", prompts_path.display(), e);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠ 读取 Prompts 语言文件 {} 失败: {}", prompts_path.display(), e);
+                }
+            }
+        }
+
+        // 4. 如果没有加载任何文件，使用内置翻译
+        if !loaded_any {
+            self.load_builtin_translations(lang);
+        } else {
+            self.translations.insert(lang, translations);
         }
     }
 
