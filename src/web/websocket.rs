@@ -4,9 +4,12 @@
 //! - WebSocket 消息收发
 //! - Agent 命令执行
 //! - 流式输出转发
+//! - Intent 意图识别和执行
 
 use crate::command::CommandRegistry;
+use crate::command_router::{CommandRouter, CommandType};
 use crate::config::Config;
+use crate::dsl::intent::IntentMatch;
 use crate::web::session::{ClientMessage, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
@@ -132,17 +135,30 @@ async fn handle_input(
     // 获取 Agent
     let agent = session.agent.read().await;
 
-    // 简化版本：直接执行命令并返回结果
-    // 注意：这里简化了实现，实际应该集成完整的 Agent 处理逻辑
-    let result = if let Some(cmd_name) = input.strip_prefix(&agent.config.prefix) {
-        // 系统命令
-        execute_system_command(cmd_name, &agent, sender).await
-    } else if input.starts_with('!') {
-        // Shell 命令
-        execute_shell_command(input, &agent, sender).await
-    } else {
-        // LLM 对话
-        execute_llm_chat(input, &agent, sender).await
+    // 使用 CommandRouter 进行智能路由
+    let router = CommandRouter::new(agent.config.prefix.clone());
+    let result = match router.route(input) {
+        CommandType::SystemCommand(cmd, args) => {
+            // 系统命令（/前缀）
+            let cmd_input = if args.is_empty() {
+                cmd
+            } else {
+                format!("{} {}", cmd, args)
+            };
+            execute_system_command(&cmd_input, &agent, sender).await
+        }
+        CommandType::CommonShell(cmd) | CommandType::ForcedShell(cmd) => {
+            // Shell 命令（常见命令自动识别 或 !前缀强制）
+            execute_shell_command(&format!("!{}", cmd), &agent, sender).await
+        }
+        CommandType::NaturalLanguage(text) => {
+            // 自然语言：先尝试 Intent 匹配，否则回退到 LLM 对话
+            if let Some(intent_match) = try_match_intent(&text, &agent) {
+                execute_intent(&intent_match, &text, &agent, sender).await
+            } else {
+                execute_llm_chat(&text, &agent, sender).await
+            }
+        }
     };
 
     if let Err(e) = result {
@@ -281,6 +297,69 @@ async fn execute_llm_chat(
             sender
                 .send(Message::Text(serde_json::to_string(&msg)?))
                 .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 尝试匹配 Intent 意图
+fn try_match_intent(text: &str, agent: &crate::agent::Agent) -> Option<IntentMatch> {
+    // 使用 Agent 的 IntentMatcher 进行匹配
+    let matches = agent.intent_matcher.match_intent(text);
+
+    // 返回最佳匹配（如果有）
+    matches.into_iter().next()
+}
+
+/// 执行 Intent 意图
+async fn execute_intent(
+    intent_match: &IntentMatch,
+    original_text: &str,
+    agent: &crate::agent::Agent,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    // 1. 发送意图识别提示
+    let info_msg = ServerMessage::Output {
+        content: format!("🎯 {}\n", intent_match.intent.name),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&info_msg)?))
+        .await?;
+
+    // 2. 使用 TemplateEngine 生成执行计划
+    match agent.template_engine.generate_from_intent(intent_match) {
+        Ok(plan) => {
+            // 3. 执行计划中的命令
+            // 简化实现：直接执行 Shell 命令
+            let cmd = &plan.command;
+
+            // 执行 shell 命令
+            let output = tokio::process::Command::new("sh")
+                .arg("-c")
+                .arg(cmd)
+                .output()
+                .await?;
+
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+
+            let result = if !stderr.is_empty() {
+                format!("{}{}", stdout, stderr)
+            } else {
+                stdout.to_string()
+            };
+
+            // 发送执行结果
+            let msg = ServerMessage::Output { content: result };
+            sender
+                .send(Message::Text(serde_json::to_string(&msg)?))
+                .await?;
+        }
+        Err(e) => {
+            // 如果生成执行计划失败，回退到 LLM 对话
+            eprintln!("⚠️ Intent 执行计划生成失败: {}", e);
+            execute_llm_chat(original_text, agent, sender).await?;
         }
     }
 
