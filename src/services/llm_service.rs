@@ -250,7 +250,16 @@ impl LlmService {
         }
 
         // 构建消息列表（如果有历史上下文则使用，否则创建新的）
-        let msgs = messages.unwrap_or_else(|| vec![crate::llm::Message::user(text)]);
+        let msgs = messages.unwrap_or_else(|| {
+            vec![
+                crate::llm::Message::system(
+                    "你是一个有用的智能助手。你可以使用提供的工具来帮助用户完成任务。\n\
+                     请直接、自然地回答用户的问题，不要过度客套。\n\
+                     当用户询问事实性问题时，请提供准确、详细的信息。"
+                ),
+                crate::llm::Message::user(text),
+            ]
+        });
 
         // 使用工具执行引擎
         let response = self

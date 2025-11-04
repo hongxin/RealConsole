@@ -10,6 +10,7 @@ use crate::command::CommandRegistry;
 use crate::command_router::{CommandRouter, CommandType};
 use crate::config::Config;
 use crate::dsl::intent::IntentMatch;
+use crate::services::{LlmRequest, Service};
 use crate::web::session::{ClientMessage, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
@@ -250,7 +251,7 @@ async fn execute_shell_command(
     Ok(())
 }
 
-/// 执行 LLM 对话
+/// 执行 LLM 对话（带工具调用）
 async fn execute_llm_chat(
     input: &str,
     agent: &crate::agent::Agent,
@@ -276,23 +277,35 @@ async fn execute_llm_chat(
         .map(|client| simplify_model_name(client.model()))
         .unwrap_or_else(|| "unknown".to_string());
 
+    // 释放 llm_manager 锁
+    drop(llm_manager);
+
     // 发送 Thinking 消息（显示飞轮）
     let thinking_msg = ServerMessage::Thinking { model: model_name };
     sender
         .send(Message::Text(serde_json::to_string(&thinking_msg)?))
         .await?;
 
-    // 调用 LLM
-    match llm_manager.chat(input).await {
-        Ok(response) => {
-            let msg = ServerMessage::Output { content: response };
+    // ✨ 使用 LlmService 处理（带工具调用）
+    let request = LlmRequest::with_tools(input.to_string());
+    match agent.llm_service().process(request).await {
+        Ok(llm_response) => {
+            // 🧹 清理 DEBUG 信息（Web 用户不需要看到）
+            let clean_content = remove_debug_info(&llm_response.text);
+
+            let msg = ServerMessage::Output {
+                content: clean_content,
+            };
             sender
                 .send(Message::Text(serde_json::to_string(&msg)?))
                 .await?;
         }
         Err(e) => {
+            // 🧹 改进错误提示，提供用户友好的错误信息
+            let error_msg = format_user_friendly_error(&e.to_string());
+
             let msg = ServerMessage::Error {
-                content: format!("LLM 调用失败: {}", e),
+                content: error_msg,
             };
             sender
                 .send(Message::Text(serde_json::to_string(&msg)?))
@@ -395,4 +408,63 @@ fn simplify_model_name(model: &str) -> String {
     } else {
         result
     }
+}
+
+/// 移除响应中的 DEBUG 信息
+///
+/// Web 用户不需要看到工具调用的调试信息，只需要看到干净的最终结果
+fn remove_debug_info(text: &str) -> String {
+    if let Some(pos) = text.find("__DEBUG__") {
+        // 移除 __DEBUG__ 及其后面的所有内容
+        text[..pos].trim_end().to_string()
+    } else {
+        text.to_string()
+    }
+}
+
+/// 格式化用户友好的错误信息
+///
+/// 将底层技术错误转换为用户可理解的友好提示
+fn format_user_friendly_error(error_str: &str) -> String {
+    // 1. 响应解码错误（最常见的问题）
+    if error_str.contains("decoding response body") || error_str.contains("Failed to read response body") {
+        return "⚠️ 响应解析失败\n\n可能原因：\n• 请求内容过于复杂，LLM 响应超出处理限制\n• 网络连接不稳定\n\n建议：\n• 尝试简化您的问题\n• 将复杂问题拆分为多个简单问题\n• 刷新页面后重试".to_string();
+    }
+
+    // 2. 网络超时
+    if error_str.contains("timeout") || error_str.contains("Timeout") {
+        return "⏱️ 请求超时\n\n原因：\n• LLM 响应时间过长（超过 60 秒）\n\n建议：\n• 简化问题描述\n• 减少工具调用次数\n• 稍后重试".to_string();
+    }
+
+    // 3. 网络错误
+    if error_str.contains("Network error") || error_str.contains("connection") {
+        return "🌐 网络连接错误\n\n可能原因：\n• 网络连接不稳定\n• API 服务暂时不可用\n\n建议：\n• 检查网络连接\n• 稍后重试".to_string();
+    }
+
+    // 4. API 认证错误
+    if error_str.contains("401") || error_str.contains("authentication") || error_str.contains("API key") {
+        return "🔑 API 认证失败\n\n原因：\n• API Key 无效或已过期\n\n建议：\n• 检查 API Key 配置\n• 联系管理员".to_string();
+    }
+
+    // 5. API 限流
+    if error_str.contains("429") || error_str.contains("rate limit") {
+        return "⚡ API 调用频率限制\n\n原因：\n• 短时间内请求过多\n\n建议：\n• 稍等片刻后重试\n• 降低使用频率".to_string();
+    }
+
+    // 6. 工具调用失败
+    if error_str.contains("工具调用失败") {
+        // 提取实际的底层错误
+        if let Some(start) = error_str.rfind("LLM 调用失败:") {
+            let core_error = &error_str[start + "LLM 调用失败:".len()..].trim();
+            return format!("🔧 工具调用过程中出错\n\n错误详情：\n{}\n\n建议：\n• 尝试使用其他方式表达问题\n• 检查输入参数是否合理", core_error);
+        }
+    }
+
+    // 7. 通用错误（清理嵌套的错误前缀）
+    let clean_error = error_str
+        .replace("LLM 调用失败: 工具调用失败: LLM 调用失败: ", "")
+        .replace("LLM 调用失败: ", "")
+        .replace("工具调用失败: ", "");
+
+    format!("❌ 处理请求时出现错误\n\n错误信息：\n{}\n\n建议：\n• 尝试重新表述问题\n• 如果问题持续，请联系技术支持", clean_error)
 }

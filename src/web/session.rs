@@ -54,10 +54,15 @@ impl Session {
     /// 创建新会话（异步，会配置 LLM）
     pub async fn new(config: Config, registry: CommandRegistry) -> Self {
         let id = Uuid::new_v4().to_string();
-        let mut agent = Agent::new(config.clone(), registry);
+
+        // ✨ 启用工具调用（Web 版本核心能力）
+        let mut web_config = config.clone();
+        web_config.features.tool_calling_enabled = Some(true);
+
+        let mut agent = Agent::new(web_config.clone(), registry);
 
         // 配置 LLM（参考 main.rs）
-        Self::configure_llm(&mut agent, &config).await;
+        Self::configure_llm(&mut agent, &web_config).await;
 
         Self {
             id,
