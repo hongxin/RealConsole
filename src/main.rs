@@ -30,6 +30,7 @@ mod llm;
 mod llm_manager;
 mod log_analyzer; // ✨ Phase 6: 日志分析工具
 mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支生肖
+mod markdown_renderer; // ✨ v1.25.0: Markdown 渲染器 - LLM 输出美化
 mod memory;
 mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
 mod project_context; // ✨ Phase 6: 项目上下文感知

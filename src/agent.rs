@@ -49,6 +49,9 @@ use crate::shell_executor::ShellExecutorWithFixer;
 // ✨ Phase 8 (Workflow): Workflow Intent 支持
 use crate::dsl::intent::{WorkflowExecutor, WorkflowIntent};
 
+// ✨ v1.25.0: Markdown 渲染支持
+use crate::markdown_renderer::MarkdownRenderer;
+
 // ✨ Phase 2 (v1.3.0): 服务层架构
 use crate::services::{
     IntentRequest, IntentService, LlmRequest, LlmService, Service, ShellService, StateManager,
@@ -2737,7 +2740,7 @@ impl Agent {
             tokio::runtime::Handle::current().block_on(async {
                 let manager = self.llm_manager.read().await;
 
-                // 使用新的 chat_stream_with_messages 方法
+                // 流式输出（在回调中直接打印）
                 manager.chat_stream_with_messages(messages.clone(), |chunk| {
                     print!("{}", chunk);
                     std::io::Write::flush(&mut std::io::stdout()).ok();

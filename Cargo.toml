@@ -1,6 +1,6 @@
 [package]
 name = "realconsole"
-version = "1.24.0"
+version = "1.25.0"
 edition = "2021"
 authors = ["RealConsole Contributors"]
 description = "An intelligent CLI agent with unified tracing system, combining Eastern philosophy wisdom with modern AI"
@@ -23,6 +23,7 @@ console = "0.15"    # Terminal manipulation (required by dialoguer)
 crossterm = "0.27"  # Terminal control for fixed statusbar
 indicatif = "0.17"  # Progress bars and spinners
 unicode-width = "0.1"  # Proper display width calculation for Unicode
+termimad = "0.30"  # Markdown rendering in terminal (lightweight, ~20KB)
 
 # Async runtime (for future HTTP/LLM integration)
 tokio = { version = "1.40", features = ["full"] }

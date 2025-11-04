@@ -365,6 +365,10 @@ pub struct DisplayConfig {
     /// 是否使用颜色（默认 true）
     #[serde(default = "default_true")]
     pub use_colors: bool,
+
+    /// ✨ v1.25.0: Markdown 渲染配置
+    #[serde(default)]
+    pub markdown: MarkdownConfig,
 }
 
 fn default_show_conversation_rounds() -> bool {
@@ -379,6 +383,31 @@ impl Default for DisplayConfig {
             show_conversation_rounds: true, // debug 模式下默认显示对话轮次
             use_emoji: false,               // 默认关闭 emoji（避免终端兼容性问题）
             use_colors: true,               // 默认启用颜色
+            markdown: MarkdownConfig::default(), // ✨ v1.25.0: Markdown 渲染
+        }
+    }
+}
+
+/// ✨ v1.25.0: Markdown 渲染配置
+///
+/// 控制 LLM 输出的 Markdown 格式美化显示
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarkdownConfig {
+    /// 是否启用 Markdown 渲染（默认 true）
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// 是否在流式输出时渲染（默认 true）
+    /// false 时仅在完整输出后渲染（减少终端刷新）
+    #[serde(default = "default_true")]
+    pub render_streaming: bool,
+}
+
+impl Default for MarkdownConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,           // 默认启用美化渲染
+            render_streaming: true,  // 默认支持流式渲染
         }
     }
 }

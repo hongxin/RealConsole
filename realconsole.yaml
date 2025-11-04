@@ -68,6 +68,12 @@ display:
   # 便于分析上下文使用情况和 workflow 套路重用
   show_conversation_rounds: true
 
+  # ✨ v1.25.0: Markdown 渲染配置
+  # 美化 LLM 输出的 Markdown 格式文本（标题、代码块、列表等）
+  markdown:
+    enabled: true              # 是否启用 Markdown 渲染（默认 true）
+    render_streaming: true     # 是否在流式输出时渲染（默认 true）
+
 # Intent DSL 智能增强配置 (v0.5.2+)
 intent:
   # LLM 智能参数提取（默认 false - 保持高性能）

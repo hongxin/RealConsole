@@ -4,11 +4,13 @@
 //! ✨ Phase 8: 集成命令历史记录和 Ctrl+R 搜索
 //! ✨ Phase 11: 多语言支持
 //! ✨ Phase 1: Tab 补全系统集成
+//! ✨ v1.25.0: Markdown 渲染输出
 
 use crate::agent::Agent;
 use crate::completion::{CompletionConfig, MultiDimensionalCompleter};
 use crate::history::SortStrategy;
 use crate::i18n;
+use crate::markdown_renderer::MarkdownRenderer; // ✨ v1.25.0: Markdown 渲染器
 use colored::Colorize;
 use rustyline::completion::{Completer, Pair};
 use rustyline::config::Configurer;
@@ -130,9 +132,20 @@ pub fn run(agent: &Agent) -> RustyResult<()> {
                     break;
                 }
 
-                // 显示响应（如果非空）
+                // ✨ v1.25.0: 使用 Markdown 渲染器显示响应（如果非空）
                 if !response.is_empty() {
-                    println!("{}", response);
+                    // 根据配置决定是否使用 Markdown 渲染
+                    if agent.config.display.markdown.enabled {
+                        if let Ok(renderer) = MarkdownRenderer::new(true) {
+                            let _ = renderer.render(&response);
+                        } else {
+                            // 降级：直接打印
+                            println!("{}", response);
+                        }
+                    } else {
+                        // Markdown 渲染未启用，直接打印
+                        println!("{}", response);
+                    }
                 }
             }
             Err(ReadlineError::Interrupted) => {
@@ -300,6 +313,17 @@ fn build_context_indicator(agent: &Agent) -> String {
 pub fn run_once(agent: &Agent, input: &str) {
     let response = agent.handle(input);
     if !response.is_empty() && response != QUIT_SIGNAL {
-        println!("{}", response);
+        // ✨ v1.25.0: 使用 Markdown 渲染器显示响应
+        if agent.config.display.markdown.enabled {
+            if let Ok(renderer) = MarkdownRenderer::new(true) {
+                let _ = renderer.render(&response);
+            } else {
+                // 降级：直接打印
+                println!("{}", response);
+            }
+        } else {
+            // Markdown 渲染未启用，直接打印
+            println!("{}", response);
+        }
     }
 }
