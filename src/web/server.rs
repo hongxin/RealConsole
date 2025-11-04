@@ -261,6 +261,38 @@ const TERMINAL_JS: &str = r#"
         }
     }
 
+    // 辅助函数：计算字符串的显示宽度（考虑中文字符）
+    function getDisplayWidth(str) {
+        let width = 0;
+        for (const char of str) {
+            const code = char.charCodeAt(0);
+            // 判断是否为宽字符（中文、日文、韩文等）
+            // 基本规则：Unicode >= 0x1100 的大部分字符为宽字符
+            if (code >= 0x1100 && (
+                (code <= 0x115f) ||  // Hangul Jamo
+                (code >= 0x2e80 && code <= 0x9fff) ||  // CJK
+                (code >= 0xac00 && code <= 0xd7a3) ||  // Hangul Syllables
+                (code >= 0xf900 && code <= 0xfaff) ||  // CJK Compatibility
+                (code >= 0xfe10 && code <= 0xfe19) ||  // Vertical forms
+                (code >= 0xfe30 && code <= 0xfe6f) ||  // CJK Compatibility Forms
+                (code >= 0xff00 && code <= 0xff60) ||  // Fullwidth Forms
+                (code >= 0xffe0 && code <= 0xffe6) ||  // Fullwidth Forms
+                (code >= 0x20000 && code <= 0x2fffd) ||  // CJK Extension
+                (code >= 0x30000 && code <= 0x3fffd)     // CJK Extension
+            )) {
+                width += 2;
+            } else {
+                width += 1;
+            }
+        }
+        return width;
+    }
+
+    // 辅助函数：获取从字符串开始到某个字符位置的显示宽度
+    function getWidthUpToPosition(str, pos) {
+        return getDisplayWidth(str.slice(0, pos));
+    }
+
     // 辅助函数：重新渲染当前输入行
     function redrawLine() {
         // 清除当前行
@@ -269,10 +301,12 @@ const TERMINAL_JS: &str = r#"
         term.write('\x1b[33m% \x1b[0m');
         // 显示输入内容
         term.write(inputBuffer);
-        // 移动光标到正确位置
+        // 移动光标到正确位置（基于显示宽度，不是字符数）
         if (cursorPosition < inputBuffer.length) {
-            const offset = inputBuffer.length - cursorPosition;
-            term.write('\x1b[' + offset + 'D');
+            const widthAfterCursor = getDisplayWidth(inputBuffer.slice(cursorPosition));
+            if (widthAfterCursor > 0) {
+                term.write('\x1b[' + widthAfterCursor + 'D');
+            }
         }
     }
 
@@ -422,8 +456,16 @@ const TERMINAL_JS: &str = r#"
             // 右箭头：光标右移
             if (data === '\x1b[C') {
                 if (cursorPosition < inputBuffer.length) {
+                    // 获取当前字符的显示宽度
+                    const char = inputBuffer[cursorPosition];
+                    const charWidth = getDisplayWidth(char);
                     cursorPosition++;
-                    term.write('\x1b[C');
+                    // 根据字符宽度移动光标
+                    if (charWidth === 2) {
+                        term.write('\x1b[2C');  // 中文字符移动2格
+                    } else {
+                        term.write('\x1b[C');   // 英文字符移动1格
+                    }
                 }
                 return;
             }
@@ -432,7 +474,15 @@ const TERMINAL_JS: &str = r#"
             if (data === '\x1b[D') {
                 if (cursorPosition > 0) {
                     cursorPosition--;
-                    term.write('\x1b[D');
+                    // 获取前一个字符的显示宽度
+                    const char = inputBuffer[cursorPosition];
+                    const charWidth = getDisplayWidth(char);
+                    // 根据字符宽度移动光标
+                    if (charWidth === 2) {
+                        term.write('\x1b[2D');  // 中文字符移动2格
+                    } else {
+                        term.write('\x1b[D');   // 英文字符移动1格
+                    }
                 }
                 return;
             }
@@ -440,7 +490,11 @@ const TERMINAL_JS: &str = r#"
             // Home 键：移到行首
             if (data === '\x1b[H' || data === '\x1b[1~') {
                 if (cursorPosition > 0) {
-                    term.write('\x1b[' + cursorPosition + 'D');
+                    // 计算从行首到当前光标的显示宽度
+                    const widthToCursor = getWidthUpToPosition(inputBuffer, cursorPosition);
+                    if (widthToCursor > 0) {
+                        term.write('\x1b[' + widthToCursor + 'D');
+                    }
                     cursorPosition = 0;
                 }
                 return;
@@ -449,8 +503,11 @@ const TERMINAL_JS: &str = r#"
             // End 键：移到行尾
             if (data === '\x1b[F' || data === '\x1b[4~') {
                 if (cursorPosition < inputBuffer.length) {
-                    const offset = inputBuffer.length - cursorPosition;
-                    term.write('\x1b[' + offset + 'C');
+                    // 计算从当前光标到行尾的显示宽度
+                    const widthAfterCursor = getDisplayWidth(inputBuffer.slice(cursorPosition));
+                    if (widthAfterCursor > 0) {
+                        term.write('\x1b[' + widthAfterCursor + 'C');
+                    }
                     cursorPosition = inputBuffer.length;
                 }
                 return;
