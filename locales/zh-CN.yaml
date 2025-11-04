@@ -59,3 +59,61 @@ cli.wizard_alias: "init"
 cli.wizard_quick_help: "快速配置模式（最小提问）"
 cli.config_cmd_help: "显示当前配置"
 cli.config_path_help: "显示配置路径"
+
+# Web 服务器
+web.server.startup: "🌐 RealConsole Web 终端启动"
+web.server.address_label: "地址:"
+web.server.tip_label: "提示:"
+web.server.stop_hint: "按 Ctrl+C 停止服务"
+
+# Web 页面
+web.page.title: "RealConsole Web 终端"
+web.header.title: "🌟 RealConsole Web 终端"
+web.header.tagline: "融合东方哲学智慧的智能 CLI Agent"
+
+# Web 连接状态
+web.status.connecting: "连接中..."
+web.status.connected: "已连接"
+web.status.disconnected: "已断开"
+web.status.error: "连接错误"
+
+# Web 终端消息
+web.terminal.welcome: "欢迎使用 RealConsole Web 终端！"
+web.terminal.usage_hint: "输入命令开始使用，输入 /help 查看帮助"
+web.terminal.disconnected_message: "连接已断开"
+
+# WebSocket
+web.websocket.connection_established: "✅ WebSocket 连接建立"
+web.websocket.handle_message_error: "❌ 处理消息失败"
+web.websocket.internal_error: "内部错误"
+web.websocket.parse_error: "❌ 解析消息失败"
+web.websocket.invalid_message_format: "消息格式错误"
+web.websocket.client_closed: "🔌 客户端关闭连接"
+web.websocket.connection_error: "❌ WebSocket 错误"
+web.websocket.connection_closed: "👋 WebSocket 连接关闭"
+
+# Web 命令执行
+web.command.execution_failed: "执行失败"
+web.command.execution_error: "命令执行失败"
+
+# Web LLM
+web.llm.not_configured: "未配置 LLM，无法进行对话"
+
+# Web 错误消息
+web.error.response_parse_failed: "⚠️ 响应解析失败\n\n可能原因：\n• 请求内容过于复杂，LLM 响应超出处理限制\n• 网络连接不稳定\n\n建议：\n• 尝试简化您的问题\n• 将复杂问题拆分为多个简单问题\n• 刷新页面后重试"
+web.error.request_timeout: "⏱️ 请求超时\n\n原因：\n• LLM 响应时间过长（超过 60 秒）\n\n建议：\n• 简化问题描述\n• 减少工具调用次数\n• 稍后重试"
+web.error.network_error: "🌐 网络连接错误\n\n可能原因：\n• 网络连接不稳定\n• API 服务暂时不可用\n\n建议：\n• 检查网络连接\n• 稍后重试"
+web.error.auth_failed: "🔑 API 认证失败\n\n原因：\n• API Key 无效或已过期\n\n建议：\n• 检查 API Key 配置\n• 联系管理员"
+web.error.rate_limit: "⚡ API 调用频率限制\n\n原因：\n• 短时间内请求过多\n\n建议：\n• 稍等片刻后重试\n• 降低使用频率"
+web.error.tool_call_failed: "工具调用失败"
+web.error.llm_call_failed_prefix: "LLM 调用失败:"
+web.error.tool_call_error: "🔧 工具调用过程中出错\n\n错误详情：\n{error}\n\n建议：\n• 尝试使用其他方式表达问题\n• 检查输入参数是否合理"
+web.error.generic_error: "❌ 处理请求时出现错误\n\n错误信息：\n{error}\n\n建议：\n• 尝试重新表述问题\n• 如果问题持续，请联系技术支持"
+
+# Web Session
+web.session.primary_llm_init_failed: "⚠ Web Session - Primary LLM 初始化失败"
+web.session.fallback_llm_init_failed: "⚠ Web Session - Fallback LLM 初始化失败"
+web.session.ollama_client_creation_failed: "Ollama 客户端创建失败"
+web.session.deepseek_requires_api_key: "Deepseek 需要 API Key"
+web.session.deepseek_client_creation_failed: "Deepseek 客户端创建失败"
+web.session.unknown_llm_provider: "未知的 LLM 提供商"

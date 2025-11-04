@@ -5,6 +5,7 @@
 use crate::agent::Agent;
 use crate::command::CommandRegistry;
 use crate::config::Config;
+use crate::i18n;
 use crate::llm::{DeepseekClient, LlmClient, OllamaClient};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -98,7 +99,7 @@ impl Session {
                     }
                 }
                 Err(e) => {
-                    eprintln!("⚠ Web Session - Primary LLM 初始化失败: {}", e);
+                    eprintln!("{}: {}", i18n::t("web.session.primary_llm_init_failed"), e);
                 }
             }
         }
@@ -110,7 +111,7 @@ impl Session {
                     manager.set_fallback(client);
                 }
                 Err(e) => {
-                    eprintln!("⚠ Web Session - Fallback LLM 初始化失败: {}", e);
+                    eprintln!("{}: {}", i18n::t("web.session.fallback_llm_init_failed"), e);
                 }
             }
         }
@@ -130,13 +131,13 @@ impl Session {
 
                 OllamaClient::new(model, endpoint)
                     .map(|client| Arc::new(client) as Arc<dyn LlmClient>)
-                    .map_err(|e| format!("Ollama 客户端创建失败: {}", e))
+                    .map_err(|e| format!("{}: {}", i18n::t("web.session.ollama_client_creation_failed"), e))
             }
             "deepseek" => {
                 let api_key = provider_config
                     .api_key
                     .as_ref()
-                    .ok_or_else(|| "Deepseek 需要 API Key".to_string())?;
+                    .ok_or_else(|| i18n::t("web.session.deepseek_requires_api_key"))?;
                 let model = provider_config.model.as_deref().unwrap_or("deepseek-chat");
                 let endpoint = provider_config
                     .endpoint
@@ -145,9 +146,9 @@ impl Session {
 
                 DeepseekClient::new(api_key, model, endpoint)
                     .map(|client| Arc::new(client) as Arc<dyn LlmClient>)
-                    .map_err(|e| format!("Deepseek 客户端创建失败: {}", e))
+                    .map_err(|e| format!("{}: {}", i18n::t("web.session.deepseek_client_creation_failed"), e))
             }
-            other => Err(format!("未知的 LLM 提供商: {}", other)),
+            other => Err(format!("{}: {}", i18n::t("web.session.unknown_llm_provider"), other)),
         }
     }
 

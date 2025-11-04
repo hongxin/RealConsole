@@ -59,3 +59,61 @@ cli.wizard_alias: "init"
 cli.wizard_quick_help: "Quick configuration mode (minimal prompts)"
 cli.config_cmd_help: "Display current configuration"
 cli.config_path_help: "Display configuration file path"
+
+# Web Server
+web.server.startup: "🌐 RealConsole Web Terminal Starting"
+web.server.address_label: "Address:"
+web.server.tip_label: "Tip:"
+web.server.stop_hint: "Press Ctrl+C to stop the service"
+
+# Web Page
+web.page.title: "RealConsole Web Terminal"
+web.header.title: "🌟 RealConsole Web Terminal"
+web.header.tagline: "Intelligent CLI Agent Blending Eastern Philosophy Wisdom"
+
+# Web Connection Status
+web.status.connecting: "Connecting..."
+web.status.connected: "Connected"
+web.status.disconnected: "Disconnected"
+web.status.error: "Connection error"
+
+# Web Terminal Messages
+web.terminal.welcome: "Welcome to RealConsole Web Terminal!"
+web.terminal.usage_hint: "Enter commands to start, type /help for help"
+web.terminal.disconnected_message: "Connection closed"
+
+# WebSocket
+web.websocket.connection_established: "✅ WebSocket connection established"
+web.websocket.handle_message_error: "❌ Failed to handle message"
+web.websocket.internal_error: "Internal error"
+web.websocket.parse_error: "❌ Failed to parse message"
+web.websocket.invalid_message_format: "Invalid message format"
+web.websocket.client_closed: "🔌 Client closed connection"
+web.websocket.connection_error: "❌ WebSocket error"
+web.websocket.connection_closed: "👋 WebSocket connection closed"
+
+# Web Command Execution
+web.command.execution_failed: "Execution failed"
+web.command.execution_error: "Command execution failed"
+
+# Web LLM
+web.llm.not_configured: "LLM not configured, unable to chat"
+
+# Web Error Messages
+web.error.response_parse_failed: "⚠️ Response parsing failed\n\nPossible causes:\n• Request content too complex, LLM response exceeded processing limit\n• Unstable network connection\n\nSuggestions:\n• Try simplifying your question\n• Break complex problems into simpler questions\n• Refresh the page and retry"
+web.error.request_timeout: "⏱️ Request timeout\n\nReason:\n• LLM response took too long (over 60 seconds)\n\nSuggestions:\n• Simplify your question description\n• Reduce tool call frequency\n• Try again later"
+web.error.network_error: "🌐 Network connection error\n\nPossible causes:\n• Unstable network connection\n• API service temporarily unavailable\n\nSuggestions:\n• Check network connection\n• Try again later"
+web.error.auth_failed: "🔑 API authentication failed\n\nReason:\n• API Key invalid or expired\n\nSuggestions:\n• Check API Key configuration\n• Contact administrator"
+web.error.rate_limit: "⚡ API call rate limit exceeded\n\nReason:\n• Too many requests in short time\n\nSuggestions:\n• Wait a moment and retry\n• Reduce usage frequency"
+web.error.tool_call_failed: "Tool call failed"
+web.error.llm_call_failed_prefix: "LLM call failed:"
+web.error.tool_call_error: "🔧 Error during tool call\n\nError details:\n{error}\n\nSuggestions:\n• Try rephrasing your question differently\n• Check if input parameters are reasonable"
+web.error.generic_error: "❌ Error occurred while processing request\n\nError message:\n{error}\n\nSuggestions:\n• Try rephrasing your question\n• If the problem persists, contact technical support"
+
+# Web Session
+web.session.primary_llm_init_failed: "⚠ Web Session - Primary LLM initialization failed"
+web.session.fallback_llm_init_failed: "⚠ Web Session - Fallback LLM initialization failed"
+web.session.ollama_client_creation_failed: "Ollama client creation failed"
+web.session.deepseek_requires_api_key: "Deepseek requires API Key"
+web.session.deepseek_client_creation_failed: "Deepseek client creation failed"
+web.session.unknown_llm_provider: "Unknown LLM provider"

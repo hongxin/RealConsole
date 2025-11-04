@@ -8,6 +8,7 @@
 
 use crate::command::CommandRegistry;
 use crate::config::{Config, WebConfig};
+use crate::i18n;
 use axum::{
     extract::{
         ws::{WebSocket, WebSocketUpgrade},
@@ -69,9 +70,9 @@ impl WebServer {
             .with_state(Arc::new(self.app_state));
 
         // 启动提示
-        println!("\n{}", "🌐 RealConsole Web 终端启动".cyan().bold());
-        println!("   {} http://{}", "地址:".green(), addr);
-        println!("   {} 按 Ctrl+C 停止服务\n", "提示:".yellow());
+        println!("\n{}", i18n::t("web.server.startup").cyan().bold());
+        println!("   {} http://{}", i18n::t("web.server.address_label").green(), addr);
+        println!("   {} {}\n", i18n::t("web.server.tip_label").yellow(), i18n::t("web.server.stop_hint"));
 
         // 启动服务
         let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -138,11 +139,11 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 
 /// 内嵌的主页 HTML
 const INDEX_HTML: &str = r#"<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" id="html-root">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RealConsole Web 终端</title>
+    <title data-i18n="web.page.title">RealConsole Web 终端</title>
     <link rel="stylesheet" href="/static/style.css">
     <!-- xterm.js CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
@@ -151,14 +152,20 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 </head>
 <body>
     <div id="header">
-        <h1>🌟 RealConsole Web 终端</h1>
-        <p>融合东方哲学智慧的智能 CLI Agent</p>
+        <div id="header-content">
+            <h1 data-i18n="web.header.title">🌟 RealConsole Web 终端</h1>
+            <p data-i18n="web.header.tagline">融合东方哲学智慧的智能 CLI Agent</p>
+        </div>
+        <div id="lang-switcher">
+            <button onclick="setLanguage('zh-CN')" id="btn-zh" class="active">中文</button>
+            <button onclick="setLanguage('en-US')" id="btn-en">English</button>
+        </div>
     </div>
     <div id="terminal-container">
         <div id="terminal"></div>
     </div>
     <div id="status">
-        <span id="connection-status">连接中...</span>
+        <span id="connection-status" data-i18n="web.status.connecting">连接中...</span>
     </div>
     <script src="/static/terminal.js"></script>
 </body>
@@ -170,6 +177,100 @@ const TERMINAL_JS: &str = r#"
 // RealConsole Web Terminal
 (function() {
     'use strict';
+
+    // ========== i18n 国际化支持 ==========
+    const I18N_TRANSLATIONS = {
+        'zh-CN': {
+            'web.page.title': 'RealConsole Web 终端',
+            'web.header.title': '🌟 RealConsole Web 终端',
+            'web.header.tagline': '融合东方哲学智慧的智能 CLI Agent',
+            'web.status.connecting': '连接中...',
+            'web.status.connected': '已连接',
+            'web.status.disconnected': '已断开',
+            'web.status.error': '连接错误',
+            'web.terminal.welcome': '欢迎使用 RealConsole Web 终端！',
+            'web.terminal.usage_hint': '输入命令开始使用，输入 /help 查看帮助',
+            'web.terminal.disconnected_message': '连接已断开',
+        },
+        'en-US': {
+            'web.page.title': 'RealConsole Web Terminal',
+            'web.header.title': '🌟 RealConsole Web Terminal',
+            'web.header.tagline': 'Intelligent CLI Agent Blending Eastern Philosophy Wisdom',
+            'web.status.connecting': 'Connecting...',
+            'web.status.connected': 'Connected',
+            'web.status.disconnected': 'Disconnected',
+            'web.status.error': 'Connection error',
+            'web.terminal.welcome': 'Welcome to RealConsole Web Terminal!',
+            'web.terminal.usage_hint': 'Enter commands to start, type /help for help',
+            'web.terminal.disconnected_message': 'Connection closed',
+        }
+    };
+
+    // 当前语言
+    let currentLanguage = 'zh-CN';
+
+    // 获取浏览器语言
+    function getBrowserLanguage() {
+        const lang = navigator.language || navigator.userLanguage;
+        if (lang.startsWith('zh')) {
+            return 'zh-CN';
+        } else if (lang.startsWith('en')) {
+            return 'en-US';
+        }
+        return 'zh-CN'; // 默认中文
+    }
+
+    // 翻译函数
+    function t(key) {
+        const translations = I18N_TRANSLATIONS[currentLanguage] || I18N_TRANSLATIONS['zh-CN'];
+        return translations[key] || key;
+    }
+
+    // 显示欢迎消息
+    function showWelcomeMessage() {
+        term.clear();
+        term.writeln('\x1b[32m' + t('web.terminal.welcome') + '\x1b[0m');
+        term.writeln('\x1b[36m' + t('web.terminal.usage_hint') + '\x1b[0m');
+        term.write('\x1b[33m% \x1b[0m');
+    }
+
+    // 设置语言
+    function setLanguage(lang) {
+        if (!I18N_TRANSLATIONS[lang]) return;
+        currentLanguage = lang;
+        updatePageText();
+        // 更新按钮状态
+        document.getElementById('btn-zh').classList.toggle('active', lang === 'zh-CN');
+        document.getElementById('btn-en').classList.toggle('active', lang === 'en-US');
+        // 刷新终端欢迎消息
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            showWelcomeMessage();
+        }
+    }
+
+    // 更新页面文本
+    function updatePageText() {
+        // 更新所有 data-i18n 元素
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            el.textContent = t(key);
+        });
+
+        // 更新 title
+        const title = document.querySelector('title');
+        if (title) {
+            const key = title.getAttribute('data-i18n');
+            if (key) title.textContent = t(key);
+        }
+    }
+
+    // 暴露到全局作用域，供 HTML 按钮调用
+    window.setLanguage = setLanguage;
+
+    // 初始化语言（从浏览器检测）
+    currentLanguage = getBrowserLanguage();
+
+    // ========== 终端核心 ==========
 
     // 创建终端
     const term = new Terminal({
@@ -337,24 +438,25 @@ const TERMINAL_JS: &str = r#"
     }
 
     ws.onopen = () => {
-        statusEl.textContent = '已连接';
+        statusEl.textContent = t('web.status.connected');
         statusEl.style.color = '#4CAF50';
-        term.writeln('\x1b[32m欢迎使用 RealConsole Web 终端！\x1b[0m');
-        term.writeln('\x1b[36m输入命令开始使用，输入 /help 查看帮助\x1b[0m');
-        term.write('\n\x1b[33m% \x1b[0m');
+        showWelcomeMessage();
 
         // 连接建立后重新 fit，确保尺寸正确
         setTimeout(doFit, 50);
+
+        // 应用初始语言设置
+        updatePageText();
     };
 
     ws.onclose = () => {
-        statusEl.textContent = '已断开';
+        statusEl.textContent = t('web.status.disconnected');
         statusEl.style.color = '#f44336';
-        term.writeln('\n\x1b[31m连接已断开\x1b[0m');
+        term.writeln('\n\x1b[31m' + t('web.terminal.disconnected_message') + '\x1b[0m');
     };
 
     ws.onerror = (err) => {
-        statusEl.textContent = '连接错误';
+        statusEl.textContent = t('web.status.error');
         statusEl.style.color = '#f44336';
         console.error('WebSocket error:', err);
     };
@@ -377,8 +479,8 @@ const TERMINAL_JS: &str = r#"
                     .replace(/\r\n/g, '\n')  // 统一换行符
                     .replace(/\n/g, '\r\n'); // 转换为终端格式
 
-                term.write('\r\n\r\n' + formattedContent);
-                term.write('\r\n\r\n\x1b[33m% \x1b[0m');
+                term.write('\r\n' + formattedContent);
+                term.write('\r\n\x1b[33m% \x1b[0m');
                 inputBuffer = '';
                 cursorPosition = 0;
                 break;
@@ -399,8 +501,8 @@ const TERMINAL_JS: &str = r#"
                 let errorContent = msg.content
                     .replace(/\r\n/g, '\n')
                     .replace(/\n/g, '\r\n');
-                term.write('\r\n\r\n\x1b[31m' + errorContent + '\x1b[0m');
-                term.write('\r\n\r\n\x1b[33m% \x1b[0m');
+                term.write('\r\n\x1b[31m' + errorContent + '\x1b[0m');
+                term.write('\r\n\x1b[33m% \x1b[0m');
                 inputBuffer = '';
                 cursorPosition = 0;
                 break;
@@ -605,6 +707,15 @@ const TERMINAL_JS: &str = r#"
         }
     });
 
+    // ========== 初始化 i18n ==========
+    // 页面加载完成后立即应用语言设置
+    window.addEventListener('DOMContentLoaded', () => {
+        updatePageText();
+        // 根据初始语言设置按钮状态
+        document.getElementById('btn-zh').classList.toggle('active', currentLanguage === 'zh-CN');
+        document.getElementById('btn-en').classList.toggle('active', currentLanguage === 'en-US');
+    });
+
 })();
 "#;
 
@@ -632,11 +743,18 @@ body {
 }
 
 #header {
-    text-align: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     color: white;
     margin-bottom: 10px;
-    padding: 8px 0;
+    padding: 8px 20px;
     flex-shrink: 0;
+}
+
+#header-content {
+    text-align: center;
+    flex: 1;
 }
 
 #header h1 {
@@ -649,6 +767,37 @@ body {
     font-size: 0.9em;
     opacity: 0.9;
     margin: 0;
+}
+
+#lang-switcher {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+#lang-switcher button {
+    padding: 6px 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+#lang-switcher button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+#lang-switcher button.active {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
 }
 
 #terminal-container {
@@ -701,12 +850,28 @@ body {
         padding: 10px;
     }
 
-    #header h1 {
-        font-size: 1.5em;
+    #header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 8px 10px;
     }
 
-    #header p {
-        font-size: 0.9em;
+    #header-content h1 {
+        font-size: 1.3em;
+    }
+
+    #header-content p {
+        font-size: 0.85em;
+    }
+
+    #lang-switcher {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #lang-switcher button {
+        flex: 1;
+        max-width: 120px;
     }
 }
 "#;

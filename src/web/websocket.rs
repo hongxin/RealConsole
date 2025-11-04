@@ -10,6 +10,7 @@ use crate::command::CommandRegistry;
 use crate::command_router::{CommandRouter, CommandType};
 use crate::config::Config;
 use crate::dsl::intent::IntentMatch;
+use crate::i18n;
 use crate::services::{LlmRequest, Service};
 use crate::web::session::{ClientMessage, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
@@ -33,7 +34,8 @@ impl WebSocketSession {
     /// 运行会话主循环
     pub async fn run(self) -> anyhow::Result<()> {
         println!(
-            "✅ WebSocket 连接建立 [Session: {}]",
+            "{} [Session: {}]",
+            i18n::t("web.websocket.connection_established"),
             self.session.id()
         );
 
@@ -52,9 +54,9 @@ impl WebSocketSession {
                         Ok(client_msg) => {
                             // 处理命令
                             if let Err(e) = handle_message(&session, client_msg, &mut sender).await {
-                                eprintln!("❌ 处理消息失败: {}", e);
+                                eprintln!("{}: {}", i18n::t("web.websocket.handle_message_error"), e);
                                 let error_msg = ServerMessage::Error {
-                                    content: format!("内部错误: {}", e),
+                                    content: format!("{}: {}", i18n::t("web.websocket.internal_error"), e),
                                 };
                                 let _ = sender
                                     .send(Message::Text(serde_json::to_string(&error_msg)?))
@@ -62,9 +64,9 @@ impl WebSocketSession {
                             }
                         }
                         Err(e) => {
-                            eprintln!("❌ 解析消息失败: {}", e);
+                            eprintln!("{}: {}", i18n::t("web.websocket.parse_error"), e);
                             let error_msg = ServerMessage::Error {
-                                content: "消息格式错误".to_string(),
+                                content: i18n::t("web.websocket.invalid_message_format"),
                             };
                             let _ = sender
                                 .send(Message::Text(serde_json::to_string(&error_msg)?))
@@ -73,7 +75,7 @@ impl WebSocketSession {
                     }
                 }
                 Ok(Message::Close(_)) => {
-                    println!("🔌 客户端关闭连接 [Session: {}]", session.id());
+                    println!("{} [Session: {}]", i18n::t("web.websocket.client_closed"), session.id());
                     break;
                 }
                 Ok(Message::Ping(data)) => {
@@ -83,14 +85,15 @@ impl WebSocketSession {
                     // 忽略其他消息类型
                 }
                 Err(e) => {
-                    eprintln!("❌ WebSocket 错误: {}", e);
+                    eprintln!("{}: {}", i18n::t("web.websocket.connection_error"), e);
                     break;
                 }
             }
         }
 
         println!(
-            "👋 WebSocket 连接关闭 [Session: {}, Duration: {}s]",
+            "{} [Session: {}, Duration: {}s]",
+            i18n::t("web.websocket.connection_closed"),
             session.id(),
             session.duration()
         );
@@ -164,7 +167,7 @@ async fn handle_input(
 
     if let Err(e) = result {
         let error_msg = ServerMessage::Error {
-            content: format!("执行失败: {}", e),
+            content: format!("{}: {}", i18n::t("web.command.execution_failed"), e),
         };
         sender
             .send(Message::Text(serde_json::to_string(&error_msg)?))
@@ -208,7 +211,7 @@ async fn execute_system_command(
         }
         Err(e) => {
             let msg = ServerMessage::Error {
-                content: format!("命令执行失败: {}", e),
+                content: format!("{}: {}", i18n::t("web.command.execution_error"), e),
             };
             sender
                 .send(Message::Text(serde_json::to_string(&msg)?))
@@ -263,7 +266,7 @@ async fn execute_llm_chat(
     // 检查是否配置了 LLM
     if llm_manager.primary().is_none() {
         let msg = ServerMessage::Error {
-            content: "未配置 LLM，无法进行对话".to_string(),
+            content: i18n::t("web.llm.not_configured"),
         };
         sender
             .send(Message::Text(serde_json::to_string(&msg)?))
@@ -428,43 +431,46 @@ fn remove_debug_info(text: &str) -> String {
 fn format_user_friendly_error(error_str: &str) -> String {
     // 1. 响应解码错误（最常见的问题）
     if error_str.contains("decoding response body") || error_str.contains("Failed to read response body") {
-        return "⚠️ 响应解析失败\n\n可能原因：\n• 请求内容过于复杂，LLM 响应超出处理限制\n• 网络连接不稳定\n\n建议：\n• 尝试简化您的问题\n• 将复杂问题拆分为多个简单问题\n• 刷新页面后重试".to_string();
+        return i18n::t("web.error.response_parse_failed");
     }
 
     // 2. 网络超时
     if error_str.contains("timeout") || error_str.contains("Timeout") {
-        return "⏱️ 请求超时\n\n原因：\n• LLM 响应时间过长（超过 60 秒）\n\n建议：\n• 简化问题描述\n• 减少工具调用次数\n• 稍后重试".to_string();
+        return i18n::t("web.error.request_timeout");
     }
 
     // 3. 网络错误
     if error_str.contains("Network error") || error_str.contains("connection") {
-        return "🌐 网络连接错误\n\n可能原因：\n• 网络连接不稳定\n• API 服务暂时不可用\n\n建议：\n• 检查网络连接\n• 稍后重试".to_string();
+        return i18n::t("web.error.network_error");
     }
 
     // 4. API 认证错误
     if error_str.contains("401") || error_str.contains("authentication") || error_str.contains("API key") {
-        return "🔑 API 认证失败\n\n原因：\n• API Key 无效或已过期\n\n建议：\n• 检查 API Key 配置\n• 联系管理员".to_string();
+        return i18n::t("web.error.auth_failed");
     }
 
     // 5. API 限流
     if error_str.contains("429") || error_str.contains("rate limit") {
-        return "⚡ API 调用频率限制\n\n原因：\n• 短时间内请求过多\n\n建议：\n• 稍等片刻后重试\n• 降低使用频率".to_string();
+        return i18n::t("web.error.rate_limit");
     }
 
     // 6. 工具调用失败
-    if error_str.contains("工具调用失败") {
+    if error_str.contains(i18n::t("web.error.tool_call_failed").as_str()) {
         // 提取实际的底层错误
-        if let Some(start) = error_str.rfind("LLM 调用失败:") {
-            let core_error = &error_str[start + "LLM 调用失败:".len()..].trim();
-            return format!("🔧 工具调用过程中出错\n\n错误详情：\n{}\n\n建议：\n• 尝试使用其他方式表达问题\n• 检查输入参数是否合理", core_error);
+        let llm_prefix = i18n::t("web.error.llm_call_failed_prefix");
+        if let Some(start) = error_str.rfind(&format!("{}:", llm_prefix)) {
+            let core_error = &error_str[start + llm_prefix.len() + 1..].trim();
+            return i18n::t_with_args("web.error.tool_call_error", &[("error", core_error)]);
         }
     }
 
     // 7. 通用错误（清理嵌套的错误前缀）
+    let llm_prefix = i18n::t("web.error.llm_call_failed_prefix");
+    let tool_prefix = i18n::t("web.error.tool_call_failed");
     let clean_error = error_str
-        .replace("LLM 调用失败: 工具调用失败: LLM 调用失败: ", "")
-        .replace("LLM 调用失败: ", "")
-        .replace("工具调用失败: ", "");
+        .replace(&format!("{}: {}: {}: ", llm_prefix, tool_prefix, llm_prefix), "")
+        .replace(&format!("{}: ", llm_prefix), "")
+        .replace(&format!("{}: ", tool_prefix), "");
 
-    format!("❌ 处理请求时出现错误\n\n错误信息：\n{}\n\n建议：\n• 尝试重新表述问题\n• 如果问题持续，请联系技术支持", clean_error)
+    i18n::t_with_args("web.error.generic_error", &[("error", &clean_error)])
 }
