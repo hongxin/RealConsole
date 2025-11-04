@@ -7,11 +7,11 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1000%2B-green.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-1.22.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.24.0-blue.svg)](CHANGELOG.md)
 
 English | **[中文](README.cn.md)**
 
-**RealConsole** is an intelligent command-line agent built with Rust, based on the "One Divides into Three" (一分为三) philosophy. It combines LLM-powered conversation, proactive suggestions, task orchestration, and DevOps tools to provide a seamless CLI experience.
+**RealConsole** is an intelligent command-line agent built with Rust, based on the "One Divides into Three" (一分为三) philosophy. It combines LLM-powered conversation, proactive suggestions, task orchestration, and DevOps tools to provide a seamless CLI experience. **Now with Web Terminal support!**
 
 ## Installation
 
@@ -34,7 +34,7 @@ cargo build --release
 
 **Requirements**: Rust 1.70+, LLM Provider ([Ollama](https://ollama.ai/)/[Deepseek](https://platform.deepseek.com/)/[OpenAI](https://platform.openai.com/))
 
-> 📖 **Detailed instructions**: [Installation Guide](docs/QUICKSTART.md#installation)
+> 📖 **Detailed instructions**: [Installation Guide](docs/02-practice/user/quickstart.md)
 
 ## Quick Start
 
@@ -56,23 +56,63 @@ cp config/realconsole.yaml.example realconsole.yaml
 
 ### 2. Run
 
+**CLI Mode**:
 ```bash
 realconsole
+```
+
+**Web Terminal Mode** (NEW):
+```bash
+realconsole web
+# Visit http://127.0.0.1:7788
 ```
 
 ### 3. Try it out
 
 ```bash
 % hello                           # Chat with AI
-% !ls -la                         # Execute shell commands
-% /suggest                        # Get proactive suggestions ⭐
+% ls -la                          # Execute shell commands (smart routing)
+% /suggest                        # Get proactive suggestions
 % /plan create a Rust project    # Task orchestration
 % /trace                          # Unified tracking
 ```
 
-> 📖 **Full guide**: [Quick Start Guide](docs/QUICKSTART.md)
+> 📖 **Full guide**: [Quick Start Guide](docs/02-practice/user/quickstart.md)
 
 ## Key Features
+
+### 🌐 Web Terminal ⭐ NEW (v1.23.0+)
+
+**Cross-platform Web Terminal** - Access RealConsole anywhere:
+
+```bash
+realconsole web --bind 0.0.0.0 --port 7788
+```
+
+**Core Features**:
+- ✨ **Smart Routing**: Auto-detects shell commands, no `!` prefix needed
+- 🎯 **Intent Understanding**: 50+ built-in intents, natural language task execution
+- 🔧 **Tool Calling**: Full LLM tool calling capability
+- 🎨 **Beautiful UI**: Real-time streaming output, command history, auto-completion
+- 📱 **Mobile Friendly**: Responsive design with touch support
+- 🌍 **LAN Access**: Team collaboration across devices
+
+**Use Cases**:
+- Remote server management
+- Mobile device access
+- Team collaboration demos
+- Quick testing without installation
+
+> 📖 **Detailed docs**: [Web Terminal User Guide](docs/02-practice/user/web-terminal.md)
+
+### 🌍 Internationalization (v1.24.0)
+
+**Complete bilingual support (English/Chinese)**:
+
+- **CLI Interface**: All command outputs and prompts
+- **LLM Prompts**: System prompts in both languages
+- **YAML Config**: Internationalized configuration files
+- **Dynamic Switching**: `REALCONSOLE_LANG=zh-CN|en-US` environment variable
 
 ### 🤖 Intelligent Conversation
 - **LLM Integration**: Ollama (local) / Deepseek / OpenAI support
@@ -80,12 +120,11 @@ realconsole
 - **Multi-turn Context**: Automatic context management (Auto/Manual/Disabled modes)
 - **Tool Calling**: 14+ built-in tools (calculator, file ops, datetime, etc.)
 
-### 💡 Proactive Suggestions ⭐ NEW (v1.8.0)
+### 💡 Proactive Suggestions
 - **Context-Aware**: Intelligent suggestions based on project type, command history, and errors
 - **Quick Execute**: Number shortcuts (e.g., `1`, `2`, `3`) to run suggestions instantly
 - **Spell Checking**: Automatic typo correction with Levenshtein distance algorithm
-- **Feedback Learning**: Adapts to your preferences through user feedback (acceptance rate + position)
-- **Smart Caching**: Recently shown suggestions cached with expiration (2.5-5 min lifecycle)
+- **Feedback Learning**: Adapts to your preferences through user feedback
 
 ```bash
 % /suggest
@@ -100,6 +139,7 @@ realconsole
 ### 🛠️ Task Orchestration
 - **Natural Language Goals**: Describe what you want, AI decomposes into tasks
 - **Intelligent Parallel Execution**: Automatic dependency analysis and optimization
+- **Task Persistence**: Save and load tasks across sessions
 - **Visual Progress**: Tree-structured task display with real-time status
 
 ```bash
@@ -108,6 +148,10 @@ realconsole
 
 % /execute
 ✓ 6/6 · 100% · 10s
+
+% /task save my_build    # Save for later
+% /task list              # List all saved tasks
+% /task load 0            # Load task
 ```
 
 ### 📊 Unified Tracking
@@ -140,13 +184,13 @@ realconsole
 ```bash
 % ls          # Auto-detected as shell
 % pwd         # No ! prefix needed for common commands
-% git status  # 80+ commands auto-recognized
+% git status  # 100+ commands auto-recognized
 ```
 
 ### Error Recovery
 
 ```bash
-% !cagro build
+% cagro build
 ❌ Command not found: cagro
 
 💡 Did you mean?
@@ -203,9 +247,9 @@ realconsole
 ## Documentation
 
 ### Getting Started
-- **[Quick Start](docs/QUICKSTART.md)** - Get up and running in 5 minutes
+- **[Quick Start](docs/02-practice/user/quickstart.md)** - Get up and running in 5 minutes
 - **[User Guide](docs/02-practice/user/user-guide.md)** - Complete feature documentation
-- **[FAQ](docs/02-practice/user/faq.md)** - Common questions
+- **[Web Terminal Guide](docs/02-practice/user/web-terminal.md)** - Web version usage
 
 ### Core Concepts
 - **[One Divides into Three Philosophy](docs/00-core/philosophy.md)** - Design principles
@@ -230,15 +274,15 @@ realconsole
 ```
 User Input
    ↓
-Smart Router ──┬── Shell Execution (! prefix or auto-detected)
+Smart Router ──┬── Shell Execution (auto-detected 100+ commands)
                ├── System Commands (/help, /suggest, /trace, etc.)
                └── LLM + Tool Calling (streaming output)
                       ↓
-                 Proactive Suggestion System ⭐
+                 Proactive Suggestion System
                  ├── Context Analyzer (project type, history)
                  ├── Spell Checker (Levenshtein distance)
                  ├── Feedback Learner (user preferences)
-                 └── Suggestion Cache (2.5-5 min lifecycle)
+                 └── Suggestion Cache (smart lifecycle)
 ```
 
 **Key Components**:
@@ -247,25 +291,55 @@ Smart Router ──┬── Shell Execution (! prefix or auto-detected)
 - **Task System**: Dependency analysis, parallel execution
 - **Suggestion Engine**: Three-source fusion (Context + History + LLM)
 - **Tracer**: Four-dimensional observation system
+- **Web Server**: Axum framework, WebSocket real-time communication
 
 ## What's New
 
-### v1.22.1 - Task Command Unification 🎯
+### v1.24.0 - Full Internationalization Support 🌍
 
-**Perfect Practice of Minimalism + Flexibility Philosophy**
+**Seamless Bilingual Experience**
 
-#### Unified Subcommand Architecture
+#### Core Improvements
 
-Merge 3 independent commands into 1 unified entry point (-66%), practicing minimalist design:
+- ✅ **Complete CLI Internationalization**: All command outputs, prompts, and error messages
+- ✅ **Bilingual LLM Prompts**: System prompts support Chinese context
+- ✅ **Internationalized YAML Config**: Configuration file comments in both languages
+- ✅ **Environment Variable Control**: `REALCONSOLE_LANG=zh-CN|en-US` for dynamic switching
 
-**Before**:
 ```bash
-/task_save [name]
-/task_list
-/task_load <id>
+# Chinese mode
+export REALCONSOLE_LANG=zh-CN
+realconsole
+
+# English mode
+export REALCONSOLE_LANG=en-US
+realconsole
 ```
 
-**After**:
+📖 **Details**: [v1.24.0 Release Notes](docs/03-evolution/archives/v1.24.0-release-notes.md)
+
+---
+
+### v1.23.0 - Web Terminal Release 🌐
+
+**Access RealConsole Anywhere**
+
+- ✅ Complete web terminal implementation (Axum + WebSocket)
+- ✅ Smart routing and Intent understanding
+- ✅ Beautiful UI with real-time streaming output
+- ✅ Mobile-friendly responsive design
+- ✅ LAN access support
+
+📖 **Details**: [Web Terminal Documentation](docs/02-practice/user/web-terminal.md)
+
+---
+
+### v1.22.1 - Task Command Unification 🎯
+
+**Minimalism in Practice**
+
+Merged 3 independent commands into 1 unified entry point (-66%):
+
 ```bash
 /task <subcommand> [args]
 
@@ -273,87 +347,27 @@ Subcommands:
   save [name]     # Save current task
   list            # List all tasks
   load <id>       # Load task
-  delete <id>     # Delete task (NEW)
-  show            # Show current task (NEW)
-  help            # Show help (NEW)
+  delete <id>     # Delete task
+  show            # Show current task
+  help            # Show help
 ```
 
-#### Key Features
-
-- ✅ **Type-Safe**: TaskSubcommand enum, compile-time checks
-- ✅ **Easy to Extend**: Add new subcommands by adding enum variants
-- ✅ **Backward Compatible**: Old commands preserved with deprecation warnings
-- ✅ **User-Friendly**: Auto help hints, clear error messages
-
-📖 **Details**: [Completion Report](docs/04-reports/v1.22.1-completion.md) | [Design Document](docs/04-reports/v1.22.1-task-command-refactoring.md)
+- ✅ Type-safe (TaskSubcommand enum)
+- ✅ Easy to extend
+- ✅ Backward compatible
+- ✅ User-friendly error hints
 
 ---
 
-### v1.22.0 - Task System Triple Enhancement ⚡
+### v1.22.0 - Task Persistence ⚡
 
-**Cross-Session Task Management + Minimalist Aesthetics + Flexible Configuration**
+**Cross-Session Task Management**
 
-#### 1. Task Persistence
+- Task persistence (JSON format, `~/.realconsole/tasks/`)
+- Number highlighting (minimalist aesthetics)
+- Executor configuration (dynamic merge strategy)
 
-Save and load task plans across sessions:
-
-```bash
-% /plan compile and test project
-% /execute
-% /task save my_build        # Save task
-% /task list                  # List all tasks
-% /task load 0                # Load task
-```
-
-- JSON format storage (`~/.realconsole/tasks/`)
-- UUID auto-generation + optional naming
-- Complete plan and result preservation
-
-#### 2. Number Highlighting
-
-Minimalist aesthetics with automatic number highlighting:
-
-- Cyan color scheme (consistent with titles)
-- Recognizes integers, decimals, percentages, numbers with units
-- Performance optimized (regex caching)
-
-#### 3. Executor Configuration
-
-Dynamic control of task merging strategy:
-
-```yaml
-task:
-  execution:
-    merge_stages: true        # Enable task merging
-    max_merged_tasks: 20      # Maximum merge count
-```
-
-- Configuration-driven execution strategy
-- Environment variable sharing across tasks
-- Prevent command line overflow
-
-📖 **Details**: [v1.22.0 Summary](docs/04-reports/v1.22.0-summary.md)
-
----
-
-### v1.8.0 - Proactive Suggestion System
-
-**Phase 4.2 Complete** - Three major features:
-
-1. **P0 - Quick Execute & Enhanced Error Analysis**
-   - Number shortcuts for instant suggestion execution
-   - 11 error patterns (command not found, permission denied, etc.)
-
-2. **P1 - Spell Checking & Suggestion Cache**
-   - Levenshtein distance algorithm with 100+ command dictionary
-   - Three-state cache lifecycle (Fresh/Stale/Expired)
-
-3. **P2.1 - Feedback Learning System**
-   - Three-state feedback (Accepted/Skipped/Rejected)
-   - Quality score = 70% acceptance rate + 30% position
-   - Automatic score adjustment (0.5x-1.5x range)
-
-📖 **Details**: [CHANGELOG.md](CHANGELOG.md) | [Completion Reports](docs/04-reports/)
+For more historical features, see [CHANGELOG.md](CHANGELOG.md)
 
 ## Disclaimer
 
