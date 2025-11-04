@@ -57,6 +57,7 @@ pub mod trace_context; // ✨ v1.5.1: 追踪上下文（TraceContext, ExecutionS
 pub mod tracer; // ✨ Phase 2 (Memory Redesign): 统一追踪系统（四维观测）
 pub mod utils; // ✨ Phase 2: 软阈值工具（连续场重构） + 字符串处理等通用工具
 pub mod voice; // ✨ 语音播报系统
+pub mod web; // ✨ v1.23.0: Web 终端（浏览器访问）
 pub mod wizard;
 
 // Re-export commonly used types

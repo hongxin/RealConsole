@@ -48,6 +48,7 @@ mod trace_context; // ✨ v1.5.1: 追踪上下文（TraceContext, ExecutionSpan�
 mod tracer; // ✨ Phase 2 (Memory Redesign): 统一追踪系统
 mod utils; // ✨ Phase 2: 软阈值工具（连续场重构）
 mod voice; // ✨ 语音播报系统
+mod web; // ✨ v1.23.0: Web 终端（浏览器访问）
 mod wizard;
 
 use clap::{Parser, Subcommand};
@@ -96,6 +97,17 @@ enum Commands {
         /// 显示配置路径
         #[arg(short, long)]
         path: bool,
+    },
+
+    /// 启动 Web 终端服务（浏览器访问）
+    Web {
+        /// 绑定地址（覆盖配置文件）
+        #[arg(short, long)]
+        bind: Option<String>,
+
+        /// 端口（覆盖配置文件）
+        #[arg(short, long)]
+        port: Option<u16>,
     },
 }
 
@@ -205,6 +217,64 @@ fn show_config(config_path: &str, show_path: bool) {
             eprintln!("{} {}", i18n::t("config.read_failed").red(), e);
             process::exit(1);
         }
+    }
+}
+
+/// 启动 Web 服务器
+async fn run_web_server(config_path: &str, bind: Option<String>, port: Option<u16>) {
+    use web::WebServer;
+
+    // 加载 .env 文件
+    load_env_file(config_path);
+
+    // 加载配置
+    let mut config = if std::path::Path::new(config_path).exists() {
+        match config::Config::from_file(config_path) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("{}", e.format_user_friendly());
+                eprintln!("\n{}", i18n::t("error.use_default_config").yellow());
+                config::Config::default()
+            }
+        }
+    } else {
+        eprintln!("{} {}", i18n::t("config.not_found").yellow(), config_path);
+        eprintln!("{}\n", i18n::t("config.run_wizard").cyan());
+        process::exit(1);
+    };
+
+    // 命令行参数覆盖配置
+    if let Some(bind_addr) = bind {
+        config.web.bind = bind_addr;
+    }
+    if let Some(port_num) = port {
+        config.web.port = port_num;
+    }
+
+    // 创建命令注册表并注册所有命令
+    let mut registry = command::CommandRegistry::new();
+
+    // 注册核心命令
+    commands::register_core_commands(&mut registry);
+
+    // 注册项目上下文命令
+    commands::register_project_commands(&mut registry);
+
+    // 注册 Git 智能助手命令
+    commands::register_git_commands(&mut registry);
+
+    // 注册日志文件分析命令
+    commands::register_log_analysis_commands(&mut registry);
+
+    // 注册系统监控命令
+    commands::register_system_commands(&mut registry);
+
+    // 创建并启动 Web 服务器
+    let web_server = WebServer::new(config.web.clone(), config, registry);
+
+    if let Err(e) = web_server.serve().await {
+        eprintln!("{} {}", "❌ Web 服务启动失败:".red(), e);
+        process::exit(1);
     }
 }
 
@@ -322,6 +392,10 @@ async fn main() {
             }
             Commands::Config { path } => {
                 show_config(&args.config, path);
+                return;
+            }
+            Commands::Web { bind, port } => {
+                run_web_server(&args.config, bind, port).await;
                 return;
             }
         }

@@ -65,6 +65,10 @@ pub struct Config {
     /// ✨ v1.9.1: 两仪演化系统配置
     #[serde(default)]
     pub liangyyi: Option<LiangyyiConfig>,
+
+    /// ✨ v1.23.0: Web 终端配置
+    #[serde(default)]
+    pub web: WebConfig,
 }
 
 fn default_prefix() -> String {
@@ -819,6 +823,7 @@ impl Default for Config {
             likan: None, // 默认使用 None，从配置文件加载
             bagua: None, // ✨ 八卦记忆宫，默认关闭
             liangyyi: None, // ✨ v1.9.1: 两仪演化系统，默认使用默认配置
+            web: WebConfig::default(), // ✨ v1.23.0: Web 终端，默认关闭
         }
     }
 }
@@ -1046,6 +1051,49 @@ impl Default for LiangyyiConfig {
         Self {
             enabled: true,
             state_tracker: crate::liangyyi::StateTrackerConfig::default(),
+        }
+    }
+}
+
+/// ✨ v1.23.0: Web 终端配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebConfig {
+    /// 是否启用 Web 服务（默认: false）
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// 绑定地址（默认: 127.0.0.1，仅本地访问）
+    #[serde(default = "default_web_bind")]
+    pub bind: String,
+
+    /// 端口（默认: 7788）
+    #[serde(default = "default_web_port")]
+    pub port: u16,
+
+    /// CORS 允许的源（默认: ["*"]）
+    #[serde(default = "default_web_allowed_origins")]
+    pub allowed_origins: Vec<String>,
+}
+
+fn default_web_bind() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_web_port() -> u16 {
+    7788
+}
+
+fn default_web_allowed_origins() -> Vec<String> {
+    vec!["*".to_string()]
+}
+
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: default_web_bind(),
+            port: 7788,
+            allowed_origins: default_web_allowed_origins(),
         }
     }
 }

@@ -25,6 +25,7 @@
 - `LlmClient` trait：统一 LLM 接口（Deepseek/Ollama，流式输出）
 - `Tool` trait：工具标准接口（14+ 内置工具，支持 Function Calling）
 - `Intent DSL`：50+ 内置意图，正则+模板引擎，LRU 缓存
+- `Web Terminal` (v1.23.0)：浏览器访问，axum + WebSocket + xterm.js
 
 **关键目录**：
 - `src/agent.rs` - 核心调度
@@ -32,6 +33,7 @@
 - `src/dsl/intent/` - Intent DSL
 - `src/task/` - 任务编排系统
 - `src/tracer/` - 统一追踪系统（v1.5.0新增，四维观测体系）
+- `src/web/` - Web 终端（v1.23.0新增，浏览器访问）
 - `src/i18n.rs` - 国际化系统
 - `scripts/` - Shell 脚本集合（test/ 按功能分类的测试脚本，utils/ 发布等工具）
 - `docs/` - 五态架构文档（00-core/01-understanding/02-practice/03-evolution/04-reports）
@@ -93,6 +95,24 @@ cp .env.example .env  # 填入 DEEPSEEK_API_KEY
 ./target/release/realconsole
 ```
 
+**Web 终端**（v1.23.0 新增）：
+```bash
+# 1. 配置 API Key（用于 LLM 对话）
+export DEEPSEEK_API_KEY="your-api-key-here"
+
+# 2. 启动 Web 服务（默认 http://127.0.0.1:7788）
+realconsole web
+
+# 自定义端口
+realconsole web --port 9000
+
+# 局域网访问（谨慎使用）
+realconsole web --bind 0.0.0.0
+```
+**注意**：需要配置 LLM 才能使用对话功能，否则只能使用系统命令和 Shell 命令。
+
+详见：`docs/02-practice/user/web-terminal.md`
+
 **测试**：
 ```bash
 make test                     # 全部测试（或 cargo test）
@@ -114,6 +134,7 @@ make uninstall                # 或 ./uninstall.sh
 - **工具**：实现 `Tool` trait，参考 `src/builtin_tools.rs`
 - **Intent**：在 `src/dsl/intent/builtin.rs` 添加，遵循现有模式
 - **LLM**：实现 `LlmClient` trait，参考 `src/llm/deepseek.rs`
+- **Web**：扩展 Web 功能参考 `src/web/`（v1.23.0，axum + WebSocket）
 
 ## 文档导航
 

@@ -1,6 +1,6 @@
 [package]
 name = "realconsole"
-version = "1.22.1"
+version = "1.23.0"
 edition = "2021"
 authors = ["RealConsole Contributors"]
 description = "An intelligent CLI agent with unified tracing system, combining Eastern philosophy wisdom with modern AI"
@@ -53,6 +53,11 @@ once_cell = "1.19"  # Lazy static initialization for regex caching
 dirs = "5.0"  # Get user directories (home, config, etc.) - ✨ v1.22.0: 用于任务持久化
 uuid = { version = "1.10", features = ["v4", "serde"] }  # UUID generation for conversation IDs
 chinese-lunisolar-calendar = "0.1"  # Chinese lunisolar calendar: 公历/农历转换、节气、干支、生肖（1901-2100）
+
+# Web server (for browser-based terminal interface)
+axum = { version = "0.7", features = ["ws"] }  # Web framework with WebSocket support
+tower = "0.4"  # Service middleware
+tower-http = { version = "0.5", features = ["fs", "cors"] }  # HTTP utilities (static files, CORS)
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -129,6 +129,9 @@ impl HttpClientBase {
     /// # 错误处理
     /// - HTTP 4xx/5xx → LlmError::Http
     /// - JSON 解析失败 → LlmError::Parse
+    ///
+    /// # 调试功能
+    /// - JSON 解析失败时会打印完整响应体到 stderr
     pub async fn handle_response(resp: Response) -> Result<Value, LlmError> {
         let status = resp.status();
 
@@ -144,10 +147,31 @@ impl HttpClientBase {
             });
         }
 
-        // 解析 JSON
-        resp.json()
+        // 先获取文本响应
+        let text = resp
+            .text()
             .await
-            .map_err(|e| LlmError::Parse(format!("Failed to parse JSON response: {}", e)))
+            .map_err(|e| LlmError::Network(format!("Failed to read response body: {}", e)))?;
+
+        // 尝试解析 JSON
+        serde_json::from_str(&text).map_err(|e| {
+            // 调试输出：打印完整响应体到 stderr
+            eprintln!("\n{}", "=".repeat(80));
+            eprintln!("[DEBUG] JSON 解析失败");
+            eprintln!("[DEBUG] 解析错误: {}", e);
+            eprintln!("[DEBUG] 响应体长度: {} 字节", text.len());
+            eprintln!("{}", "-".repeat(80));
+            eprintln!("[DEBUG] 完整响应体:");
+            eprintln!("{}", text);
+            eprintln!("{}\n", "=".repeat(80));
+
+            // 返回错误，包含截断的响应体预览
+            let preview = crate::utils::string::truncate_safe(&text, 200);
+            LlmError::Parse(format!(
+                "Failed to parse JSON response: {}. Response preview: {}",
+                e, preview
+            ))
+        })
     }
 
     /// 带重试的操作执行
