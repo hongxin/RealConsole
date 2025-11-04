@@ -141,6 +141,10 @@ pub struct LlmService {
     tool_registry: Arc<RwLock<ToolRegistry>>,
     /// Tool Executor（用于工具调用模式）
     tool_executor: Arc<ToolExecutor>,
+    /// 配置文件中的系统提示词
+    config_system_prompt: Option<String>,
+    /// 运行时系统提示词（可通过 /set-prompt 动态修改）
+    runtime_system_prompt: Arc<RwLock<Option<String>>>,
 }
 
 impl LlmService {
@@ -149,11 +153,15 @@ impl LlmService {
         llm_manager: Arc<RwLock<LlmManager>>,
         tool_registry: Arc<RwLock<ToolRegistry>>,
         tool_executor: Arc<ToolExecutor>,
+        config_system_prompt: Option<String>,
+        runtime_system_prompt: Arc<RwLock<Option<String>>>,
     ) -> Self {
         Self {
             llm_manager,
             tool_registry,
             tool_executor,
+            config_system_prompt,
+            runtime_system_prompt,
         }
     }
 
@@ -251,12 +259,26 @@ impl LlmService {
 
         // 构建消息列表（如果有历史上下文则使用，否则创建新的）
         let msgs = messages.unwrap_or_else(|| {
+            // 内置默认提示词
+            let default_system_prompt = "你是一个有用的智能助手。你可以使用提供的工具来帮助用户完成任务。\n\
+                请直接、自然地回答用户的问题，不要过度客套。\n\
+                当用户询问事实性问题时，请提供准确、详细的信息。";
+
+            // 系统提示词优先级：运行时 > 配置文件 > 内置默认
+            // 注意：这里使用阻塞调用是安全的，因为我们已经在 tokio 运行时中
+            let runtime_prompt = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    self.runtime_system_prompt.read().await.clone()
+                })
+            });
+
+            let system_prompt = runtime_prompt
+                .as_deref()
+                .or(self.config_system_prompt.as_deref())
+                .unwrap_or(default_system_prompt);
+
             vec![
-                crate::llm::Message::system(
-                    "你是一个有用的智能助手。你可以使用提供的工具来帮助用户完成任务。\n\
-                     请直接、自然地回答用户的问题，不要过度客套。\n\
-                     当用户询问事实性问题时，请提供准确、详细的信息。"
-                ),
+                crate::llm::Message::system(system_prompt),
                 crate::llm::Message::user(text),
             ]
         });
@@ -322,8 +344,15 @@ mod tests {
         let llm_manager = Arc::new(RwLock::new(LlmManager::new()));
         let tool_registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let tool_executor = Arc::new(ToolExecutor::with_defaults(tool_registry.clone()));
+        let runtime_prompt = Arc::new(RwLock::new(None));
 
-        let service = LlmService::new(llm_manager, tool_registry, tool_executor);
+        let service = LlmService::new(
+            llm_manager,
+            tool_registry,
+            tool_executor,
+            None,
+            runtime_prompt,
+        );
 
         let request = LlmRequest::normal("Hello".to_string());
         let result = service.process(request).await;
@@ -340,8 +369,15 @@ mod tests {
         let llm_manager = Arc::new(RwLock::new(LlmManager::new()));
         let tool_registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let tool_executor = Arc::new(ToolExecutor::with_defaults(tool_registry.clone()));
+        let runtime_prompt = Arc::new(RwLock::new(None));
 
-        let service = LlmService::new(llm_manager, tool_registry, tool_executor);
+        let service = LlmService::new(
+            llm_manager,
+            tool_registry,
+            tool_executor,
+            None,
+            runtime_prompt,
+        );
 
         // 没有配置 LLM 时，health_check 应该返回 false
         assert!(!service.health_check().await);

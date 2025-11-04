@@ -88,6 +88,10 @@ pub struct Agent {
     llm_service: Arc<LlmService>,
     shell_service: Arc<ShellService>,
 
+    // === 运行时状态 ===
+    /// 运行时系统提示词（可通过 /set-prompt 动态修改）
+    runtime_system_prompt: Arc<RwLock<Option<String>>>,
+
     // === 原有字段（保留，向后兼容）===
     pub llm_manager: Arc<RwLock<LlmManager>>,
 
@@ -342,10 +346,15 @@ impl Agent {
                 Arc::clone(&llm_manager),
             ));
 
+            // 创建运行时系统提示词
+            let runtime_system_prompt = Arc::new(RwLock::new(None));
+
             let llm_service = Arc::new(LlmService::new(
                 Arc::clone(&llm_manager),
                 Arc::clone(&tool_registry),
                 Arc::clone(&tool_executor_arc),
+                config.llm.system_prompt.clone(),
+                Arc::clone(&runtime_system_prompt),
             ));
 
             let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
@@ -365,6 +374,8 @@ impl Agent {
                 intent_service,
                 llm_service,
                 shell_service,
+                // 运行时状态
+                runtime_system_prompt: Arc::new(RwLock::new(None)),
                 // 原有字段
                 llm_manager: Arc::clone(&llm_manager),
                 memory: Arc::clone(&memory_arc),
@@ -428,10 +439,15 @@ impl Agent {
             Arc::clone(&llm_manager),
         ));
 
+        // 创建运行时系统提示词
+        let runtime_system_prompt = Arc::new(RwLock::new(None));
+
         let llm_service = Arc::new(LlmService::new(
             Arc::clone(&llm_manager),
             Arc::clone(&tool_registry),
             Arc::clone(&tool_executor_arc),
+            config.llm.system_prompt.clone(),
+            Arc::clone(&runtime_system_prompt),
         ));
 
         let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
@@ -451,6 +467,8 @@ impl Agent {
             intent_service,
             llm_service,
             shell_service,
+            // 运行时状态
+            runtime_system_prompt,
             // 原有字段
             llm_manager: Arc::clone(&llm_manager),
             memory: Arc::clone(&memory_arc),
@@ -648,6 +666,11 @@ impl Agent {
     /// 获取状态管理器的引用
     pub fn state_manager(&self) -> &StateManager {
         &self.state_manager
+    }
+
+    /// 获取运行时系统提示词的引用
+    pub fn runtime_system_prompt(&self) -> Arc<RwLock<Option<String>>> {
+        Arc::clone(&self.runtime_system_prompt)
     }
 
     /// 获取对话管理器的引用

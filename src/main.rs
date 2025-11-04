@@ -481,6 +481,14 @@ async fn main() {
     // 注册统计命令（Phase 9） - 需要 stats_collector
     commands::register_stats_commands(&mut agent.registry, stats_collector);
 
+    // 注册 LLM 提示词命令（v1.23.1）- 需要 runtime_system_prompt
+    let runtime_system_prompt = agent.runtime_system_prompt();
+    commands::register_llm_prompt_commands(
+        &mut agent.registry,
+        runtime_system_prompt,
+        config.llm.system_prompt.clone(),
+    );
+
     // 初始化 LLM 客户端
     {
         let mut manager = agent.llm_manager.write().await;

@@ -6,6 +6,7 @@ pub mod liangyyi_cmd; // ✨ v1.9.4: 两仪演化系统可视化命令
 pub mod likan; // ✨ Phase 4.3: 离坎炼化炉命令
 pub mod llm;
 pub mod llm_log; // ✨ LLM 交互日志命令
+pub mod llm_prompt_cmd; // ✨ v1.23.1: LLM 系统提示词命令
 pub mod log;
 pub mod logfile_cmd; // ✨ Phase 6: 日志文件分析命令
 pub mod memory;
@@ -26,6 +27,7 @@ pub use liangyyi_cmd::register_liangyyi_commands;
 pub use likan::register_likan_commands;
 pub use llm::register_llm_commands;
 pub use llm_log::register_llm_log_commands;
+pub use llm_prompt_cmd::register_llm_prompt_commands;
 pub use log::register_log_commands;
 pub use logfile_cmd::register_log_analysis_commands;
 pub use memory::register_memory_commands;

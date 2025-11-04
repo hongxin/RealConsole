@@ -83,6 +83,11 @@ pub struct LlmConfig {
     /// LLM 交互日志配置
     #[serde(default)]
     pub logging: LlmLoggingConfig,
+
+    /// 系统提示词（可选，用于指导 LLM 行为）
+    /// 如果未配置，将使用内置默认提示词
+    #[serde(default)]
+    pub system_prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -162,6 +167,7 @@ impl LlmConfig {
                     }),
                     fallback: None,
                     logging: LlmLoggingConfig::default(),
+                    system_prompt: None,
                 };
             }
         }
@@ -178,6 +184,7 @@ impl LlmConfig {
                     }),
                     fallback: None,
                     logging: LlmLoggingConfig::default(),
+                    system_prompt: None,
                 };
             }
         }
@@ -194,6 +201,7 @@ impl LlmConfig {
                     }),
                     fallback: None,
                     logging: LlmLoggingConfig::default(),
+                    system_prompt: None,
                 };
             }
         }
