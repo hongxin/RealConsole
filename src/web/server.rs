@@ -145,10 +145,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="web.page.title">RealConsole Web 终端</title>
     <link rel="stylesheet" href="/static/style.css">
-    <!-- xterm.js CDN -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <!-- Markdown 渲染支持 (v1.26.0) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 </head>
 <body>
     <div id="header">
@@ -162,7 +160,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         </div>
     </div>
     <div id="terminal-container">
-        <div id="terminal"></div>
+        <!-- 混合终端：单一容器，统一滚动 -->
     </div>
     <div id="status">
         <span id="connection-status" data-i18n="web.status.connecting">连接中...</span>
@@ -174,9 +172,521 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
 /// 内嵌的终端 JavaScript
 const TERMINAL_JS: &str = r#"
-// RealConsole Web Terminal
+// RealConsole Web Hybrid Terminal (v1.26.0)
+// 融合终端 + Markdown 的统一体验
 (function() {
     'use strict';
+
+    // ========== ANSI 颜色解析器 ==========
+    class AnsiParser {
+        constructor() {
+            this.ansiMap = {
+                '0': 'reset',
+                '1': 'bold',
+                '31': 'red',
+                '32': 'green',
+                '33': 'yellow',
+                '34': 'blue',
+                '36': 'cyan',
+                '37': 'white',
+            };
+        }
+
+        parse(text) {
+            // 解析 ANSI 转义序列为 HTML
+            const regex = /\x1b\[([0-9;]+)m/g;
+            let html = '';
+            let lastIndex = 0;
+            let currentClasses = [];
+
+            text.replace(regex, (match, codes, offset) => {
+                // 添加前面的文本
+                if (offset > lastIndex) {
+                    const content = text.slice(lastIndex, offset);
+                    html += this.wrapWithClasses(content, currentClasses);
+                }
+
+                // 处理 ANSI 代码
+                const codeList = codes.split(';');
+                for (const code of codeList) {
+                    if (code === '0') {
+                        currentClasses = [];
+                    } else if (this.ansiMap[code]) {
+                        currentClasses.push(`ansi-${this.ansiMap[code]}`);
+                    }
+                }
+
+                lastIndex = offset + match.length;
+                return '';
+            });
+
+            // 添加剩余文本
+            if (lastIndex < text.length) {
+                html += this.wrapWithClasses(text.slice(lastIndex), currentClasses);
+            }
+
+            return html || this.escapeHtml(text);
+        }
+
+        wrapWithClasses(text, classes) {
+            const escaped = this.escapeHtml(text);
+            if (classes.length > 0) {
+                return `<span class="${classes.join(' ')}">${escaped}</span>`;
+            }
+            return escaped;
+        }
+
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+
+    // ========== Markdown 渲染器 ==========
+    class MarkdownRenderer {
+        constructor(enabled = true) {
+            this.enabled = enabled;
+            this.streamBuffer = '';
+            this.renderTimeout = null;
+            this.RENDER_INTERVAL = 300; // 300ms 渲染一次（流式输出时）
+            this.overlayElement = document.getElementById('markdown-overlay');
+            this.configureMarked();
+        }
+
+        configureMarked() {
+            if (typeof marked !== 'undefined') {
+                marked.setOptions({
+                    breaks: true,        // 支持 GFM 换行
+                    gfm: true,          // GitHub Flavored Markdown
+                    headerIds: false,   // 不生成 header ID
+                    mangle: false       // 不混淆邮箱
+                });
+            }
+        }
+
+        // 检测文本是否包含 Markdown 标记
+        isMarkdown(text) {
+            if (!text || typeof text !== 'string') return false;
+
+            // 启发式检测常见 Markdown 模式
+            const patterns = [
+                /^#{1,6}\s+/m,          // 标题 # ## ###
+                /\*\*[^*]+\*\*/,        // 粗体 **text**
+                /\*[^*]+\*/,            // 斜体 *text*
+                /`[^`]+`/,              // 内联代码 `code`
+                /^```/m,                // 代码块 ```
+                /^\s*[-*+]\s+/m,        // 无序列表
+                /^\s*\d+\.\s+/m,        // 有序列表
+                /\[.+\]\(.+\)/,         // 链接 [text](url)
+                /^>\s+/m                // 引用块 >
+            ];
+
+            return patterns.some(pattern => pattern.test(text));
+        }
+
+        // 渲染 Markdown 文本
+        render(text, isStream = false) {
+            if (!this.enabled || typeof marked === 'undefined' || !this.isMarkdown(text)) {
+                return null; // 返回 null 表示不渲染为 Markdown
+            }
+
+            try {
+                const html = marked.parse(text);
+                return `<div class="markdown-content">${html}</div>`;
+            } catch (error) {
+                console.error('Markdown render error:', error);
+                return null;
+            }
+        }
+
+        // 显示 Markdown 内容（覆盖层模式）
+        show(html) {
+            if (!this.overlayElement || !html) return;
+
+            this.overlayElement.innerHTML = html;
+            this.overlayElement.classList.add('active');
+
+            // 滚动到底部
+            setTimeout(() => {
+                this.overlayElement.scrollTop = this.overlayElement.scrollHeight;
+            }, 50);
+        }
+
+        // 隐藏 Markdown 覆盖层
+        hide() {
+            if (!this.overlayElement) return;
+
+            this.overlayElement.classList.remove('active');
+            this.overlayElement.innerHTML = '';
+        }
+
+        // 处理流式输出
+        handleStream(chunk) {
+            if (!this.enabled) return false;
+
+            this.streamBuffer += chunk;
+
+            // 防抖渲染
+            if (this.renderTimeout) {
+                clearTimeout(this.renderTimeout);
+            }
+
+            this.renderTimeout = setTimeout(() => {
+                const html = this.render(this.streamBuffer, true);
+                if (html) {
+                    this.show(html);
+                }
+            }, this.RENDER_INTERVAL);
+
+            return this.isMarkdown(this.streamBuffer);
+        }
+
+        // 完成流式输出
+        finishStream() {
+            if (this.renderTimeout) {
+                clearTimeout(this.renderTimeout);
+                this.renderTimeout = null;
+            }
+
+            if (this.streamBuffer) {
+                const html = this.render(this.streamBuffer, false);
+                if (html) {
+                    this.show(html);
+                }
+            }
+
+            this.streamBuffer = '';
+        }
+
+        // 重置状态
+        reset() {
+            this.streamBuffer = '';
+            if (this.renderTimeout) {
+                clearTimeout(this.renderTimeout);
+                this.renderTimeout = null;
+            }
+            this.hide();
+        }
+
+        // 设置启用状态
+        setEnabled(enabled) {
+            this.enabled = enabled;
+            if (!enabled) {
+                this.reset();
+            }
+        }
+    }
+
+    // ========== 混合终端核心 ==========
+    class HybridTerminal {
+        constructor(container) {
+            this.container = container;
+            this.lines = [];
+            this.currentInput = null;
+            this.history = [];
+            this.historyIndex = -1;
+            this.tempInput = '';
+
+            this.ansiParser = new AnsiParser();
+            this.markdownRenderer = new MarkdownRenderer(true);
+
+            this.spinnerLine = null;
+            this.streamBuffer = '';
+            this.isStreaming = false;
+
+            this.init();
+        }
+
+        init() {
+            this.container.innerHTML = '';
+            this.container.className = 'hybrid-terminal';
+
+            // 创建输出区
+            this.outputArea = document.createElement('div');
+            this.outputArea.className = 'terminal-output-area';
+            this.container.appendChild(this.outputArea);
+
+            // 创建输入行
+            this.createInputLine();
+
+            // 点击容器时聚焦输入
+            this.container.addEventListener('click', (e) => {
+                if (e.target === this.container || e.target === this.outputArea) {
+                    this.focusInput();
+                }
+            });
+        }
+
+        createInputLine() {
+            const line = document.createElement('div');
+            line.className = 'terminal-input-field';
+
+            const prompt = document.createElement('span');
+            prompt.className = 'prompt';
+            prompt.textContent = '% ';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.autocomplete = 'off';
+            input.spellcheck = false;
+
+            line.appendChild(prompt);
+            line.appendChild(input);
+
+            this.currentInput = { line, input };
+            this.container.appendChild(line);
+
+            this.setupInputHandlers();
+            this.focusInput();
+        }
+
+        setupInputHandlers() {
+            const input = this.currentInput.input;
+
+            input.addEventListener('keydown', (e) => {
+                switch (e.key) {
+                    case 'Enter':
+                        this.handleSubmit();
+                        break;
+                    case 'ArrowUp':
+                        this.historyPrev();
+                        e.preventDefault();
+                        break;
+                    case 'ArrowDown':
+                        this.historyNext();
+                        e.preventDefault();
+                        break;
+                    case 'l':
+                        if (e.ctrlKey) {
+                            this.clear();
+                            e.preventDefault();
+                        }
+                        break;
+                    case 'c':
+                        if (e.ctrlKey) {
+                            this.handleInterrupt();
+                            e.preventDefault();
+                        }
+                        break;
+                }
+            });
+        }
+
+        handleSubmit() {
+            const command = this.currentInput.input.value.trim();
+            if (!command) return;
+
+            // 添加到历史
+            if (command && (this.history.length === 0 || this.history[this.history.length - 1] !== command)) {
+                this.history.push(command);
+                if (this.history.length > 1000) {
+                    this.history.shift();
+                }
+            }
+            this.historyIndex = this.history.length;
+            this.tempInput = '';
+
+            // 显示命令
+            this.writeCommand(command);
+
+            // 清空输入
+            this.currentInput.input.value = '';
+
+            // 发送命令
+            if (this.onCommand) {
+                this.onCommand(command);
+            }
+        }
+
+        handleInterrupt() {
+            this.writeOutput('\x1b[36m^C\x1b[0m');
+            this.currentInput.input.value = '';
+            if (this.onInterrupt) {
+                this.onInterrupt();
+            }
+        }
+
+        historyPrev() {
+            if (this.history.length === 0) return;
+
+            if (this.historyIndex === this.history.length) {
+                this.tempInput = this.currentInput.input.value;
+            }
+
+            if (this.historyIndex > 0) {
+                this.historyIndex--;
+                this.currentInput.input.value = this.history[this.historyIndex];
+            }
+        }
+
+        historyNext() {
+            if (this.historyIndex === this.history.length) return;
+
+            this.historyIndex++;
+            if (this.historyIndex >= this.history.length) {
+                this.historyIndex = this.history.length;
+                this.currentInput.input.value = this.tempInput;
+            } else {
+                this.currentInput.input.value = this.history[this.historyIndex];
+            }
+        }
+
+        focusInput() {
+            this.currentInput.input.focus();
+        }
+
+        // ========== 输出方法 ==========
+
+        writeCommand(command) {
+            const line = document.createElement('div');
+            line.className = 'terminal-line line-command';
+            line.innerHTML = `<span class="prompt">% </span><span class="command">${this.escapeHtml(command)}</span>`;
+            this.appendToOutput(line);
+        }
+
+        writeOutput(content) {
+            // 自动检测 Markdown
+            if (this.markdownRenderer.isMarkdown(content)) {
+                this.writeMarkdown(content);
+            } else {
+                this.writePlainText(content);
+            }
+        }
+
+        writePlainText(content) {
+            const line = document.createElement('div');
+            line.className = 'terminal-line line-output';
+
+            // 解析 ANSI 颜色
+            const html = this.ansiParser.parse(content);
+
+            const pre = document.createElement('pre');
+            pre.className = 'terminal-text';
+            pre.innerHTML = html;
+
+            line.appendChild(pre);
+            this.appendToOutput(line);
+        }
+
+        writeMarkdown(content) {
+            const line = document.createElement('div');
+            line.className = 'terminal-line line-markdown';
+
+            try {
+                const html = marked.parse(content);
+                line.innerHTML = html;
+            } catch (error) {
+                console.error('Markdown parse error:', error);
+                this.writePlainText(content);
+                return;
+            }
+
+            this.appendToOutput(line);
+        }
+
+        writeSpinner(modelName = '') {
+            this.removeSpinner();
+
+            const line = document.createElement('div');
+            line.className = 'terminal-line line-spinner';
+
+            const icon = document.createElement('span');
+            icon.className = 'spinner-icon';
+            icon.textContent = '⠋';
+
+            const text = document.createElement('span');
+            text.className = 'spinner-text';
+            text.textContent = modelName || '思考中...';
+
+            line.appendChild(icon);
+            line.appendChild(text);
+
+            this.spinnerLine = line;
+            this.appendToOutput(line);
+
+            this.startSpinnerAnimation();
+        }
+
+        removeSpinner() {
+            if (this.spinnerLine) {
+                this.spinnerLine.remove();
+                this.spinnerLine = null;
+            }
+            this.stopSpinnerAnimation();
+        }
+
+        startSpinnerAnimation() {
+            const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+            let frame = 0;
+
+            this.spinnerInterval = setInterval(() => {
+                if (this.spinnerLine) {
+                    const icon = this.spinnerLine.querySelector('.spinner-icon');
+                    if (icon) {
+                        icon.textContent = frames[frame];
+                        frame = (frame + 1) % frames.length;
+                    }
+                }
+            }, 80);
+        }
+
+        stopSpinnerAnimation() {
+            if (this.spinnerInterval) {
+                clearInterval(this.spinnerInterval);
+                this.spinnerInterval = null;
+            }
+        }
+
+        // ========== 流式输出 ==========
+
+        startStream() {
+            this.isStreaming = true;
+            this.streamBuffer = '';
+            this.removeSpinner();
+        }
+
+        writeStream(chunk) {
+            this.streamBuffer += chunk;
+        }
+
+        finishStream() {
+            if (this.streamBuffer) {
+                this.writeOutput(this.streamBuffer);
+            }
+            this.streamBuffer = '';
+            this.isStreaming = false;
+        }
+
+        // ========== 辅助方法 ==========
+
+        appendToOutput(element) {
+            this.outputArea.appendChild(element);
+            this.lines.push(element);
+            this.scrollToBottom();
+        }
+
+        scrollToBottom() {
+            requestAnimationFrame(() => {
+                this.container.scrollTop = this.container.scrollHeight;
+            });
+        }
+
+        clear() {
+            this.outputArea.innerHTML = '';
+            this.lines = [];
+            this.removeSpinner();
+            this.streamBuffer = '';
+            this.isStreaming = false;
+            this.focusInput();
+        }
+
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
 
     // ========== i18n 国际化支持 ==========
     const I18N_TRANSLATIONS = {
@@ -272,51 +782,8 @@ const TERMINAL_JS: &str = r#"
 
     // ========== 终端核心 ==========
 
-    // 创建终端
-    const term = new Terminal({
-        cursorBlink: true,
-        fontSize: 14,
-        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        theme: {
-            background: '#1e1e1e',
-            foreground: '#d4d4d4',
-            cursor: '#00ff00',
-            selection: '#264f78',
-        },
-        scrollback: 10000,
-        convertEol: true,  // 自动转换行尾符
-        wordSeparator: ' ()[]{}\'"`',  // 单词分隔符
-        allowProposedApi: true,  // 允许使用提议的 API
-    });
-
-    // 适配插件
-    const fitAddon = new FitAddon.FitAddon();
-    term.loadAddon(fitAddon);
-
-    // 挂载到 DOM
-    term.open(document.getElementById('terminal'));
-
-    // 延迟执行 fit，确保 DOM 完全渲染
-    // 使用 requestAnimationFrame 确保在下一帧执行
-    const doFit = () => {
-        try {
-            fitAddon.fit();
-        } catch (e) {
-            console.warn('Fit failed:', e);
-        }
-    };
-
-    // 初始 fit（延迟执行）
-    setTimeout(() => {
-        doFit();
-        // 再次 fit 确保准确
-        setTimeout(doFit, 100);
-    }, 0);
-
-    // 窗口大小调整
-    window.addEventListener('resize', () => {
-        doFit();
-    });
+    // 创建混合终端
+    const terminal = new HybridTerminal(document.getElementById('terminal-container'));
 
     // WebSocket 连接
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -440,10 +907,10 @@ const TERMINAL_JS: &str = r#"
     ws.onopen = () => {
         statusEl.textContent = t('web.status.connected');
         statusEl.style.color = '#4CAF50';
-        showWelcomeMessage();
 
-        // 连接建立后重新 fit，确保尺寸正确
-        setTimeout(doFit, 50);
+        // 显示欢迎消息
+        terminal.writePlainText('\x1b[32m' + t('web.terminal.welcome') + '\x1b[0m\n' +
+                                '\x1b[36m' + t('web.terminal.usage_hint') + '\x1b[0m');
 
         // 应用初始语言设置
         updatePageText();
@@ -452,7 +919,7 @@ const TERMINAL_JS: &str = r#"
     ws.onclose = () => {
         statusEl.textContent = t('web.status.disconnected');
         statusEl.style.color = '#f44336';
-        term.writeln('\n\x1b[31m' + t('web.terminal.disconnected_message') + '\x1b[0m');
+        terminal.writePlainText('\x1b[31m' + t('web.terminal.disconnected_message') + '\x1b[0m');
     };
 
     ws.onerror = (err) => {
@@ -466,246 +933,58 @@ const TERMINAL_JS: &str = r#"
 
         switch (msg.type) {
             case 'thinking':
-                // 开始思考，显示飞轮
-                const modelName = msg.model || '';
-                startSpinner(modelName);
+                // 显示思考状态
+                const modelName = msg.model || '思考中...';
+                terminal.writeSpinner(modelName);
                 break;
+
             case 'output':
-                // 停止飞轮
-                stopSpinner();
-
-                // 格式化输出：将 \n 转换为 \r\n，确保正确换行
-                let formattedContent = msg.content
-                    .replace(/\r\n/g, '\n')  // 统一换行符
-                    .replace(/\n/g, '\r\n'); // 转换为终端格式
-
-                term.write('\r\n' + formattedContent);
-                term.write('\r\n\x1b[33m% \x1b[0m');
-                inputBuffer = '';
-                cursorPosition = 0;
+                // 完整输出（自动检测 Markdown）
+                terminal.removeSpinner();
+                terminal.writeOutput(msg.content);
                 break;
+
             case 'stream':
-                // 第一次流式输出时停止飞轮
-                stopSpinner();
-
-                // 流式输出也需要格式化
-                let streamContent = msg.content
-                    .replace(/\r\n/g, '\n')
-                    .replace(/\n/g, '\r\n');
-                term.write(streamContent);
+                // 流式输出
+                if (!terminal.isStreaming) {
+                    terminal.startStream();
+                }
+                terminal.writeStream(msg.content);
                 break;
+
+            case 'stream_end':
+                // 流式输出结束
+                terminal.finishStream();
+                break;
+
             case 'error':
-                // 停止飞轮
-                stopSpinner();
-
-                let errorContent = msg.content
-                    .replace(/\r\n/g, '\n')
-                    .replace(/\n/g, '\r\n');
-                term.write('\r\n\x1b[31m' + errorContent + '\x1b[0m');
-                term.write('\r\n\x1b[33m% \x1b[0m');
-                inputBuffer = '';
-                cursorPosition = 0;
+                // 错误输出（红色）
+                terminal.removeSpinner();
+                terminal.writePlainText('\x1b[31m' + msg.content + '\x1b[0m');
                 break;
-            case 'clear':
-                // 停止飞轮
-                stopSpinner();
 
-                term.clear();
-                term.write('\x1b[33m% \x1b[0m');
-                inputBuffer = '';
-                cursorPosition = 0;
+            case 'clear':
+                // 清屏
+                terminal.clear();
                 break;
         }
     };
 
-    // 处理用户输入
-    term.onData((data) => {
-        // 处理方向键和特殊键（ESC 序列）
-        if (data.startsWith('\x1b[')) {
-            // 上箭头：历史命令（上一条）
-            if (data === '\x1b[A') {
-                if (commandHistory.length === 0) return;
+    // 设置命令处理回调
+    terminal.onCommand = (command) => {
+        ws.send(JSON.stringify({
+            type: 'input',
+            content: command
+        }));
+    };
 
-                // 第一次按上箭头，保存当前输入
-                if (historyIndex === -1) {
-                    tempInput = inputBuffer;
-                    historyIndex = commandHistory.length - 1;
-                } else if (historyIndex > 0) {
-                    historyIndex--;
-                }
-
-                loadHistory(historyIndex);
-                return;
-            }
-
-            // 下箭头：历史命令（下一条）
-            if (data === '\x1b[B') {
-                if (historyIndex === -1) return;
-
-                historyIndex++;
-                if (historyIndex >= commandHistory.length) {
-                    // 恢复临时输入
-                    historyIndex = -1;
-                    inputBuffer = tempInput;
-                    cursorPosition = inputBuffer.length;
-                } else {
-                    loadHistory(historyIndex);
-                }
-                redrawLine();
-                return;
-            }
-
-            // 右箭头：光标右移
-            if (data === '\x1b[C') {
-                if (cursorPosition < inputBuffer.length) {
-                    // 获取当前字符的显示宽度
-                    const char = inputBuffer[cursorPosition];
-                    const charWidth = getDisplayWidth(char);
-                    cursorPosition++;
-                    // 根据字符宽度移动光标
-                    if (charWidth === 2) {
-                        term.write('\x1b[2C');  // 中文字符移动2格
-                    } else {
-                        term.write('\x1b[C');   // 英文字符移动1格
-                    }
-                }
-                return;
-            }
-
-            // 左箭头：光标左移
-            if (data === '\x1b[D') {
-                if (cursorPosition > 0) {
-                    cursorPosition--;
-                    // 获取前一个字符的显示宽度
-                    const char = inputBuffer[cursorPosition];
-                    const charWidth = getDisplayWidth(char);
-                    // 根据字符宽度移动光标
-                    if (charWidth === 2) {
-                        term.write('\x1b[2D');  // 中文字符移动2格
-                    } else {
-                        term.write('\x1b[D');   // 英文字符移动1格
-                    }
-                }
-                return;
-            }
-
-            // Home 键：移到行首
-            if (data === '\x1b[H' || data === '\x1b[1~') {
-                if (cursorPosition > 0) {
-                    // 计算从行首到当前光标的显示宽度
-                    const widthToCursor = getWidthUpToPosition(inputBuffer, cursorPosition);
-                    if (widthToCursor > 0) {
-                        term.write('\x1b[' + widthToCursor + 'D');
-                    }
-                    cursorPosition = 0;
-                }
-                return;
-            }
-
-            // End 键：移到行尾
-            if (data === '\x1b[F' || data === '\x1b[4~') {
-                if (cursorPosition < inputBuffer.length) {
-                    // 计算从当前光标到行尾的显示宽度
-                    const widthAfterCursor = getDisplayWidth(inputBuffer.slice(cursorPosition));
-                    if (widthAfterCursor > 0) {
-                        term.write('\x1b[' + widthAfterCursor + 'C');
-                    }
-                    cursorPosition = inputBuffer.length;
-                }
-                return;
-            }
-
-            // Delete 键：删除光标处字符
-            if (data === '\x1b[3~') {
-                if (cursorPosition < inputBuffer.length) {
-                    inputBuffer = inputBuffer.slice(0, cursorPosition) +
-                                  inputBuffer.slice(cursorPosition + 1);
-                    redrawLine();
-                }
-                return;
-            }
-
-            // 其他 ESC 序列忽略
-            return;
-        }
-
-        const code = data.charCodeAt(0);
-
-        // Enter 键
-        if (code === 13) {
-            if (inputBuffer.trim()) {
-                // 添加到历史
-                addToHistory(inputBuffer);
-
-                // 显示换行
-                term.write('\r\n');
-
-                // 发送命令
-                ws.send(JSON.stringify({
-                    type: 'input',
-                    content: inputBuffer
-                }));
-
-                // 清空缓冲区
-                inputBuffer = '';
-                cursorPosition = 0;
-            }
-            return;
-        }
-
-        // Backspace 键
-        if (code === 127) {
-            if (cursorPosition > 0) {
-                // 删除光标前的字符
-                inputBuffer = inputBuffer.slice(0, cursorPosition - 1) +
-                              inputBuffer.slice(cursorPosition);
-                cursorPosition--;
-                redrawLine();
-            }
-            return;
-        }
-
-        // Ctrl+C
-        if (code === 3) {
-            ws.send(JSON.stringify({
-                type: 'interrupt',
-                content: ''
-            }));
-            inputBuffer = '';
-            cursorPosition = 0;
-            historyIndex = -1;
-            term.write('^C\r\n\x1b[33m% \x1b[0m');
-            return;
-        }
-
-        // Ctrl+L (清屏)
-        if (code === 12) {
-            term.clear();
-            term.write('\x1b[33m% \x1b[0m');
-            inputBuffer = '';
-            cursorPosition = 0;
-            return;
-        }
-
-        // Ctrl+U (清除整行)
-        if (code === 21) {
-            inputBuffer = '';
-            cursorPosition = 0;
-            redrawLine();
-            return;
-        }
-
-        // 支持所有字符（包括中文）
-        // 排除控制字符但允许 UTF-8
-        if (code >= 32 || data.length > 1) {
-            // 在光标位置插入字符
-            inputBuffer = inputBuffer.slice(0, cursorPosition) +
-                          data +
-                          inputBuffer.slice(cursorPosition);
-            cursorPosition += data.length;
-            redrawLine();
-        }
-    });
+    // 设置中断处理回调
+    terminal.onInterrupt = () => {
+        ws.send(JSON.stringify({
+            type: 'interrupt',
+            content: ''
+        }));
+    };
 
     // ========== 初始化 i18n ==========
     // 页面加载完成后立即应用语言设置
@@ -718,6 +997,7 @@ const TERMINAL_JS: &str = r#"
 
 })();
 "#;
+
 
 /// 内嵌的样式 CSS
 const STYLE_CSS: &str = r#"
@@ -815,19 +1095,171 @@ body {
     flex-direction: column;
 }
 
-#terminal {
+/* ============================================
+   混合终端样式 (v1.26.0)
+   统一的终端 + Markdown 融合体验
+   ============================================ */
+
+.hybrid-terminal {
     width: 100%;
     height: 100%;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 14px;
+    color: rgb(240, 240, 240);
 }
 
-/* xterm.js 内部容器 */
-.xterm {
-    height: 100%;
+.terminal-output-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    line-height: 1.5;
 }
 
-.xterm-viewport {
-    overflow-y: auto !important;
+.terminal-line {
+    margin: 4px 0;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* 输出行 */
+.line-output {
+    color: rgb(240, 240, 240);
+}
+
+.line-output .terminal-text {
+    margin: 0;
+    font-family: inherit;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* 命令回显行 */
+.line-command {
+    color: rgb(180, 180, 180);
+}
+
+.line-command .prompt {
+    color: rgb(100, 255, 100);
+    font-weight: bold;
+}
+
+.line-command .command {
+    color: rgb(100, 180, 255);
+    font-weight: 600;
+}
+
+/* Markdown 行 - 融入终端的 Markdown 格式化 */
+.line-markdown {
+    padding: 8px 0 8px 12px;
+    border-left: 3px solid rgb(100, 180, 255);
+    background: rgba(100, 180, 255, 0.03);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    white-space: normal;
+}
+
+/* Spinner 行 */
+.line-spinner {
+    color: rgb(100, 255, 100);
+    font-style: italic;
+}
+
+.spinner {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { content: '⠋'; }
+    12.5% { content: '⠙'; }
+    25% { content: '⠹'; }
+    37.5% { content: '⠸'; }
+    50% { content: '⠼'; }
+    62.5% { content: '⠴'; }
+    75% { content: '⠦'; }
+    87.5% { content: '⠧'; }
+    100% { content: '⠇'; }
+}
+
+/* 输入字段 */
+.terminal-input-field {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.terminal-input-field .prompt {
+    color: rgb(100, 255, 100);
+    font-weight: bold;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.terminal-input-field input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: rgb(255, 255, 255);
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* ANSI 颜色类 */
+.ansi-reset {
+    color: rgb(240, 240, 240);
+    font-weight: normal;
+}
+
+.ansi-bold {
+    font-weight: bold;
+}
+
+.ansi-red {
+    color: rgb(255, 100, 100);
+}
+
+.ansi-green {
+    color: rgb(100, 255, 100);
+}
+
+.ansi-yellow {
+    color: rgb(255, 255, 100);
+}
+
+.ansi-blue {
+    color: rgb(100, 180, 255);
+}
+
+.ansi-cyan {
+    color: rgb(100, 255, 255);
+}
+
+.ansi-white {
+    color: rgb(255, 255, 255);
+}
+
+/* 滚动条样式 */
+.terminal-output-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.terminal-output-area::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.terminal-output-area::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.terminal-output-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 #status {
@@ -873,5 +1305,146 @@ body {
         flex: 1;
         max-width: 120px;
     }
+}
+
+/* ============================================
+   Markdown 内容样式 (v1.26.0)
+   Claude Code 风格 - 融入终端体验
+   ============================================ */
+
+.line-markdown h1,
+.line-markdown h2,
+.line-markdown h3,
+.line-markdown h4,
+.line-markdown h5,
+.line-markdown h6 {
+    color: rgb(100, 180, 255);
+    font-weight: 600;
+    margin: 0.8em 0 0.4em 0;
+}
+
+.line-markdown h1 { font-size: 1.8em; }
+.line-markdown h2 { font-size: 1.5em; }
+.line-markdown h3 { font-size: 1.3em; }
+.line-markdown h4 { font-size: 1.1em; }
+.line-markdown h5 { font-size: 1.0em; }
+.line-markdown h6 { font-size: 0.9em; }
+
+/* 粗体 - 明亮白色 */
+.line-markdown strong {
+    color: rgb(255, 255, 255);
+    font-weight: 700;
+}
+
+/* 斜体 - 浅灰色 */
+.line-markdown em {
+    color: rgb(180, 180, 180);
+    font-style: italic;
+}
+
+/* 内联代码 - 浅蓝色 */
+.line-markdown code {
+    color: rgb(130, 200, 255);
+    background-color: rgba(40, 40, 40, 0.6);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 0.9em;
+}
+
+/* 代码块 - 柔和绿色 + 深灰背景 */
+.line-markdown pre {
+    background-color: rgb(40, 40, 40);
+    padding: 1em;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 0.5em 0;
+}
+
+.line-markdown pre code {
+    color: rgb(150, 220, 150);
+    background: none;
+    padding: 0;
+    font-size: 0.95em;
+}
+
+/* 段落 */
+.line-markdown p {
+    margin: 0.5em 0;
+    color: rgb(240, 240, 240);
+}
+
+/* 列表 - 柔和蓝色 bullet */
+.line-markdown ul,
+.line-markdown ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+}
+
+.line-markdown ul li::marker {
+    color: rgb(100, 180, 255);
+}
+
+.line-markdown ol li::marker {
+    color: rgb(100, 180, 255);
+    font-weight: 600;
+}
+
+.line-markdown li {
+    margin: 0.3em 0;
+}
+
+/* 引用块 - 中等灰色 */
+.line-markdown blockquote {
+    border-left: 3px solid rgb(120, 120, 120);
+    padding-left: 1em;
+    color: rgb(180, 180, 180);
+    margin: 0.5em 0;
+    font-style: italic;
+}
+
+/* 链接 - 与标题一致的蓝色 */
+.line-markdown a {
+    color: rgb(100, 180, 255);
+    text-decoration: underline;
+}
+
+.line-markdown a:hover {
+    color: rgb(130, 200, 255);
+}
+
+/* 分隔线 */
+.line-markdown hr {
+    border: none;
+    border-top: 1px solid rgb(80, 80, 80);
+    margin: 1em 0;
+}
+
+/* 表格 */
+.line-markdown table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5em 0;
+}
+
+.line-markdown th,
+.line-markdown td {
+    border: 1px solid rgb(80, 80, 80);
+    padding: 0.4em 0.8em;
+    text-align: left;
+}
+
+.line-markdown th {
+    background-color: rgba(100, 180, 255, 0.2);
+    color: rgb(100, 180, 255);
+    font-weight: 600;
+}
+
+/* 图片 */
+.line-markdown img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin: 0.5em 0;
 }
 "#;
