@@ -394,6 +394,7 @@ const TERMINAL_JS: &str = r#"
             this.spinnerLine = null;
             this.streamBuffer = '';
             this.isStreaming = false;
+            this.isComposing = false;  // 输入法组合状态
 
             this.init();
         }
@@ -444,18 +445,36 @@ const TERMINAL_JS: &str = r#"
         setupInputHandlers() {
             const input = this.currentInput.input;
 
+            // 监听输入法组合状态（中文、日文等输入法）
+            input.addEventListener('compositionstart', () => {
+                this.isComposing = true;
+            });
+
+            input.addEventListener('compositionend', () => {
+                this.isComposing = false;
+            });
+
             input.addEventListener('keydown', (e) => {
                 switch (e.key) {
                     case 'Enter':
-                        this.handleSubmit();
+                        // 如果正在使用输入法组合，不提交命令
+                        if (!this.isComposing) {
+                            this.handleSubmit();
+                            e.preventDefault();
+                        }
                         break;
                     case 'ArrowUp':
-                        this.historyPrev();
-                        e.preventDefault();
+                        // 输入法组合时，方向键由输入法处理
+                        if (!this.isComposing) {
+                            this.historyPrev();
+                            e.preventDefault();
+                        }
                         break;
                     case 'ArrowDown':
-                        this.historyNext();
-                        e.preventDefault();
+                        if (!this.isComposing) {
+                            this.historyNext();
+                            e.preventDefault();
+                        }
                         break;
                     case 'l':
                         if (e.ctrlKey) {
@@ -492,6 +511,9 @@ const TERMINAL_JS: &str = r#"
 
             // 清空输入
             this.currentInput.input.value = '';
+
+            // 用户提交新命令时，强制滚动到底部
+            this.forceScrollToBottom();
 
             // 发送命令
             if (this.onCommand) {
@@ -653,6 +675,8 @@ const TERMINAL_JS: &str = r#"
         finishStream() {
             if (this.streamBuffer) {
                 this.writeOutput(this.streamBuffer);
+                // 流式输出完成时，确保滚动到底部
+                this.forceScrollToBottom();
             }
             this.streamBuffer = '';
             this.isStreaming = false;
@@ -667,8 +691,23 @@ const TERMINAL_JS: &str = r#"
         }
 
         scrollToBottom() {
+            // 智能自动滚动：只在用户位于底部附近时滚动
             requestAnimationFrame(() => {
-                this.container.scrollTop = this.container.scrollHeight;
+                const { scrollTop, scrollHeight, clientHeight } = this.outputArea;
+                const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+                // 如果用户在底部 100px 范围内，自动滚动到底部
+                // 如果用户向上滚动查看历史，不打断
+                if (distanceFromBottom < 100) {
+                    this.outputArea.scrollTop = this.outputArea.scrollHeight;
+                }
+            });
+        }
+
+        // 强制滚动到底部（用于用户提交命令等场景）
+        forceScrollToBottom() {
+            requestAnimationFrame(() => {
+                this.outputArea.scrollTop = this.outputArea.scrollHeight;
             });
         }
 
@@ -1001,6 +1040,11 @@ const TERMINAL_JS: &str = r#"
 
 /// 内嵌的样式 CSS
 const STYLE_CSS: &str = r#"
+/* ============================================
+   🌃 Cyberpunk Theme - RealConsole v1.26.0
+   未来赛博朋克风格
+   ============================================ */
+
 * {
     margin: 0;
     padding: 0;
@@ -1015,21 +1059,74 @@ html, body {
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* 赛博朋克深色背景 + 动态网格 */
+    background:
+        repeating-linear-gradient(
+            0deg,
+            rgba(0, 240, 255, 0.03) 0px,
+            transparent 1px,
+            transparent 40px,
+            rgba(0, 240, 255, 0.03) 41px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            rgba(0, 240, 255, 0.03) 0px,
+            transparent 1px,
+            transparent 40px,
+            rgba(0, 240, 255, 0.03) 41px
+        ),
+        linear-gradient(135deg, #0a0e27 0%, #0d1117 50%, #1a0b2e 100%);
+    background-attachment: fixed;
     display: flex;
     flex-direction: column;
     padding: 10px;
     margin: 0;
+    position: relative;
+}
+
+/* 扫描线效果 */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15) 0px,
+        transparent 1px,
+        transparent 2px,
+        rgba(0, 0, 0, 0.15) 3px
+    );
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.3;
+    animation: scanlines 8s linear infinite;
+}
+
+@keyframes scanlines {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(10px); }
 }
 
 #header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: white;
     margin-bottom: 10px;
     padding: 8px 20px;
     flex-shrink: 0;
+    background: rgba(10, 14, 39, 0.6);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+    /* 与终端容器等宽对齐 */
+    max-width: 1400px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 #header-content {
@@ -1040,13 +1137,40 @@ body {
 #header h1 {
     font-size: 1.5em;
     margin: 0 0 5px 0;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    /* 霓虹发光效果 - 青色到粉色渐变 */
+    background: linear-gradient(90deg, #00f0ff 0%, #ff006e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow:
+        0 0 10px rgba(0, 240, 255, 0.5),
+        0 0 20px rgba(0, 240, 255, 0.3),
+        0 0 30px rgba(0, 240, 255, 0.2);
+    animation: neon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes neon-pulse {
+    0%, 100% {
+        filter: brightness(1);
+        text-shadow:
+            0 0 10px rgba(0, 240, 255, 0.5),
+            0 0 20px rgba(0, 240, 255, 0.3),
+            0 0 30px rgba(0, 240, 255, 0.2);
+    }
+    50% {
+        filter: brightness(1.2);
+        text-shadow:
+            0 0 15px rgba(0, 240, 255, 0.7),
+            0 0 25px rgba(0, 240, 255, 0.5),
+            0 0 35px rgba(0, 240, 255, 0.3);
+    }
 }
 
 #header p {
     font-size: 0.9em;
-    opacity: 0.9;
     margin: 0;
+    color: #00f0ff;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
 }
 
 #lang-switcher {
@@ -1057,34 +1181,50 @@ body {
 
 #lang-switcher button {
     padding: 6px 12px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+    /* 霓虹边框 */
+    border: 2px solid rgba(0, 240, 255, 0.4);
+    background: rgba(10, 14, 39, 0.5);
+    color: #00f0ff;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.85em;
     font-weight: 500;
     transition: all 0.3s ease;
     backdrop-filter: blur(10px);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
 }
 
 #lang-switcher button:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(0, 240, 255, 0.1);
+    border-color: rgba(0, 240, 255, 0.8);
     transform: translateY(-2px);
+    box-shadow:
+        0 0 15px rgba(0, 240, 255, 0.4),
+        0 0 25px rgba(0, 240, 255, 0.2);
 }
 
 #lang-switcher button.active {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(0, 240, 255, 0.15);
+    border-color: #00f0ff;
     font-weight: 600;
+    box-shadow:
+        0 0 20px rgba(0, 240, 255, 0.5),
+        0 0 30px rgba(0, 240, 255, 0.3),
+        inset 0 0 10px rgba(0, 240, 255, 0.2);
 }
 
 #terminal-container {
     flex: 1;
-    background: #1e1e1e;
+    /* 深色背景 */
+    background: rgba(5, 8, 20, 0.85);
     border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    /* 霓虹青色边框 + 发光 */
+    border: 2px solid rgba(0, 240, 255, 0.5);
+    box-shadow:
+        0 0 20px rgba(0, 240, 255, 0.3),
+        0 0 40px rgba(0, 240, 255, 0.2),
+        inset 0 0 60px rgba(0, 240, 255, 0.05);
     overflow: hidden;
     padding: 8px;
     max-width: 1400px;
@@ -1093,6 +1233,31 @@ body {
     min-height: 0;
     display: flex;
     flex-direction: column;
+    position: relative;
+    backdrop-filter: blur(10px);
+}
+
+/* 终端容器脉动效果 */
+#terminal-container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg,
+        rgba(0, 240, 255, 0.3) 0%,
+        rgba(255, 0, 110, 0.3) 50%,
+        rgba(0, 240, 255, 0.3) 100%);
+    border-radius: 8px;
+    z-index: -1;
+    opacity: 0;
+    animation: border-glow 3s ease-in-out infinite;
+}
+
+@keyframes border-glow {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.4; }
 }
 
 /* ============================================
@@ -1135,35 +1300,59 @@ body {
     word-wrap: break-word;
 }
 
-/* 命令回显行 */
+/* 命令回显行 - 赛博朋克风格 */
 .line-command {
-    color: rgb(180, 180, 180);
+    color: rgba(0, 240, 255, 0.6);
 }
 
 .line-command .prompt {
-    color: rgb(100, 255, 100);
+    color: #39ff14;
     font-weight: bold;
+    text-shadow:
+        0 0 10px rgba(57, 255, 20, 0.6),
+        0 0 20px rgba(57, 255, 20, 0.3);
 }
 
 .line-command .command {
-    color: rgb(100, 180, 255);
+    color: #00f0ff;
     font-weight: 600;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
 
-/* Markdown 行 - 融入终端的 Markdown 格式化 */
+/* Markdown 行 - 融入终端的赛博朋克 Markdown 格式化 */
 .line-markdown {
     padding: 8px 0 8px 12px;
-    border-left: 3px solid rgb(100, 180, 255);
-    background: rgba(100, 180, 255, 0.03);
+    /* 霓虹粉色左边框 + 发光 */
+    border-left: 3px solid #ff006e;
+    background: rgba(255, 0, 110, 0.05);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     line-height: 1.6;
     white-space: normal;
+    box-shadow: -3px 0 10px rgba(255, 0, 110, 0.2);
 }
 
-/* Spinner 行 */
+/* Spinner 行 - 赛博朋克闪烁 */
 .line-spinner {
-    color: rgb(100, 255, 100);
+    color: #39ff14;
     font-style: italic;
+    text-shadow:
+        0 0 10px rgba(57, 255, 20, 0.8),
+        0 0 20px rgba(57, 255, 20, 0.4);
+    animation: spinner-glow 1s ease-in-out infinite;
+}
+
+@keyframes spinner-glow {
+    0%, 100% {
+        text-shadow:
+            0 0 10px rgba(57, 255, 20, 0.8),
+            0 0 20px rgba(57, 255, 20, 0.4);
+    }
+    50% {
+        text-shadow:
+            0 0 15px rgba(57, 255, 20, 1),
+            0 0 25px rgba(57, 255, 20, 0.6),
+            0 0 35px rgba(57, 255, 20, 0.3);
+    }
 }
 
 .spinner {
@@ -1183,20 +1372,32 @@ body {
     100% { content: '⠇'; }
 }
 
-/* 输入字段 */
+/* 输入字段 - 赛博朋克风格 */
 .terminal-input-field {
     display: flex;
     align-items: center;
     padding: 8px 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.2);
+    /* 霓虹青色分割线 + 发光 */
+    border-top: 2px solid rgba(0, 240, 255, 0.3);
+    background: rgba(0, 240, 255, 0.03);
+    box-shadow: 0 -2px 10px rgba(0, 240, 255, 0.1);
 }
 
 .terminal-input-field .prompt {
-    color: rgb(100, 255, 100);
+    /* 霓虹绿色 Prompt */
+    color: #39ff14;
     font-weight: bold;
     margin-right: 8px;
     flex-shrink: 0;
+    text-shadow:
+        0 0 10px rgba(57, 255, 20, 0.8),
+        0 0 20px rgba(57, 255, 20, 0.4);
+    animation: prompt-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes prompt-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 .terminal-input-field input {
@@ -1204,77 +1405,111 @@ body {
     background: transparent;
     border: none;
     outline: none;
-    color: rgb(255, 255, 255);
+    /* 霓虹青色文字 */
+    color: #00f0ff;
     font-family: inherit;
     font-size: inherit;
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
 }
 
-/* ANSI 颜色类 */
+.terminal-input-field input::placeholder {
+    color: rgba(0, 240, 255, 0.3);
+}
+
+/* ANSI 颜色类 - 赛博朋克霓虹色系 */
 .ansi-reset {
-    color: rgb(240, 240, 240);
+    color: #00f0ff;
     font-weight: normal;
 }
 
 .ansi-bold {
     font-weight: bold;
+    text-shadow: 0 0 5px currentColor;
 }
 
 .ansi-red {
-    color: rgb(255, 100, 100);
+    color: #ff0055;
+    text-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
 }
 
 .ansi-green {
-    color: rgb(100, 255, 100);
+    color: #39ff14;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
 }
 
 .ansi-yellow {
-    color: rgb(255, 255, 100);
+    color: #ffea00;
+    text-shadow: 0 0 10px rgba(255, 234, 0, 0.5);
 }
 
 .ansi-blue {
-    color: rgb(100, 180, 255);
+    color: #00f0ff;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
 }
 
 .ansi-cyan {
-    color: rgb(100, 255, 255);
+    color: #00ffff;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
 .ansi-white {
-    color: rgb(255, 255, 255);
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
 }
 
-/* 滚动条样式 */
+/* 滚动条样式 - 赛博朋克霓虹 */
 .terminal-output-area::-webkit-scrollbar {
     width: 8px;
 }
 
 .terminal-output-area::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
+    box-shadow: inset 0 0 5px rgba(0, 240, 255, 0.1);
 }
 
 .terminal-output-area::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 240, 255, 0.3);
     border-radius: 4px;
+    box-shadow:
+        0 0 5px rgba(0, 240, 255, 0.5),
+        inset 0 0 3px rgba(0, 240, 255, 0.3);
 }
 
 .terminal-output-area::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 240, 255, 0.5);
+    box-shadow:
+        0 0 10px rgba(0, 240, 255, 0.8),
+        inset 0 0 5px rgba(0, 240, 255, 0.5);
 }
 
 #status {
     text-align: center;
     margin-top: 8px;
-    color: white;
     font-size: 0.85em;
     flex-shrink: 0;
 }
 
 #connection-status {
     padding: 5px 15px;
-    background: rgba(255,255,255,0.2);
+    /* 霓虹青色状态指示器 */
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid rgba(0, 240, 255, 0.4);
     border-radius: 20px;
     display: inline-block;
+    color: #00f0ff;
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    animation: status-pulse 2s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+    }
 }
 
 @media (max-width: 768px) {
@@ -1318,9 +1553,15 @@ body {
 .line-markdown h4,
 .line-markdown h5,
 .line-markdown h6 {
-    color: rgb(100, 180, 255);
+    /* 霓虹青色到粉色渐变标题 */
+    background: linear-gradient(90deg, #00f0ff 0%, #ff006e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     font-weight: 600;
     margin: 0.8em 0 0.4em 0;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.4));
 }
 
 .line-markdown h1 { font-size: 1.8em; }
@@ -1330,51 +1571,64 @@ body {
 .line-markdown h5 { font-size: 1.0em; }
 .line-markdown h6 { font-size: 0.9em; }
 
-/* 粗体 - 明亮白色 */
+/* 粗体 - 霓虹白色发光 */
 .line-markdown strong {
-    color: rgb(255, 255, 255);
+    color: #ffffff;
     font-weight: 700;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
-/* 斜体 - 浅灰色 */
+/* 斜体 - 霓虹青色 */
 .line-markdown em {
-    color: rgb(180, 180, 180);
+    color: #00f0ff;
     font-style: italic;
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
 }
 
-/* 内联代码 - 浅蓝色 */
+/* 内联代码 - 霓虹青色 + 发光边框 */
 .line-markdown code {
-    color: rgb(130, 200, 255);
-    background-color: rgba(40, 40, 40, 0.6);
+    color: #00f0ff;
+    background-color: rgba(0, 240, 255, 0.08);
     padding: 0.2em 0.4em;
     border-radius: 3px;
+    border: 1px solid rgba(0, 240, 255, 0.3);
     font-family: "Consolas", "Monaco", "Courier New", monospace;
     font-size: 0.9em;
+    box-shadow:
+        0 0 5px rgba(0, 240, 255, 0.2),
+        inset 0 0 5px rgba(0, 240, 255, 0.1);
 }
 
-/* 代码块 - 柔和绿色 + 深灰背景 */
+/* 代码块 - 霓虹绿色 + 发光边框 */
 .line-markdown pre {
-    background-color: rgb(40, 40, 40);
+    background-color: rgba(0, 0, 0, 0.5);
     padding: 1em;
     border-radius: 5px;
+    border: 1px solid rgba(57, 255, 20, 0.3);
     overflow-x: auto;
     margin: 0.5em 0;
+    box-shadow:
+        0 0 10px rgba(57, 255, 20, 0.2),
+        inset 0 0 20px rgba(57, 255, 20, 0.05);
 }
 
 .line-markdown pre code {
-    color: rgb(150, 220, 150);
+    color: #39ff14;
     background: none;
+    border: none;
     padding: 0;
     font-size: 0.95em;
+    box-shadow: none;
+    text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
 }
 
-/* 段落 */
+/* 段落 - 霓虹青色 */
 .line-markdown p {
     margin: 0.5em 0;
-    color: rgb(240, 240, 240);
+    color: rgba(0, 240, 255, 0.9);
 }
 
-/* 列表 - 柔和蓝色 bullet */
+/* 列表 - 霓虹粉色 bullet */
 .line-markdown ul,
 .line-markdown ol {
     margin: 0.5em 0;
@@ -1382,45 +1636,64 @@ body {
 }
 
 .line-markdown ul li::marker {
-    color: rgb(100, 180, 255);
+    color: #ff006e;
+    text-shadow: 0 0 5px rgba(255, 0, 110, 0.5);
 }
 
 .line-markdown ol li::marker {
-    color: rgb(100, 180, 255);
+    color: #ff006e;
     font-weight: 600;
+    text-shadow: 0 0 5px rgba(255, 0, 110, 0.5);
 }
 
 .line-markdown li {
     margin: 0.3em 0;
+    color: rgba(0, 240, 255, 0.9);
 }
 
-/* 引用块 - 中等灰色 */
+/* 引用块 - 霓虹紫色边框 */
 .line-markdown blockquote {
-    border-left: 3px solid rgb(120, 120, 120);
+    border-left: 3px solid rgba(162, 57, 234, 0.6);
     padding-left: 1em;
-    color: rgb(180, 180, 180);
+    color: rgba(0, 240, 255, 0.7);
     margin: 0.5em 0;
     font-style: italic;
+    background: rgba(162, 57, 234, 0.05);
+    box-shadow: -3px 0 10px rgba(162, 57, 234, 0.2);
 }
 
-/* 链接 - 与标题一致的蓝色 */
+/* 链接 - 霓虹粉色 + 悬停发光 */
 .line-markdown a {
-    color: rgb(100, 180, 255);
-    text-decoration: underline;
+    color: #ff006e;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255, 0, 110, 0.5);
+    text-shadow: 0 0 5px rgba(255, 0, 110, 0.3);
+    transition: all 0.3s ease;
 }
 
 .line-markdown a:hover {
-    color: rgb(130, 200, 255);
+    color: #ff3399;
+    border-bottom-color: #ff006e;
+    text-shadow:
+        0 0 10px rgba(255, 0, 110, 0.6),
+        0 0 20px rgba(255, 0, 110, 0.3);
 }
 
-/* 分隔线 */
+/* 分隔线 - 霓虹发光 */
 .line-markdown hr {
     border: none;
-    border-top: 1px solid rgb(80, 80, 80);
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(0, 240, 255, 0.5) 20%,
+        rgba(255, 0, 110, 0.5) 50%,
+        rgba(0, 240, 255, 0.5) 80%,
+        transparent 100%);
     margin: 1em 0;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
 }
 
-/* 表格 */
+/* 表格 - 赛博朋克网格 */
 .line-markdown table {
     border-collapse: collapse;
     width: 100%;
@@ -1429,22 +1702,31 @@ body {
 
 .line-markdown th,
 .line-markdown td {
-    border: 1px solid rgb(80, 80, 80);
+    border: 1px solid rgba(0, 240, 255, 0.3);
     padding: 0.4em 0.8em;
     text-align: left;
+    color: rgba(0, 240, 255, 0.9);
 }
 
 .line-markdown th {
-    background-color: rgba(100, 180, 255, 0.2);
-    color: rgb(100, 180, 255);
+    background-color: rgba(0, 240, 255, 0.1);
+    color: #00f0ff;
     font-weight: 600;
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.4);
+    box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1);
 }
 
-/* 图片 */
+.line-markdown td {
+    background-color: rgba(0, 240, 255, 0.03);
+}
+
+/* 图片 - 霓虹边框 */
 .line-markdown img {
     max-width: 100%;
     height: auto;
     border-radius: 4px;
+    border: 2px solid rgba(0, 240, 255, 0.4);
     margin: 0.5em 0;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
 }
 "#;

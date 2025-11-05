@@ -49,6 +49,8 @@ pub struct Session {
     pub agent: Arc<RwLock<Agent>>,
     /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// LLM 初始化错误信息（用于诊断）
+    pub llm_init_error: Option<String>,
 }
 
 impl Session {
@@ -62,19 +64,23 @@ impl Session {
 
         let mut agent = Agent::new(web_config.clone(), registry);
 
-        // 配置 LLM（参考 main.rs）
-        Self::configure_llm(&mut agent, &web_config).await;
+        // 配置 LLM（参考 main.rs），记录初始化错误
+        let llm_init_error = Self::configure_llm(&mut agent, &web_config).await;
 
         Self {
             id,
             agent: Arc::new(RwLock::new(agent)),
             created_at: chrono::Utc::now(),
+            llm_init_error,
         }
     }
 
     /// 配置 Agent 的 LLM
-    async fn configure_llm(agent: &mut Agent, config: &Config) {
+    ///
+    /// 返回初始化错误信息（如果有）
+    async fn configure_llm(agent: &mut Agent, config: &Config) -> Option<String> {
         let mut manager = agent.llm_manager.write().await;
+        let mut error_messages = Vec::new();
 
         // 初始化 primary LLM
         if let Some(ref primary_cfg) = config.llm.primary {
@@ -99,7 +105,9 @@ impl Session {
                     }
                 }
                 Err(e) => {
-                    eprintln!("{}: {}", i18n::t("web.session.primary_llm_init_failed"), e);
+                    let error_msg = format!("{}: {}", i18n::t("web.session.primary_llm_init_failed"), e);
+                    eprintln!("{}", error_msg);
+                    error_messages.push(error_msg);
                 }
             }
         }
@@ -111,9 +119,18 @@ impl Session {
                     manager.set_fallback(client);
                 }
                 Err(e) => {
-                    eprintln!("{}: {}", i18n::t("web.session.fallback_llm_init_failed"), e);
+                    let error_msg = format!("{}: {}", i18n::t("web.session.fallback_llm_init_failed"), e);
+                    eprintln!("{}", error_msg);
+                    error_messages.push(error_msg);
                 }
             }
+        }
+
+        // 返回合并的错误信息
+        if error_messages.is_empty() {
+            None
+        } else {
+            Some(error_messages.join("\n"))
         }
     }
 

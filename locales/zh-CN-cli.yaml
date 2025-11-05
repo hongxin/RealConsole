@@ -301,3 +301,15 @@ cli.context.warning: "[上下文: {turns}轮 | {minutes}分钟前]"
 # Panic 消息
 cli.panic.reset_message: "程序发生错误，终端状态已重置"
 cli.panic.recovery_hint: "如果终端显示异常，请尝试运行: reset"
+
+# Web 终端相关
+web.llm.not_configured: "未配置 LLM，无法进行对话"
+web.llm.init_error_details: "LLM 初始化失败详情："
+web.llm.config_missing_hint: "请检查 realconsole.yaml 配置文件，确保配置了 llm.primary 或 llm.fallback"
+web.session.primary_llm_init_failed: "Primary LLM 初始化失败"
+web.session.fallback_llm_init_failed: "Fallback LLM 初始化失败"
+web.session.ollama_client_creation_failed: "Ollama 客户端创建失败"
+web.session.deepseek_client_creation_failed: "Deepseek 客户端创建失败"
+web.session.deepseek_requires_api_key: "Deepseek 需要配置 API Key"
+web.session.unknown_llm_provider: "未知的 LLM 提供商"
+web.command.execution_failed: "命令执行失败"

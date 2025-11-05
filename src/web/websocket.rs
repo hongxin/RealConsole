@@ -158,9 +158,10 @@ async fn handle_input(
         CommandType::NaturalLanguage(text) => {
             // 自然语言：先尝试 Intent 匹配，否则回退到 LLM 对话
             if let Some(intent_match) = try_match_intent(&text, &agent) {
-                execute_intent(&intent_match, &text, &agent, sender).await
+                execute_intent(&intent_match, &text, &agent, session, sender).await
             } else {
-                execute_llm_chat(&text, &agent, sender).await
+                // 传递 session 以便访问 llm_init_error
+                execute_llm_chat(&text, &agent, session, sender).await
             }
         }
     };
@@ -258,15 +259,37 @@ async fn execute_shell_command(
 async fn execute_llm_chat(
     input: &str,
     agent: &crate::agent::Agent,
+    session: &Arc<Session>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
 ) -> anyhow::Result<()> {
     // 获取 LLM 管理器
     let llm_manager = agent.llm_manager.read().await;
 
-    // 检查是否配置了 LLM
-    if llm_manager.primary().is_none() {
+    // 检查是否配置了 LLM（优先 primary，其次 fallback）
+    if llm_manager.primary().or(llm_manager.fallback()).is_none() {
+        // 释放锁，以便访问 session
+        drop(llm_manager);
+
+        // 提供详细的诊断信息
+        let error_content = if let Some(ref init_error) = session.llm_init_error {
+            // 有初始化错误信息，显示详细错误
+            format!(
+                "{}\n\n{}\n{}",
+                i18n::t("web.llm.not_configured"),
+                i18n::t("web.llm.init_error_details"),
+                init_error
+            )
+        } else {
+            // 没有初始化错误，说明配置文件中未配置
+            format!(
+                "{}\n\n{}",
+                i18n::t("web.llm.not_configured"),
+                i18n::t("web.llm.config_missing_hint")
+            )
+        };
+
         let msg = ServerMessage::Error {
-            content: i18n::t("web.llm.not_configured"),
+            content: error_content,
         };
         sender
             .send(Message::Text(serde_json::to_string(&msg)?))
@@ -274,9 +297,10 @@ async fn execute_llm_chat(
         return Ok(());
     }
 
-    // 获取模型名称并简化（与命令行版本一致）
+    // 获取模型名称并简化（与命令行版本一致，优先 primary，其次 fallback）
     let model_name = llm_manager
         .primary()
+        .or(llm_manager.fallback())
         .map(|client| simplify_model_name(client.model()))
         .unwrap_or_else(|| "unknown".to_string());
 
@@ -333,6 +357,7 @@ async fn execute_intent(
     intent_match: &IntentMatch,
     original_text: &str,
     agent: &crate::agent::Agent,
+    session: &Arc<Session>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
 ) -> anyhow::Result<()> {
     // 1. 发送意图识别提示
@@ -375,7 +400,7 @@ async fn execute_intent(
         Err(e) => {
             // 如果生成执行计划失败，回退到 LLM 对话
             eprintln!("⚠️ Intent 执行计划生成失败: {}", e);
-            execute_llm_chat(original_text, agent, sender).await?;
+            execute_llm_chat(original_text, agent, session, sender).await?;
         }
     }
 

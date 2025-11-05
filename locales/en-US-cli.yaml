@@ -301,3 +301,15 @@ cli.context.warning: "[Context: {turns} turns | {minutes}m ago]"
 # Panic Messages
 cli.panic.reset_message: "Program error occurred, terminal state has been reset"
 cli.panic.recovery_hint: "If terminal display is abnormal, try running: reset"
+
+# Web Terminal
+web.llm.not_configured: "LLM not configured, unable to chat"
+web.llm.init_error_details: "LLM initialization error details:"
+web.llm.config_missing_hint: "Please check realconsole.yaml config file and ensure llm.primary or llm.fallback is configured"
+web.session.primary_llm_init_failed: "Primary LLM initialization failed"
+web.session.fallback_llm_init_failed: "Fallback LLM initialization failed"
+web.session.ollama_client_creation_failed: "Failed to create Ollama client"
+web.session.deepseek_client_creation_failed: "Failed to create Deepseek client"
+web.session.deepseek_requires_api_key: "Deepseek requires API Key configuration"
+web.session.unknown_llm_provider: "Unknown LLM provider"
+web.command.execution_failed: "Command execution failed"
