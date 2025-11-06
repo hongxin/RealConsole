@@ -51,6 +51,8 @@ pub struct Session {
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// LLM 初始化错误信息（用于诊断）
     pub llm_init_error: Option<String>,
+    /// 对话 ID（用于多轮对话上下文）
+    pub conversation_id: String,
 }
 
 impl Session {
@@ -67,11 +69,15 @@ impl Session {
         // 配置 LLM（参考 main.rs），记录初始化错误
         let llm_init_error = Self::configure_llm(&mut agent, &web_config).await;
 
+        // ✨ 为每个 Web 会话创建独立的对话 ID
+        let conversation_id = format!("web-{}", Uuid::new_v4());
+
         Self {
             id,
             agent: Arc::new(RwLock::new(agent)),
             created_at: chrono::Utc::now(),
             llm_init_error,
+            conversation_id,
         }
     }
 

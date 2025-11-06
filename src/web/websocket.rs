@@ -313,10 +313,44 @@ async fn execute_llm_chat(
         .send(Message::Text(serde_json::to_string(&thinking_msg)?))
         .await?;
 
-    // ✨ 使用 LlmService 处理（带工具调用）
-    let request = LlmRequest::with_tools(input.to_string());
+    // ✨ v1.27.0: 支持多轮对话上下文（参考 CLI 版本逻辑）
+    let ctx_arc = agent.state_manager().conversation_context();
+    let mut ctx_manager = ctx_arc.write().await;
+
+    // 检查是否应该使用上下文
+    let should_use_context = ctx_manager.should_use_context(input);
+
+    // 构建消息列表（带上下文或不带）
+    let messages = if should_use_context {
+        ctx_manager.build_messages(input)
+    } else {
+        vec![crate::llm::Message::user(input)]
+    };
+
+    // 释放上下文管理器锁
+    drop(ctx_manager);
+
+    // 创建 LLM 请求（根据是否使用上下文选择方法）
+    let request = if should_use_context {
+        LlmRequest::with_tools_and_context(messages.clone())
+    } else {
+        LlmRequest::with_tools(input.to_string())
+    };
+
+    // 处理 LLM 请求
     match agent.llm_service().process(request).await {
         Ok(llm_response) => {
+            // 记录到上下文管理器（如果启用了上下文）
+            if should_use_context {
+                let ctx_arc = agent.state_manager().conversation_context();
+                let mut ctx_manager = ctx_arc.write().await;
+                let turn = crate::conversation::Turn::new(
+                    input.to_string(),
+                    llm_response.text.clone(),
+                );
+                ctx_manager.add_turn(turn);
+            }
+
             // 🧹 清理 DEBUG 信息（Web 用户不需要看到）
             let clean_content = remove_debug_info(&llm_response.text);
 

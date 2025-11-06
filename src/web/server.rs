@@ -1146,7 +1146,7 @@ body::before {
         0 0 10px rgba(0, 240, 255, 0.5),
         0 0 20px rgba(0, 240, 255, 0.3),
         0 0 30px rgba(0, 240, 255, 0.2);
-    animation: neon-pulse 2s ease-in-out infinite;
+    animation: neon-pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes neon-pulse {
@@ -1157,12 +1157,26 @@ body::before {
             0 0 20px rgba(0, 240, 255, 0.3),
             0 0 30px rgba(0, 240, 255, 0.2);
     }
+    25% {
+        filter: brightness(1.05);
+        text-shadow:
+            0 0 12px rgba(0, 240, 255, 0.6),
+            0 0 22px rgba(0, 240, 255, 0.4),
+            0 0 32px rgba(0, 240, 255, 0.25);
+    }
     50% {
-        filter: brightness(1.2);
+        filter: brightness(1.15);
         text-shadow:
             0 0 15px rgba(0, 240, 255, 0.7),
             0 0 25px rgba(0, 240, 255, 0.5),
             0 0 35px rgba(0, 240, 255, 0.3);
+    }
+    75% {
+        filter: brightness(1.05);
+        text-shadow:
+            0 0 12px rgba(0, 240, 255, 0.6),
+            0 0 22px rgba(0, 240, 255, 0.4),
+            0 0 32px rgba(0, 240, 255, 0.25);
     }
 }
 
@@ -1237,8 +1251,8 @@ body::before {
     backdrop-filter: blur(10px);
 }
 
-/* 终端容器脉动效果 */
-#terminal-container::before {
+/* 终端容器脉动效果 - 已移除（极简主义） */
+/* #terminal-container::before {
     content: '';
     position: absolute;
     top: -2px;
@@ -1252,13 +1266,23 @@ body::before {
     border-radius: 8px;
     z-index: -1;
     opacity: 0;
-    animation: border-glow 3s ease-in-out infinite;
+    animation: border-glow 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes border-glow {
-    0%, 100% { opacity: 0; }
-    50% { opacity: 0.4; }
-}
+    0%, 100% {
+        opacity: 0;
+    }
+    25% {
+        opacity: 0.15;
+    }
+    50% {
+        opacity: 0.35;
+    }
+    75% {
+        opacity: 0.15;
+    }
+} */
 
 /* ============================================
    混合终端样式 (v1.26.0)
