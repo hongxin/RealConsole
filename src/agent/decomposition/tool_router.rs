@@ -138,7 +138,7 @@ impl ToolRouter {
         None
     }
 
-    /// 构建映射表（v1.33.0 - 渐进增强：3 个映射）
+    /// 构建映射表（v1.34.0 - 渐进增强：4 个映射）
     ///
     /// # 设计原则
     ///
@@ -146,11 +146,12 @@ impl ToolRouter {
     /// 2. **简单性**: 参数提取逻辑简单明确
     /// 3. **可扩展**: 后续版本可逐步添加更多映射
     ///
-    /// # 当前映射（v1.33.0）
+    /// # 当前映射（v1.34.0）
     ///
     /// - list_directory → list_dir (文件操作，极高频)
     /// - count_python_lines → count_code_lines (代码统计，高频)
     /// - find_files_by_name → find_file (文件查找，高频)
+    /// - grep_pattern → search_text (文本搜索，高频)
     fn build_mappings() -> Vec<ToolMapping> {
         vec![
             // ===== v1.32.0 映射 =====
@@ -172,6 +173,13 @@ impl ToolRouter {
                 intent_name: "find_files_by_name".to_string(),
                 tool_name: "find_file".to_string(),
                 param_extractor: extract_find_files_by_name_params,
+            },
+            // ===== v1.34.0 新增映射 =====
+            // 映射 4: grep_pattern → search_text
+            ToolMapping {
+                intent_name: "grep_pattern".to_string(),
+                tool_name: "search_text".to_string(),
+                param_extractor: extract_grep_pattern_params,
             },
         ]
     }
@@ -259,6 +267,72 @@ fn extract_find_files_by_name_params(intent_match: &IntentMatch) -> Result<JsonV
     }))
 }
 
+/// 提取 grep_pattern Intent 的参数 (v1.34.0)
+///
+/// # 策略
+/// 1. 从实体中提取搜索模式（Custom("pattern", value)）
+/// 2. directory 默认为 "."（当前目录）
+/// 3. file_pattern 默认为 "*"（所有文件），如果有 FileType 实体则使用 "*.ext"
+/// 4. case_insensitive 默认为 false
+/// 5. max_results 默认为 100
+///
+/// # 示例
+/// - 输入: "搜索 TODO 注释"
+/// - 提取: Custom("pattern", "TODO")
+/// - 输出: {"pattern": "TODO", "directory": ".", "file_pattern": "*", ...}
+fn extract_grep_pattern_params(intent_match: &IntentMatch) -> Result<JsonValue, String> {
+    // 尝试从实体中提取搜索模式
+    let pattern = intent_match
+        .extracted_entities
+        .values()
+        .find_map(|entity| {
+            if let EntityType::Custom(name, value) = entity {
+                if name == "pattern" {
+                    Some(value.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .ok_or("未能从 Intent 中提取搜索模式")?;
+
+    // 提取路径（可选）
+    let directory = intent_match
+        .extracted_entities
+        .values()
+        .find_map(|entity| {
+            if let EntityType::Path(path) = entity {
+                Some(path.clone())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| ".".to_string());
+
+    // 提取文件类型（可选）
+    let file_pattern = intent_match
+        .extracted_entities
+        .values()
+        .find_map(|entity| {
+            if let EntityType::FileType(ext) = entity {
+                Some(format!("*.{}", ext))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "*".to_string());
+
+    Ok(json!({
+        "pattern": pattern,
+        "directory": directory,
+        "file_pattern": file_pattern,
+        "case_insensitive": false,
+        "max_results": 100
+    }))
+}
+
 // ===== 单元测试 =====
 
 #[cfg(test)]
@@ -287,7 +361,7 @@ mod tests {
     #[test]
     fn test_router_creation() {
         let router = ToolRouter::new();
-        assert_eq!(router.mappings.len(), 3); // v1.33.0: 3 个映射
+        assert_eq!(router.mappings.len(), 4); // v1.34.0: 4 个映射
     }
 
     #[test]

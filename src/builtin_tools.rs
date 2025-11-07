@@ -21,6 +21,7 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry) {
     register_code_stats(registry);
     register_shell_execute(registry); // ✨ Phase 8: Shell 执行工具
     register_find_file(registry); // ✨ v1.33.0: 文件查找工具
+    register_search_text(registry); // ✨ v1.34.0: 文本搜索工具
     lunar_tool::register_lunar_tool(registry); // ✨ 农历工具
 }
 
@@ -638,6 +639,213 @@ fn wildcard_to_regex(pattern: &str) -> Result<regex::Regex, String> {
 
     regex::Regex::new(&regex_pattern)
         .map_err(|e| format!("无效的文件名模式: {}", e))
+}
+
+// ==================== v1.34.0: 文本搜索工具 ====================
+
+/// 搜索匹配结果
+#[derive(Debug)]
+struct SearchMatch {
+    file_path: String,
+    line_number: usize,
+    line_content: String,
+}
+
+/// 注册文本搜索工具 (v1.34.0)
+///
+/// 在指定目录下递归搜索文件内容，支持正则表达式。
+/// 跨平台实现，无需依赖 grep/findstr 命令。
+///
+/// # 参数
+/// - pattern: 搜索模式（支持正则表达式）
+/// - directory: 搜索目录（默认 "."）
+/// - file_pattern: 文件名模式（如 "*.rs"，默认 "*"）
+/// - case_insensitive: 是否忽略大小写（默认 false）
+/// - max_results: 最多返回结果数（默认 100）
+///
+/// # 示例
+/// ```json
+/// {
+///   "pattern": "TODO",
+///   "directory": ".",
+///   "file_pattern": "*.rs",
+///   "case_insensitive": false,
+///   "max_results": 100
+/// }
+/// ```
+fn register_search_text(registry: &mut ToolRegistry) {
+    let tool = Tool::new(
+        "search_text",
+        "在指定目录下递归搜索文件内容，支持正则表达式。返回匹配行的文件路径、行号和内容。",
+        vec![
+            Parameter {
+                name: "pattern".to_string(),
+                param_type: ParameterType::String,
+                description: "搜索模式（支持正则表达式）".to_string(),
+                required: true,
+                default: None,
+            },
+            Parameter {
+                name: "directory".to_string(),
+                param_type: ParameterType::String,
+                description: "搜索目录（默认为当前目录）".to_string(),
+                required: false,
+                default: Some(json!(".")),
+            },
+            Parameter {
+                name: "file_pattern".to_string(),
+                param_type: ParameterType::String,
+                description: "文件名模式（如 '*.rs', '*.py'，默认 '*'）".to_string(),
+                required: false,
+                default: Some(json!("*")),
+            },
+            Parameter {
+                name: "case_insensitive".to_string(),
+                param_type: ParameterType::Boolean,
+                description: "是否忽略大小写（默认 false）".to_string(),
+                required: false,
+                default: Some(json!(false)),
+            },
+            Parameter {
+                name: "max_results".to_string(),
+                param_type: ParameterType::Number,
+                description: "最多返回结果数（默认 100）".to_string(),
+                required: false,
+                default: Some(json!(100)),
+            },
+        ],
+        |args: JsonValue| {
+            let pattern_str = args["pattern"]
+                .as_str()
+                .ok_or("pattern 必须是字符串")?;
+            let directory = args["directory"].as_str().unwrap_or(".");
+            let file_pattern = args["file_pattern"].as_str().unwrap_or("*");
+            let case_insensitive = args["case_insensitive"].as_bool().unwrap_or(false);
+            let max_results = args["max_results"].as_u64().unwrap_or(100) as usize;
+
+            // 1. 检查目录是否存在
+            let dir_path = Path::new(directory);
+            if !dir_path.exists() {
+                return Err(format!("目录不存在: {}", directory));
+            }
+
+            // 2. 编译正则表达式
+            let pattern = if case_insensitive {
+                regex::RegexBuilder::new(pattern_str)
+                    .case_insensitive(true)
+                    .build()
+            } else {
+                regex::Regex::new(pattern_str)
+            }
+            .map_err(|e| format!("无效的正则表达式: {}", e))?;
+
+            // 3. 编译文件名模式
+            let file_regex = wildcard_to_regex(file_pattern)?;
+
+            // 4. 递归搜索文件内容
+            let mut results = Vec::new();
+            search_in_files(
+                dir_path,
+                &pattern,
+                &file_regex,
+                &mut results,
+                max_results,
+            )?;
+
+            // 5. 格式化输出
+            if results.is_empty() {
+                return Ok(format!("未找到匹配 '{}' 的内容", pattern_str));
+            }
+
+            let mut output = format!("找到 {} 个匹配:\n", results.len());
+            output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+            for match_result in results.iter() {
+                output.push_str(&format!(
+                    "{}:{}:{}\n",
+                    match_result.file_path, match_result.line_number, match_result.line_content
+                ));
+            }
+
+            Ok(output)
+        },
+    );
+
+    registry.register(tool);
+}
+
+/// 递归搜索文件内容
+///
+/// # 参数
+/// - dir: 搜索目录
+/// - pattern: 搜索正则表达式
+/// - file_pattern: 文件名过滤正则表达式
+/// - results: 存储搜索结果
+/// - max_results: 最大结果数限制
+fn search_in_files(
+    dir: &Path,
+    pattern: &regex::Regex,
+    file_pattern: &regex::Regex,
+    results: &mut Vec<SearchMatch>,
+    max_results: usize,
+) -> Result<(), String> {
+    // 结果数量限制
+    if results.len() >= max_results {
+        return Ok(());
+    }
+
+    // 读取目录
+    let entries = std::fs::read_dir(dir)
+        .map_err(|e| format!("无法读取目录 {}: {}", dir.display(), e))?;
+
+    for entry in entries {
+        if results.len() >= max_results {
+            break;
+        }
+
+        let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
+        let path = entry.path();
+
+        // 跳过隐藏目录和大型依赖目录
+        if path.is_dir() {
+            let dir_name = path.file_name().unwrap().to_string_lossy();
+            if dir_name.starts_with('.')
+                || dir_name == "target"
+                || dir_name == "node_modules"
+                || dir_name == "build"
+            {
+                continue;
+            }
+
+            // 递归搜索子目录
+            search_in_files(&path, pattern, file_pattern, results, max_results)?;
+        } else if path.is_file() {
+            // 检查文件名是否匹配
+            let file_name = path.file_name().unwrap().to_string_lossy();
+            if !file_pattern.is_match(&file_name) {
+                continue;
+            }
+
+            // 读取文件并搜索匹配
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                for (line_num, line) in content.lines().enumerate() {
+                    if results.len() >= max_results {
+                        break;
+                    }
+
+                    if pattern.is_match(line) {
+                        results.push(SearchMatch {
+                            file_path: path.display().to_string(),
+                            line_number: line_num + 1,
+                            line_content: line.trim().to_string(),
+                        });
+                    }
+                }
+            }
+            // 静默跳过无法读取的文件（二进制文件等）
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
