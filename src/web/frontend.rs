@@ -848,13 +848,17 @@ const TERMINAL_JS: &str = r#"
                 // 根据回合类型选择渲染方式
                 if (round.roundType === RoundType.LLM) {
                     // LLM 对话：使用 Markdown 渲染
-                    outputContent.innerHTML = this.markdownRenderer.render(round.aiResponse);
+                    // v1.29.1: 追加而不是覆盖，保留意图卡片
+                    const responseDiv = document.createElement('div');
+                    responseDiv.className = 'llm-response';
+                    responseDiv.innerHTML = this.markdownRenderer.render(round.aiResponse);
+                    outputContent.appendChild(responseDiv);
                 } else {
                     // Shell/System 命令：使用 <pre> 保留格式
+                    // v1.29.1: 追加而不是覆盖，保留意图卡片
                     const pre = document.createElement('pre');
                     pre.className = 'terminal-text';
                     pre.textContent = round.aiResponse;
-                    outputContent.innerHTML = '';
                     outputContent.appendChild(pre);
                 }
             }
@@ -979,8 +983,30 @@ const TERMINAL_JS: &str = r#"
                 </div>
             `;
 
-            this.container.appendChild(card);
-            this.lines.push(card);
+            // ===== v1.29.1 修复：根据视图模式选择容器 =====
+            if (this.viewMode === 'round' && this.currentRound && this.currentRound.element) {
+                // 回合模式：追加到当前回合的 output-content
+                const outputContent = this.currentRound.element.querySelector('.output-content');
+                if (outputContent) {
+                    outputContent.appendChild(card);
+                } else {
+                    // 降级：找不到 output-content，追加到根容器
+                    this.container.appendChild(card);
+                    this.lines.push(card);
+                }
+            } else {
+                // 传统模式（stream）：移除飞轮，在其位置插入意图卡片
+                if (this.spinnerLine && this.spinnerLine.parentNode) {
+                    // 在飞轮位置插入意图卡片
+                    this.spinnerLine.parentNode.insertBefore(card, this.spinnerLine);
+                    this.removeSpinner();  // 移除飞轮
+                } else {
+                    // 降级：没有飞轮，追加到根容器
+                    this.container.appendChild(card);
+                }
+                this.lines.push(card);
+            }
+
             this.scrollToBottom();
         }
 

@@ -770,47 +770,82 @@ fn extract_tools_from_response(llm_response: &crate::services::LlmResponse) -> V
 ///
 /// 处理 `/decompose` 命令的 WebSocket 版本
 ///
-/// ## 消息流程
+/// ## 消息流程（v1.29.1 修复：加入回合系统）
 /// ```
-/// IntentUnderstanding → StepProgress (pending) × N → (未来执行时会有更多消息)
+/// RoundStart → Thinking → IntentUnderstanding → StepProgress × N → Output → RoundComplete
 /// ```
+///
+/// ## 与其他命令的一致性
+/// - ✅ 有 `RoundStart` 和 `RoundComplete`（回合模式必需）
+/// - ✅ 有 `Thinking` 消息（显示加载状态）
+/// - ✅ 有自定义可视化消息（IntentUnderstanding/StepProgress）
 async fn execute_decompose_command(
     query: &str,
     agent: &crate::agent::Agent,
-    _session: &Arc<Session>,
+    session: &Arc<Session>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
 ) -> anyhow::Result<()> {
     use crate::agent::decomposition::StepStatus;
 
     eprintln!("📋 [Decompose] Starting with query: {}", query);
 
+    // ===== 创建回合（v1.29.1 新增）=====
+    let full_command = format!("/decompose {}", query);
+    let round = session.create_round(
+        crate::web::session::RoundType::System,
+        full_command.clone(),
+        "intent-decomposer".to_string(),
+    ).await;
+    let round_id = round.id.clone();
+
+    // 发送 RoundStart 消息
+    let round_start_msg = ServerMessage::RoundStart {
+        round: round.clone(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&round_start_msg)?))
+        .await?;
+
+    // 记录开始时间
+    let start_time = std::time::Instant::now();
+
     // 检查拆解器是否已初始化
     let decomposer = match &agent.intent_decomposer {
         Some(d) => d,
         None => {
-            let error_msg = ServerMessage::Error {
-                content: format!("{}\n{}",
-                    "⚠ 意图拆解系统未启用",
-                    "提示: 意图拆解系统需要配置 LLM 客户端"),
-            };
-            sender
-                .send(Message::Text(serde_json::to_string(&error_msg)?))
-                .await?;
+            let error_content = format!("{}\n{}",
+                "⚠ 意图拆解系统未启用",
+                "提示: 意图拆解系统需要配置 LLM 客户端");
+
+            // 标记回合失败
+            if let Some(failed_round) = session.fail_round(&round_id, error_content.clone()).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
             return Ok(());
         }
     };
 
     // 检查是否提供了查询
     if query.trim().is_empty() {
-        let error_msg = ServerMessage::Error {
-            content: format!("{}\n{}\n{}",
-                "❌ 请提供要拆解的自然语言查询",
-                "用法: /decompose <自然语言查询>",
-                "示例: /decompose 加载 data.csv 并显示前 10 行"),
-        };
-        sender
-            .send(Message::Text(serde_json::to_string(&error_msg)?))
-            .await?;
+        let error_content = format!("{}\n{}\n{}",
+            "❌ 请提供要拆解的自然语言查询",
+            "用法: /decompose <自然语言查询>",
+            "示例: /decompose 加载 data.csv 并显示前 10 行");
+
+        // 标记回合失败
+        if let Some(failed_round) = session.fail_round(&round_id, error_content.clone()).await {
+            let round_complete_msg = ServerMessage::RoundComplete {
+                round: failed_round,
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                .await?;
+        }
         return Ok(());
     }
 
@@ -860,27 +895,45 @@ async fn execute_decompose_command(
                     .await?;
             }
 
-            // 3. 发送完成提示（当前版本只显示计划，不执行）
-            let output_msg = ServerMessage::Output {
-                content: format!(
-                    "\n💡 提示：v1.29.0 实现了意图拆解可视化，执行功能将在后续版本完善\n\
-                    📊 计划ID: {}\n\
-                    ⏰ 总预计时间: {:.1}s",
-                    plan.id,
-                    plan.total_estimated_time
-                ),
-            };
-            sender
-                .send(Message::Text(serde_json::to_string(&output_msg)?))
-                .await?;
+            // 3. 构建完成消息
+            let output_content = format!(
+                "\n💡 提示：v1.29.0 实现了意图拆解可视化，执行功能将在后续版本完善\n\
+                📊 计划ID: {}\n\
+                ⏰ 总预计时间: {:.1}s",
+                plan.id,
+                plan.total_estimated_time
+            );
+
+            // 计算执行时间
+            let execution_time = start_time.elapsed().as_secs_f64();
+
+            // 完成回合
+            if let Some(completed_round) = session.complete_round(
+                &round_id,
+                output_content,
+                execution_time,
+                vec!["intent-decomposer".to_string()],
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
         }
         Err(e) => {
-            let error_msg = ServerMessage::Error {
-                content: format!("❌ 意图拆解失败\n详情: {}", e),
-            };
-            sender
-                .send(Message::Text(serde_json::to_string(&error_msg)?))
-                .await?;
+            let error_content = format!("❌ 意图拆解失败\n详情: {}", e);
+
+            // 标记回合失败
+            if let Some(failed_round) = session.fail_round(&round_id, error_content).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
         }
     }
 
