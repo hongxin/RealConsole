@@ -75,6 +75,12 @@
 - 翻译资源：`locales/*.yaml`
 - 使用：`i18n::t("key")` / `i18n::t_with_args("key", &[("param", "value")])`
 
+**根目录管理**（极简原则）：
+- **保留**：README（.md/.cn.md）、CLAUDE.md、CHANGELOG.md、LICENSE、Cargo.toml、配置文件（.env.example, realconsole.yaml）、构建脚本（Makefile, install.sh, uninstall.sh）
+- **归档**：发布说明 → `docs/03-evolution/archives/vX.Y.Z-release-notes.md`，开发报告 → `docs/04-reports/`
+- **清理**：临时辅助文件（COMMIT_MESSAGE*.md, GIT_COMMIT_GUIDE*.md 等）提交后立即删除
+- **时机**：每次 Git 提交前检查根目录，执行清理和归档操作
+
 ## 快速操作
 
 **安装使用**（推荐）：

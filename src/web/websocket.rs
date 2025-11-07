@@ -179,7 +179,24 @@ async fn handle_input(
     Ok(())
 }
 
-/// 执行系统命令（v1.28.0: 统一回合系统）
+/// 执行系统命令（v1.28.1: 统一回合系统）
+///
+/// ## 消息流程
+/// ```
+/// RoundStart(type: system) → 执行命令 → RoundComplete
+/// ```
+///
+/// ## 与 LLM 的差异
+/// - ❌ 没有 `Thinking` 消息
+/// - ❌ 没有 `Stream` 消息（一次性返回）
+/// - ✅ 有 `RoundStart` 和 `RoundComplete`
+///
+/// ## 传统模式显示
+/// - 命令：`handleSubmit()` 显示（用户输入时）
+/// - 输出：`round_complete` 时额外显示
+///
+/// ## 特殊处理
+/// - `clear` 命令不创建回合，直接发送 `Clear` 消息
 async fn execute_system_command(
     cmd_name: &str,
     agent: &crate::agent::Agent,
@@ -260,7 +277,25 @@ async fn execute_system_command(
     Ok(())
 }
 
-/// 执行 Shell 命令（v1.28.0: 统一回合系统）
+/// 执行 Shell 命令（v1.28.1: 统一回合系统）
+///
+/// ## 消息流程
+/// ```
+/// RoundStart(type: shell) → 执行命令 → RoundComplete
+/// ```
+///
+/// ## 与 LLM 的差异
+/// - ❌ 没有 `Thinking` 消息
+/// - ❌ 没有 `Stream` 消息（一次性返回）
+/// - ✅ 有 `RoundStart` 和 `RoundComplete`
+///
+/// ## 传统模式显示
+/// - 命令：`handleSubmit()` 显示（用户输入时）
+/// - 输出：`round_complete` 时额外显示
+///
+/// ## 与 System 的差异
+/// - Shell 命令通过 `sh -c` 执行
+/// - System 命令通过工具注册表执行
 async fn execute_shell_command(
     input: &str,
     _agent: &crate::agent::Agent,
@@ -343,7 +378,27 @@ async fn execute_shell_command(
     Ok(())
 }
 
-/// 执行 LLM 对话（带工具调用）
+/// 执行 LLM 对话（v1.28.1: 统一回合系统 + 工具调用）
+///
+/// ## 消息流程
+/// ```
+/// RoundStart(type: llm) → Thinking → Stream(流式) → RoundComplete
+/// ```
+///
+/// ## 与 Shell/System 的差异
+/// - ✅ 有 `Thinking` 消息（显示飞轮 + 模型名称）
+/// - ✅ 有 `Stream` 消息（流式输出，逐步显示）
+/// - ✅ 有 `RoundStart` 和 `RoundComplete`
+///
+/// ## 传统模式显示
+/// - 命令：`handleSubmit()` 显示（用户输入时）
+/// - 输出：`stream` 消息流式显示（**不需要** `round_complete` 重复显示）
+///   - ⚠️ 关键：Shell/System 在 `round_complete` 时额外显示输出
+///   - ⚠️ 但 LLM 已通过 `stream` 显示，`round_complete` 时跳过
+///
+/// ## 工具调用
+/// - 从 `__DEBUG__` 部分提取工具名称
+/// - 显示在回合元数据中
 async fn execute_llm_chat(
     input: &str,
     agent: &crate::agent::Agent,

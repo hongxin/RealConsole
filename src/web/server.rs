@@ -246,6 +246,15 @@ const TERMINAL_JS: &str = r#"
         }
     }
 
+    // ========== 常量定义 ==========
+
+    // 回合类型常量（与后端 RoundType 枚举对应）
+    const RoundType = {
+        LLM: 'llm',
+        SHELL: 'shell',
+        SYSTEM: 'system'
+    };
+
     // ========== Markdown 渲染器 ==========
     class MarkdownRenderer {
         constructor(enabled = true) {
@@ -769,7 +778,7 @@ const TERMINAL_JS: &str = r#"
             const roundData = {
                 id: round.id,
                 index: round.index,
-                roundType: round.round_type || 'llm', // v1.28.0+: llm/shell/system
+                roundType: round.round_type || RoundType.LLM, // 默认为 LLM 类型
                 userInput: round.user_input,
                 aiResponse: round.ai_response || '',
                 toolsUsed: round.tools_used || [],
@@ -877,23 +886,29 @@ const TERMINAL_JS: &str = r#"
         // 获取回合类型配置
         getRoundTypeConfig(roundType) {
             const configs = {
-                'llm': {
+                [RoundType.LLM]: {
                     badge: 'Round',
                     inputLabel: '📥 Input:',
                     outputLabel: '📤 Output:'
                 },
-                'shell': {
+                [RoundType.SHELL]: {
                     badge: '💻 Shell',
                     inputLabel: '💻 Command:',
                     outputLabel: '📤 Output:'
                 },
-                'system': {
+                [RoundType.SYSTEM]: {
                     badge: '⚙️ System',
                     inputLabel: '⚙️ Command:',
                     outputLabel: '📤 Output:'
                 }
             };
-            return configs[roundType] || configs['llm'];
+
+            const config = configs[roundType];
+            if (!config) {
+                console.warn(`Unknown round type: ${roundType}, falling back to LLM`);
+                return configs[RoundType.LLM];
+            }
+            return config;
         }
 
         updateRoundStatus(roundId, status) {
@@ -934,7 +949,7 @@ const TERMINAL_JS: &str = r#"
             const outputContent = round.element.querySelector('.output-content');
             if (round.aiResponse) {
                 // 根据回合类型选择渲染方式
-                if (round.roundType === 'llm') {
+                if (round.roundType === RoundType.LLM) {
                     // LLM 对话：使用 Markdown 渲染
                     outputContent.innerHTML = this.markdownRenderer.render(round.aiResponse);
                 } else {
@@ -1349,7 +1364,7 @@ const TERMINAL_JS: &str = r#"
                 if (terminal.viewMode === 'stream') {
                     // 传统模式：只有 Shell/System 命令才额外显示输出
                     // LLM 对话已经通过 stream 消息显示过了，不需要重复显示
-                    if (msg.round.round_type !== 'llm' && msg.round.ai_response) {
+                    if (msg.round.round_type !== RoundType.LLM && msg.round.ai_response) {
                         terminal.writeOutput(msg.round.ai_response);
                     }
                 }
