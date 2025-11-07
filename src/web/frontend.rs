@@ -310,6 +310,13 @@ const TERMINAL_JS: &str = r#"
             this.currentRound = null;   // 当前执行的回合
             this.viewMode = 'round';    // 视图模式: 'round' (回合卡片) 或 'stream' (流式输出)
 
+            // ===== v1.29.2: 意图拆解交互编辑 =====
+            this.intentPlans = new Map();  // 存储计划数据: planId -> {understanding, steps, metadata}
+            this.editMode = new Map();     // 存储编辑状态: planId -> {editing: boolean, originalSteps: [...]}
+
+            // ===== v1.29.3: 执行计划回调 =====
+            this.onExecutePlan = null;     // 执行计划回调: (planId, enabledSteps) => void
+
             this.init();
         }
 
@@ -961,6 +968,20 @@ const TERMINAL_JS: &str = r#"
         // ===== v1.29.0: 意图拆解可视化方法 =====
 
         showIntentUnderstanding(msg) {
+            // ===== v1.29.2: 存储计划数据 =====
+            this.intentPlans.set(msg.plan_id, {
+                understanding: msg.understanding,
+                stepCount: msg.step_count,
+                totalTime: msg.total_time,
+                steps: []  // 步骤将在 updateStepProgress 中填充
+            });
+
+            // 初始化编辑状态
+            this.editMode.set(msg.plan_id, {
+                editing: false,
+                originalSteps: []
+            });
+
             // 创建意图理解卡片
             const card = document.createElement('div');
             card.className = 'intent-card';
@@ -980,6 +1001,11 @@ const TERMINAL_JS: &str = r#"
                 </div>
                 <div class="intent-steps" id="intent-steps-${msg.plan_id}">
                     <!-- 步骤将动态添加 -->
+                </div>
+                <div class="intent-actions" id="intent-actions-${msg.plan_id}">
+                    <button class="intent-edit-btn" data-plan-id="${msg.plan_id}">
+                        ✏️ 修改计划
+                    </button>
                 </div>
             `;
 
@@ -1007,6 +1033,14 @@ const TERMINAL_JS: &str = r#"
                 this.lines.push(card);
             }
 
+            // ===== v1.29.2: 添加编辑按钮事件监听 =====
+            const editBtn = card.querySelector('.intent-edit-btn');
+            if (editBtn) {
+                editBtn.addEventListener('click', () => {
+                    this.enterEditMode(msg.plan_id);
+                });
+            }
+
             this.scrollToBottom();
         }
 
@@ -1032,6 +1066,19 @@ const TERMINAL_JS: &str = r#"
                     </div>
                 `;
                 stepsContainer.appendChild(stepElement);
+
+                // ===== v1.29.2: 存储步骤数据 =====
+                const plan = this.intentPlans.get(msg.plan_id);
+                if (plan) {
+                    plan.steps.push({
+                        stepId: msg.step_id,
+                        stepIndex: msg.step_index,
+                        description: msg.description,
+                        tool: msg.tool,
+                        status: msg.status,
+                        enabled: true  // 默认启用
+                    });
+                }
             }
 
             // 更新步骤状态
@@ -1084,6 +1131,314 @@ const TERMINAL_JS: &str = r#"
 
             // 标记卡片为已完成
             card.classList.add('completed');
+
+            this.scrollToBottom();
+        }
+
+        // ===== v1.29.2: 编辑模式方法 =====
+
+        enterEditMode(planId) {
+            console.log(`[v1.29.2 DEBUG] Entering edit mode for plan: ${planId}`);
+
+            const plan = this.intentPlans.get(planId);
+            const editState = this.editMode.get(planId);
+            if (!plan || !editState) {
+                console.error(`[v1.29.2 ERROR] Plan or edit state not found: ${planId}`);
+                return;
+            }
+
+            // 备份原始状态
+            editState.editing = true;
+            editState.originalSteps = plan.steps.map(s => ({...s}));
+            this.editMode.set(planId, editState);
+
+            // 重新渲染为编辑模式
+            this.renderEditMode(planId);
+        }
+
+        exitEditMode(planId) {
+            console.log(`[v1.29.2 DEBUG] Exiting edit mode (cancel) for plan: ${planId}`);
+
+            const plan = this.intentPlans.get(planId);
+            const editState = this.editMode.get(planId);
+            if (!plan || !editState) return;
+
+            // 恢复原始状态
+            plan.steps = editState.originalSteps.map(s => ({...s}));
+            editState.editing = false;
+            editState.originalSteps = [];
+            this.editMode.set(planId, editState);
+
+            // 重新渲染为普通模式
+            this.renderNormalMode(planId);
+        }
+
+        confirmEditMode(planId) {
+            console.log(`[v1.29.2 DEBUG] Confirming edit mode for plan: ${planId}`);
+
+            const plan = this.intentPlans.get(planId);
+            const editState = this.editMode.get(planId);
+            if (!plan || !editState) return;
+
+            // 保存编辑状态
+            editState.editing = false;
+            editState.originalSteps = [];
+            this.editMode.set(planId, editState);
+
+            console.log(`[v1.29.2 DEBUG] Saved plan:`, plan.steps);
+
+            // 重新渲染为普通模式，显示禁用的步骤
+            this.renderNormalMode(planId);
+        }
+
+        renderEditMode(planId) {
+            const card = document.querySelector(`[data-plan-id="${planId}"]`);
+            if (!card) return;
+
+            const plan = this.intentPlans.get(planId);
+            if (!plan) return;
+
+            // 添加编辑模式标识
+            card.classList.add('editing');
+
+            // 更新步骤显示 - 添加 checkbox
+            plan.steps.forEach((step, index) => {
+                const stepElement = document.getElementById(`step-${step.stepId}`);
+                if (!stepElement) return;
+
+                const stepHeader = stepElement.querySelector('.step-header');
+                if (!stepHeader) return;
+
+                // 检查是否已有 checkbox
+                let checkbox = stepHeader.querySelector('.step-checkbox');
+                if (!checkbox) {
+                    checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'step-checkbox';
+                    checkbox.checked = step.enabled;
+                    checkbox.dataset.stepId = step.stepId;
+
+                    // 添加 change 事件监听
+                    checkbox.addEventListener('change', (e) => {
+                        const stepId = e.target.dataset.stepId;
+                        const stepData = plan.steps.find(s => s.stepId === stepId);
+                        if (stepData) {
+                            stepData.enabled = e.target.checked;
+                            console.log(`[v1.29.2 DEBUG] Step ${stepId} enabled: ${stepData.enabled}`);
+                        }
+                    });
+
+                    // 插入到最前面
+                    stepHeader.insertBefore(checkbox, stepHeader.firstChild);
+                }
+            });
+
+            // 更新按钮区域
+            const actionsDiv = card.querySelector('.intent-actions');
+            if (actionsDiv) {
+                actionsDiv.innerHTML = `
+                    <button class="intent-cancel-btn" data-plan-id="${planId}">
+                        ❌ 取消
+                    </button>
+                    <button class="intent-confirm-btn" data-plan-id="${planId}">
+                        ✅ 确认
+                    </button>
+                `;
+
+                // 添加事件监听
+                const cancelBtn = actionsDiv.querySelector('.intent-cancel-btn');
+                const confirmBtn = actionsDiv.querySelector('.intent-confirm-btn');
+
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => this.exitEditMode(planId));
+                }
+
+                if (confirmBtn) {
+                    confirmBtn.addEventListener('click', () => this.confirmEditMode(planId));
+                }
+            }
+        }
+
+        renderNormalMode(planId) {
+            const card = document.querySelector(`[data-plan-id="${planId}"]`);
+            if (!card) return;
+
+            const plan = this.intentPlans.get(planId);
+            if (!plan) return;
+
+            // 移除编辑模式标识
+            card.classList.remove('editing');
+
+            // 移除 checkbox，更新步骤显示
+            plan.steps.forEach(step => {
+                const stepElement = document.getElementById(`step-${step.stepId}`);
+                if (!stepElement) return;
+
+                // 移除 checkbox
+                const checkbox = stepElement.querySelector('.step-checkbox');
+                if (checkbox) {
+                    checkbox.remove();
+                }
+
+                // 如果步骤被禁用，添加视觉反馈
+                if (!step.enabled) {
+                    stepElement.classList.add('disabled');
+                } else {
+                    stepElement.classList.remove('disabled');
+                }
+            });
+
+            // 恢复原始按钮
+            const actionsDiv = card.querySelector('.intent-actions');
+            if (actionsDiv) {
+                actionsDiv.innerHTML = `
+                    <button class="intent-edit-btn" data-plan-id="${planId}">
+                        ✏️ 修改计划
+                    </button>
+                    <button class="intent-execute-btn" data-plan-id="${planId}">
+                        ▶️ 执行计划
+                    </button>
+                `;
+
+                // 重新添加事件监听
+                const editBtn = actionsDiv.querySelector('.intent-edit-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => this.enterEditMode(planId));
+                }
+
+                // v1.29.3: 添加执行按钮事件监听
+                const executeBtn = actionsDiv.querySelector('.intent-execute-btn');
+                if (executeBtn) {
+                    executeBtn.addEventListener('click', () => this.executePlan(planId));
+                }
+            }
+        }
+
+        // ===== v1.29.3: 执行计划方法 =====
+
+        executePlan(planId) {
+            console.log(`[v1.29.3 DEBUG] Executing plan: ${planId}`);
+
+            const plan = this.intentPlans.get(planId);
+            if (!plan) {
+                console.error(`[v1.29.3 ERROR] Plan not found: ${planId}`);
+                return;
+            }
+
+            // 筛选出启用的步骤
+            const enabledSteps = plan.steps.filter(step => step.enabled).map(step => ({
+                step_id: step.stepId,
+                step_index: step.stepIndex,
+                description: step.description,
+                tool: step.tool,
+                params: step.params || null  // v1.29.4: 包含工具参数
+            }));
+
+            if (enabledSteps.length === 0) {
+                console.warn(`[v1.29.3 WARN] No enabled steps to execute`);
+                alert('没有启用的步骤可执行！');
+                return;
+            }
+
+            console.log(`[v1.29.3 DEBUG] Sending execute_plan with ${enabledSteps.length} steps:`, enabledSteps);
+
+            // 通过回调发送执行请求到后端
+            if (this.onExecutePlan) {
+                this.onExecutePlan(planId, enabledSteps);
+                console.log(`[v1.29.3 DEBUG] Execute plan callback invoked`);
+            } else {
+                console.error(`[v1.29.3 ERROR] onExecutePlan callback not set`);
+                alert('执行回调未设置，无法执行计划！');
+            }
+        }
+
+        showPlanExecutionStart(msg) {
+            console.log(`[v1.29.3 DEBUG] Plan execution started: ${msg.plan_id}, ${msg.enabled_count}/${msg.total_count} steps`);
+
+            // 在意图卡片底部添加执行开始提示
+            const card = document.querySelector(`[data-plan-id="${msg.plan_id}"]`);
+            if (!card) return;
+
+            const actionsDiv = card.querySelector('.intent-actions');
+            if (actionsDiv) {
+                // 禁用按钮，显示执行中状态
+                const executeBtn = actionsDiv.querySelector('.intent-execute-btn');
+                if (executeBtn) {
+                    executeBtn.disabled = true;
+                    executeBtn.textContent = '⏳ 执行中...';
+                    executeBtn.style.opacity = '0.5';
+                    executeBtn.style.cursor = 'not-allowed';
+                }
+            }
+        }
+
+        showStepOutput(msg) {
+            console.log(`[v1.29.3 DEBUG] Step output: ${msg.step_id}`, msg.output);
+
+            // 在步骤下方显示输出
+            const stepElement = document.getElementById(`step-${msg.step_id}`);
+            if (!stepElement) {
+                console.error(`[v1.29.3 ERROR] Step element not found: step-${msg.step_id}`);
+                return;
+            }
+            console.log(`[v1.29.3 DEBUG] Step element found:`, stepElement);
+
+            // 检查是否已有输出容器
+            let outputDiv = stepElement.querySelector('.step-output');
+            if (!outputDiv) {
+                console.log(`[v1.29.3 DEBUG] Creating new .step-output div`);
+                outputDiv = document.createElement('div');
+                outputDiv.className = 'step-output';
+                stepElement.appendChild(outputDiv);
+                console.log(`[v1.29.3 DEBUG] .step-output div appended:`, outputDiv);
+            } else {
+                console.log(`[v1.29.3 DEBUG] Found existing .step-output div:`, outputDiv);
+            }
+
+            // 追加输出内容
+            const outputPre = document.createElement('pre');
+            outputPre.className = 'step-output-content';
+            outputPre.textContent = msg.output;
+            outputDiv.appendChild(outputPre);
+
+            this.scrollToBottom();
+        }
+
+        showPlanExecutionComplete(msg) {
+            console.log(`[v1.29.3 DEBUG] Plan execution complete: ${msg.plan_id}, success=${msg.success}, executed=${msg.executed_count}, time=${msg.total_time}s`);
+
+            // 恢复按钮状态
+            const card = document.querySelector(`[data-plan-id="${msg.plan_id}"]`);
+            if (!card) {
+                console.error(`[v1.29.3 ERROR] Card not found: ${msg.plan_id}`);
+                return;
+            }
+            console.log(`[v1.29.3 DEBUG] Card found:`, card);
+
+            const actionsDiv = card.querySelector('.intent-actions');
+            if (actionsDiv) {
+                const executeBtn = actionsDiv.querySelector('.intent-execute-btn');
+                if (executeBtn) {
+                    executeBtn.disabled = false;
+                    executeBtn.textContent = '▶️ 执行计划';
+                    executeBtn.style.opacity = '1';
+                    executeBtn.style.cursor = 'pointer';
+                }
+            }
+
+            // 在卡片底部添加执行结果摘要
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = msg.success ? 'execution-summary success' : 'execution-summary failed';
+            summaryDiv.innerHTML = `
+                <div class="summary-icon">${msg.success ? '✅' : '⚠️'}</div>
+                <div class="summary-text">
+                    ${msg.success ? '执行成功' : '执行完成（部分失败）'}
+                    <span class="summary-details">
+                        执行了 ${msg.executed_count} 个步骤，用时 ${msg.total_time.toFixed(2)}s
+                    </span>
+                </div>
+            `;
+            card.appendChild(summaryDiv);
 
             this.scrollToBottom();
         }
@@ -1340,6 +1695,9 @@ const TERMINAL_JS: &str = r#"
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
 
+        // v1.29.3: Debug all messages
+        console.log(`[WS Message] type: ${msg.type}`, msg);
+
         switch (msg.type) {
             case 'thinking':
                 // 显示思考状态
@@ -1424,6 +1782,22 @@ const TERMINAL_JS: &str = r#"
                 // 执行完成：显示最终结果
                 terminal.showStepComplete(msg);
                 break;
+
+            // ===== v1.29.3: 计划执行消息 =====
+            case 'plan_execution_start':
+                // 计划执行开始
+                terminal.showPlanExecutionStart(msg);
+                break;
+
+            case 'step_output':
+                // 步骤输出
+                terminal.showStepOutput(msg);
+                break;
+
+            case 'plan_execution_complete':
+                // 计划执行完成
+                terminal.showPlanExecutionComplete(msg);
+                break;
         }
     };
 
@@ -1440,6 +1814,15 @@ const TERMINAL_JS: &str = r#"
         ws.send(JSON.stringify({
             type: 'interrupt',
             content: ''
+        }));
+    };
+
+    // v1.29.3: 设置执行计划回调
+    terminal.onExecutePlan = (planId, enabledSteps) => {
+        ws.send(JSON.stringify({
+            type: 'execute_plan',
+            plan_id: planId,
+            enabled_steps: enabledSteps
         }));
     };
 
@@ -2687,6 +3070,195 @@ body::before {
 .complete-time {
     margin-left: 1em;
     color: #ffb700;
+}
+
+/* ===== v1.29.2: 意图操作按钮 ===== */
+.intent-actions {
+    display: flex;
+    gap: 0.5em;
+    margin-top: 1em;
+    padding-top: 1em;
+    border-top: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.intent-edit-btn {
+    padding: 0.5em 1em;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    color: #00f0ff;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.intent-edit-btn:hover {
+    background: rgba(0, 240, 255, 0.2);
+    border-color: rgba(0, 240, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+.intent-edit-btn:active {
+    transform: translateY(0);
+}
+
+/* v1.29.3: 执行按钮样式 */
+.intent-execute-btn {
+    padding: 0.5em 1em;
+    background: rgba(138, 43, 226, 0.1);  /* 紫色主题 */
+    border: 1px solid rgba(138, 43, 226, 0.3);
+    border-radius: 4px;
+    color: #8a2be2;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.intent-execute-btn:hover {
+    background: rgba(138, 43, 226, 0.2);
+    border-color: rgba(138, 43, 226, 0.5);
+    transform: translateY(-1px);
+}
+
+.intent-execute-btn:active {
+    transform: translateY(0);
+}
+
+.intent-cancel-btn, .intent-confirm-btn {
+    padding: 0.5em 1em;
+    border: 1px solid;
+    border-radius: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.intent-cancel-btn {
+    background: rgba(255, 68, 68, 0.1);
+    border-color: rgba(255, 68, 68, 0.3);
+    color: #ff4444;
+}
+
+.intent-cancel-btn:hover {
+    background: rgba(255, 68, 68, 0.2);
+    border-color: rgba(255, 68, 68, 0.5);
+    transform: translateY(-1px);
+}
+
+.intent-confirm-btn {
+    background: rgba(0, 255, 100, 0.1);
+    border-color: rgba(0, 255, 100, 0.3);
+    color: #00ff64;
+}
+
+.intent-confirm-btn:hover {
+    background: rgba(0, 255, 100, 0.2);
+    border-color: rgba(0, 255, 100, 0.5);
+    transform: translateY(-1px);
+}
+
+/* ===== v1.29.2: 编辑模式样式 ===== */
+
+/* 编辑模式卡片标识 */
+.intent-card.editing {
+    border-color: rgba(255, 183, 0, 0.5);
+    box-shadow: 0 4px 20px rgba(255, 183, 0, 0.3);
+}
+
+/* Checkbox 样式 */
+.step-checkbox {
+    width: 1.2em;
+    height: 1.2em;
+    margin-right: 0.5em;
+    cursor: pointer;
+    accent-color: #00f0ff;
+    transition: transform 0.2s ease;
+}
+
+.step-checkbox:hover {
+    transform: scale(1.15);
+}
+
+/* 编辑模式下的步骤hover效果 */
+.intent-step:has(.step-checkbox):hover {
+    background: rgba(0, 240, 255, 0.15);
+    transform: translateX(2px);
+}
+
+/* 禁用的步骤 */
+.intent-step.disabled {
+    opacity: 0.5;
+    text-decoration: line-through;
+    text-decoration-color: rgba(255, 255, 255, 0.3);
+    transition: opacity 0.3s ease, text-decoration 0.3s ease;
+}
+
+.intent-step.disabled .step-description {
+    color: #888888;
+}
+
+.intent-step.disabled .step-tool {
+    color: #666666;
+}
+
+/* ===== v1.29.3: 步骤输出和执行摘要 ===== */
+
+/* 步骤输出 */
+.step-output {
+    margin: 0.5em 0 0 2em;
+    padding: 0.5em;
+    background: rgba(0, 0, 0, 0.4);
+    border-left: 2px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+}
+
+.step-output-content {
+    margin: 0;
+    padding: 0.5em;
+    color: #e0e0e0;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* 执行摘要 */
+.execution-summary {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-top: 1.5em;
+    padding: 1em;
+    border-radius: 6px;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.execution-summary.success {
+    background: rgba(0, 255, 100, 0.15);
+    border: 1px solid rgba(0, 255, 100, 0.4);
+}
+
+.execution-summary.failed {
+    background: rgba(255, 183, 0, 0.15);
+    border: 1px solid rgba(255, 183, 0, 0.4);
+}
+
+.summary-icon {
+    font-size: 2em;
+}
+
+.summary-text {
+    flex: 1;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.summary-details {
+    display: block;
+    margin-top: 0.3em;
+    font-size: 0.9em;
+    color: #b0b0b0;
+    font-weight: normal;
 }
 
 /* 动画 */

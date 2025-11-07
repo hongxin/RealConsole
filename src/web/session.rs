@@ -119,6 +119,24 @@ pub enum ClientMessage {
     Input { content: String },
     /// 中断信号（Ctrl+C）
     Interrupt { content: String },
+    /// v1.29.3: 执行计划
+    #[serde(rename = "execute_plan")]
+    ExecutePlan {
+        plan_id: String,
+        enabled_steps: Vec<EnabledStep>,
+    },
+}
+
+/// v1.29.3: 启用的步骤信息
+#[derive(Debug, Deserialize, Clone)]
+pub struct EnabledStep {
+    pub step_id: String,
+    pub step_index: usize,
+    pub description: String,
+    pub tool: String,
+    /// 工具参数（可选，JSON 格式）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<serde_json::Value>,
 }
 
 /// 消息类型（Server → Client）
@@ -185,6 +203,33 @@ pub enum ServerMessage {
         success: bool,
         total_time: f64,
         outputs: Vec<String>,
+    },
+
+    // ===== v1.29.3 新增：计划执行消息 =====
+    /// 计划执行开始
+    #[serde(rename = "plan_execution_start")]
+    PlanExecutionStart {
+        plan_id: String,
+        enabled_count: usize,
+        total_count: usize,
+    },
+
+    /// 步骤输出（执行中的步骤产生的输出）
+    #[serde(rename = "step_output")]
+    StepOutput {
+        plan_id: String,
+        step_id: String,
+        output: String,
+    },
+
+    /// 计划执行完成
+    #[serde(rename = "plan_execution_complete")]
+    PlanExecutionComplete {
+        plan_id: String,
+        success: bool,
+        executed_count: usize,
+        skipped_count: usize,
+        total_time: f64,
     },
 }
 

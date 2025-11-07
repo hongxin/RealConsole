@@ -81,3 +81,4 @@ __pycache__/
 venv/
 .venv/
 test_*.json
+config.yaml

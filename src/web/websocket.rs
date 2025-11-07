@@ -12,7 +12,7 @@ use crate::config::Config;
 use crate::dsl::intent::IntentMatch;
 use crate::i18n;
 use crate::services::{LlmRequest, Service};
-use crate::web::session::{ClientMessage, ServerMessage, Session};
+use crate::web::session::{ClientMessage, EnabledStep, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
 use std::sync::Arc;
@@ -121,6 +121,10 @@ async fn handle_message(
             sender
                 .send(Message::Text(serde_json::to_string(&response)?))
                 .await?;
+        }
+        ClientMessage::ExecutePlan { plan_id, enabled_steps } => {
+            // v1.29.3: 执行计划
+            execute_plan(session, &plan_id, &enabled_steps, sender).await?;
         }
     }
     Ok(())
@@ -938,4 +942,308 @@ async fn execute_decompose_command(
     }
 
     Ok(())
+}
+
+/// v1.29.3: 执行计划
+async fn execute_plan(
+    session: &Arc<Session>,
+    plan_id: &str,
+    enabled_steps: &[EnabledStep],
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use std::time::Instant;
+
+    let total_count = enabled_steps.len();
+
+    // 发送执行开始消息
+    let start_msg = ServerMessage::PlanExecutionStart {
+        plan_id: plan_id.to_string(),
+        enabled_count: total_count,
+        total_count,
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&start_msg)?))
+        .await?;
+
+    let mut executed_count = 0;
+    let mut has_error = false;
+    let plan_start_time = Instant::now();
+
+    // 执行每个启用的步骤
+    for step in enabled_steps {
+        let step_start_time = Instant::now();
+
+        // 发送步骤开始运行
+        let progress_msg = ServerMessage::StepProgress {
+            plan_id: plan_id.to_string(),
+            step_id: step.step_id.clone(),
+            step_index: step.step_index,
+            description: step.description.clone(),
+            tool: step.tool.clone(),
+            status: "running".to_string(),
+            elapsed_time: None,
+        };
+        sender
+            .send(Message::Text(serde_json::to_string(&progress_msg)?))
+            .await?;
+
+        // 执行步骤（模拟工具调用）
+        let result = execute_step(session, step).await;
+
+        let elapsed = step_start_time.elapsed().as_secs_f64();
+
+        match result {
+            Ok(output) => {
+                // 发送步骤输出
+                if !output.is_empty() {
+                    let output_msg = ServerMessage::StepOutput {
+                        plan_id: plan_id.to_string(),
+                        step_id: step.step_id.clone(),
+                        output: output.clone(),
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&output_msg)?))
+                        .await?;
+                }
+
+                // 发送步骤成功
+                let success_msg = ServerMessage::StepProgress {
+                    plan_id: plan_id.to_string(),
+                    step_id: step.step_id.clone(),
+                    step_index: step.step_index,
+                    description: step.description.clone(),
+                    tool: step.tool.clone(),
+                    status: "success".to_string(),
+                    elapsed_time: Some(elapsed),
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&success_msg)?))
+                    .await?;
+
+                executed_count += 1;
+            }
+            Err(e) => {
+                // 发送步骤失败
+                let error_msg = ServerMessage::StepOutput {
+                    plan_id: plan_id.to_string(),
+                    step_id: step.step_id.clone(),
+                    output: format!("❌ 步骤执行失败: {}", e),
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&error_msg)?))
+                    .await?;
+
+                let failed_msg = ServerMessage::StepProgress {
+                    plan_id: plan_id.to_string(),
+                    step_id: step.step_id.clone(),
+                    step_index: step.step_index,
+                    description: step.description.clone(),
+                    tool: step.tool.clone(),
+                    status: "failed".to_string(),
+                    elapsed_time: Some(elapsed),
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&failed_msg)?))
+                    .await?;
+
+                has_error = true;
+                // 继续执行其他步骤，不中断
+            }
+        }
+
+        // 添加小延迟，避免消息过快
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+
+    let total_time = plan_start_time.elapsed().as_secs_f64();
+
+    // 发送执行完成消息
+    let complete_msg = ServerMessage::PlanExecutionComplete {
+        plan_id: plan_id.to_string(),
+        success: !has_error,
+        executed_count,
+        skipped_count: 0, // 当前版本没有跳过的步骤
+        total_time,
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&complete_msg)?))
+        .await?;
+
+    Ok(())
+}
+
+/// 执行单个步骤（简化版真实执行）
+async fn execute_step(
+    session: &Arc<Session>,
+    step: &EnabledStep,
+) -> anyhow::Result<String> {
+    // v1.29.4: 简化版真实执行
+    // - shell: 尝试执行命令
+    // - 其他: 返回有意义的说明
+
+    match step.tool.as_str() {
+        "shell" => {
+            // 尝试从 description 中提取命令
+            // 常见模式："检查 X 是否存在" -> "test -f X"
+            //         "列出 X 目录" -> "ls X"
+            //         "读取 X" -> "cat X"
+
+            let cmd = extract_shell_command(&step.description);
+            if let Some(command) = cmd {
+                // 执行 Shell 命令（在当前目录）
+                match tokio::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(&command)
+                    .output()
+                    .await
+                {
+                    Ok(output) => {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+
+                        if output.status.success() {
+                            if !stdout.is_empty() {
+                                Ok(format!("✅ 执行成功\n$ {}\n\n{}", command, stdout.trim()))
+                            } else {
+                                Ok(format!("✅ 执行成功\n$ {}\n(无输出)", command))
+                            }
+                        } else {
+                            if !stderr.is_empty() {
+                                Ok(format!("❌ 执行失败\n$ {}\n\n{}", command, stderr.trim()))
+                            } else {
+                                Ok(format!("❌ 执行失败\n$ {}\n退出码: {}", command, output.status.code().unwrap_or(-1)))
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        Ok(format!("❌ 命令执行出错\n$ {}\n错误: {}", command, e))
+                    }
+                }
+            } else {
+                // 无法提取命令，返回说明
+                Ok(format!("ℹ️ Shell 工具\n描述: {}\n提示: 无法自动提取命令", step.description))
+            }
+        }
+        "file_read" => {
+            // 尝试从 description 中提取文件路径
+            if let Some(path) = extract_file_path(&step.description) {
+                match tokio::fs::read_to_string(&path).await {
+                    Ok(content) => {
+                        let lines: Vec<&str> = content.lines().collect();
+                        let preview = if lines.len() > 20 {
+                            format!("{}...\n(共 {} 行，显示前 20 行)",
+                                lines[..20].join("\n"), lines.len())
+                        } else {
+                            content
+                        };
+                        Ok(format!("✅ 读取文件成功: {}\n\n{}", path, preview))
+                    }
+                    Err(e) => {
+                        Ok(format!("❌ 读取文件失败: {}\n错误: {}", path, e))
+                    }
+                }
+            } else {
+                Ok(format!("ℹ️ 文件读取工具\n描述: {}\n提示: 无法自动提取文件路径", step.description))
+            }
+        }
+        _ => {
+            // 其他工具暂时返回说明性输出
+            Ok(format!(
+                "ℹ️ 工具: {}\n描述: {}\n提示: 此工具尚未实现真实执行",
+                step.tool,
+                step.description
+            ))
+        }
+    }
+}
+
+/// 从描述中提取 Shell 命令
+fn extract_shell_command(description: &str) -> Option<String> {
+    let desc_lower = description.to_lowercase();
+
+    // 首先尝试提取明确的文件名（带扩展名的）
+    let filename = extract_filename_strict(description);
+
+    // 优先级 1: "列出" 动作（因为列出目录也能看到文件是否存在）
+    if desc_lower.contains("列出") {
+        if desc_lower.contains("当前目录") || desc_lower.contains("文件") {
+            return Some("ls -la".to_string());
+        } else if desc_lower.contains("目录") {
+            // 尝试查找目录名（如 src, docs 等）
+            for word in description.split_whitespace() {
+                if word.len() >= 2 && word.len() <= 10
+                   && word.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '/')
+                   && !word.chars().all(|c| c.is_ascii_digit()) {
+                    return Some(format!("ls -la {}", word));
+                }
+            }
+            return Some("ls -la".to_string());
+        }
+    }
+
+    // 优先级 2: "检查/确认 X 是否存在"
+    if (desc_lower.contains("检查") || desc_lower.contains("确认"))
+       && desc_lower.contains("是否存在") {
+        if let Some(file) = &filename {
+            return Some(format!("test -e {} && echo '✅ 文件存在' || echo '❌ 文件不存在'", file));
+        }
+    }
+
+    // 优先级 3: "读取 X"
+    if desc_lower.contains("读取") || desc_lower.contains("read") {
+        if let Some(file) = &filename {
+            return Some(format!("cat {}", file));
+        }
+    }
+
+    None
+}
+
+/// 严格提取文件名（只提取带扩展名的文件）
+fn extract_filename_strict(description: &str) -> Option<String> {
+    // 常见文件扩展名
+    let extensions = vec![
+        ".yaml", ".yml", ".json", ".txt", ".csv", ".toml", ".md", ".rs",
+        ".py", ".js", ".ts", ".go", ".c", ".cpp", ".h", ".java", ".xml",
+        ".ini", ".conf", ".cfg", ".log"
+    ];
+
+    for word in description.split_whitespace() {
+        // 清理标点符号
+        let cleaned = word.trim_matches(|c: char| {
+            c.is_ascii_punctuation() && c != '.' && c != '/' && c != '_' && c != '-'
+        });
+
+        // 检查是否包含扩展名
+        if extensions.iter().any(|ext| cleaned.ends_with(ext)) {
+            return Some(cleaned.to_string());
+        }
+    }
+
+    None
+}
+
+/// 从描述中提取文件/目录名
+fn extract_filename(description: &str) -> Option<String> {
+    // 常见文件扩展名
+    let extensions = vec![".yaml", ".yml", ".json", ".txt", ".csv", ".toml", ".md", ".rs"];
+
+    for word in description.split_whitespace() {
+        // 检查是否包含扩展名
+        if extensions.iter().any(|ext| word.contains(ext)) {
+            return Some(word.trim_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '/' && c != '_' && c != '-').to_string());
+        }
+
+        // 检查是否是目录名（如 src, data 等）
+        if word.len() > 2 && word.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '/') {
+            return Some(word.to_string());
+        }
+    }
+
+    None
+}
+
+/// 从描述中提取文件路径
+fn extract_file_path(description: &str) -> Option<String> {
+    extract_filename_strict(description)
 }
