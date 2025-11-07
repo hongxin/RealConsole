@@ -20,6 +20,7 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry) {
     register_datetime(registry);
     register_code_stats(registry);
     register_shell_execute(registry); // ✨ Phase 8: Shell 执行工具
+    register_find_file(registry); // ✨ v1.33.0: 文件查找工具
     lunar_tool::register_lunar_tool(registry); // ✨ 农历工具
 }
 
@@ -463,6 +464,180 @@ fn register_shell_execute(registry: &mut ToolRegistry) {
     );
 
     registry.register(tool);
+}
+
+/// 注册文件查找工具 (v1.33.0)
+///
+/// 在指定目录下递归搜索匹配的文件，支持通配符模式
+fn register_find_file(registry: &mut ToolRegistry) {
+    let tool = Tool::new(
+        "find_file",
+        "在指定目录下递归搜索匹配指定模式的文件。支持通配符（如 *.py, test_*.rs）。返回文件路径列表。",
+        vec![
+            Parameter {
+                name: "directory".to_string(),
+                param_type: ParameterType::String,
+                description: "搜索目录（默认为当前目录）".to_string(),
+                required: false,
+                default: Some(json!(".")),
+            },
+            Parameter {
+                name: "pattern".to_string(),
+                param_type: ParameterType::String,
+                description: "文件名模式（支持通配符，如 '*.py', 'test_*.rs'）".to_string(),
+                required: true,
+                default: None,
+            },
+            Parameter {
+                name: "max_depth".to_string(),
+                param_type: ParameterType::Number,
+                description: "最大搜索深度（默认 10，0 表示仅当前目录）".to_string(),
+                required: false,
+                default: Some(json!(10)),
+            },
+            Parameter {
+                name: "max_results".to_string(),
+                param_type: ParameterType::Number,
+                description: "最多返回结果数（默认 100）".to_string(),
+                required: false,
+                default: Some(json!(100)),
+            },
+        ],
+        |args: JsonValue| {
+            let directory = args["directory"].as_str().unwrap_or(".");
+            let pattern = args["pattern"]
+                .as_str()
+                .ok_or("pattern 必须是字符串")?;
+            let max_depth = args["max_depth"].as_u64().unwrap_or(10) as usize;
+            let max_results = args["max_results"].as_u64().unwrap_or(100) as usize;
+
+            // 1. 检查目录是否存在
+            let dir_path = Path::new(directory);
+            if !dir_path.exists() {
+                return Err(format!("目录不存在: {}", directory));
+            }
+            if !dir_path.is_dir() {
+                return Err(format!("不是有效的目录: {}", directory));
+            }
+
+            // 2. 编译通配符模式为正则表达式
+            let pattern_regex = wildcard_to_regex(pattern)?;
+
+            // 3. 递归搜索文件
+            let mut results = Vec::new();
+            if let Err(e) = search_files(dir_path, &pattern_regex, max_depth, 0, &mut results, max_results) {
+                return Err(format!("搜索失败: {}", e));
+            }
+
+            // 4. 格式化输出
+            if results.is_empty() {
+                return Ok(format!("未找到匹配 '{}' 的文件", pattern));
+            }
+
+            let mut output = format!("找到 {} 个匹配的文件:\n", results.len());
+            output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+            for (i, path) in results.iter().enumerate() {
+                output.push_str(&format!("{}. {}\n", i + 1, path));
+            }
+
+            Ok(output)
+        },
+    );
+
+    registry.register(tool);
+}
+
+/// 递归搜索文件
+fn search_files(
+    dir: &Path,
+    pattern: &regex::Regex,
+    max_depth: usize,
+    current_depth: usize,
+    results: &mut Vec<String>,
+    max_results: usize,
+) -> Result<(), String> {
+    // 检查深度限制
+    if current_depth > max_depth {
+        return Ok(());
+    }
+
+    // 检查结果数限制
+    if results.len() >= max_results {
+        return Ok(());
+    }
+
+    // 读取目录
+    let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))?;
+
+    for entry in entries.flatten() {
+        // 检查结果数限制
+        if results.len() >= max_results {
+            break;
+        }
+
+        let path = entry.path();
+
+        // 跳过隐藏目录和常见的大型目录
+        if let Some(name) = path.file_name() {
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with('.')
+                || name_str == "target"
+                || name_str == "node_modules"
+                || name_str == "build"
+                || name_str == "dist"
+            {
+                continue;
+            }
+        }
+
+        if path.is_dir() {
+            // 递归搜索子目录
+            if let Err(e) = search_files(&path, pattern, max_depth, current_depth + 1, results, max_results) {
+                // 忽略权限错误，继续搜索其他目录
+                eprintln!("搜索子目录失败: {}", e);
+            }
+        } else if path.is_file() {
+            // 检查文件名是否匹配模式
+            if let Some(file_name) = path.file_name() {
+                let file_name_str = file_name.to_string_lossy();
+                if pattern.is_match(&file_name_str) {
+                    // 转换为相对路径（如果可能）
+                    let relative_path = path
+                        .strip_prefix(".")
+                        .unwrap_or(&path)
+                        .to_string_lossy()
+                        .to_string();
+                    results.push(relative_path);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 将通配符模式转换为正则表达式
+fn wildcard_to_regex(pattern: &str) -> Result<regex::Regex, String> {
+    // 转义所有正则表达式特殊字符，除了 * 和 ?
+    let mut regex_pattern = String::new();
+    regex_pattern.push('^'); // 匹配开始
+
+    for ch in pattern.chars() {
+        match ch {
+            '*' => regex_pattern.push_str(".*"),
+            '?' => regex_pattern.push('.'),
+            '.' | '+' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' | '\\' => {
+                regex_pattern.push('\\');
+                regex_pattern.push(ch);
+            }
+            _ => regex_pattern.push(ch),
+        }
+    }
+
+    regex_pattern.push('$'); // 匹配结束
+
+    regex::Regex::new(&regex_pattern)
+        .map_err(|e| format!("无效的文件名模式: {}", e))
 }
 
 #[cfg(test)]

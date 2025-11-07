@@ -138,7 +138,7 @@ impl ToolRouter {
         None
     }
 
-    /// 构建映射表（v1.32.0 - 保守策略：只映射 2 个最常用的 Intent）
+    /// 构建映射表（v1.33.0 - 渐进增强：3 个映射）
     ///
     /// # 设计原则
     ///
@@ -146,23 +146,32 @@ impl ToolRouter {
     /// 2. **简单性**: 参数提取逻辑简单明确
     /// 3. **可扩展**: 后续版本可逐步添加更多映射
     ///
-    /// # 当前映射
+    /// # 当前映射（v1.33.0）
     ///
     /// - list_directory → list_dir (文件操作，极高频)
     /// - count_python_lines → count_code_lines (代码统计，高频)
+    /// - find_files_by_name → find_file (文件查找，高频)
     fn build_mappings() -> Vec<ToolMapping> {
         vec![
-            // ===== 映射 1: list_directory → list_dir =====
+            // ===== v1.32.0 映射 =====
+            // 映射 1: list_directory → list_dir
             ToolMapping {
                 intent_name: "list_directory".to_string(),
                 tool_name: "list_dir".to_string(),
                 param_extractor: extract_list_directory_params,
             },
-            // ===== 映射 2: count_python_lines → count_code_lines =====
+            // 映射 2: count_python_lines → count_code_lines
             ToolMapping {
                 intent_name: "count_python_lines".to_string(),
                 tool_name: "count_code_lines".to_string(),
                 param_extractor: extract_count_python_lines_params,
+            },
+            // ===== v1.33.0 新增映射 =====
+            // 映射 3: find_files_by_name → find_file
+            ToolMapping {
+                intent_name: "find_files_by_name".to_string(),
+                tool_name: "find_file".to_string(),
+                param_extractor: extract_find_files_by_name_params,
             },
         ]
     }
@@ -214,6 +223,42 @@ fn extract_count_python_lines_params(_intent_match: &IntentMatch) -> Result<Json
     }))
 }
 
+/// 提取 find_files_by_name Intent 的参数 (v1.33.0)
+///
+/// # 策略
+/// 1. 从实体中提取文件类型（FileType），转换为通配符模式 (*.ext)
+/// 2. 如果实体中有 Custom("pattern", value)，直接使用该模式
+/// 3. directory 默认为 "."（当前目录）
+/// 4. max_depth 默认为 10
+/// 5. max_results 默认为 100
+fn extract_find_files_by_name_params(intent_match: &IntentMatch) -> Result<JsonValue, String> {
+    // 尝试从实体中提取文件模式
+    let pattern = intent_match
+        .extracted_entities
+        .values()
+        .find_map(|entity| {
+            match entity {
+                EntityType::FileType(ext) => {
+                    // 文件类型实体，如 "py" → "*.py"
+                    Some(format!("*.{}", ext))
+                }
+                EntityType::Custom(name, value) if name == "pattern" => {
+                    // 自定义模式实体
+                    Some(value.clone())
+                }
+                _ => None,
+            }
+        })
+        .ok_or("未能从 Intent 中提取文件模式")?;
+
+    Ok(json!({
+        "directory": ".",
+        "pattern": pattern,
+        "max_depth": 10,
+        "max_results": 100
+    }))
+}
+
 // ===== 单元测试 =====
 
 #[cfg(test)]
@@ -242,7 +287,7 @@ mod tests {
     #[test]
     fn test_router_creation() {
         let router = ToolRouter::new();
-        assert_eq!(router.mappings.len(), 2); // v1.32.0: 2 个映射
+        assert_eq!(router.mappings.len(), 3); // v1.33.0: 3 个映射
     }
 
     #[test]
