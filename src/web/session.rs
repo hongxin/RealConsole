@@ -242,6 +242,8 @@ pub struct Session {
     pub id: SessionId,
     /// Agent 实例（独立）
     pub agent: Arc<RwLock<Agent>>,
+    /// Intent 路由器（v1.31.0 新增 - 快速识别简单意图）
+    pub intent_router: crate::agent::decomposition::IntentRouter,
     /// 创建时间
     pub created_at: DateTime<Utc>,
     /// LLM 初始化错误信息（用于诊断）
@@ -275,6 +277,7 @@ impl Session {
         Self {
             id,
             agent: Arc::new(RwLock::new(agent)),
+            intent_router: crate::agent::decomposition::IntentRouter::new(), // v1.31.0
             created_at: Utc::now(),
             llm_init_error,
             conversation_id,

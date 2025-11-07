@@ -854,6 +854,62 @@ async fn execute_decompose_command(
         return Ok(());
     }
 
+    // v1.31.0: 先尝试 Intent 预识别（快速路径）
+    if let Some(plan) = session.intent_router.try_match(query) {
+        eprintln!("✨ [Intent] 快速识别成功，跳过 LLM 拆解");
+
+        // 直接发送 Intent 生成的执行计划（复用下面的发送逻辑）
+        // 1. 发送意图理解消息
+        let understanding_msg = ServerMessage::IntentUnderstanding {
+            plan_id: plan.id.clone(),
+            understanding: plan.understanding.clone(),
+            step_count: plan.steps.len(),
+            total_time: plan.total_estimated_time,
+        };
+        sender
+            .send(Message::Text(serde_json::to_string(&understanding_msg)?))
+            .await?;
+
+        // 2. 发送步骤状态
+        for (index, step) in plan.steps.iter().enumerate() {
+            let progress_msg = ServerMessage::StepProgress {
+                plan_id: plan.id.clone(),
+                step_index: index,
+                step_id: step.id.clone(),
+                description: step.description.clone(),
+                tool: step.tool.clone(),
+                params: step.params.clone(),
+                status: "pending".to_string(),
+                elapsed_time: step.actual_time,
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&progress_msg)?))
+                .await?;
+        }
+
+        // 3. 构建完成消息
+        let output_content = "\n⚡ 通过 Intent DSL 快速识别".to_string();
+
+        // 完成回合
+        let execution_time = start_time.elapsed().as_secs_f64();
+        if let Some(completed_round) = session
+            .complete_round(&round_id, output_content, execution_time, Vec::new())
+            .await
+        {
+            let round_complete_msg = ServerMessage::RoundComplete {
+                round: completed_round,
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                .await?;
+        }
+
+        return Ok(());
+    }
+
+    // Intent 未匹配，继续 LLM 拆解（v1.30.0 原有逻辑）
+    eprintln!("🤖 [LLM] Intent 未匹配，回退到 LLM 拆解");
+
     // 发送思考状态
     let thinking_msg = ServerMessage::Thinking {
         model: "意图拆解中...".to_string(),
@@ -902,13 +958,7 @@ async fn execute_decompose_command(
             }
 
             // 3. 构建完成消息
-            let output_content = format!(
-                "\n💡 提示：v1.29.0 实现了意图拆解可视化，执行功能将在后续版本完善\n\
-                📊 计划ID: {}\n\
-                ⏰ 总预计时间: {:.1}s",
-                plan.id,
-                plan.total_estimated_time
-            );
+            let output_content = "\n🤖 通过 LLM 拆解执行".to_string();
 
             // 计算执行时间
             let execution_time = start_time.elapsed().as_secs_f64();
