@@ -192,6 +192,9 @@ pub enum ServerMessage {
         step_id: String,
         description: String,
         tool: String,
+        /// v1.30.0: 工具参数
+        #[serde(skip_serializing_if = "Option::is_none")]
+        params: Option<serde_json::Value>,
         status: String, // "pending" | "running" | "success" | "failed"
         elapsed_time: Option<f64>,
     },

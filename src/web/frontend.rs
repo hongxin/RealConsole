@@ -1075,6 +1075,7 @@ const TERMINAL_JS: &str = r#"
                         stepIndex: msg.step_index,
                         description: msg.description,
                         tool: msg.tool,
+                        params: msg.params || null,  // v1.30.0: 保存工具参数
                         status: msg.status,
                         enabled: true  // 默认启用
                     });

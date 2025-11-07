@@ -74,6 +74,7 @@ impl IntentDecomposer {
     {{
       "description": "步骤描述",
       "tool": "工具名称",
+      "params": {{"参数名": "参数值"}},
       "estimated_time": 1.2
     }}
   ]
@@ -81,11 +82,28 @@ impl IntentDecomposer {
 
 要求：
 1. 步骤描述要具体、可执行
-2. 工具名称必须在可用工具列表中
-3. 时间估计要合理（秒）
-4. 步骤之间要有逻辑顺序
-5. 步骤数量控制在 3-10 步之间
-6. 只返回 JSON，不要有其他说明文字
+2. tool 必须是可用工具列表中的工具名称（如 read_file, shell_execute）
+3. params 必须是 JSON 对象，包含工具所需的参数（参考上面的参数示例）
+4. 优先使用专用工具（如 read_file），而非 shell_execute
+5. 时间估计要合理（秒）
+6. 步骤之间要有逻辑顺序
+7. 步骤数量控制在 3-10 步之间
+8. 只返回 JSON，不要有其他说明文字
+
+示例：
+用户输入：读取 config.yaml 文件
+正确输出：
+{{
+  "understanding": "用户需要读取 config.yaml 文件的内容",
+  "steps": [
+    {{
+      "description": "读取配置文件",
+      "tool": "read_file",
+      "params": {{"path": "config.yaml"}},
+      "estimated_time": 0.5
+    }}
+  ]
+}}
 "#,
             input, available_tools
         );
@@ -129,7 +147,11 @@ impl IntentDecomposer {
                 .as_f64()
                 .unwrap_or(1.0);
 
-            let step = ExecutionStep::new(description, tool, estimated_time);
+            // v1.30.0: 解析 params 字段
+            let params = step_value.get("params").cloned();
+
+            let mut step = ExecutionStep::new(description, tool, estimated_time);
+            step.params = params;
             steps.push(step);
         }
 
@@ -197,14 +219,39 @@ impl IntentDecomposer {
         Ok(())
     }
 
-    /// 获取可用工具列表（占位符）
+    /// 获取可用工具列表（v1.30.0: 真实工具清单）
     fn get_available_tools(&self) -> String {
-        // TODO: 从 ToolRegistry 获取
-        r#"- file_read: 读取文件
-- file_write: 写入文件
-- shell: 执行 Shell 命令
-- calculate: 计算表达式
-- search: 搜索信息"#
+        r#"1. read_file - 读取文件内容
+   参数: {"path": "文件路径"}
+   示例: {"path": "config.yaml"}
+
+2. write_file - 写入文件内容
+   参数: {"path": "文件路径", "content": "内容"}
+   示例: {"path": "output.txt", "content": "Hello World"}
+
+3. list_dir - 列出目录内容
+   参数: {"path": "目录路径"}（可选，默认当前目录）
+   示例: {"path": "."} 或 {"path": "src"}
+
+4. shell_execute - 执行 Shell 命令
+   参数: {"command": "命令"}
+   示例: {"command": "ls -la"}
+   注意: 禁止危险命令（rm, sudo, chmod 等）
+
+5. calculator - 数学计算
+   参数: {"expression": "表达式"}
+   示例: {"expression": "2 + 3 * 4"}
+
+6. get_datetime - 获取当前日期时间
+   参数: {}（无需参数）
+
+7. count_code_lines - 统计代码行数
+   参数: {"path": "目录或文件", "extensions": ["扩展名列表"]}
+   示例: {"path": "src", "extensions": ["rs", "toml"]}
+
+8. lunar_date - 农历日期转换
+   参数: {"date": "日期"}（可选）
+   示例: {}"#
             .to_string()
     }
 }

@@ -15,6 +15,7 @@ use crate::services::{LlmRequest, Service};
 use crate::web::session::{ClientMessage, EnabledStep, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
+use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -891,6 +892,7 @@ async fn execute_decompose_command(
                     step_id: step.id.clone(),
                     description: step.description.clone(),
                     tool: step.tool.clone(),
+                    params: step.params.clone(),  // v1.30.0: 包含工具参数
                     status: status_str.to_string(),
                     elapsed_time: step.actual_time,
                 };
@@ -980,6 +982,7 @@ async fn execute_plan(
             step_index: step.step_index,
             description: step.description.clone(),
             tool: step.tool.clone(),
+            params: step.params.clone(),  // v1.30.0: 包含工具参数
             status: "running".to_string(),
             elapsed_time: None,
         };
@@ -1013,6 +1016,7 @@ async fn execute_plan(
                     step_index: step.step_index,
                     description: step.description.clone(),
                     tool: step.tool.clone(),
+                    params: step.params.clone(),  // v1.30.0: 包含工具参数
                     status: "success".to_string(),
                     elapsed_time: Some(elapsed),
                 };
@@ -1039,6 +1043,7 @@ async fn execute_plan(
                     step_index: step.step_index,
                     description: step.description.clone(),
                     tool: step.tool.clone(),
+                    params: step.params.clone(),  // v1.30.0: 包含工具参数
                     status: "failed".to_string(),
                     elapsed_time: Some(elapsed),
                 };
@@ -1072,14 +1077,44 @@ async fn execute_plan(
     Ok(())
 }
 
-/// 执行单个步骤（简化版真实执行）
+/// 执行单个步骤（v1.30.0: 调用 ToolRegistry）
 async fn execute_step(
     session: &Arc<Session>,
     step: &EnabledStep,
 ) -> anyhow::Result<String> {
-    // v1.29.4: 简化版真实执行
-    // - shell: 尝试执行命令
-    // - 其他: 返回有意义的说明
+    // v1.30.0: 直接调用 ToolRegistry
+    // 所有工具统一由 Tool 系统处理，包括：
+    // - 参数验证
+    // - 安全检查
+    // - 错误处理
+
+    // 获取 ToolRegistry
+    let agent = session.agent.read().await;
+    let registry = agent.tool_registry.read().await;
+
+    // 解析参数（如果没有提供，使用空对象）
+    let params = step.params.clone().unwrap_or(json!({}));
+
+    // 调用工具
+    match registry.execute(&step.tool, params) {
+        Ok(output) => {
+            Ok(format!("✅ 执行成功\n工具: {}\n\n{}", step.tool, output))
+        }
+        Err(e) => {
+            Ok(format!("❌ 执行失败\n工具: {}\n错误: {}", step.tool, e))
+        }
+    }
+}
+
+/// 执行单个步骤（v1.29.4 废弃：手动命令提取）
+/// 该函数已被 v1.30.0 的 ToolRegistry 方案替代
+#[allow(dead_code)]
+async fn execute_step_legacy(
+    _session: &Arc<Session>,
+    step: &EnabledStep,
+) -> anyhow::Result<String> {
+    // v1.29.4: 简化版真实执行（已废弃）
+    // 保留此代码作为参考，展示命令提取的局限性
 
     match step.tool.as_str() {
         "shell" => {
