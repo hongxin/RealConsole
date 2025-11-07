@@ -138,7 +138,7 @@ impl ToolRouter {
         None
     }
 
-    /// 构建映射表（v1.34.0 - 渐进增强：4 个映射）
+    /// 构建映射表（v1.35.0 - 渐进增强：5 个映射）
     ///
     /// # 设计原则
     ///
@@ -146,12 +146,13 @@ impl ToolRouter {
     /// 2. **简单性**: 参数提取逻辑简单明确
     /// 3. **可扩展**: 后续版本可逐步添加更多映射
     ///
-    /// # 当前映射（v1.34.0）
+    /// # 当前映射（v1.35.0）
     ///
     /// - list_directory → list_dir (文件操作，极高频)
     /// - count_python_lines → count_code_lines (代码统计，高频)
     /// - find_files_by_name → find_file (文件查找，高频)
     /// - grep_pattern → search_text (文本搜索，高频)
+    /// - count_files → count_files_tool (文件统计，中-高频)
     fn build_mappings() -> Vec<ToolMapping> {
         vec![
             // ===== v1.32.0 映射 =====
@@ -180,6 +181,13 @@ impl ToolRouter {
                 intent_name: "grep_pattern".to_string(),
                 tool_name: "search_text".to_string(),
                 param_extractor: extract_grep_pattern_params,
+            },
+            // ===== v1.35.0 新增映射 =====
+            // 映射 5: count_files → count_files_tool
+            ToolMapping {
+                intent_name: "count_files".to_string(),
+                tool_name: "count_files_tool".to_string(),
+                param_extractor: extract_count_files_params,
             },
         ]
     }
@@ -333,6 +341,53 @@ fn extract_grep_pattern_params(intent_match: &IntentMatch) -> Result<JsonValue, 
     }))
 }
 
+/// 提取 count_files Intent 的参数 (v1.35.0)
+///
+/// # 策略
+/// 1. 从实体中提取路径（Path），默认为 "."
+/// 2. 从实体中提取文件类型（FileType），转换为 "*.ext"，默认为 "*"
+/// 3. max_depth 默认为 10
+/// 4. show_breakdown 默认为 false
+///
+/// # 示例
+/// - 输入: "统计 Python 文件数量"
+/// - 提取: FileType("py")
+/// - 输出: {"directory": ".", "file_pattern": "*.py", ...}
+fn extract_count_files_params(intent_match: &IntentMatch) -> Result<JsonValue, String> {
+    // 提取路径（可选）
+    let directory = intent_match
+        .extracted_entities
+        .values()
+        .find_map(|entity| {
+            if let EntityType::Path(path) = entity {
+                Some(path.clone())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| ".".to_string());
+
+    // 提取文件类型（可选）
+    let file_pattern = intent_match
+        .extracted_entities
+        .values()
+        .find_map(|entity| {
+            if let EntityType::FileType(ext) = entity {
+                Some(format!("*.{}", ext))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "*".to_string());
+
+    Ok(json!({
+        "directory": directory,
+        "file_pattern": file_pattern,
+        "max_depth": 10,
+        "show_breakdown": false
+    }))
+}
+
 // ===== 单元测试 =====
 
 #[cfg(test)]
@@ -361,7 +416,7 @@ mod tests {
     #[test]
     fn test_router_creation() {
         let router = ToolRouter::new();
-        assert_eq!(router.mappings.len(), 4); // v1.34.0: 4 个映射
+        assert_eq!(router.mappings.len(), 5); // v1.35.0: 5 个映射
     }
 
     #[test]

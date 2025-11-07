@@ -10,6 +10,7 @@ use crate::lunar_tool;
 use crate::tool::{Parameter, ParameterType, Tool, ToolRegistry};
 use chrono::Local;
 use serde_json::{json, Value as JsonValue};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -22,6 +23,7 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry) {
     register_shell_execute(registry); // ✨ Phase 8: Shell 执行工具
     register_find_file(registry); // ✨ v1.33.0: 文件查找工具
     register_search_text(registry); // ✨ v1.34.0: 文本搜索工具
+    register_count_files_tool(registry); // ✨ v1.35.0: 文件统计工具
     lunar_tool::register_lunar_tool(registry); // ✨ 农历工具
 }
 
@@ -843,6 +845,201 @@ fn search_in_files(
             }
             // 静默跳过无法读取的文件（二进制文件等）
         }
+    }
+
+    Ok(())
+}
+
+// ==================== v1.35.0: 文件统计工具 ====================
+
+/// 文件统计结果
+#[derive(Debug)]
+struct FileCount {
+    total: usize,
+    by_directory: HashMap<String, usize>,
+}
+
+/// 注册文件统计工具 (v1.35.0)
+///
+/// 在指定目录下递归统计文件数量，支持文件类型过滤。
+/// 跨平台实现，无需依赖 find/dir 命令。
+///
+/// # 参数
+/// - directory: 搜索目录（默认 "."）
+/// - file_pattern: 文件名模式（如 "*.rs"，默认 "*"）
+/// - max_depth: 最大搜索深度（默认 10）
+/// - show_breakdown: 是否显示每个目录的文件数（默认 false）
+///
+/// # 示例
+/// ```json
+/// {
+///   "directory": ".",
+///   "file_pattern": "*.rs",
+///   "max_depth": 10,
+///   "show_breakdown": false
+/// }
+/// ```
+fn register_count_files_tool(registry: &mut ToolRegistry) {
+    let tool = Tool::new(
+        "count_files_tool",
+        "统计指定目录下的文件数量。支持按文件类型过滤。可选显示每个目录的文件数。",
+        vec![
+            Parameter {
+                name: "directory".to_string(),
+                param_type: ParameterType::String,
+                description: "搜索目录（默认为当前目录）".to_string(),
+                required: false,
+                default: Some(json!(".")),
+            },
+            Parameter {
+                name: "file_pattern".to_string(),
+                param_type: ParameterType::String,
+                description: "文件名模式（如 '*.rs', '*.py'，默认 '*' 表示所有文件）".to_string(),
+                required: false,
+                default: Some(json!("*")),
+            },
+            Parameter {
+                name: "max_depth".to_string(),
+                param_type: ParameterType::Number,
+                description: "最大搜索深度（默认 10，0 表示仅当前目录）".to_string(),
+                required: false,
+                default: Some(json!(10)),
+            },
+            Parameter {
+                name: "show_breakdown".to_string(),
+                param_type: ParameterType::Boolean,
+                description: "是否显示每个子目录的文件数量（默认 false）".to_string(),
+                required: false,
+                default: Some(json!(false)),
+            },
+        ],
+        |args: JsonValue| {
+            let directory = args["directory"].as_str().unwrap_or(".");
+            let file_pattern = args["file_pattern"].as_str().unwrap_or("*");
+            let max_depth = args["max_depth"].as_u64().unwrap_or(10) as usize;
+            let show_breakdown = args["show_breakdown"].as_bool().unwrap_or(false);
+
+            // 1. 检查目录是否存在
+            let dir_path = Path::new(directory);
+            if !dir_path.exists() {
+                return Err(format!("目录不存在: {}", directory));
+            }
+
+            // 2. 编译文件名模式
+            let file_regex = wildcard_to_regex(file_pattern)?;
+
+            // 3. 递归统计文件
+            let mut count_result = FileCount {
+                total: 0,
+                by_directory: HashMap::new(),
+            };
+
+            count_files_recursive(
+                dir_path,
+                &file_regex,
+                max_depth,
+                0,
+                &mut count_result,
+                show_breakdown,
+            )?;
+
+            // 4. 格式化输出
+            let mut output = format!("总计: {} 个文件", count_result.total);
+
+            if show_breakdown && !count_result.by_directory.is_empty() {
+                output.push_str("\n\n按目录统计:\n");
+                output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+                // 按文件数量排序
+                let mut dirs: Vec<_> = count_result.by_directory.iter().collect();
+                dirs.sort_by(|a, b| b.1.cmp(a.1));
+
+                for (dir, count) in dirs.iter().take(20) {
+                    output.push_str(&format!("{:6} 个文件 - {}\n", count, dir));
+                }
+
+                if count_result.by_directory.len() > 20 {
+                    output.push_str(&format!(
+                        "\n... 还有 {} 个目录未显示\n",
+                        count_result.by_directory.len() - 20
+                    ));
+                }
+            }
+
+            Ok(output)
+        },
+    );
+
+    registry.register(tool);
+}
+
+/// 递归统计文件数量
+///
+/// # 参数
+/// - dir: 搜索目录
+/// - file_pattern: 文件名过滤正则表达式
+/// - max_depth: 最大深度限制
+/// - current_depth: 当前深度
+/// - result: 存储统计结果
+/// - track_dirs: 是否按目录统计
+fn count_files_recursive(
+    dir: &Path,
+    file_pattern: &regex::Regex,
+    max_depth: usize,
+    current_depth: usize,
+    result: &mut FileCount,
+    track_dirs: bool,
+) -> Result<(), String> {
+    // 深度限制
+    if current_depth > max_depth {
+        return Ok(());
+    }
+
+    // 读取目录
+    let entries = std::fs::read_dir(dir)
+        .map_err(|e| format!("无法读取目录 {}: {}", dir.display(), e))?;
+
+    let mut dir_count = 0;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
+        let path = entry.path();
+
+        // 跳过隐藏目录和大型依赖目录
+        if path.is_dir() {
+            let dir_name = path.file_name().unwrap().to_string_lossy();
+            if dir_name.starts_with('.')
+                || dir_name == "target"
+                || dir_name == "node_modules"
+                || dir_name == "build"
+            {
+                continue;
+            }
+
+            // 递归统计子目录
+            count_files_recursive(
+                &path,
+                file_pattern,
+                max_depth,
+                current_depth + 1,
+                result,
+                track_dirs,
+            )?;
+        } else if path.is_file() {
+            // 检查文件名是否匹配
+            let file_name = path.file_name().unwrap().to_string_lossy();
+            if file_pattern.is_match(&file_name) {
+                result.total += 1;
+                dir_count += 1;
+            }
+        }
+    }
+
+    // 记录当前目录的文件数
+    if track_dirs && dir_count > 0 {
+        result
+            .by_directory
+            .insert(dir.display().to_string(), dir_count);
     }
 
     Ok(())
