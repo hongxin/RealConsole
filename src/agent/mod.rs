@@ -6,6 +6,10 @@
 //! - 智能命令路由（常见Shell命令自动识别） ✨ Phase 10.1
 //! - 处理特殊前缀（!, /）
 //! - Intent DSL 意图识别 ✨ Phase 3
+//! - 意图拆解与可视化 ✨ v1.29.0
+
+// ✨ v1.29.0: 意图拆解模块
+pub mod decomposition;
 
 use crate::command::CommandRegistry;
 use crate::command_router::{CommandRouter, CommandType as RouterCommandType};
@@ -159,6 +163,8 @@ pub struct Agent {
     pub bagua_palace: Option<Arc<RwLock<BaguaMemoryPalace>>>,
     // ✨ v1.9.0: 两仪状态追踪器（时间维度演化）
     pub state_tracker: Option<Arc<crate::liangyyi::StateTracker>>,
+    // ✨ v1.29.0: 意图拆解器（Intent Decomposition）
+    pub intent_decomposer: Option<Arc<decomposition::IntentDecomposer>>,
 }
 
 impl Agent {
@@ -409,6 +415,7 @@ impl Agent {
                 likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
                 bagua_palace: None, // ✨ v1.8.4: 八卦记忆宫，稍后初始化
                 state_tracker: None, // ✨ v1.9.0: 两仪状态追踪器，稍后初始化
+                intent_decomposer: None, // ✨ v1.29.0: 意图拆解器，在配置 LLM 后初始化
             };
         }
 
@@ -502,6 +509,7 @@ impl Agent {
             likan_trigger: None, // ✨ Phase 4.3: 在启动后台循环时初始化
             bagua_palace: None, // ✨ v1.8.4: 八卦记忆宫，稍后初始化
             state_tracker: None, // ✨ v1.9.0: 两仪状态追踪器，稍后初始化
+            intent_decomposer: None, // ✨ v1.29.0: 意图拆解器，在配置 LLM 后初始化
         }
     }
 
@@ -855,6 +863,24 @@ impl Agent {
             println!("✨ 两仪状态追踪器已启动（时间维度）");
         } else {
             println!("ℹ️  两仪状态追踪器已禁用");
+        }
+    }
+
+    /// ✨ v1.29.0: 配置意图拆解器
+    ///
+    /// 在配置 LLM 客户端后调用，初始化意图拆解系统
+    pub fn configure_intent_decomposer(&mut self) {
+        // 获取 LLM 客户端（如果可用）
+        let llm_client = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let manager = self.llm_manager.read().await;
+                manager.primary().or(manager.fallback()).cloned()
+            })
+        });
+
+        if let Some(llm) = llm_client {
+            let decomposer = decomposition::IntentDecomposer::new(llm);
+            self.intent_decomposer = Some(Arc::new(decomposer));
         }
     }
 
@@ -2003,10 +2029,13 @@ impl Agent {
 
         // ✨ Phase 9.2: 特殊处理 /fix 命令
         // ✨ Phase 4.1: 特殊处理 /suggest 命令
+        // ✨ v1.29.0: 特殊处理 /decompose 命令
         let result = if cmd_name == "fix" {
             self.handle_fix_command()
         } else if cmd_name == "suggest" {
             self.handle_suggest_command()
+        } else if cmd_name == "decompose" {
+            self.handle_decompose_command(arg)
         } else {
             match self.registry.execute(cmd_name, arg) {
                 Ok(output) => {
@@ -2184,6 +2213,104 @@ impl Agent {
         ));
 
         output
+    }
+
+    /// ✨ v1.29.0: 处理 /decompose 命令 - 意图拆解可视化
+    fn handle_decompose_command(&self, query: &str) -> String {
+        // 检查拆解器是否已初始化
+        let decomposer = match &self.intent_decomposer {
+            Some(decomposer) => decomposer,
+            None => {
+                return format!(
+                    "{}\n{}",
+                    "⚠ 意图拆解系统未启用".yellow(),
+                    "提示: 意图拆解系统需要配置 LLM 客户端".dimmed()
+                );
+            }
+        };
+
+        // 检查是否提供了查询
+        if query.trim().is_empty() {
+            return format!(
+                "{}\n{}\n{}",
+                "❌ 请提供要拆解的自然语言查询".red(),
+                "用法: /decompose <自然语言查询>".dimmed(),
+                "示例: /decompose 加载 data.csv 并显示前 10 行".dimmed()
+            );
+        }
+
+        // 显示处理中提示
+        println!("{}", "🔍 分析意图中...".cyan());
+        let spinner = Spinner::new();
+
+        // 调用拆解器
+        let plan_result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                decomposer.decompose(query).await
+            })
+        });
+
+        spinner.stop();
+
+        match plan_result {
+            Ok(plan) => {
+                // 格式化输出拆解结果
+                let mut output = String::new();
+
+                // 头部信息
+                output.push_str(&format!("{}\n\n", "━━━ 🎯 意图拆解结果 ━━━".cyan().bold()));
+
+                // 意图理解
+                output.push_str(&format!(
+                    "💭 {}：{}\n\n",
+                    "AI 理解".yellow().bold(),
+                    plan.understanding.dimmed()
+                ));
+
+                // 执行步骤
+                output.push_str(&format!(
+                    "{} {}：\n",
+                    "📋".cyan(),
+                    format!("执行步骤 (共 {} 步)", plan.step_count()).cyan().bold()
+                ));
+
+                for (i, step) in plan.steps.iter().enumerate() {
+                    output.push_str(&format!(
+                        "\n  {} {}\n",
+                        format!("[{}]", i + 1).cyan().bold(),
+                        step.description.white().bold()
+                    ));
+                    output.push_str(&format!(
+                        "     🔧 工具: {} | ⏱️  预计: {}s\n",
+                        step.tool.green(),
+                        step.estimated_time
+                    ));
+                }
+
+                // 总预计时间
+                output.push_str(&format!(
+                    "\n⏰ {} {}s\n",
+                    "总预计时间:".dimmed(),
+                    plan.total_estimated_time.to_string().yellow().bold()
+                ));
+
+                // 底部提示
+                output.push_str(&format!(
+                    "\n{}\n{}",
+                    "━━━━━━━━━━━━━━━━━━".dimmed(),
+                    "💡 提示：v1.29.0 实现了意图拆解可视化，执行功能将在后续版本完善".dimmed()
+                ));
+
+                output
+            }
+            Err(e) => {
+                format!(
+                    "{}\n详情: {}",
+                    "❌ 意图拆解失败".red(),
+                    e.to_string().dimmed()
+                )
+            }
+        }
     }
 
     /// ✨ Phase 4.2: 处理数字快速执行建议

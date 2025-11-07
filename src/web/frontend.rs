@@ -953,6 +953,114 @@ const TERMINAL_JS: &str = r#"
                 });
             }
         }
+
+        // ===== v1.29.0: 意图拆解可视化方法 =====
+
+        showIntentUnderstanding(msg) {
+            // 创建意图理解卡片
+            const card = document.createElement('div');
+            card.className = 'intent-card';
+            card.dataset.planId = msg.plan_id;
+            card.innerHTML = `
+                <div class="intent-header">
+                    <span class="intent-icon">🎯</span>
+                    <span class="intent-title">意图拆解</span>
+                </div>
+                <div class="intent-understanding">
+                    <div class="understanding-label">💭 AI 理解：</div>
+                    <div class="understanding-content">${this.escapeHtml(msg.understanding)}</div>
+                </div>
+                <div class="intent-meta">
+                    <span class="step-count">📋 ${msg.step_count} 个步骤</span>
+                    <span class="total-time">⏱️ 预计 ${msg.total_time.toFixed(1)}s</span>
+                </div>
+                <div class="intent-steps" id="intent-steps-${msg.plan_id}">
+                    <!-- 步骤将动态添加 -->
+                </div>
+            `;
+
+            this.container.appendChild(card);
+            this.lines.push(card);
+            this.scrollToBottom();
+        }
+
+        updateStepProgress(msg) {
+            const stepsContainer = document.getElementById(`intent-steps-${msg.plan_id}`);
+            if (!stepsContainer) return;
+
+            // 查找或创建步骤元素
+            let stepElement = document.getElementById(`step-${msg.step_id}`);
+            if (!stepElement) {
+                stepElement = document.createElement('div');
+                stepElement.id = `step-${msg.step_id}`;
+                stepElement.className = 'intent-step';
+                stepElement.innerHTML = `
+                    <div class="step-header">
+                        <span class="step-number">[${msg.step_index + 1}]</span>
+                        <span class="step-description">${this.escapeHtml(msg.description)}</span>
+                        <span class="step-status"></span>
+                    </div>
+                    <div class="step-meta">
+                        <span class="step-tool">🔧 ${this.escapeHtml(msg.tool)}</span>
+                        <span class="step-time"></span>
+                    </div>
+                `;
+                stepsContainer.appendChild(stepElement);
+            }
+
+            // 更新步骤状态
+            const statusSpan = stepElement.querySelector('.step-status');
+            const timeSpan = stepElement.querySelector('.step-time');
+
+            switch (msg.status) {
+                case 'pending':
+                    stepElement.className = 'intent-step pending';
+                    statusSpan.textContent = '⏸️';
+                    break;
+                case 'running':
+                    stepElement.className = 'intent-step running';
+                    statusSpan.textContent = '⏳';
+                    break;
+                case 'success':
+                    stepElement.className = 'intent-step success';
+                    statusSpan.textContent = '✅';
+                    if (msg.elapsed_time) {
+                        timeSpan.textContent = `⏱️ ${msg.elapsed_time.toFixed(2)}s`;
+                    }
+                    break;
+                case 'failed':
+                    stepElement.className = 'intent-step failed';
+                    statusSpan.textContent = '❌';
+                    if (msg.elapsed_time) {
+                        timeSpan.textContent = `⏱️ ${msg.elapsed_time.toFixed(2)}s`;
+                    }
+                    break;
+            }
+
+            this.scrollToBottom();
+        }
+
+        showStepComplete(msg) {
+            const card = document.querySelector(`[data-plan-id="${msg.plan_id}"]`);
+            if (!card) return;
+
+            // 添加完成标记
+            const completeDiv = document.createElement('div');
+            completeDiv.className = msg.success ? 'intent-complete success' : 'intent-complete failed';
+            completeDiv.innerHTML = `
+                <div class="complete-icon">${msg.success ? '✅' : '❌'}</div>
+                <div class="complete-text">
+                    ${msg.success ? '执行成功' : '执行失败'}
+                    <span class="complete-time">总用时: ${msg.total_time.toFixed(2)}s</span>
+                </div>
+            `;
+            card.appendChild(completeDiv);
+
+            // 标记卡片为已完成
+            card.classList.add('completed');
+
+            this.scrollToBottom();
+        }
     }
 
     // ========== i18n 国际化支持 ==========
@@ -1273,6 +1381,22 @@ const TERMINAL_JS: &str = r#"
                     terminal.createRound(round);
                     terminal.completeRound(round);
                 });
+                break;
+
+            // ===== v1.29.0: 意图拆解可视化消息 =====
+            case 'intent_understanding':
+                // 意图理解：显示AI对用户意图的理解
+                terminal.showIntentUnderstanding(msg);
+                break;
+
+            case 'step_progress':
+                // 步骤进度：更新执行步骤的状态
+                terminal.updateStepProgress(msg);
+                break;
+
+            case 'step_complete':
+                // 执行完成：显示最终结果
+                terminal.showStepComplete(msg);
                 break;
         }
     };
@@ -2355,5 +2479,217 @@ body::before {
     border: 2px solid rgba(0, 240, 255, 0.4);
     margin: 0.5em 0;
     box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+}
+
+/* ========== v1.29.0: 意图拆解可视化样式 ========== */
+
+/* 意图卡片 */
+.intent-card {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.05) 0%, rgba(138, 43, 226, 0.05) 100%);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 8px;
+    margin: 1em 0;
+    padding: 1.5em;
+    box-shadow: 0 4px 15px rgba(0, 240, 255, 0.2);
+    animation: fadeInSlide 0.4s ease-out;
+}
+
+.intent-card.completed {
+    border-color: rgba(0, 255, 100, 0.3);
+    background: linear-gradient(135deg, rgba(0, 255, 100, 0.05) 0%, rgba(0, 240, 255, 0.05) 100%);
+}
+
+/* 意图头部 */
+.intent-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 1em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.intent-icon {
+    font-size: 1.5em;
+}
+
+.intent-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #00f0ff;
+}
+
+/* 意图理解 */
+.intent-understanding {
+    margin: 1em 0;
+}
+
+.understanding-label {
+    color: #ffb700;
+    font-weight: 500;
+    margin-bottom: 0.5em;
+}
+
+.understanding-content {
+    color: #e0e0e0;
+    padding: 0.5em 1em;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    border-left: 3px solid #ffb700;
+}
+
+/* 元信息 */
+.intent-meta {
+    display: flex;
+    gap: 1.5em;
+    margin: 1em 0;
+    font-size: 0.9em;
+    color: #b0b0b0;
+}
+
+.step-count, .total-time {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+}
+
+/* 步骤容器 */
+.intent-steps {
+    margin-top: 1em;
+}
+
+/* 单个步骤 */
+.intent-step {
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 3px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    margin: 0.5em 0;
+    padding: 0.8em 1em;
+    transition: all 0.3s ease;
+}
+
+.intent-step.running {
+    border-left-color: #ffb700;
+    background: rgba(255, 183, 0, 0.1);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.intent-step.success {
+    border-left-color: #00ff64;
+    background: rgba(0, 255, 100, 0.1);
+}
+
+.intent-step.failed {
+    border-left-color: #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+}
+
+/* 步骤头部 */
+.step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+.step-number {
+    color: #00f0ff;
+    font-weight: 600;
+    min-width: 2em;
+}
+
+.step-description {
+    flex: 1;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.step-status {
+    font-size: 1.2em;
+    min-width: 1.5em;
+    text-align: center;
+}
+
+/* 步骤元信息 */
+.step-meta {
+    display: flex;
+    gap: 1em;
+    font-size: 0.9em;
+    color: #b0b0b0;
+    margin-left: 2em;
+}
+
+.step-tool {
+    color: #00ff64;
+}
+
+.step-time {
+    color: #ffb700;
+}
+
+/* 完成标记 */
+.intent-complete {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-top: 1.5em;
+    padding: 1em;
+    border-radius: 6px;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.intent-complete.success {
+    background: rgba(0, 255, 100, 0.15);
+    border: 1px solid rgba(0, 255, 100, 0.4);
+}
+
+.intent-complete.failed {
+    background: rgba(255, 68, 68, 0.15);
+    border: 1px solid rgba(255, 68, 68, 0.4);
+}
+
+.complete-icon {
+    font-size: 2em;
+}
+
+.complete-text {
+    flex: 1;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.complete-time {
+    margin-left: 1em;
+    color: #ffb700;
+}
+
+/* 动画 */
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 183, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 15px 5px rgba(255, 183, 0, 0.2);
+    }
 }
 "#;

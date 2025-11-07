@@ -567,6 +567,9 @@ async fn main() {
     // ✨ Phase 4.1: 配置主动建议系统
     agent.configure_suggestion_engine();
 
+    // ✨ v1.29.0: 配置意图拆解器
+    agent.configure_intent_decomposer();
+
     // ✨ Phase 4.3: 启动离坎炼化炉后台循环
     agent.start_likan_background_cycle();
 

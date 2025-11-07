@@ -221,6 +221,12 @@ async fn execute_system_command(
         return Ok(());
     }
 
+    // ===== v1.29.0: 特殊处理意图拆解命令 =====
+    if cmd == "decompose" {
+        eprintln!("🔍 [Web] Handling decompose command with args: {}", args_str);
+        return execute_decompose_command(&args_str, agent, session, sender).await;
+    }
+
     // ===== 创建回合 =====
     let round = session.create_round(
         crate::web::session::RoundType::System,
@@ -758,4 +764,125 @@ fn extract_tools_from_response(llm_response: &crate::services::LlmResponse) -> V
     }
     
     tools
+}
+
+/// ===== v1.29.0: 执行意图拆解命令 =====
+///
+/// 处理 `/decompose` 命令的 WebSocket 版本
+///
+/// ## 消息流程
+/// ```
+/// IntentUnderstanding → StepProgress (pending) × N → (未来执行时会有更多消息)
+/// ```
+async fn execute_decompose_command(
+    query: &str,
+    agent: &crate::agent::Agent,
+    _session: &Arc<Session>,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::agent::decomposition::StepStatus;
+
+    eprintln!("📋 [Decompose] Starting with query: {}", query);
+
+    // 检查拆解器是否已初始化
+    let decomposer = match &agent.intent_decomposer {
+        Some(d) => d,
+        None => {
+            let error_msg = ServerMessage::Error {
+                content: format!("{}\n{}",
+                    "⚠ 意图拆解系统未启用",
+                    "提示: 意图拆解系统需要配置 LLM 客户端"),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&error_msg)?))
+                .await?;
+            return Ok(());
+        }
+    };
+
+    // 检查是否提供了查询
+    if query.trim().is_empty() {
+        let error_msg = ServerMessage::Error {
+            content: format!("{}\n{}\n{}",
+                "❌ 请提供要拆解的自然语言查询",
+                "用法: /decompose <自然语言查询>",
+                "示例: /decompose 加载 data.csv 并显示前 10 行"),
+        };
+        sender
+            .send(Message::Text(serde_json::to_string(&error_msg)?))
+            .await?;
+        return Ok(());
+    }
+
+    // 发送思考状态
+    let thinking_msg = ServerMessage::Thinking {
+        model: "意图拆解中...".to_string(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&thinking_msg)?))
+        .await?;
+
+    // 调用拆解器
+    match decomposer.decompose(query).await {
+        Ok(plan) => {
+            // 1. 发送意图理解消息
+            let understanding_msg = ServerMessage::IntentUnderstanding {
+                plan_id: plan.id.clone(),
+                understanding: plan.understanding.clone(),
+                step_count: plan.steps.len(),
+                total_time: plan.total_estimated_time,
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&understanding_msg)?))
+                .await?;
+
+            // 2. 发送每个步骤的初始状态（pending）
+            for (index, step) in plan.steps.iter().enumerate() {
+                let status_str = match step.status {
+                    StepStatus::Pending => "pending",
+                    StepStatus::Running => "running",
+                    StepStatus::Success => "success",
+                    StepStatus::Failed => "failed",
+                    StepStatus::Skipped => "skipped",
+                };
+
+                let progress_msg = ServerMessage::StepProgress {
+                    plan_id: plan.id.clone(),
+                    step_index: index,
+                    step_id: step.id.clone(),
+                    description: step.description.clone(),
+                    tool: step.tool.clone(),
+                    status: status_str.to_string(),
+                    elapsed_time: step.actual_time,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&progress_msg)?))
+                    .await?;
+            }
+
+            // 3. 发送完成提示（当前版本只显示计划，不执行）
+            let output_msg = ServerMessage::Output {
+                content: format!(
+                    "\n💡 提示：v1.29.0 实现了意图拆解可视化，执行功能将在后续版本完善\n\
+                    📊 计划ID: {}\n\
+                    ⏰ 总预计时间: {:.1}s",
+                    plan.id,
+                    plan.total_estimated_time
+                ),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&output_msg)?))
+                .await?;
+        }
+        Err(e) => {
+            let error_msg = ServerMessage::Error {
+                content: format!("❌ 意图拆解失败\n详情: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&error_msg)?))
+                .await?;
+        }
+    }
+
+    Ok(())
 }
