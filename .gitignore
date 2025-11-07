@@ -56,8 +56,8 @@ perf.data*
 *.svg
 *.prof
 
-# Claude 配置（私有）
-.claude/
+# Claude 配置（仅忽略本地配置）
+.claude/settings.local.json
 
 # 备份文件
 *.bak
