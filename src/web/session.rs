@@ -155,6 +155,37 @@ pub enum ServerMessage {
     /// 历史回合列表（初始加载或重连）
     #[serde(rename = "round_history")]
     RoundHistory { rounds: Vec<ConversationRound> },
+
+    // ===== v1.29.0 新增：意图拆解可视化消息 =====
+    /// 意图理解（显示AI对意图的理解）
+    #[serde(rename = "intent_understanding")]
+    IntentUnderstanding {
+        plan_id: String,
+        understanding: String,
+        step_count: usize,
+        total_time: f64,
+    },
+
+    /// 步骤进度（执行中的步骤更新）
+    #[serde(rename = "step_progress")]
+    StepProgress {
+        plan_id: String,
+        step_index: usize,
+        step_id: String,
+        description: String,
+        tool: String,
+        status: String, // "pending" | "running" | "success" | "failed"
+        elapsed_time: Option<f64>,
+    },
+
+    /// 步骤完成（整个计划执行完成）
+    #[serde(rename = "step_complete")]
+    StepComplete {
+        plan_id: String,
+        success: bool,
+        total_time: f64,
+        outputs: Vec<String>,
+    },
 }
 
 /// Web 终端会话
@@ -186,6 +217,9 @@ impl Session {
 
         // 配置 LLM（参考 main.rs），记录初始化错误
         let llm_init_error = Self::configure_llm(&mut agent, &web_config).await;
+
+        // ✨ v1.29.0: 配置意图拆解器
+        agent.configure_intent_decomposer();
 
         // ✨ 为每个 Web 会话创建独立的对话 ID
         let conversation_id = format!("web-{}", Uuid::new_v4());
