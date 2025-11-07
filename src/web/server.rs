@@ -638,7 +638,7 @@ const TERMINAL_JS: &str = r#"
                         // 显示模型名称（如果有）
                         const timeSpan = this.currentRound.element.querySelector('.round-time');
                         if (timeSpan && modelName) {
-                            timeSpan.textContent = `${modelName} 思考中...`;
+                            timeSpan.textContent = `${modelName} ...`;
                         }
                     }
                 }
@@ -656,7 +656,7 @@ const TERMINAL_JS: &str = r#"
 
             const text = document.createElement('span');
             text.className = 'spinner-text';
-            text.textContent = modelName || '思考中...';
+            text.textContent = modelName || '...';
 
             line.appendChild(icon);
             line.appendChild(text);
@@ -769,6 +769,7 @@ const TERMINAL_JS: &str = r#"
             const roundData = {
                 id: round.id,
                 index: round.index,
+                roundType: round.round_type || 'llm', // v1.28.0+: llm/shell/system
                 userInput: round.user_input,
                 aiResponse: round.ai_response || '',
                 toolsUsed: round.tools_used || [],
@@ -814,15 +815,24 @@ const TERMINAL_JS: &str = r#"
             roundDiv.className = 'conversation-round expanded';
             roundDiv.dataset.roundId = round.id;
 
+            // 根据类型确定标签和图标
+            const typeConfig = this.getRoundTypeConfig(round.roundType);
+
             // 回合头部
             const header = document.createElement('div');
             header.className = 'round-header';
+
+            // 对于 Shell/System 命令，不显示工具使用
+            const toolsHtml = (round.roundType === 'llm')
+                ? `<span class="round-tools">${this.renderTools(round.toolsUsed)}</span>`
+                : '';
+
             header.innerHTML = `
                 <div class="round-info">
-                    <span class="round-number">Round #${round.index}</span>
+                    <span class="round-number">${typeConfig.badge} #${round.index}</span>
                     <span class="round-status ${round.status}">${this.getStatusIcon(round.status)}</span>
                     <span class="round-time">${round.executionTime.toFixed(2)}s</span>
-                    <span class="round-tools">${this.renderTools(round.toolsUsed)}</span>
+                    ${toolsHtml}
                     <span class="round-summary">${this.escapeHtml(round.userInput.substring(0, 50))}${round.userInput.length > 50 ? '...' : ''}</span>
                 </div>
                 <button class="round-toggle" data-action="collapse">▼</button>
@@ -836,11 +846,11 @@ const TERMINAL_JS: &str = r#"
             const inputDiv = document.createElement('div');
             inputDiv.className = 'round-input';
             inputDiv.innerHTML = `
-                <span class="round-input-label">📥 Input:</span>
+                <span class="round-input-label">${typeConfig.inputLabel}</span>
                 <div class="round-input-content">${this.escapeHtml(round.userInput)}</div>
             `;
 
-            // AI 输出
+            // 输出
             const outputDiv = document.createElement('div');
             outputDiv.className = 'round-output';
             outputDiv.innerHTML = `
@@ -862,6 +872,28 @@ const TERMINAL_JS: &str = r#"
             });
 
             return roundDiv;
+        }
+
+        // 获取回合类型配置
+        getRoundTypeConfig(roundType) {
+            const configs = {
+                'llm': {
+                    badge: 'Round',
+                    inputLabel: '📥 Input:',
+                    outputLabel: '📤 Output:'
+                },
+                'shell': {
+                    badge: '💻 Shell',
+                    inputLabel: '💻 Command:',
+                    outputLabel: '📤 Output:'
+                },
+                'system': {
+                    badge: '⚙️ System',
+                    inputLabel: '⚙️ Command:',
+                    outputLabel: '📤 Output:'
+                }
+            };
+            return configs[roundType] || configs['llm'];
         }
 
         updateRoundStatus(roundId, status) {
@@ -894,11 +926,25 @@ const TERMINAL_JS: &str = r#"
             timeSpan.textContent = `${roundData.execution_time.toFixed(2)}s`;
 
             const toolsSpan = round.element.querySelector('.round-tools');
-            toolsSpan.innerHTML = this.renderTools(roundData.tools_used);
+            if (toolsSpan) {  // Shell/System 命令可能没有 toolsSpan
+                toolsSpan.innerHTML = this.renderTools(roundData.tools_used);
+            }
 
+            // 渲染输出内容
             const outputContent = round.element.querySelector('.output-content');
             if (round.aiResponse) {
-                outputContent.innerHTML = this.markdownRenderer.render(round.aiResponse);
+                // 根据回合类型选择渲染方式
+                if (round.roundType === 'llm') {
+                    // LLM 对话：使用 Markdown 渲染
+                    outputContent.innerHTML = this.markdownRenderer.render(round.aiResponse);
+                } else {
+                    // Shell/System 命令：使用 <pre> 保留格式
+                    const pre = document.createElement('pre');
+                    pre.className = 'terminal-text';
+                    pre.textContent = round.aiResponse;
+                    outputContent.innerHTML = '';
+                    outputContent.appendChild(pre);
+                }
             }
 
             // 滚动到底部
@@ -1287,7 +1333,8 @@ const TERMINAL_JS: &str = r#"
 
             // ===== v1.28.0: 对话回合消息 =====
             case 'round_start':
-                // 回合开始
+                // 回合开始：总是创建回合（维护数据）
+                // 注意：不需要在这里显示命令，handleSubmit() 已经显示过了
                 terminal.createRound(msg.round);
                 break;
 
@@ -1297,8 +1344,15 @@ const TERMINAL_JS: &str = r#"
                 break;
 
             case 'round_complete':
-                // 回合完成
+                // 回合完成：总是完成回合（维护数据），传统模式下额外显示输出
                 terminal.completeRound(msg.round);
+                if (terminal.viewMode === 'stream') {
+                    // 传统模式：只有 Shell/System 命令才额外显示输出
+                    // LLM 对话已经通过 stream 消息显示过了，不需要重复显示
+                    if (msg.round.round_type !== 'llm' && msg.round.ai_response) {
+                        terminal.writeOutput(msg.round.ai_response);
+                    }
+                }
                 break;
 
             case 'round_history':

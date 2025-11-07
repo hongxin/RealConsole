@@ -150,11 +150,11 @@ async fn handle_input(
             } else {
                 format!("{} {}", cmd, args)
             };
-            execute_system_command(&cmd_input, &agent, sender).await
+            execute_system_command(&cmd_input, &agent, session, sender).await
         }
         CommandType::CommonShell(cmd) | CommandType::ForcedShell(cmd) => {
             // Shell 命令（常见命令自动识别 或 !前缀强制）
-            execute_shell_command(&format!("!{}", cmd), &agent, sender).await
+            execute_shell_command(&format!("!{}", cmd), &agent, session, sender).await
         }
         CommandType::NaturalLanguage(text) => {
             // 自然语言：先尝试 Intent 匹配，否则回退到 LLM 对话
@@ -179,10 +179,11 @@ async fn handle_input(
     Ok(())
 }
 
-/// 执行系统命令
+/// 执行系统命令（v1.28.0: 统一回合系统）
 async fn execute_system_command(
     cmd_name: &str,
     agent: &crate::agent::Agent,
+    session: &Arc<Session>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
 ) -> anyhow::Result<()> {
     // 解析命令和参数
@@ -194,7 +195,7 @@ async fn execute_system_command(
     let cmd = parts[0];
     let args_str = parts[1..].join(" ");
 
-    // 特殊处理清屏命令
+    // 特殊处理清屏命令（不创建回合）
     if cmd == "clear" {
         let msg = ServerMessage::Clear;
         sender
@@ -203,55 +204,141 @@ async fn execute_system_command(
         return Ok(());
     }
 
-    // 执行命令（简化版本）
+    // ===== 创建回合 =====
+    let round = session.create_round(
+        crate::web::session::RoundType::System,
+        cmd_name.to_string(),
+        "system".to_string()
+    ).await;
+    let round_id = round.id.clone();
+
+    // 发送 RoundStart 消息
+    let round_start_msg = ServerMessage::RoundStart {
+        round: round.clone(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&round_start_msg)?))
+        .await?;
+
+    // 记录开始时间
+    let start_time = Instant::now();
+
+    // 执行命令
     match agent.registry.execute(cmd, &args_str) {
         Ok(output) => {
-            let msg = ServerMessage::Output { content: output };
-            sender
-                .send(Message::Text(serde_json::to_string(&msg)?))
-                .await?;
+            let execution_time = start_time.elapsed().as_secs_f64();
+
+            // 完成回合
+            if let Some(completed_round) = session.complete_round(
+                &round_id,
+                output,
+                execution_time,
+                Vec::new(), // 系统命令没有工具使用
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
         }
         Err(e) => {
-            let msg = ServerMessage::Error {
-                content: format!("{}: {}", i18n::t("web.command.execution_error"), e),
-            };
-            sender
-                .send(Message::Text(serde_json::to_string(&msg)?))
-                .await?;
+            // 标记回合失败
+            let error_msg = format!("{}: {}", i18n::t("web.command.execution_error"), e);
+            if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
         }
     }
 
     Ok(())
 }
 
-/// 执行 Shell 命令
+/// 执行 Shell 命令（v1.28.0: 统一回合系统）
 async fn execute_shell_command(
     input: &str,
     _agent: &crate::agent::Agent,
+    session: &Arc<Session>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
 ) -> anyhow::Result<()> {
     let cmd = input.trim_start_matches('!').trim();
+
+    // ===== 创建回合 =====
+    let round = session.create_round(
+        crate::web::session::RoundType::Shell,
+        cmd.to_string(),
+        "shell".to_string()
+    ).await;
+    let round_id = round.id.clone();
+
+    // 发送 RoundStart 消息
+    let round_start_msg = ServerMessage::RoundStart {
+        round: round.clone(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&round_start_msg)?))
+        .await?;
+
+    // 记录开始时间
+    let start_time = Instant::now();
 
     // 使用 tokio 执行 shell 命令
     let output = tokio::process::Command::new("sh")
         .arg("-c")
         .arg(cmd)
         .output()
-        .await?;
+        .await;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    // 计算执行时间
+    let execution_time = start_time.elapsed().as_secs_f64();
 
-    let result = if !stderr.is_empty() {
-        format!("{}{}", stdout, stderr)
-    } else {
-        stdout.to_string()
-    };
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
 
-    let msg = ServerMessage::Output { content: result };
-    sender
-        .send(Message::Text(serde_json::to_string(&msg)?))
-        .await?;
+            let result = if !stderr.is_empty() {
+                format!("{}{}", stdout, stderr)
+            } else {
+                stdout.to_string()
+            };
+
+            // 完成回合
+            if let Some(completed_round) = session.complete_round(
+                &round_id,
+                result,
+                execution_time,
+                Vec::new(), // Shell 命令没有工具使用
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+        }
+        Err(e) => {
+            // 标记回合失败
+            if let Some(failed_round) = session.fail_round(
+                &round_id,
+                format!("Shell command execution failed: {}", e),
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+        }
+    }
 
     Ok(())
 }
@@ -309,7 +396,11 @@ async fn execute_llm_chat(
     drop(llm_manager);
 
     // ===== v1.28.0: 创建对话回合 =====
-    let round = session.create_round(input.to_string(), model_name.clone()).await;
+    let round = session.create_round(
+        crate::web::session::RoundType::Llm,
+        input.to_string(),
+        model_name.clone()
+    ).await;
     let round_id = round.id.clone();
 
     // 发送 RoundStart 消息

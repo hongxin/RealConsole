@@ -16,6 +16,18 @@ use uuid::Uuid;
 /// 会话 ID
 pub type SessionId = String;
 
+/// 对话回合类型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RoundType {
+    /// LLM 对话
+    Llm,
+    /// Shell 命令
+    Shell,
+    /// 系统命令
+    System,
+}
+
 /// 对话回合状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -41,6 +53,9 @@ pub struct ConversationRound {
     /// 回合序号（从 1 开始）
     pub index: usize,
 
+    /// 回合类型
+    pub round_type: RoundType,
+
     /// 用户输入
     pub user_input: String,
 
@@ -65,10 +80,11 @@ pub struct ConversationRound {
 
 impl ConversationRound {
     /// 创建新回合
-    pub fn new(index: usize, user_input: String, model: String) -> Self {
+    pub fn new(index: usize, round_type: RoundType, user_input: String, model: String) -> Self {
         Self {
             id: format!("round-{}", Uuid::new_v4()),
             index,
+            round_type,
             user_input,
             ai_response: String::new(),
             tools_used: Vec::new(),
@@ -187,10 +203,10 @@ impl Session {
     // ===== v1.28.0 新增：回合管理方法 =====
 
     /// 创建新回合
-    pub async fn create_round(&self, user_input: String, model: String) -> ConversationRound {
+    pub async fn create_round(&self, round_type: RoundType, user_input: String, model: String) -> ConversationRound {
         let mut rounds = self.rounds.write().await;
         let index = rounds.len() + 1;
-        let round = ConversationRound::new(index, user_input, model);
+        let round = ConversationRound::new(index, round_type, user_input, model);
         rounds.push(round.clone());
         round
     }
