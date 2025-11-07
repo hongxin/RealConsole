@@ -55,7 +55,7 @@ impl TaskSubcommand {
     /// - "save my_task" -> Save { name: Some("my_task") }
     /// - "load 0" -> Load { id: 0 }
     pub fn parse(input: &str) -> Result<Self, String> {
-        let parts: Vec<&str> = input.trim().split_whitespace().collect();
+        let parts: Vec<&str> = input.split_whitespace().collect();
 
         if parts.is_empty() {
             return Ok(Self::Help);
@@ -106,23 +106,20 @@ impl TaskSubcommand {
         println!();
         println!("{}:", "子命令".yellow());
         println!(
-            "  {:<20} {}",
-            "save [name]".green(),
-            "保存当前任务（可选命名）"
+            "  {:<20} 保存当前任务（可选命名）",
+            "save [name]".green()
         );
-        println!("  {:<20} {}", "list".green(), "列出所有保存的任务");
+        println!("  {:<20} 列出所有保存的任务", "list".green());
         println!(
-            "  {:<20} {}",
-            "load <id>".green(),
-            "加载任务到当前会话"
+            "  {:<20} 加载任务到当前会话",
+            "load <id>".green()
         );
-        println!("  {:<20} {}", "show".green(), "显示当前任务详情");
+        println!("  {:<20} 显示当前任务详情", "show".green());
         println!(
-            "  {:<20} {}",
-            "delete <id>".green(),
-            "删除保存的任务"
+            "  {:<20} 删除保存的任务",
+            "delete <id>".green()
         );
-        println!("  {:<20} {}", "help".green(), "显示此帮助信息");
+        println!("  {:<20} 显示此帮助信息", "help".green());
         println!();
         println!("{}:", "示例".yellow());
         println!("  /task save my_build");

@@ -115,14 +115,14 @@ impl TypeChecker {
         }
 
         // 处理类型变量
-        if let Type::TypeVar(name) = expected {
+        if let Type::Var(name) = expected {
             if let Some(bound_type) = self.get_type_var(name) {
                 return self.check_assignable(bound_type, actual, context);
             }
             return Err(TypeError::UndefinedTypeVar { name: name.clone() });
         }
 
-        if let Type::TypeVar(name) = actual {
+        if let Type::Var(name) = actual {
             if let Some(bound_type) = self.get_type_var(name) {
                 return self.check_assignable(expected, bound_type, context);
             }
@@ -472,13 +472,13 @@ mod tests {
         checker.bind_type_var("T".to_string(), Type::string());
 
         // 使用类型变量
-        let type_var = Type::TypeVar("T".to_string());
+        let type_var = Type::Var("T".to_string());
         assert!(checker
             .check_assignable(&type_var, &Type::string(), "test")
             .is_ok());
 
         // 未绑定的类型变量应该报错
-        let unbound_var = Type::TypeVar("U".to_string());
+        let unbound_var = Type::Var("U".to_string());
         assert!(checker
             .check_assignable(&unbound_var, &Type::string(), "test")
             .is_err());

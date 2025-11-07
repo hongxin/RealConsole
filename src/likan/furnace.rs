@@ -307,7 +307,7 @@ mod tests {
 
         // 应该有时间差
         let elapsed = furnace.time_since_last_cycle().unwrap();
-        assert!(elapsed >= 0);
+        assert!(elapsed > 0); // elapsed is i64, should be positive after sleep
     }
 
     #[tokio::test]

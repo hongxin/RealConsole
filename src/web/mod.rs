@@ -22,5 +22,6 @@
 pub mod server;
 pub mod session;
 pub mod websocket;
+pub mod frontend;
 
 pub use server::WebServer;

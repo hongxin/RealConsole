@@ -30,7 +30,7 @@ impl TypeInference {
     pub fn fresh_type_var(&mut self) -> Type {
         let name = format!("T{}", self.var_counter);
         self.var_counter += 1;
-        Type::TypeVar(name)
+        Type::Var(name)
     }
 
     /// 统一两个类型（解决类型变量）
@@ -47,11 +47,11 @@ impl TypeInference {
             (_, Type::Any) => Ok(t1.clone()),
 
             // 类型变量统一
-            (Type::TypeVar(name), _) => {
+            (Type::Var(name), _) => {
                 self.bind_type_var(name.clone(), t2.clone());
                 Ok(t2.clone())
             }
-            (_, Type::TypeVar(name)) => {
+            (_, Type::Var(name)) => {
                 self.bind_type_var(name.clone(), t1.clone());
                 Ok(t1.clone())
             }
@@ -140,7 +140,7 @@ impl TypeInference {
     /// 绑定类型变量
     fn bind_type_var(&mut self, name: String, ty: Type) {
         // 避免循环引用
-        if let Type::TypeVar(var_name) = &ty {
+        if let Type::Var(var_name) = &ty {
             if var_name == &name {
                 return;
             }
@@ -153,7 +153,7 @@ impl TypeInference {
     /// 解析类型变量到具体类型
     pub fn resolve_type(&self, ty: &Type) -> Type {
         match ty {
-            Type::TypeVar(name) => {
+            Type::Var(name) => {
                 if let Some(resolved) = self.unification_map.get(name) {
                     // 递归解析
                     self.resolve_type(resolved)
@@ -192,7 +192,7 @@ impl TypeInference {
         substitutions: &HashMap<String, Type>,
     ) -> Type {
         match generic_type {
-            Type::TypeVar(name) => substitutions
+            Type::Var(name) => substitutions
                 .get(name)
                 .cloned()
                 .unwrap_or_else(|| generic_type.clone()),
@@ -268,8 +268,8 @@ mod tests {
         let t1 = inference.fresh_type_var();
         let t2 = inference.fresh_type_var();
 
-        assert!(matches!(t1, Type::TypeVar(_)));
-        assert!(matches!(t2, Type::TypeVar(_)));
+        assert!(matches!(t1, Type::Var(_)));
+        assert!(matches!(t2, Type::Var(_)));
         assert_ne!(t1, t2); // 不同的类型变量
     }
 
@@ -371,7 +371,7 @@ mod tests {
         let mut inference = TypeInference::new();
 
         // 定义泛型类型 List<T>
-        let generic_list = Type::list(Type::TypeVar("T".to_string()));
+        let generic_list = Type::list(Type::Var("T".to_string()));
 
         // 实例化为 List<String>
         let mut substitutions = HashMap::new();

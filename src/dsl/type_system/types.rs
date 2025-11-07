@@ -70,7 +70,7 @@ pub enum Type {
     /// 领域类型
     Domain(DomainType),
     /// 泛型类型变量 (用于类型推导)
-    TypeVar(String),
+    Var(String),
     /// 任意类型 (用于动态类型)
     Any,
 }
@@ -187,7 +187,7 @@ impl Type {
 
     /// 判断是否为类型变量
     pub fn is_type_var(&self) -> bool {
-        matches!(self, Type::TypeVar(_))
+        matches!(self, Type::Var(_))
     }
 
     /// 判断是否为 Any 类型
@@ -238,7 +238,7 @@ impl fmt::Display for Type {
             Type::Primitive(p) => write!(f, "{}", p),
             Type::Composite(c) => write!(f, "{}", c),
             Type::Domain(d) => write!(f, "{}", d),
-            Type::TypeVar(name) => write!(f, "${}", name),
+            Type::Var(name) => write!(f, "${}", name),
             Type::Any => write!(f, "Any"),
         }
     }

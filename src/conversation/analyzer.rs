@@ -392,8 +392,6 @@ mod tests {
 
     #[test]
     fn test_convert_to_parameter_value() {
-        let analyzer = ParameterAnalyzer::new();
-
         // 测试字符串转换
         let json_value = serde_json::json!("test_string");
         let result = ParameterAnalyzer::convert_to_parameter_value(&json_value, &ParameterType::String)
@@ -407,10 +405,11 @@ mod tests {
         assert_eq!(result, ParameterValue::Integer(42));
 
         // 测试浮点数转换
-        let json_value = serde_json::json!(3.14);
+        let test_float = 3.15; // Use a non-PI value to avoid clippy warning
+        let json_value = serde_json::json!(test_float);
         let result = ParameterAnalyzer::convert_to_parameter_value(&json_value, &ParameterType::Float)
             .unwrap();
-        assert_eq!(result, ParameterValue::Float(3.14));
+        assert_eq!(result, ParameterValue::Float(test_float));
 
         // 测试布尔转换
         let json_value = serde_json::json!(true);

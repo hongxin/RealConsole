@@ -14,36 +14,36 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 注册核心命令
 pub fn register_core_commands(registry: &mut CommandRegistry) {
     // /help 命令
-    let help_cmd = Command::from_fn("help", &i18n::t("cli.cmd.help.desc"), cmd_help)
+    let help_cmd = Command::from_fn("help", i18n::t("cli.cmd.help.desc"), cmd_help)
         .with_aliases(vec!["h".to_string(), "?".to_string()])
         .with_group("core");
     registry.register(help_cmd);
 
     // /quit 命令
-    let quit_cmd = Command::from_fn("quit", &i18n::t("cli.cmd.quit.desc"), cmd_quit)
+    let quit_cmd = Command::from_fn("quit", i18n::t("cli.cmd.quit.desc"), cmd_quit)
         .with_aliases(vec!["q".to_string(), "exit".to_string()])
         .with_group("core");
     registry.register(quit_cmd);
 
     // /version 命令
-    let version_cmd = Command::from_fn("version", &i18n::t("cli.cmd.version.desc"), cmd_version)
+    let version_cmd = Command::from_fn("version", i18n::t("cli.cmd.version.desc"), cmd_version)
         .with_aliases(vec!["v".to_string()])
         .with_group("core");
     registry.register(version_cmd);
 
     // /commands 命令（列出所有命令）
     let commands_cmd =
-        Command::from_fn("commands", &i18n::t("cli.cmd.commands.desc"), cmd_commands).with_group("core");
+        Command::from_fn("commands", i18n::t("cli.cmd.commands.desc"), cmd_commands).with_group("core");
     registry.register(commands_cmd);
 
     // /examples 命令（使用示例）
-    let examples_cmd = Command::from_fn("examples", &i18n::t("cli.cmd.examples.desc"), cmd_examples)
+    let examples_cmd = Command::from_fn("examples", i18n::t("cli.cmd.examples.desc"), cmd_examples)
         .with_aliases(vec!["ex".to_string()])
         .with_group("core");
     registry.register(examples_cmd);
 
     // /quickref 命令（快速参考）
-    let quickref_cmd = Command::from_fn("quickref", &i18n::t("cli.cmd.quickref.desc"), cmd_quickref)
+    let quickref_cmd = Command::from_fn("quickref", i18n::t("cli.cmd.quickref.desc"), cmd_quickref)
         .with_aliases(vec!["qr".to_string()])
         .with_group("core");
     registry.register(quickref_cmd);
