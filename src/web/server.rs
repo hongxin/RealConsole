@@ -154,9 +154,12 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <h1 data-i18n="web.header.title">🌟 RealConsole Web 终端</h1>
             <p data-i18n="web.header.tagline">融合东方哲学智慧的智能 CLI Agent</p>
         </div>
-        <div id="lang-switcher">
-            <button onclick="setLanguage('zh-CN')" id="btn-zh" class="active">中文</button>
-            <button onclick="setLanguage('en-US')" id="btn-en">English</button>
+        <div id="header-controls">
+            <div id="lang-switcher">
+                <button onclick="setLanguage('zh-CN')" id="btn-zh" class="active">中文</button>
+                <button onclick="setLanguage('en-US')" id="btn-en">English</button>
+            </div>
+            <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合模式</button>
         </div>
     </div>
     <div id="terminal-container">
@@ -396,6 +399,11 @@ const TERMINAL_JS: &str = r#"
             this.isStreaming = false;
             this.isComposing = false;  // 输入法组合状态
 
+            // ===== v1.28.0: 对话回合管理 =====
+            this.rounds = [];           // 回合列表
+            this.currentRound = null;   // 当前执行的回合
+            this.viewMode = 'round';    // 视图模式: 'round' (回合卡片) 或 'stream' (流式输出)
+
             this.init();
         }
 
@@ -561,6 +569,9 @@ const TERMINAL_JS: &str = r#"
         // ========== 输出方法 ==========
 
         writeCommand(command) {
+            // 回合模式下跳过命令回显（已在回合卡片中显示）
+            if (this.viewMode === 'round') return;
+
             const line = document.createElement('div');
             line.className = 'terminal-line line-command';
             line.innerHTML = `<span class="prompt">% </span><span class="command">${this.escapeHtml(command)}</span>`;
@@ -568,6 +579,9 @@ const TERMINAL_JS: &str = r#"
         }
 
         writeOutput(content) {
+            // 回合模式下跳过输出（已在回合卡片中显示）
+            if (this.viewMode === 'round') return;
+
             // 自动检测 Markdown
             if (this.markdownRenderer.isMarkdown(content)) {
                 this.writeMarkdown(content);
@@ -576,7 +590,10 @@ const TERMINAL_JS: &str = r#"
             }
         }
 
-        writePlainText(content) {
+        writePlainText(content, isSystemMessage = false) {
+            // 回合模式下跳过（除非是系统消息）
+            if (this.viewMode === 'round' && !isSystemMessage) return;
+
             const line = document.createElement('div');
             line.className = 'terminal-line line-output';
 
@@ -592,6 +609,9 @@ const TERMINAL_JS: &str = r#"
         }
 
         writeMarkdown(content) {
+            // 回合模式下跳过
+            if (this.viewMode === 'round') return;
+
             const line = document.createElement('div');
             line.className = 'terminal-line line-markdown';
 
@@ -608,6 +628,23 @@ const TERMINAL_JS: &str = r#"
         }
 
         writeSpinner(modelName = '') {
+            // 回合模式下在当前回合卡片中显示 Spinner
+            if (this.viewMode === 'round') {
+                if (this.currentRound && this.currentRound.element) {
+                    const statusSpan = this.currentRound.element.querySelector('.round-status');
+                    if (statusSpan) {
+                        // 添加飞轮动画类
+                        statusSpan.classList.add('spinner-active');
+                        // 显示模型名称（如果有）
+                        const timeSpan = this.currentRound.element.querySelector('.round-time');
+                        if (timeSpan && modelName) {
+                            timeSpan.textContent = `${modelName} 思考中...`;
+                        }
+                    }
+                }
+                return;
+            }
+
             this.removeSpinner();
 
             const line = document.createElement('div');
@@ -725,6 +762,239 @@ const TERMINAL_JS: &str = r#"
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ===== v1.28.0: 对话回合管理方法 =====
+
+        createRound(round) {
+            const roundData = {
+                id: round.id,
+                index: round.index,
+                userInput: round.user_input,
+                aiResponse: round.ai_response || '',
+                toolsUsed: round.tools_used || [],
+                executionTime: round.execution_time || 0,
+                status: this.normalizeStatus(round.status),
+                timestamp: round.timestamp,
+                model: round.model,
+                element: null,
+                expanded: true
+            };
+
+            // 创建回合 DOM 元素
+            roundData.element = this.createRoundElement(roundData);
+            this.outputArea.appendChild(roundData.element);
+
+            this.rounds.push(roundData);
+            this.currentRound = roundData;
+
+            // ===== 关键修复：根据当前视图模式设置初始显示状态 =====
+            if (this.viewMode === 'stream') {
+                // 传统模式下，立即隐藏新创建的回合卡片
+                roundData.element.style.display = 'none';
+            }
+
+            return roundData;
+        }
+
+        // 标准化状态值（处理 Rust enum 序列化格式）
+        normalizeStatus(status) {
+            // 如果是字符串，直接返回（pending, running, success）
+            if (typeof status === 'string') {
+                return status;
+            }
+            // 如果是对象，提取键名（error）
+            if (typeof status === 'object' && status !== null) {
+                return Object.keys(status)[0] || 'unknown';
+            }
+            return 'unknown';
+        }
+
+        createRoundElement(round) {
+            const roundDiv = document.createElement('div');
+            roundDiv.className = 'conversation-round expanded';
+            roundDiv.dataset.roundId = round.id;
+
+            // 回合头部
+            const header = document.createElement('div');
+            header.className = 'round-header';
+            header.innerHTML = `
+                <div class="round-info">
+                    <span class="round-number">Round #${round.index}</span>
+                    <span class="round-status ${round.status}">${this.getStatusIcon(round.status)}</span>
+                    <span class="round-time">${round.executionTime.toFixed(2)}s</span>
+                    <span class="round-tools">${this.renderTools(round.toolsUsed)}</span>
+                    <span class="round-summary">${this.escapeHtml(round.userInput.substring(0, 50))}${round.userInput.length > 50 ? '...' : ''}</span>
+                </div>
+                <button class="round-toggle" data-action="collapse">▼</button>
+            `;
+
+            // 回合内容
+            const content = document.createElement('div');
+            content.className = 'round-content';
+
+            // 用户输入
+            const inputDiv = document.createElement('div');
+            inputDiv.className = 'round-input';
+            inputDiv.innerHTML = `
+                <span class="round-input-label">📥 Input:</span>
+                <div class="round-input-content">${this.escapeHtml(round.userInput)}</div>
+            `;
+
+            // AI 输出
+            const outputDiv = document.createElement('div');
+            outputDiv.className = 'round-output';
+            outputDiv.innerHTML = `
+                <span class="round-output-label">📤 Output:</span>
+                <div class="output-content"></div>
+            `;
+
+            content.appendChild(inputDiv);
+            content.appendChild(outputDiv);
+
+            roundDiv.appendChild(header);
+            roundDiv.appendChild(content);
+
+            // 折叠/展开事件
+            const toggleBtn = header.querySelector('.round-toggle');
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleRound(round.id);
+            });
+
+            return roundDiv;
+        }
+
+        updateRoundStatus(roundId, status) {
+            const round = this.rounds.find(r => r.id === roundId);
+            if (!round) return;
+
+            const normalizedStatus = this.normalizeStatus(status);
+            round.status = normalizedStatus;
+            const statusSpan = round.element.querySelector('.round-status');
+            statusSpan.textContent = this.getStatusIcon(normalizedStatus);
+            statusSpan.className = `round-status ${normalizedStatus}`;
+        }
+
+        completeRound(roundData) {
+            const round = this.rounds.find(r => r.id === roundData.id);
+            if (!round) return;
+
+            const normalizedStatus = this.normalizeStatus(roundData.status);
+            round.aiResponse = roundData.ai_response || '';
+            round.executionTime = roundData.execution_time || 0;
+            round.toolsUsed = roundData.tools_used || [];
+            round.status = normalizedStatus;
+
+            // 更新 UI
+            const statusSpan = round.element.querySelector('.round-status');
+            statusSpan.textContent = this.getStatusIcon(normalizedStatus);
+            statusSpan.className = `round-status ${normalizedStatus}`;  // 移除 spinner-active
+
+            const timeSpan = round.element.querySelector('.round-time');
+            timeSpan.textContent = `${roundData.execution_time.toFixed(2)}s`;
+
+            const toolsSpan = round.element.querySelector('.round-tools');
+            toolsSpan.innerHTML = this.renderTools(roundData.tools_used);
+
+            const outputContent = round.element.querySelector('.output-content');
+            if (round.aiResponse) {
+                outputContent.innerHTML = this.markdownRenderer.render(round.aiResponse);
+            }
+
+            // 滚动到底部
+            this.scrollToBottom();
+        }
+
+        toggleRound(roundId) {
+            const round = this.rounds.find(r => r.id === roundId);
+            if (!round) return;
+
+            round.expanded = !round.expanded;
+            round.element.classList.toggle('collapsed');
+            round.element.classList.toggle('expanded');
+
+            const toggleBtn = round.element.querySelector('.round-toggle');
+            toggleBtn.textContent = round.expanded ? '▼' : '▶';
+        }
+
+        getStatusIcon(status) {
+            const icons = {
+                success: '✓',
+                running: '⏳',
+                error: '✗',
+                pending: '⏸'
+            };
+            return icons[status] || '?';
+        }
+
+        renderTools(tools) {
+            if (!tools || tools.length === 0) return '';
+            return tools.map(tool =>
+                `<span class="tool-badge">${this.escapeHtml(tool)}</span>`
+            ).join('');
+        }
+
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ===== v1.28.0: 视图模式切换 =====
+
+        toggleViewMode() {
+            this.viewMode = this.viewMode === 'round' ? 'stream' : 'round';
+
+            // 更新按钮文字和样式
+            const button = document.getElementById('view-mode-toggle');
+            if (button) {
+                if (this.viewMode === 'round') {
+                    button.textContent = '📊 回合模式';
+                    button.title = '切换到传统流式输出';
+                } else {
+                    button.textContent = '📜 传统模式';
+                    button.title = '切换到回合卡片视图';
+                }
+            }
+
+            // 根据模式显示/隐藏内容
+            this.applyViewMode();
+        }
+
+        applyViewMode() {
+            if (this.viewMode === 'round') {
+                // 回合模式：隐藏传统输出，显示回合卡片
+
+                // 隐藏所有传统输出行
+                this.lines.forEach(line => {
+                    line.style.display = 'none';
+                });
+
+                // 显示所有回合卡片（使用已保存的元素引用）
+                this.rounds.forEach(round => {
+                    if (round.element) {
+                        round.element.style.display = 'block';
+                    }
+                });
+            } else {
+                // 传统模式：显示传统输出，隐藏回合卡片
+
+                // 隐藏所有回合卡片（使用已保存的元素引用）
+                this.rounds.forEach(round => {
+                    if (round.element) {
+                        round.element.style.display = 'none';
+                    }
+                });
+
+                // 显示所有传统输出行（只显示非回合卡片的行）
+                this.lines.forEach(line => {
+                    // 确保不是回合卡片元素
+                    if (!line.classList.contains('conversation-round')) {
+                        line.style.display = 'block';
+                    }
+                });
+            }
+        }
     }
 
     // ========== i18n 国际化支持 ==========
@@ -823,6 +1093,14 @@ const TERMINAL_JS: &str = r#"
 
     // 创建混合终端
     const terminal = new HybridTerminal(document.getElementById('terminal-container'));
+
+    // ===== v1.28.0: 绑定视图模式切换按钮 =====
+    const viewModeToggle = document.getElementById('view-mode-toggle');
+    if (viewModeToggle) {
+        viewModeToggle.addEventListener('click', () => {
+            terminal.toggleViewMode();
+        });
+    }
 
     // WebSocket 连接
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -947,9 +1225,9 @@ const TERMINAL_JS: &str = r#"
         statusEl.textContent = t('web.status.connected');
         statusEl.style.color = '#4CAF50';
 
-        // 显示欢迎消息
+        // 显示欢迎消息（系统消息，在回合模式下也显示）
         terminal.writePlainText('\x1b[32m' + t('web.terminal.welcome') + '\x1b[0m\n' +
-                                '\x1b[36m' + t('web.terminal.usage_hint') + '\x1b[0m');
+                                '\x1b[36m' + t('web.terminal.usage_hint') + '\x1b[0m', true);
 
         // 应用初始语言设置
         updatePageText();
@@ -958,7 +1236,7 @@ const TERMINAL_JS: &str = r#"
     ws.onclose = () => {
         statusEl.textContent = t('web.status.disconnected');
         statusEl.style.color = '#f44336';
-        terminal.writePlainText('\x1b[31m' + t('web.terminal.disconnected_message') + '\x1b[0m');
+        terminal.writePlainText('\x1b[31m' + t('web.terminal.disconnected_message') + '\x1b[0m', true);
     };
 
     ws.onerror = (err) => {
@@ -1005,6 +1283,30 @@ const TERMINAL_JS: &str = r#"
             case 'clear':
                 // 清屏
                 terminal.clear();
+                break;
+
+            // ===== v1.28.0: 对话回合消息 =====
+            case 'round_start':
+                // 回合开始
+                terminal.createRound(msg.round);
+                break;
+
+            case 'round_update':
+                // 回合状态更新
+                terminal.updateRoundStatus(msg.round_id, msg.status);
+                break;
+
+            case 'round_complete':
+                // 回合完成
+                terminal.completeRound(msg.round);
+                break;
+
+            case 'round_history':
+                // 历史回合列表（重连时）
+                msg.rounds.forEach(round => {
+                    terminal.createRound(round);
+                    terminal.completeRound(round);
+                });
                 break;
         }
     };
@@ -1226,6 +1528,40 @@ body::before {
         0 0 20px rgba(0, 240, 255, 0.5),
         0 0 30px rgba(0, 240, 255, 0.3),
         inset 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+/* ===== v1.28.0: 视图模式切换按钮 ===== */
+
+#header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.view-mode-btn {
+    padding: 6px 12px;
+    border: 2px solid rgba(255, 0, 110, 0.4);
+    background: rgba(10, 14, 39, 0.5);
+    color: #ff006e;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 10px rgba(255, 0, 110, 0.2);
+    text-shadow: 0 0 5px rgba(255, 0, 110, 0.3);
+    white-space: nowrap;
+}
+
+.view-mode-btn:hover {
+    background: rgba(255, 0, 110, 0.1);
+    border-color: rgba(255, 0, 110, 0.8);
+    transform: translateY(-2px);
+    box-shadow:
+        0 0 15px rgba(255, 0, 110, 0.4),
+        0 0 25px rgba(255, 0, 110, 0.2);
 }
 
 #terminal-container {
@@ -1563,6 +1899,307 @@ body::before {
     #lang-switcher button {
         flex: 1;
         max-width: 120px;
+    }
+}
+
+/* ============================================
+   对话回合样式 (v1.28.0)
+   Jupyter-like 卡片式回合显示
+   ============================================ */
+
+/* 回合容器 - 卡片风格 */
+.conversation-round {
+    margin: 12px 0;
+    padding: 0;
+    background: rgba(10, 14, 39, 0.6);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.conversation-round:hover {
+    border-color: rgba(0, 240, 255, 0.5);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+}
+
+/* 回合头部 */
+.round-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(0, 240, 255, 0.05);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.round-header:hover {
+    background: rgba(0, 240, 255, 0.08);
+}
+
+/* 回合信息容器 */
+.round-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+/* 回合编号 */
+.round-number {
+    font-weight: 600;
+    color: #00f0ff;
+    font-size: 0.9em;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+/* 回合状态指示器 */
+.round-status {
+    font-size: 1.1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    transition: all 0.3s;
+}
+
+.round-status.pending {
+    color: #888;
+    background: rgba(136, 136, 136, 0.1);
+}
+
+.round-status.running {
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.15);
+    animation: status-pulse 1.5s ease-in-out infinite;
+}
+
+.round-status.success {
+    color: #39ff14;
+    background: rgba(57, 255, 20, 0.15);
+    text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
+}
+
+.round-status.error {
+    color: #ff006e;
+    background: rgba(255, 0, 110, 0.15);
+    text-shadow: 0 0 8px rgba(255, 0, 110, 0.6);
+}
+
+/* 飞轮动画（回合模式思考中） */
+.round-status.spinner-active::before {
+    content: '⠋';
+    display: inline-block;
+    animation: spinner-rotate 1s steps(10) infinite;
+}
+
+@keyframes spinner-rotate {
+    0% { content: '⠋'; }
+    10% { content: '⠙'; }
+    20% { content: '⠹'; }
+    30% { content: '⠸'; }
+    40% { content: '⠼'; }
+    50% { content: '⠴'; }
+    60% { content: '⠦'; }
+    70% { content: '⠧'; }
+    80% { content: '⠇'; }
+    90% { content: '⠏'; }
+    100% { content: '⠋'; }
+}
+
+/* 执行时间 */
+.round-time {
+    color: #888;
+    font-size: 0.85em;
+    font-family: "Consolas", monospace;
+}
+
+/* 工具容器 */
+.round-tools {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+/* 工具标签 */
+.tool-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(255, 0, 110, 0.15);
+    border: 1px solid rgba(255, 0, 110, 0.3);
+    border-radius: 12px;
+    font-size: 0.75em;
+    color: #ff006e;
+    text-shadow: 0 0 5px rgba(255, 0, 110, 0.4);
+    box-shadow: 0 0 8px rgba(255, 0, 110, 0.2);
+}
+
+/* 回合摘要 */
+.round-summary {
+    color: rgba(240, 240, 240, 0.7);
+    font-size: 0.85em;
+    font-style: italic;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+}
+
+/* 折叠按钮 */
+.round-toggle {
+    background: none;
+    border: none;
+    color: #00f0ff;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 4px 8px;
+    transition: all 0.2s;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+.round-toggle:hover {
+    color: #39ff14;
+    text-shadow: 0 0 12px rgba(57, 255, 20, 0.6);
+    transform: scale(1.1);
+}
+
+/* 回合内容区域 */
+.round-content {
+    padding: 12px;
+    max-height: 10000px;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease,
+                padding 0.3s ease;
+    opacity: 1;
+}
+
+/* 折叠状态 */
+.conversation-round.collapsed .round-content {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+.conversation-round.collapsed .round-toggle {
+    transform: rotate(-90deg);
+}
+
+/* 输入区域 */
+.round-input {
+    margin-bottom: 8px;
+}
+
+.round-input-label {
+    display: block;
+    color: #00f0ff;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
+}
+
+.round-input-content {
+    padding: 8px 12px;
+    background: rgba(0, 240, 255, 0.05);
+    border-left: 3px solid #00f0ff;
+    border-radius: 4px;
+    color: rgba(240, 240, 240, 0.9);
+    font-family: "Consolas", monospace;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    box-shadow: -3px 0 10px rgba(0, 240, 255, 0.1);
+}
+
+/* 输出区域 */
+.round-output {
+    margin-top: 8px;
+}
+
+.round-output-label {
+    display: block;
+    color: #39ff14;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+}
+
+.output-content {
+    padding: 8px 12px;
+    background: rgba(57, 255, 20, 0.03);
+    border-left: 3px solid #39ff14;
+    border-radius: 4px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    box-shadow: -3px 0 10px rgba(57, 255, 20, 0.1);
+}
+
+/* 输出内容继承 Markdown 样式 */
+.output-content h1,
+.output-content h2,
+.output-content h3,
+.output-content h4,
+.output-content h5,
+.output-content h6 {
+    background: linear-gradient(90deg, #00f0ff 0%, #ff006e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 600;
+    margin: 0.8em 0 0.4em 0;
+    filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.4));
+}
+
+.output-content code {
+    color: #00f0ff;
+    background-color: rgba(0, 240, 255, 0.08);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 0.9em;
+}
+
+.output-content pre {
+    background: rgba(10, 14, 39, 0.8);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 6px;
+    padding: 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+    box-shadow: inset 0 0 15px rgba(0, 240, 255, 0.1);
+}
+
+.output-content pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: rgba(240, 240, 240, 0.9);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .round-info {
+        gap: 8px;
+    }
+
+    .round-summary {
+        max-width: 200px;
+    }
+
+    .conversation-round {
+        margin: 8px 0;
     }
 }
 

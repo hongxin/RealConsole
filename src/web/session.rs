@@ -7,6 +7,7 @@ use crate::command::CommandRegistry;
 use crate::config::Config;
 use crate::i18n;
 use crate::llm::{DeepseekClient, LlmClient, OllamaClient};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -14,6 +15,85 @@ use uuid::Uuid;
 
 /// 会话 ID
 pub type SessionId = String;
+
+/// 对话回合状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RoundStatus {
+    /// 等待执行
+    Pending,
+    /// 执行中
+    Running,
+    /// 执行成功
+    Success,
+    /// 执行失败
+    Error { message: String },
+}
+
+/// 对话回合（v1.28.0 新增）
+///
+/// 每个对话轮次对应一个回合，包含用户输入、AI 响应、执行元数据等
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationRound {
+    /// 回合 ID
+    pub id: String,
+
+    /// 回合序号（从 1 开始）
+    pub index: usize,
+
+    /// 用户输入
+    pub user_input: String,
+
+    /// AI 响应（完整文本）
+    pub ai_response: String,
+
+    /// 使用的工具列表
+    pub tools_used: Vec<String>,
+
+    /// 执行时间（秒）
+    pub execution_time: f64,
+
+    /// 执行状态
+    pub status: RoundStatus,
+
+    /// 创建时间
+    pub timestamp: DateTime<Utc>,
+
+    /// 使用的模型
+    pub model: String,
+}
+
+impl ConversationRound {
+    /// 创建新回合
+    pub fn new(index: usize, user_input: String, model: String) -> Self {
+        Self {
+            id: format!("round-{}", Uuid::new_v4()),
+            index,
+            user_input,
+            ai_response: String::new(),
+            tools_used: Vec::new(),
+            execution_time: 0.0,
+            status: RoundStatus::Running,
+            timestamp: Utc::now(),
+            model,
+        }
+    }
+
+    /// 完成回合（成功）
+    pub fn complete(&mut self, response: String, execution_time: f64, tools_used: Vec<String>) {
+        self.ai_response = response;
+        self.execution_time = execution_time;
+        self.tools_used = tools_used;
+        self.status = RoundStatus::Success;
+    }
+
+    /// 标记失败
+    pub fn fail(&mut self, error_message: String) {
+        self.status = RoundStatus::Error {
+            message: error_message,
+        };
+    }
+}
 
 /// 消息类型（Client → Server）
 #[derive(Debug, Deserialize)]
@@ -39,6 +119,26 @@ pub enum ServerMessage {
     Error { content: String },
     /// 清屏
     Clear,
+
+    // ===== v1.28.0 新增：对话回合消息 =====
+    /// 回合开始（创建新回合）
+    #[serde(rename = "round_start")]
+    RoundStart { round: ConversationRound },
+
+    /// 回合更新（状态变化）
+    #[serde(rename = "round_update")]
+    RoundUpdate {
+        round_id: String,
+        status: RoundStatus,
+    },
+
+    /// 回合完成（包含完整结果）
+    #[serde(rename = "round_complete")]
+    RoundComplete { round: ConversationRound },
+
+    /// 历史回合列表（初始加载或重连）
+    #[serde(rename = "round_history")]
+    RoundHistory { rounds: Vec<ConversationRound> },
 }
 
 /// Web 终端会话
@@ -48,11 +148,13 @@ pub struct Session {
     /// Agent 实例（独立）
     pub agent: Arc<RwLock<Agent>>,
     /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: DateTime<Utc>,
     /// LLM 初始化错误信息（用于诊断）
     pub llm_init_error: Option<String>,
     /// 对话 ID（用于多轮对话上下文）
     pub conversation_id: String,
+    /// 对话回合列表（v1.28.0 新增）
+    pub rounds: Arc<RwLock<Vec<ConversationRound>>>,
 }
 
 impl Session {
@@ -75,10 +177,79 @@ impl Session {
         Self {
             id,
             agent: Arc::new(RwLock::new(agent)),
-            created_at: chrono::Utc::now(),
+            created_at: Utc::now(),
             llm_init_error,
             conversation_id,
+            rounds: Arc::new(RwLock::new(Vec::new())),
         }
+    }
+
+    // ===== v1.28.0 新增：回合管理方法 =====
+
+    /// 创建新回合
+    pub async fn create_round(&self, user_input: String, model: String) -> ConversationRound {
+        let mut rounds = self.rounds.write().await;
+        let index = rounds.len() + 1;
+        let round = ConversationRound::new(index, user_input, model);
+        rounds.push(round.clone());
+        round
+    }
+
+    /// 获取当前回合（最后一个）
+    pub async fn current_round(&self) -> Option<ConversationRound> {
+        let rounds = self.rounds.read().await;
+        rounds.last().cloned()
+    }
+
+    /// 更新回合状态
+    pub async fn update_round_status(&self, round_id: &str, status: RoundStatus) -> bool {
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.iter_mut().find(|r| r.id == round_id) {
+            round.status = status;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 完成回合（成功）
+    pub async fn complete_round(
+        &self,
+        round_id: &str,
+        response: String,
+        execution_time: f64,
+        tools_used: Vec<String>,
+    ) -> Option<ConversationRound> {
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.iter_mut().find(|r| r.id == round_id) {
+            round.complete(response, execution_time, tools_used);
+            Some(round.clone())
+        } else {
+            None
+        }
+    }
+
+    /// 标记回合失败
+    pub async fn fail_round(&self, round_id: &str, error_message: String) -> Option<ConversationRound> {
+        let mut rounds = self.rounds.write().await;
+        if let Some(round) = rounds.iter_mut().find(|r| r.id == round_id) {
+            round.fail(error_message);
+            Some(round.clone())
+        } else {
+            None
+        }
+    }
+
+    /// 获取所有回合
+    pub async fn get_rounds(&self) -> Vec<ConversationRound> {
+        let rounds = self.rounds.read().await;
+        rounds.clone()
+    }
+
+    /// 获取回合数量
+    pub async fn round_count(&self) -> usize {
+        let rounds = self.rounds.read().await;
+        rounds.len()
     }
 
     /// 配置 Agent 的 LLM

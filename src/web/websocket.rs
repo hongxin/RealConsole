@@ -16,6 +16,7 @@ use crate::web::session::{ClientMessage, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
 use std::sync::Arc;
+use std::time::Instant;
 
 /// WebSocket 会话处理器
 pub struct WebSocketSession {
@@ -307,8 +308,25 @@ async fn execute_llm_chat(
     // 释放 llm_manager 锁
     drop(llm_manager);
 
+    // ===== v1.28.0: 创建对话回合 =====
+    let round = session.create_round(input.to_string(), model_name.clone()).await;
+    let round_id = round.id.clone();
+
+    // 发送 RoundStart 消息
+    let round_start_msg = ServerMessage::RoundStart {
+        round: round.clone(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&round_start_msg)?))
+        .await?;
+
+    // 记录开始时间
+    let start_time = Instant::now();
+
     // 发送 Thinking 消息（显示飞轮）
-    let thinking_msg = ServerMessage::Thinking { model: model_name };
+    let thinking_msg = ServerMessage::Thinking {
+        model: model_name.clone(),
+    };
     sender
         .send(Message::Text(serde_json::to_string(&thinking_msg)?))
         .await?;
@@ -340,6 +358,9 @@ async fn execute_llm_chat(
     // 处理 LLM 请求
     match agent.llm_service().process(request).await {
         Ok(llm_response) => {
+            // 计算执行时间
+            let execution_time = start_time.elapsed().as_secs_f64();
+
             // 记录到上下文管理器（如果启用了上下文）
             if should_use_context {
                 let ctx_arc = agent.state_manager().conversation_context();
@@ -354,6 +375,28 @@ async fn execute_llm_chat(
             // 🧹 清理 DEBUG 信息（Web 用户不需要看到）
             let clean_content = remove_debug_info(&llm_response.text);
 
+            // ===== v1.28.0: 提取使用的工具 =====
+            let tools_used = extract_tools_from_response(&llm_response);
+
+            // ===== v1.28.0: 完成回合 =====
+            if let Some(completed_round) = session
+                .complete_round(
+                    &round_id,
+                    clean_content.clone(),
+                    execution_time,
+                    tools_used,
+                )
+                .await
+            {
+                // 发送 RoundComplete 消息
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+
             let msg = ServerMessage::Output {
                 content: clean_content,
             };
@@ -364,6 +407,17 @@ async fn execute_llm_chat(
         Err(e) => {
             // 🧹 改进错误提示，提供用户友好的错误信息
             let error_msg = format_user_friendly_error(&e.to_string());
+
+            // ===== v1.28.0: 标记回合失败 =====
+            if let Some(failed_round) = session.fail_round(&round_id, error_msg.clone()).await {
+                // 发送 RoundComplete 消息（带错误状态）
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
 
             let msg = ServerMessage::Error {
                 content: error_msg,
@@ -532,4 +586,30 @@ fn format_user_friendly_error(error_str: &str) -> String {
         .replace(&format!("{}: ", tool_prefix), "");
 
     i18n::t_with_args("web.error.generic_error", &[("error", &clean_error)])
+}
+
+/// 从 LLM 响应中提取使用的工具（v1.28.0 新增）
+fn extract_tools_from_response(llm_response: &crate::services::LlmResponse) -> Vec<String> {
+    // 从响应中的工具调用信息提取工具名称
+    let mut tools = Vec::new();
+    
+    // 如果响应包含工具调用信息（从 DEBUG 部分提取）
+    let text = &llm_response.text;
+    if let Some(debug_start) = text.find("__DEBUG__") {
+        let debug_section = &text[debug_start..];
+        
+        // 查找 "Tool:" 标记
+        for line in debug_section.lines() {
+            if line.trim().starts_with("Tool:") {
+                if let Some(tool_name) = line.split(':').nth(1) {
+                    let name = tool_name.trim().to_string();
+                    if !name.is_empty() && !tools.contains(&name) {
+                        tools.push(name);
+                    }
+                }
+            }
+        }
+    }
+    
+    tools
 }
