@@ -1724,6 +1724,7 @@ async fn handle_export_session(
                         session_id: session_id.to_string(),
                         export_path: export_path.to_string_lossy().to_string(),
                         format: file_format.to_string(),
+                        content: content.clone(),  // 返回文件内容供前端下载
                     };
                     sender
                         .send(Message::Text(serde_json::to_string(&response)?))

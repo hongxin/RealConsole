@@ -300,6 +300,7 @@ pub enum ServerMessage {
         session_id: String,
         export_path: String,
         format: String,
+        content: String,  // 文件内容，供前端下载
     },
 
     /// 会话操作错误

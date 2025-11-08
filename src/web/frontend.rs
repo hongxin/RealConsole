@@ -566,8 +566,10 @@ const TERMINAL_JS: &str = r#"
         }
 
         handleSessionExported(data) {
-            this.showNotification(`✅ 会话已导出: ${data.file_path}`);
-            this.downloadFile(data.file_path, data.content);
+            // 从路径中提取文件名
+            const filename = data.export_path.split('/').pop() || `session-${data.session_id}.${data.format}`;
+            this.showNotification(`✅ 会话已导出: ${filename}`);
+            this.downloadFile(filename, data.content);
         }
 
         handleSessionError(data) {
