@@ -1357,12 +1357,10 @@ async fn execute_step_legacy(
                             } else {
                                 Ok(format!("✅ 执行成功\n$ {}\n(无输出)", command))
                             }
+                        } else if !stderr.is_empty() {
+                            Ok(format!("❌ 执行失败\n$ {}\n\n{}", command, stderr.trim()))
                         } else {
-                            if !stderr.is_empty() {
-                                Ok(format!("❌ 执行失败\n$ {}\n\n{}", command, stderr.trim()))
-                            } else {
-                                Ok(format!("❌ 执行失败\n$ {}\n退出码: {}", command, output.status.code().unwrap_or(-1)))
-                            }
+                            Ok(format!("❌ 执行失败\n$ {}\n退出码: {}", command, output.status.code().unwrap_or(-1)))
                         }
                     }
                     Err(e) => {
@@ -1476,7 +1474,7 @@ fn extract_filename_strict(description: &str) -> Option<String> {
 /// 从描述中提取文件/目录名
 fn extract_filename(description: &str) -> Option<String> {
     // 常见文件扩展名
-    let extensions = vec![".yaml", ".yml", ".json", ".txt", ".csv", ".toml", ".md", ".rs"];
+    let extensions = [".yaml", ".yml", ".json", ".txt", ".csv", ".toml", ".md", ".rs"];
 
     for word in description.split_whitespace() {
         // 检查是否包含扩展名

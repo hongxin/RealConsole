@@ -181,7 +181,7 @@ impl YinYangBalance {
         };
 
         // 阴阳比例在 30%-70% 之间认为是平衡的
-        let is_balanced = yin_ratio >= 0.3 && yin_ratio <= 0.7;
+        let is_balanced = (0.3..=0.7).contains(&yin_ratio);
 
         let balance_comment = if total == 0 {
             "无步骤".to_string()
@@ -229,7 +229,7 @@ pub struct NatureDistribution {
 
 impl NatureDistribution {
     pub fn from_plan(plan: &ExecutionPlan) -> Self {
-        let mut counts = vec![0; 6];
+        let mut counts = [0; 6];
 
         for step in &plan.steps {
             let nature = StepAnalyzer::analyze_nature(step);

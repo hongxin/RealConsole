@@ -820,8 +820,7 @@ mod tests {
 
         let _tracer = UnifiedTracer::new(history, exec_logger, None, context);
 
-        // 测试基本创建
-        assert!(true); // 如果能创建就成功
+        // 测试基本创建成功（如果能创建就成功）
     }
 
     #[tokio::test]
@@ -838,7 +837,7 @@ mod tests {
             .unwrap();
 
         // 应该有来自 history 的条目
-        assert!(entries.len() > 0);
+        assert!(!entries.is_empty());
         for entry in entries {
             assert_eq!(entry.dimension, Dimension::Statistics);
         }
@@ -896,7 +895,7 @@ mod tests {
 
         // 应该有统计数据
         assert!(stats.total_entries > 0);
-        assert!(stats.by_dimension.len() > 0);
+        assert!(!stats.by_dimension.is_empty());
     }
 
     // === 边缘情况测试 ===
@@ -977,7 +976,7 @@ mod tests {
 
         // 搜索大数据集（搜索通用词）
         let results = tracer.search("command").await.unwrap();
-        assert!(results.len() > 0, "搜索 'command' 应该找到结果");
+        assert!(!results.is_empty(), "搜索 'command' 应该找到结果");
 
         // 验证能处理大数据集的统计
         let stats = tracer.stats().await.unwrap();
@@ -1002,7 +1001,7 @@ mod tests {
 
         // 超大 limit 不应该崩溃
         let entries = tracer.query_all(999999).await.unwrap();
-        assert!(entries.len() > 0); // 应该返回所有可用条目
+        assert!(!entries.is_empty()); // 应该返回所有可用条目
     }
 
     #[tokio::test]

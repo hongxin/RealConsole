@@ -132,7 +132,7 @@ fn bench_recent_50(c: &mut Criterion) {
 fn bench_append_single(c: &mut Criterion) {
     c.bench_function("memory_append_single", |b| {
         b.iter_batched(
-            || create_small_memory(),
+            create_small_memory,
             |mut mem| {
                 mem.add(
                     black_box("新的记忆条目".to_string()),
@@ -148,7 +148,7 @@ fn bench_append_single(c: &mut Criterion) {
 fn bench_append_batch_10(c: &mut Criterion) {
     c.bench_function("memory_append_batch_10", |b| {
         b.iter_batched(
-            || create_small_memory(),
+            create_small_memory,
             |mut mem| {
                 for i in 0..10 {
                     let content = format!("批量记忆 {}", i);
@@ -197,7 +197,7 @@ fn bench_len(c: &mut Criterion) {
 fn bench_clear(c: &mut Criterion) {
     c.bench_function("memory_clear", |b| {
         b.iter_batched(
-            || create_small_memory(),
+            create_small_memory,
             |mut mem| {
                 mem.clear();
             },
@@ -210,7 +210,7 @@ fn bench_clear(c: &mut Criterion) {
 fn bench_combined_operations(c: &mut Criterion) {
     c.bench_function("memory_combined_ops", |b| {
         b.iter_batched(
-            || create_small_memory(),
+            create_small_memory,
             |mut mem| {
                 // 追加记忆
                 mem.add("新记忆".to_string(), EntryType::User);

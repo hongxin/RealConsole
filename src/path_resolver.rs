@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn test_search_paths() {
         let paths = PathResolver::search_paths("realconsole.yaml");
-        assert!(paths.len() >= 1); // 至少有当前目录
+        assert!(!paths.is_empty()); // 至少有当前目录
 
         // 第一个路径应该是当前目录
         assert_eq!(paths[0], PathBuf::from("realconsole.yaml"));

@@ -1069,7 +1069,7 @@ mod tests {
         // 但第一个任务应该成功并有输出
         if !results[0].output.is_empty() && results[0].output.contains("A") {
             // 如果第一个任务有正确输出，就认为测试通过
-            assert!(true);
+            // 测试通过，无需额外断言
         } else {
             // 否则检查整体失败情况
             assert!(results.iter().any(|r| matches!(r.status, TaskStatus::Failed)));

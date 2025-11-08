@@ -94,7 +94,7 @@ impl YarrowStalksSimulator {
                 let mut current = 49;
 
                 // 分二
-                current = current / 2;
+                current /= 2;
                 steps.push(YarrowStep {
                     operation: format!("第{}爻-第{}变-分二", yao_idx + 1, change_idx + 1),
                     value: current,

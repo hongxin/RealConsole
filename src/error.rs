@@ -376,7 +376,7 @@ mod tests {
     #[test]
     fn test_error_code_uniqueness() {
         // 确保所有错误代码唯一
-        let codes = vec![
+        let codes = [
             ErrorCode::ConfigNotFound.code(),
             ErrorCode::ConfigParseError.code(),
             ErrorCode::LlmAuthError.code(),

@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_divine_with_tool_names() {
-        let mut steps = vec![
+        let steps = vec![
             ExecutionStep::new("列出文件".to_string(), "list_directory".to_string(), 1.0),
             ExecutionStep::new("搜索内容".to_string(), "search_text".to_string(), 1.0),
         ];
@@ -219,7 +219,7 @@ mod tests {
         let result = DivinationEngine::divine(&plan);
 
         // 演算步骤应该包含：大衍 + 操作步骤 + 成卦
-        assert!(result.yarrow_steps.len() > 0);
+        assert!(!result.yarrow_steps.is_empty());
 
         // 第一步应该是大衍
         assert_eq!(result.yarrow_steps[0].operation, "大衍");

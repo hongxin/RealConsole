@@ -193,8 +193,10 @@ mod tests {
             return;
         }
 
-        let mut config = BroadcastConfig::default();
-        config.enabled = true;
+        let config = BroadcastConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let broadcaster = VoiceBroadcaster::new(config);
 
         let result = broadcaster.speak("测试语音播报").await;

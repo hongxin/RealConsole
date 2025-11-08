@@ -442,7 +442,7 @@ mod tests {
         // EWMA 应该产生合理的预测值
         let x = predicted.get("x").unwrap();
         // EWMA 平滑处理，可能低于最后值（0.7），但应该在合理范围内 [0.5, 0.8]
-        assert!(x >= 0.5 && x <= 0.8, "Expected x in [0.5, 0.8], got {}", x);
+        assert!((0.5..=0.8).contains(&x), "Expected x in [0.5, 0.8], got {}", x);
     }
 
     #[test]

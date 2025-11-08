@@ -509,7 +509,7 @@ mod tests {
         let result = truncate_str(chinese_text, 60);
 
         // 应该正确截断，不会 panic
-        assert!(result.len() > 0);
+        assert!(!result.is_empty());
         assert!(result.contains("..."));
 
         // 验证截断后的字符数（不包括 "..."）

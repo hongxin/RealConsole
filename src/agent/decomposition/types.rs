@@ -198,11 +198,7 @@ impl ExecutionResult {
             .iter()
             .enumerate()
             .filter_map(|(i, step)| {
-                if let Some(error) = &step.error {
-                    Some((i, error.as_str()))
-                } else {
-                    None
-                }
+                step.error.as_ref().map(|error| (i, error.as_str()))
             })
             .collect()
     }

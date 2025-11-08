@@ -416,8 +416,8 @@ mod tests {
         let steps = predictor.predict("cargo build", true);
 
         assert!(!steps.is_empty());
-        assert!(steps.iter().any(|s| s.command.as_ref().map_or(false, |c| c.contains("cargo test"))));
-        assert!(steps.iter().any(|s| s.command.as_ref().map_or(false, |c| c.contains("cargo run"))));
+        assert!(steps.iter().any(|s| s.command.as_ref().is_some_and(|c| c.contains("cargo test"))));
+        assert!(steps.iter().any(|s| s.command.as_ref().is_some_and(|c| c.contains("cargo run"))));
     }
 
     #[test]
@@ -435,7 +435,7 @@ mod tests {
         let steps = predictor.predict("git commit -m 'test'", true);
 
         assert!(!steps.is_empty());
-        assert!(steps.iter().any(|s| s.command.as_ref().map_or(false, |c| c.contains("git push"))));
+        assert!(steps.iter().any(|s| s.command.as_ref().is_some_and(|c| c.contains("git push"))));
     }
 
     #[test]

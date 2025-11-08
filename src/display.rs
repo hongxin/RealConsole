@@ -930,7 +930,7 @@ mod tests {
         let text = "📅 公历 2025年10月20日\n农历 二零二五 乙巳、蛇年 八月 廿九";
         let result = Display::truncate(text, 80);
         // 应该能正常截断，不会panic
-        assert!(result.len() > 0);
+        assert!(!result.is_empty());
 
         // 测试短文本
         let short_text = "今天农历几号";

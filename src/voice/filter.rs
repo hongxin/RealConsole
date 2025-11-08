@@ -142,8 +142,10 @@ mod tests {
 
     #[test]
     fn test_truncate_long_text() {
-        let mut config = FilterConfig::default();
-        config.max_length = 20;
+        let config = FilterConfig {
+            max_length: 20,
+            ..Default::default()
+        };
         let text = "这是一段很长很长很长很长很长很长很长的文本内容";
         let result = filter_for_voice(text, &config);
         assert!(result.is_some());

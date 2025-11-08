@@ -303,11 +303,11 @@ mod tests {
 
         // 设置循环时间
         furnace.last_cycle_time = Some(Instant::now());
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_secs(1));
 
-        // 应该有时间差
+        // 应该有时间差（至少1秒）
         let elapsed = furnace.time_since_last_cycle().unwrap();
-        assert!(elapsed > 0); // elapsed is i64, should be positive after sleep
+        assert!(elapsed >= 1); // elapsed is u64 in seconds, should be >= 1 after 1s sleep
     }
 
     #[tokio::test]

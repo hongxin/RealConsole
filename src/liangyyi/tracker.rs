@@ -1455,7 +1455,7 @@ mod tests {
 
         let stats = tracker.stats().await;
         assert_eq!(stats.total_snapshots, 3);
-        assert!(stats.sixiang_counts.len() > 0);
+        assert!(!stats.sixiang_counts.is_empty());
     }
 
     #[tokio::test]
@@ -1933,7 +1933,7 @@ mod tests {
     #[tokio::test]
     async fn test_enhanced_vector_dimensions_valid_range() {
         // 即使没有 tracer，增强向量的所有维度也应该在 [0, 1] 范围内
-        let mut tracker = StateTracker::with_default();
+        let tracker = StateTracker::with_default();
 
         // 添加一些事件
         for _ in 0..5 {
@@ -1949,7 +1949,7 @@ mod tests {
         for dim in &["efficiency", "activity", "load", "context", "yin", "yang", "confidence"] {
             if let Some(value) = enhanced_vector.get(dim) {
                 assert!(
-                    value >= 0.0 && value <= 1.0,
+                    (0.0..=1.0).contains(&value),
                     "维度 {} 的值 {} 超出范围 [0, 1]",
                     dim,
                     value
@@ -1961,7 +1961,7 @@ mod tests {
     #[tokio::test]
     async fn test_enhanced_vector_with_activity() {
         // 测试活跃状态下的增强向量
-        let mut tracker = StateTracker::with_default();
+        let tracker = StateTracker::with_default();
 
         // 模拟高活动
         for _ in 0..20 {
@@ -1983,7 +1983,7 @@ mod tests {
     #[tokio::test]
     async fn test_enhanced_vector_with_idle() {
         // 测试空闲状态下的增强向量
-        let mut tracker = StateTracker::with_default();
+        let tracker = StateTracker::with_default();
 
         // 模拟低活动
         for _ in 0..10 {
@@ -1996,7 +1996,7 @@ mod tests {
         // 验证向量仍然有效
         let efficiency = enhanced_vector.get("efficiency").unwrap();
         assert!(
-            efficiency >= 0.0 && efficiency <= 1.0,
+            (0.0..=1.0).contains(&efficiency),
             "efficiency 应该在有效范围内，实际: {}",
             efficiency
         );
@@ -2005,7 +2005,7 @@ mod tests {
     #[tokio::test]
     async fn test_enhanced_vector_consistency() {
         // 测试增强向量在相同状态下的一致性
-        let mut tracker = StateTracker::with_default();
+        let tracker = StateTracker::with_default();
 
         // 添加固定的事件序列
         for _ in 0..5 {
@@ -2024,7 +2024,7 @@ mod tests {
     #[tokio::test]
     async fn test_enhanced_vector_evolution() {
         // 测试增强向量随事件演化
-        let mut tracker = StateTracker::with_default();
+        let tracker = StateTracker::with_default();
 
         let vector_initial = tracker.to_state_vector_enhanced().await;
 
@@ -2068,7 +2068,7 @@ mod tests {
     #[tokio::test]
     async fn test_enhanced_vector_with_mixed_events() {
         // 测试混合事件类型的增强向量
-        let mut tracker = StateTracker::with_default();
+        let tracker = StateTracker::with_default();
 
         // 混合不同类型的事件
         tracker.update_from_event(Event::UserRead).await;
@@ -2083,7 +2083,7 @@ mod tests {
         for dim in &["efficiency", "activity", "load", "context"] {
             let value = enhanced_vector.get(dim).unwrap();
             assert!(
-                value >= 0.0 && value <= 1.0,
+                (0.0..=1.0).contains(&value),
                 "维度 {} 在混合事件后超出范围: {}",
                 dim,
                 value
