@@ -894,21 +894,7 @@ const TERMINAL_JS: &str = r#"
                 <span class="round-time">${round.executionTime.toFixed(2)}s</span>
                 ${toolsHtml}
                 <span style="margin-left: auto;"></span>
-                <button class="round-rerun-btn" title="重新执行此 Cell" style="
-                    padding: 0.25em 0.5em;
-                    background: linear-gradient(90deg, #00f0ff 0%, #39ff14 100%);
-                    border: none;
-                    border-radius: 3px;
-                    color: #000;
-                    cursor: pointer;
-                    font-size: 0.9em;
-                    margin-right: 0.5em;
-                    box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
-                    transition: all 0.2s ease;
-                " onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 0 12px rgba(0, 240, 255, 0.5)';"
-                   onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 8px rgba(0, 240, 255, 0.3)';">
-                    🔄
-                </button>
+                <button class="round-rerun-btn" title="重新执行此 Cell">🔄</button>
                 <button class="round-toggle" data-action="collapse">▼</button>
             `;
 
@@ -2495,17 +2481,13 @@ body::before {
 }
 
 .line-command .prompt {
-    color: #39ff14;
+    color: #F0B90B;  /* 币安金色，优雅提示 */
     font-weight: bold;
-    text-shadow:
-        0 0 10px rgba(57, 255, 20, 0.6),
-        0 0 20px rgba(57, 255, 20, 0.3);
 }
 
 .line-command .command {
-    color: #00f0ff;
+    color: #E6EDF3;  /* GitHub 白色，清晰可读 */
     font-weight: 600;
-    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
 
 /* Markdown 行 - 融入终端的赛博朋克 Markdown 格式化 */
@@ -2520,27 +2502,19 @@ body::before {
     box-shadow: -3px 0 10px rgba(255, 0, 110, 0.2);
 }
 
-/* Spinner 行 - 赛博朋克闪烁 */
+/* Spinner 行 - 优雅紫色脉动 */
 .line-spinner {
-    color: #39ff14;
+    color: #A371F7;  /* GitHub 紫色，替代霓虹绿 */
     font-style: italic;
-    text-shadow:
-        0 0 10px rgba(57, 255, 20, 0.8),
-        0 0 20px rgba(57, 255, 20, 0.4);
-    animation: spinner-glow 1s ease-in-out infinite;
+    animation: spinner-glow 1.5s ease-in-out infinite;
 }
 
 @keyframes spinner-glow {
     0%, 100% {
-        text-shadow:
-            0 0 10px rgba(57, 255, 20, 0.8),
-            0 0 20px rgba(57, 255, 20, 0.4);
+        opacity: 0.6;
     }
     50% {
-        text-shadow:
-            0 0 15px rgba(57, 255, 20, 1),
-            0 0 25px rgba(57, 255, 20, 0.6),
-            0 0 35px rgba(57, 255, 20, 0.3);
+        opacity: 1;
     }
 }
 
@@ -2561,32 +2535,28 @@ body::before {
     100% { content: '⠇'; }
 }
 
-/* 输入字段 - 赛博朋克风格 */
+/* 输入字段 - 优雅暗色风格 */
 .terminal-input-field {
     display: flex;
     align-items: center;
     padding: 8px 10px;
-    /* 霓虹青色分割线 + 发光 */
-    border-top: 2px solid rgba(0, 240, 255, 0.3);
-    background: rgba(0, 240, 255, 0.03);
-    box-shadow: 0 -2px 10px rgba(0, 240, 255, 0.1);
+    /* 低调深灰分割线，GitHub 风格 */
+    border-top: 1px solid #30363D;
+    background: rgba(22, 27, 34, 0.5);
 }
 
 .terminal-input-field .prompt {
-    /* 霓虹绿色 Prompt */
-    color: #39ff14;
+    /* 币安金色提示符，优雅醒目 */
+    color: #F0B90B;
     font-weight: bold;
     margin-right: 8px;
     flex-shrink: 0;
-    text-shadow:
-        0 0 10px rgba(57, 255, 20, 0.8),
-        0 0 20px rgba(57, 255, 20, 0.4);
     animation: prompt-blink 1.5s ease-in-out infinite;
 }
 
 @keyframes prompt-blink {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    50% { opacity: 0.8; }
 }
 
 .terminal-input-field input {
@@ -2594,59 +2564,51 @@ body::before {
     background: transparent;
     border: none;
     outline: none;
-    /* 霓虹青色文字 */
-    color: #00f0ff;
+    /* GitHub 白色，清晰可读 */
+    color: #E6EDF3;
     font-family: inherit;
     font-size: inherit;
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
 }
 
 .terminal-input-field input::placeholder {
-    color: rgba(0, 240, 255, 0.3);
+    color: rgba(139, 148, 158, 0.5);  /* 低调灰色 */
 }
 
-/* ANSI 颜色类 - 赛博朋克霓虹色系 */
+/* ANSI 颜色类 - 护眼优雅色系 */
 .ansi-reset {
-    color: #00f0ff;
+    color: #E6EDF3;  /* GitHub 白色，护眼 */
     font-weight: normal;
 }
 
 .ansi-bold {
     font-weight: bold;
-    text-shadow: 0 0 5px currentColor;
 }
 
 .ansi-red {
-    color: #ff0055;
-    text-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+    color: #FF6B6B;  /* 柔和红色，降低刺激 */
 }
 
 .ansi-green {
-    color: #39ff14;
-    text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+    color: #51CF66;  /* 柔和绿色，护眼 */
 }
 
 .ansi-yellow {
-    color: #ffea00;
-    text-shadow: 0 0 10px rgba(255, 234, 0, 0.5);
+    color: #F0B90B;  /* 币安金色，替代刺眼黄色 */
 }
 
 .ansi-blue {
-    color: #00f0ff;
-    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+    color: #A371F7;  /* 紫色替代蓝色，更护眼 */
 }
 
 .ansi-cyan {
-    color: #00ffff;
-    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    color: #9DB4C0;  /* 灰蓝色替代亮青色 */
 }
 
 .ansi-white {
-    color: #ffffff;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    color: #E6EDF3;  /* GitHub 白色 */
 }
 
-/* 滚动条样式 - 赛博朋克霓虹 */
+/* 滚动条样式 - 简洁优雅 */
 .terminal-output-area::-webkit-scrollbar {
     width: 8px;
 }
@@ -2654,22 +2616,15 @@ body::before {
 .terminal-output-area::-webkit-scrollbar-track {
     background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
-    box-shadow: inset 0 0 5px rgba(0, 240, 255, 0.1);
 }
 
 .terminal-output-area::-webkit-scrollbar-thumb {
-    background: rgba(0, 240, 255, 0.3);
+    background: rgba(139, 148, 158, 0.3);  /* GitHub 灰色 */
     border-radius: 4px;
-    box-shadow:
-        0 0 5px rgba(0, 240, 255, 0.5),
-        inset 0 0 3px rgba(0, 240, 255, 0.3);
 }
 
 .terminal-output-area::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 240, 255, 0.5);
-    box-shadow:
-        0 0 10px rgba(0, 240, 255, 0.8),
-        inset 0 0 5px rgba(0, 240, 255, 0.5);
+    background: rgba(163, 113, 247, 0.4);  /* 紫色高亮 */
 }
 
 #status {
@@ -2681,23 +2636,21 @@ body::before {
 
 #connection-status {
     padding: 5px 15px;
-    /* 霓虹青色状态指示器 */
-    background: rgba(0, 240, 255, 0.15);
-    border: 1px solid rgba(0, 240, 255, 0.4);
+    /* 优雅灰色状态指示器 */
+    background: rgba(139, 148, 158, 0.1);
+    border: 1px solid rgba(139, 148, 158, 0.3);
     border-radius: 20px;
     display: inline-block;
-    color: #00f0ff;
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    color: #8B949E;
     animation: status-pulse 2s ease-in-out infinite;
 }
 
 @keyframes status-pulse {
     0%, 100% {
-        box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        opacity: 0.8;
     }
     50% {
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+        opacity: 1;
     }
 }
 
@@ -2856,38 +2809,54 @@ body::before {
     flex-wrap: wrap;
 }
 
-/* 工具标签 */
+/* 工具标签 - 优雅低调风格 */
 .tool-badge {
     display: inline-block;
     padding: 2px 8px;
-    background: rgba(255, 0, 110, 0.15);
-    border: 1px solid rgba(255, 0, 110, 0.3);
+    background: rgba(163, 113, 247, 0.1);  /* 紫色背景，替代粉红 */
+    border: 1px solid rgba(163, 113, 247, 0.3);
     border-radius: 12px;
     font-size: 0.75em;
-    color: #ff006e;
-    text-shadow: 0 0 5px rgba(255, 0, 110, 0.4);
-    box-shadow: 0 0 8px rgba(255, 0, 110, 0.2);
+    color: #A371F7;  /* GitHub 紫色 */
 }
 
 /* 回合摘要 - 已移除，简化为扁平结构 */
 
-/* 折叠按钮 - 固定在最右边 */
+/* 重新执行按钮 - 简洁风格，紧挨折叠按钮 */
+.round-rerun-btn {
+    background: none;
+    border: none;
+    color: #8B949E;  /* 低调的灰色，GitHub 风格 */
+    font-size: 1.1em;
+    cursor: pointer;
+    padding: 4px 6px;
+    margin-right: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.round-rerun-btn:hover {
+    color: #A371F7;  /* 紫色高亮，替代青色 */
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* 折叠按钮 - 统一风格优化 */
 .round-toggle {
     background: none;
     border: none;
-    color: #00f0ff;
+    color: #8B949E;  /* 低调的灰色，统一风格 */
     font-size: 1.2em;
     cursor: pointer;
     padding: 4px 8px;
-    margin-left: auto;  /* 推到最右边 */
-    transition: all 0.2s;
-    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+    transition: all 0.2s ease;
+    opacity: 0.7;
 }
 
 .round-toggle:hover {
-    color: #39ff14;
-    text-shadow: 0 0 12px rgba(57, 255, 20, 0.6);
-    transform: scale(1.1);
+    color: #A371F7;  /* 紫色高亮，替代绿色 */
+    opacity: 1;
+    transform: scale(1.05);
 }
 
 /* 回合内容区域 */
@@ -3220,18 +3189,17 @@ body::before {
 
 /* 意图卡片 */
 .intent-card {
-    background: linear-gradient(135deg, rgba(0, 240, 255, 0.05) 0%, rgba(138, 43, 226, 0.05) 100%);
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    background: linear-gradient(135deg, rgba(163, 113, 247, 0.05) 0%, rgba(139, 148, 158, 0.03) 100%);
+    border: 1px solid rgba(139, 148, 158, 0.3);
     border-radius: 8px;
     margin: 1em 0;
     padding: 1.5em;
-    box-shadow: 0 4px 15px rgba(0, 240, 255, 0.2);
     animation: fadeInSlide 0.4s ease-out;
 }
 
 .intent-card.completed {
-    border-color: rgba(0, 255, 100, 0.3);
-    background: linear-gradient(135deg, rgba(0, 255, 100, 0.05) 0%, rgba(0, 240, 255, 0.05) 100%);
+    border-color: rgba(81, 207, 102, 0.3);  /* 柔和绿色 */
+    background: linear-gradient(135deg, rgba(81, 207, 102, 0.05) 0%, rgba(139, 148, 158, 0.03) 100%);
 }
 
 /* 意图头部 */
@@ -3241,7 +3209,7 @@ body::before {
     gap: 0.5em;
     margin-bottom: 1em;
     padding-bottom: 0.5em;
-    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    border-bottom: 1px solid rgba(139, 148, 158, 0.2);
 }
 
 .intent-icon {
@@ -3251,7 +3219,7 @@ body::before {
 .intent-title {
     font-size: 1.2em;
     font-weight: 600;
-    color: #00f0ff;
+    color: #E6EDF3;  /* GitHub 白色，替代青色 */
 }
 
 /* 意图理解 */

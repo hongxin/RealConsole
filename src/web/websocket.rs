@@ -894,7 +894,7 @@ async fn execute_decompose_command(
             .send(Message::Text(serde_json::to_string(&understanding_msg)?))
             .await?;
 
-        // 2. 发送步骤状态
+        // 2. 发送步骤状态（可视化）
         for (index, step) in plan.steps.iter().enumerate() {
             let progress_msg = ServerMessage::StepProgress {
                 plan_id: plan.id.clone(),
@@ -911,8 +911,40 @@ async fn execute_decompose_command(
                 .await?;
         }
 
-        // 3. 构建完成消息
-        let output_content = "\n⚡ 通过 Intent DSL 快速识别".to_string();
+        // v1.39.0: 自动执行计划（保留可视化价值）
+        eprintln!("🚀 [Decompose] Auto-executing plan: {}", plan.id);
+
+        // 转换 ExecutionStep -> EnabledStep
+        let enabled_steps: Vec<EnabledStep> = plan
+            .steps
+            .iter()
+            .enumerate()
+            .map(|(index, step)| EnabledStep {
+                step_id: step.id.clone(),
+                step_index: index,
+                description: step.description.clone(),
+                tool: step.tool.clone(),
+                params: step.params.clone(),
+            })
+            .collect();
+
+        // 执行计划（调用已有的 execute_plan 函数）
+        if let Err(e) = execute_plan(session, &plan.id, &enabled_steps, sender).await {
+            eprintln!("❌ [Decompose] Plan execution failed: {}", e);
+            // 标记回合失败
+            if let Some(failed_round) = session.fail_round(&round_id, format!("❌ 计划执行失败: {}", e)).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+            return Ok(());
+        }
+
+        // 构建完成消息
+        let output_content = "\n⚡ 通过 Intent DSL 快速识别并执行".to_string();
 
         // 完成回合
         let execution_time = start_time.elapsed().as_secs_f64();
@@ -978,7 +1010,7 @@ async fn execute_decompose_command(
                 .send(Message::Text(serde_json::to_string(&understanding_msg)?))
                 .await?;
 
-            // 2. 发送每个步骤的初始状态（pending）
+            // 2. 发送每个步骤的初始状态（可视化）
             for (index, step) in plan.steps.iter().enumerate() {
                 let status_str = match step.status {
                     StepStatus::Pending => "pending",
@@ -1003,8 +1035,40 @@ async fn execute_decompose_command(
                     .await?;
             }
 
-            // 3. 构建完成消息
-            let output_content = "\n🤖 通过 LLM 拆解执行".to_string();
+            // v1.39.0: 自动执行计划（保留可视化价值）
+            eprintln!("🚀 [Decompose] Auto-executing LLM plan: {}", plan.id);
+
+            // 转换 ExecutionStep -> EnabledStep
+            let enabled_steps: Vec<EnabledStep> = plan
+                .steps
+                .iter()
+                .enumerate()
+                .map(|(index, step)| EnabledStep {
+                    step_id: step.id.clone(),
+                    step_index: index,
+                    description: step.description.clone(),
+                    tool: step.tool.clone(),
+                    params: step.params.clone(),
+                })
+                .collect();
+
+            // 执行计划（调用已有的 execute_plan 函数）
+            if let Err(e) = execute_plan(session, &plan.id, &enabled_steps, sender).await {
+                eprintln!("❌ [Decompose] LLM plan execution failed: {}", e);
+                // 标记回合失败
+                if let Some(failed_round) = session.fail_round(&round_id, format!("❌ 计划执行失败: {}", e)).await {
+                    let round_complete_msg = ServerMessage::RoundComplete {
+                        round: failed_round,
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                        .await?;
+                }
+                return Ok(());
+            }
+
+            // 构建完成消息
+            let output_content = "\n🤖 通过 LLM 拆解并执行".to_string();
 
             // 计算执行时间
             let execution_time = start_time.elapsed().as_secs_f64();
