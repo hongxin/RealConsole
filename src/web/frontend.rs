@@ -1190,6 +1190,7 @@ const TERMINAL_JS: &str = r#"
                 ${toolsHtml}
                 <span style="margin-left: auto;"></span>
                 <button class="round-rerun-btn" title="重新执行此 Cell">🔄</button>
+                <button class="round-delete-btn" title="删除此 Cell">🗑️</button>
                 <button class="round-toggle" data-action="collapse">▼</button>
             `;
 
@@ -1225,6 +1226,15 @@ const TERMINAL_JS: &str = r#"
                 rerunBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.rerunCell(round.id);
+                });
+            }
+
+            // v1.41.0: 删除回合按钮事件
+            const deleteBtn = header.querySelector('.round-delete-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.deleteRound(round.id);
                 });
             }
 
@@ -1388,6 +1398,50 @@ const TERMINAL_JS: &str = r#"
                     `;
                 }
             }
+        }
+
+        // v1.41.0: 删除回合
+        deleteRound(roundId) {
+            console.log(`[v1.41.0] Deleting round: ${roundId}`);
+
+            const round = this.rounds.find(r => r.id === roundId);
+            if (!round) {
+                console.error(`[v1.41.0 ERROR] Round not found: ${roundId}`);
+                return;
+            }
+
+            // 准备用户输入预览（最多50个字符）
+            const inputPreview = round.userInput.substring(0, 50);
+            const inputSuffix = round.userInput.length > 50 ? '...' : '';
+
+            // 显示确认对话框
+            const confirmed = confirm(
+                `确定删除 Round #${round.index}？\n\n` +
+                `输入：${inputPreview}${inputSuffix}\n\n` +
+                `⚠️ 此操作不可恢复！`
+            );
+
+            if (!confirmed) {
+                console.log(`[v1.41.0] Delete cancelled by user`);
+                return;
+            }
+
+            // 从 rounds 数组中删除
+            const index = this.rounds.indexOf(round);
+            if (index > -1) {
+                this.rounds.splice(index, 1);
+                console.log(`[v1.41.0] Removed from rounds array, remaining: ${this.rounds.length}`);
+            }
+
+            // 从 DOM 中移除（添加淡出动画）
+            round.element.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            round.element.style.opacity = '0';
+            round.element.style.transform = 'translateX(-20px)';
+
+            setTimeout(() => {
+                round.element.remove();
+                console.log(`[v1.41.0] Round #${round.index} deleted successfully`);
+            }, 300);
         }
 
         getStatusIcon(status) {
@@ -3219,6 +3273,25 @@ body::before {
 
 .round-rerun-btn:hover {
     color: #A371F7;  /* 紫色高亮，替代青色 */
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* v1.41.0: 删除按钮 */
+.round-delete-btn {
+    background: none;
+    border: none;
+    color: #8B949E;  /* 默认灰色，低调 */
+    font-size: 1.1em;
+    cursor: pointer;
+    padding: 4px 6px;
+    margin-right: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.round-delete-btn:hover {
+    color: #ff006e;  /* 红色，表示危险操作 */
     opacity: 1;
     transform: scale(1.05);
 }
