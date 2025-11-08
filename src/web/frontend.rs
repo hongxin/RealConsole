@@ -57,7 +57,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <button onclick="setLanguage('zh-CN')" id="btn-zh" class="active">中文</button>
                 <button onclick="setLanguage('en-US')" id="btn-en">English</button>
             </div>
-            <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合模式</button>
+            <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合</button>
         </div>
     </div>
     <div id="terminal-container">
@@ -2918,12 +2918,19 @@ body::before {
    Claude Code 风格 - 融入终端体验
    ============================================ */
 
+/* v1.36.3: Markdown 渲染样式统一（传统模式 + 回合模式） */
 .line-markdown h1,
 .line-markdown h2,
 .line-markdown h3,
 .line-markdown h4,
 .line-markdown h5,
-.line-markdown h6 {
+.line-markdown h6,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
     /* 霓虹青色到粉色渐变标题 */
     background: linear-gradient(90deg, #00f0ff 0%, #ff006e 100%);
     -webkit-background-clip: text;
@@ -2935,29 +2942,32 @@ body::before {
     filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.4));
 }
 
-.line-markdown h1 { font-size: 1.8em; }
-.line-markdown h2 { font-size: 1.5em; }
-.line-markdown h3 { font-size: 1.3em; }
-.line-markdown h4 { font-size: 1.1em; }
-.line-markdown h5 { font-size: 1.0em; }
-.line-markdown h6 { font-size: 0.9em; }
+.line-markdown h1, .markdown-content h1 { font-size: 1.8em; }
+.line-markdown h2, .markdown-content h2 { font-size: 1.5em; }
+.line-markdown h3, .markdown-content h3 { font-size: 1.3em; }
+.line-markdown h4, .markdown-content h4 { font-size: 1.1em; }
+.line-markdown h5, .markdown-content h5 { font-size: 1.0em; }
+.line-markdown h6, .markdown-content h6 { font-size: 0.9em; }
 
 /* 粗体 - 霓虹白色发光 */
-.line-markdown strong {
+.line-markdown strong,
+.markdown-content strong {
     color: #ffffff;
     font-weight: 700;
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
 /* 斜体 - 霓虹青色 */
-.line-markdown em {
+.line-markdown em,
+.markdown-content em {
     color: #00f0ff;
     font-style: italic;
     text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
 }
 
 /* 内联代码 - 霓虹青色 + 发光边框 */
-.line-markdown code {
+.line-markdown code,
+.markdown-content code {
     color: #00f0ff;
     background-color: rgba(0, 240, 255, 0.08);
     padding: 0.2em 0.4em;
@@ -2971,7 +2981,8 @@ body::before {
 }
 
 /* 代码块 - 霓虹绿色 + 发光边框 */
-.line-markdown pre {
+.line-markdown pre,
+.markdown-content pre {
     background-color: rgba(0, 0, 0, 0.5);
     padding: 1em;
     border-radius: 5px;
@@ -2983,7 +2994,8 @@ body::before {
         inset 0 0 20px rgba(57, 255, 20, 0.05);
 }
 
-.line-markdown pre code {
+.line-markdown pre code,
+.markdown-content pre code {
     color: #39ff14;
     background: none;
     border: none;
@@ -2994,36 +3006,43 @@ body::before {
 }
 
 /* 段落 - 霓虹青色 */
-.line-markdown p {
+.line-markdown p,
+.markdown-content p {
     margin: 0.5em 0;
     color: rgba(0, 240, 255, 0.9);
 }
 
 /* 列表 - 霓虹粉色 bullet */
 .line-markdown ul,
-.line-markdown ol {
+.line-markdown ol,
+.markdown-content ul,
+.markdown-content ol {
     margin: 0.5em 0;
     padding-left: 1.5em;
 }
 
-.line-markdown ul li::marker {
+.line-markdown ul li::marker,
+.markdown-content ul li::marker {
     color: #ff006e;
     text-shadow: 0 0 5px rgba(255, 0, 110, 0.5);
 }
 
-.line-markdown ol li::marker {
+.line-markdown ol li::marker,
+.markdown-content ol li::marker {
     color: #ff006e;
     font-weight: 600;
     text-shadow: 0 0 5px rgba(255, 0, 110, 0.5);
 }
 
-.line-markdown li {
+.line-markdown li,
+.markdown-content li {
     margin: 0.3em 0;
     color: rgba(0, 240, 255, 0.9);
 }
 
 /* 引用块 - 霓虹紫色边框 */
-.line-markdown blockquote {
+.line-markdown blockquote,
+.markdown-content blockquote {
     border-left: 3px solid rgba(162, 57, 234, 0.6);
     padding-left: 1em;
     color: rgba(0, 240, 255, 0.7);
@@ -3034,7 +3053,8 @@ body::before {
 }
 
 /* 链接 - 霓虹粉色 + 悬停发光 */
-.line-markdown a {
+.line-markdown a,
+.markdown-content a {
     color: #ff006e;
     text-decoration: none;
     border-bottom: 1px solid rgba(255, 0, 110, 0.5);
@@ -3042,7 +3062,8 @@ body::before {
     transition: all 0.3s ease;
 }
 
-.line-markdown a:hover {
+.line-markdown a:hover,
+.markdown-content a:hover {
     color: #ff3399;
     border-bottom-color: #ff006e;
     text-shadow:
@@ -3051,7 +3072,8 @@ body::before {
 }
 
 /* 分隔线 - 霓虹发光 */
-.line-markdown hr {
+.line-markdown hr,
+.markdown-content hr {
     border: none;
     height: 1px;
     background: linear-gradient(90deg,
@@ -3065,21 +3087,25 @@ body::before {
 }
 
 /* 表格 - 赛博朋克网格 */
-.line-markdown table {
+.line-markdown table,
+.markdown-content table {
     border-collapse: collapse;
     width: 100%;
     margin: 0.5em 0;
 }
 
 .line-markdown th,
-.line-markdown td {
+.line-markdown td,
+.markdown-content th,
+.markdown-content td {
     border: 1px solid rgba(0, 240, 255, 0.3);
     padding: 0.4em 0.8em;
     text-align: left;
     color: rgba(0, 240, 255, 0.9);
 }
 
-.line-markdown th {
+.line-markdown th,
+.markdown-content th {
     background-color: rgba(0, 240, 255, 0.1);
     color: #00f0ff;
     font-weight: 600;
@@ -3087,12 +3113,14 @@ body::before {
     box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1);
 }
 
-.line-markdown td {
+.line-markdown td,
+.markdown-content td {
     background-color: rgba(0, 240, 255, 0.03);
 }
 
 /* 图片 - 霓虹边框 */
-.line-markdown img {
+.line-markdown img,
+.markdown-content img {
     max-width: 100%;
     height: auto;
     border-radius: 4px;
