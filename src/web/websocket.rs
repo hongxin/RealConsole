@@ -127,6 +127,10 @@ async fn handle_message(
             // v1.29.3: 执行计划
             execute_plan(session, &plan_id, &enabled_steps, sender).await?;
         }
+        ClientMessage::RerunCell { round_id } => {
+            // v1.38.0: 重新执行 Cell
+            handle_rerun_cell(session, &round_id, sender).await?;
+        }
     }
     Ok(())
 }
@@ -1373,4 +1377,53 @@ fn extract_filename(description: &str) -> Option<String> {
 /// 从描述中提取文件路径
 fn extract_file_path(description: &str) -> Option<String> {
     extract_filename_strict(description)
+}
+
+/// v1.38.0: 处理 Cell 重新执行
+async fn handle_rerun_cell(
+    session: &Arc<Session>,
+    round_id: &str,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    // 1. 从 session 中获取原始输入内容
+    let original_input = {
+        let rounds = session.rounds.read().await;
+        rounds
+            .iter()
+            .find(|r| r.id == round_id)
+            .map(|r| r.user_input.clone())
+    };
+
+    let input_content = match original_input {
+        Some(content) => content,
+        None => {
+            // Round 不存在，返回错误
+            let error_msg = ServerMessage::Error {
+                content: format!("Round {} not found", round_id),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&error_msg)?))
+                .await?;
+            return Ok(());
+        }
+    };
+
+    println!(
+        "[v1.38.0] Rerunning cell: round_id={}, input={}",
+        round_id,
+        input_content.chars().take(50).collect::<String>()
+    );
+
+    // 2. 发送 ClearCell 消息，通知前端清空输出
+    let clear_msg = ServerMessage::ClearCell {
+        round_id: round_id.to_string(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&clear_msg)?))
+        .await?;
+
+    // 3. 重新执行该输入（复用现有的 handle_input 逻辑）
+    handle_input(session, &input_content, sender).await?;
+
+    Ok(())
 }

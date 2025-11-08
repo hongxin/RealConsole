@@ -5,6 +5,68 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0] - 2025-01-08
+
+### 🎯 Highlights
+
+**主题**: Cell 重新执行功能 (Cell Rerun Feature)
+
+- ✅ Jupyter-like 体验 - 一键重新执行任何历史命令/对话
+- ✅ 赛博朋克 UI - 青色到绿色渐变按钮，发光效果
+- ✅ 实时反馈 - Loading 状态、错误处理、按钮禁用
+- ✅ WebSocket 通信 - 前后端消息流完整实现
+
+### ✨ Added
+
+**Web 终端 Cell 重新执行**
+
+- **UI 按钮** (`src/web/frontend.rs` - lines 877-893)
+  - 位置：每个 Round 卡片头部右侧
+  - 样式：`linear-gradient(90deg, #00f0ff 0%, #39ff14 100%)`
+  - 文字：🔄 重新执行 (黑色粗体)
+  - 交互：Hover 放大 1.05 倍 + 发光效果
+
+- **消息类型** (`src/web/session.rs`)
+  - `ClientMessage::RerunCell` - 客户端请求重新执行
+  - `ServerMessage::ClearCell` - 服务端清空输出指令
+
+- **后端处理** (`src/web/websocket.rs` - lines 1382-1429)
+  - `handle_rerun_cell()` - 核心处理函数
+  - 查找原始输入 → 清空输出 → 重新执行 → 流式返回
+
+- **前端逻辑** (`src/web/frontend.rs`)
+  - `rerunCell()` - 发送 WebSocket 消息 (lines 1034-1091)
+  - `clearCellOutput()` - 清空输出区域 (lines 1093-1116)
+  - 按钮状态管理 - 禁用/恢复 (lines 1018-1025)
+
+### 🐛 Fixed
+
+- **WebSocket 引用问题** (`src/web/frontend.rs` - line 1883)
+  - 修复：`terminal.ws = ws;` - 保存 WebSocket 对象引用
+  - 影响：`rerunCell()` 方法可以正确访问 `this.ws`
+  - 错误：之前显示 "❌ WebSocket 未连接，无法重新执行"
+
+### 🧪 Testing
+
+- **测试脚本**: `scripts/test/test_v1.38.0_rerun.sh`
+  - 自动编译、启动服务器 (端口 7799)
+  - 详细测试步骤和 UI 验证清单
+  - macOS 自动打开浏览器
+
+- **验证场景**:
+  - Shell 命令重执行 (`!date` - 显示新时间) ✅
+  - LLM 对话重执行 ("你好" - 可能不同回复) ✅
+  - 系统命令重执行 (`/system help` - 重新显示) ✅
+  - 边界测试（快速点击、断连错误处理） ✅
+
+### 📚 Documentation
+
+- **完成报告**: `docs/04-reports/v1.38.0-cell-rerun-completion.md`
+  - 功能概述、技术实现、Bug 修复、测试验证
+  - 代码示例、影响范围、用户价值
+
+---
+
 ## [1.22.1] - 2025-11-02
 
 ### 🎯 Highlights

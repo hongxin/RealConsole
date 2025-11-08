@@ -125,6 +125,9 @@ pub enum ClientMessage {
         plan_id: String,
         enabled_steps: Vec<EnabledStep>,
     },
+    /// v1.38.0: 重新执行 Cell
+    #[serde(rename = "rerun_cell")]
+    RerunCell { round_id: String },
 }
 
 /// v1.29.3: 启用的步骤信息
@@ -173,6 +176,11 @@ pub enum ServerMessage {
     /// 历史回合列表（初始加载或重连）
     #[serde(rename = "round_history")]
     RoundHistory { rounds: Vec<ConversationRound> },
+
+    // ===== v1.38.0 新增：Cell 重新执行消息 =====
+    /// 清空 Cell 输出（重新执行前）
+    #[serde(rename = "clear_cell")]
+    ClearCell { round_id: String },
 
     // ===== v1.29.0 新增：意图拆解可视化消息 =====
     /// 意图理解（显示AI对意图的理解）
