@@ -822,6 +822,25 @@ const TERMINAL_JS: &str = r#"
                 expanded: true
             };
 
+            // v1.38.0: 检查是否是重新执行的 Round
+            if (this.rerunningRound && this.rerunningRound.input === round.user_input) {
+                console.log(`[v1.38.0] Replacing rerun round: ${this.rerunningRound.id} -> ${round.id}`);
+
+                // 删除旧 Round
+                const oldRoundIndex = this.rounds.findIndex(r => r.id === this.rerunningRound.id);
+                if (oldRoundIndex !== -1) {
+                    this.rounds.splice(oldRoundIndex, 1);
+                }
+
+                // 从 DOM 中移除旧 Round
+                if (this.rerunningRound.element && this.rerunningRound.element.parentNode) {
+                    this.rerunningRound.element.parentNode.removeChild(this.rerunningRound.element);
+                }
+
+                // 清空重新执行标记
+                this.rerunningRound = null;
+            }
+
             // 创建回合 DOM 元素
             roundData.element = this.createRoundElement(roundData);
             this.outputArea.appendChild(roundData.element);
@@ -874,22 +893,21 @@ const TERMINAL_JS: &str = r#"
                 <span class="round-status ${round.status}">${this.getStatusIcon(round.status)}</span>
                 <span class="round-time">${round.executionTime.toFixed(2)}s</span>
                 ${toolsHtml}
+                <span style="margin-left: auto;"></span>
                 <button class="round-rerun-btn" title="重新执行此 Cell" style="
-                    padding: 0.3em 0.8em;
+                    padding: 0.25em 0.5em;
                     background: linear-gradient(90deg, #00f0ff 0%, #39ff14 100%);
                     border: none;
-                    border-radius: 4px;
+                    border-radius: 3px;
                     color: #000;
-                    font-weight: 600;
                     cursor: pointer;
-                    font-size: 0.85em;
-                    margin-left: auto;
+                    font-size: 0.9em;
                     margin-right: 0.5em;
-                    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+                    box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
                     transition: all 0.2s ease;
-                " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 0 15px rgba(0, 240, 255, 0.5)';"
-                   onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 10px rgba(0, 240, 255, 0.3)';">
-                    🔄 重新执行
+                " onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 0 12px rgba(0, 240, 255, 0.5)';"
+                   onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 8px rgba(0, 240, 255, 0.3)';">
+                    🔄
                 </button>
                 <button class="round-toggle" data-action="collapse">▼</button>
             `;
@@ -1015,15 +1033,6 @@ const TERMINAL_JS: &str = r#"
                 }
             }
 
-            // v1.38.0: 恢复"重新执行"按钮状态
-            const rerunBtn = round.element.querySelector('.round-rerun-btn');
-            if (rerunBtn) {
-                rerunBtn.disabled = false;
-                rerunBtn.textContent = '🔄 重新执行';
-                rerunBtn.style.opacity = '1';
-                rerunBtn.style.cursor = 'pointer';
-            }
-
             // 滚动到底部
             this.scrollToBottom();
         }
@@ -1050,38 +1059,26 @@ const TERMINAL_JS: &str = r#"
                 return;
             }
 
-            // 1. 更新 UI：禁用按钮，显示 Loading
-            const rerunBtn = round.element.querySelector('.round-rerun-btn');
-            if (rerunBtn) {
-                rerunBtn.disabled = true;
-                rerunBtn.textContent = '⏳ 执行中...';
-                rerunBtn.style.opacity = '0.6';
-                rerunBtn.style.cursor = 'not-allowed';
-            }
-
-            // 2. 清空输出区域，显示 Loading
-            const outputContent = round.element.querySelector('.output-content');
-            if (outputContent) {
-                outputContent.innerHTML = `
-                    <div class="loading-spinner" style="
-                        padding: 1em;
-                        text-align: center;
-                        color: #00f0ff;
-                        font-size: 1.1em;
-                    ">
-                        🔄 正在重新执行...
-                    </div>
-                `;
-            }
-
-            // 3. 发送 WebSocket 消息
+            // 发送 WebSocket 消息
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                // 记录正在重新执行的 Round（用于后续替换）
+                this.rerunningRound = {
+                    id: roundId,
+                    input: round.userInput,
+                    element: round.element
+                };
+
+                // 隐藏旧 Round（避免显示重复的 Loading 状态）
+                round.element.style.display = 'none';
+
                 this.ws.send(JSON.stringify({
                     type: 'rerun_cell',
                     round_id: roundId
                 }));
             } else {
                 console.error('[v1.38.0 ERROR] WebSocket not connected');
+                // 显示错误提示
+                const outputContent = round.element.querySelector('.output-content');
                 if (outputContent) {
                     outputContent.innerHTML = `
                         <div style="color: #ff006e; padding: 1em;">
@@ -1089,38 +1086,6 @@ const TERMINAL_JS: &str = r#"
                         </div>
                     `;
                 }
-                // 恢复按钮状态
-                if (rerunBtn) {
-                    rerunBtn.disabled = false;
-                    rerunBtn.textContent = '🔄 重新执行';
-                    rerunBtn.style.opacity = '1';
-                    rerunBtn.style.cursor = 'pointer';
-                }
-            }
-        }
-
-        // v1.38.0: 清空 Cell 输出（响应 clear_cell 消息）
-        clearCellOutput(roundId) {
-            console.log(`[v1.38.0] Clearing cell output: ${roundId}`);
-
-            const round = this.rounds.find(r => r.id === roundId);
-            if (!round) {
-                console.warn(`[v1.38.0 WARN] Round not found for clearing: ${roundId}`);
-                return;
-            }
-
-            const outputContent = round.element.querySelector('.output-content');
-            if (outputContent) {
-                outputContent.innerHTML = `
-                    <div class="loading-spinner" style="
-                        padding: 1em;
-                        text-align: center;
-                        color: #00f0ff;
-                        font-size: 1.1em;
-                    ">
-                        🔄 正在执行...
-                    </div>
-                `;
             }
         }
 
@@ -2093,12 +2058,6 @@ const TERMINAL_JS: &str = r#"
                     terminal.createRound(round);
                     terminal.completeRound(round);
                 });
-                break;
-
-            // ===== v1.38.0: Cell 重新执行消息 =====
-            case 'clear_cell':
-                // 清空 Cell 输出（重新执行前）
-                terminal.clearCellOutput(msg.round_id);
                 break;
 
             // ===== v1.36.0: 态势测算分析消息 =====

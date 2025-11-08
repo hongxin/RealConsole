@@ -5,6 +5,33 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.1] - 2025-01-08
+
+### 🐛 Fixed
+
+**Cell 重新执行 UX 优化**
+
+- **修复重复 Loading 状态** (`src/web/frontend.rs`)
+  - 问题：重新执行时，旧 Round 显示 Loading，新 Round 也创建，导致重复显示
+  - 解决：隐藏旧 Round → 创建新 Round → 删除旧 Round
+  - 简化逻辑：删除 `clearCellOutput()` 方法、`clear_cell` 消息处理器
+  - 代码净减少 ~30 行
+
+- **UI 图标化** (`src/web/frontend.rs` - lines 890-913)
+  - 将 "🔄 重新执行" 按钮改为小图标 "🔄"
+  - 缩小尺寸：`padding: 0.25em 0.5em`
+  - 与折叠按钮并列显示在最右边
+  - 更简洁清爽的界面
+
+### 💡 Improvement
+
+- **交互流程优化**
+  - 旧流程：点击按钮 → 更新旧 Round UI → 清空输出 → 发送消息 → 创建新 Round
+  - 新流程：点击按钮 → 隐藏旧 Round → 发送消息 → 创建并替换 Round
+  - 用户体验：无缝切换，无重复状态
+
+---
+
 ## [1.38.0] - 2025-01-08
 
 ### 🎯 Highlights
