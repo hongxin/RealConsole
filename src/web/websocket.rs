@@ -131,6 +131,22 @@ async fn handle_message(
             // v1.38.0: 重新执行 Cell
             handle_rerun_cell(session, &round_id, sender).await?;
         }
+        // v1.40.0: 会话管理消息
+        ClientMessage::SaveSession { name } => {
+            handle_save_session(session, name, sender).await?;
+        }
+        ClientMessage::LoadSession { session_id } => {
+            handle_load_session(session, &session_id, sender).await?;
+        }
+        ClientMessage::ListSessions => {
+            handle_list_sessions(sender).await?;
+        }
+        ClientMessage::DeleteSession { session_id } => {
+            handle_delete_session(&session_id, sender).await?;
+        }
+        ClientMessage::ExportSession { session_id, format } => {
+            handle_export_session(&session_id, &format, sender).await?;
+        }
     }
     Ok(())
 }
@@ -602,6 +618,9 @@ fn try_match_intent(text: &str, agent: &crate::agent::Agent) -> Option<IntentMat
 }
 
 /// 执行 Intent 意图
+///
+/// ## v1.40.0: 添加回合系统支持
+/// 消息流程：RoundStart(type: llm) → Output(Intent名称) → Output(结果) → RoundComplete
 async fn execute_intent(
     intent_match: &IntentMatch,
     original_text: &str,
@@ -609,6 +628,23 @@ async fn execute_intent(
     session: &Arc<Session>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
 ) -> anyhow::Result<()> {
+    use std::time::Instant;
+    let start_time = Instant::now();
+
+    // 创建新回合
+    let round = session.create_round(
+        crate::web::session::RoundType::Llm,
+        original_text.to_string(),
+        "intent".to_string()  // 标记为 Intent 执行
+    ).await;
+    let round_id = round.id.clone();
+
+    // 发送 RoundStart 消息
+    let round_start_msg = ServerMessage::RoundStart { round: round.clone() };
+    sender
+        .send(Message::Text(serde_json::to_string(&round_start_msg)?))
+        .await?;
+
     // 1. 发送意图识别提示
     let info_msg = ServerMessage::Output {
         content: format!("🎯 {}\n", intent_match.intent.name),
@@ -617,11 +653,9 @@ async fn execute_intent(
         .send(Message::Text(serde_json::to_string(&info_msg)?))
         .await?;
 
-    // 2. 使用 TemplateEngine 生成执行计划
-    match agent.template_engine.generate_from_intent(intent_match) {
+    let (ai_response, _status) = match agent.template_engine.generate_from_intent(intent_match) {
         Ok(plan) => {
-            // 3. 执行计划中的命令
-            // 简化实现：直接执行 Shell 命令
+            // 2. 执行计划中的命令
             let cmd = &plan.command;
 
             // 执行 shell 命令
@@ -641,16 +675,37 @@ async fn execute_intent(
             };
 
             // 发送执行结果
-            let msg = ServerMessage::Output { content: result };
+            let msg = ServerMessage::Output { content: result.clone() };
             sender
                 .send(Message::Text(serde_json::to_string(&msg)?))
                 .await?;
+
+            // 返回完整响应（Intent 名称 + 结果）
+            let full_response = format!("🎯 {}\n{}", intent_match.intent.name, result);
+            (full_response, "success")
         }
         Err(e) => {
             // 如果生成执行计划失败，回退到 LLM 对话
             eprintln!("⚠️ Intent 执行计划生成失败: {}", e);
             execute_llm_chat(original_text, agent, session, sender).await?;
+            return Ok(());  // LLM 对话会自己发送 RoundComplete
         }
+    };
+
+    // 完成回合
+    let execution_time = start_time.elapsed().as_secs_f64();
+    if let Some(completed_round) = session.complete_round(
+        &round_id,
+        ai_response,
+        execution_time,
+        vec![]  // Intent 执行没有工具使用
+    ).await {
+        let round_complete_msg = ServerMessage::RoundComplete {
+            round: completed_round,
+        };
+        sender
+            .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+            .await?;
     }
 
     Ok(())
@@ -1488,6 +1543,213 @@ async fn handle_rerun_cell(
 
     // 3. 重新执行该输入（复用现有的 handle_input 逻辑）
     handle_input(session, &input_content, sender).await?;
+
+    Ok(())
+}
+
+// ===== v1.40.0 新增：会话管理处理器 =====
+
+/// 处理保存会话
+async fn handle_save_session(
+    session: &Arc<Session>,
+    name: Option<String>,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::web::session_manager::SessionManager;
+
+    let manager = SessionManager::new()?;
+    let mut serializable = session.to_serializable().await;
+
+    // 如果提供了名称，使用自定义名称
+    if let Some(custom_name) = name {
+        serializable.name = custom_name;
+    }
+
+    match manager.save_session(&serializable) {
+        Ok(_) => {
+            let response = ServerMessage::SessionSaved {
+                session_id: serializable.id.clone(),
+                name: serializable.name.clone(),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+        Err(e) => {
+            let response = ServerMessage::SessionError {
+                message: format!("保存会话失败: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理加载会话
+async fn handle_load_session(
+    session: &Arc<Session>,
+    session_id: &str,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::web::session_manager::SessionManager;
+
+    let manager = SessionManager::new()?;
+
+    match manager.load_session(session_id) {
+        Ok(serializable) => {
+            // 恢复会话数据到当前会话（只恢复回合历史）
+            {
+                let mut rounds = session.rounds.write().await;
+                *rounds = serializable.rounds.clone();
+            }
+
+            let response = ServerMessage::SessionLoaded {
+                session: serializable,
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+        Err(e) => {
+            let response = ServerMessage::SessionError {
+                message: format!("加载会话失败: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理列出会话
+async fn handle_list_sessions(
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::web::session_manager::SessionManager;
+
+    let manager = SessionManager::new()?;
+
+    match manager.list_sessions() {
+        Ok(sessions) => {
+            let response = ServerMessage::SessionList { sessions };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+        Err(e) => {
+            let response = ServerMessage::SessionError {
+                message: format!("列出会话失败: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理删除会话
+async fn handle_delete_session(
+    session_id: &str,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::web::session_manager::SessionManager;
+
+    let manager = SessionManager::new()?;
+
+    match manager.delete_session(session_id) {
+        Ok(_) => {
+            let response = ServerMessage::SessionDeleted {
+                session_id: session_id.to_string(),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+        Err(e) => {
+            let response = ServerMessage::SessionError {
+                message: format!("删除会话失败: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理导出会话
+async fn handle_export_session(
+    session_id: &str,
+    format: &str,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::web::session_manager::SessionManager;
+
+    let manager = SessionManager::new()?;
+
+    // 1. 加载会话
+    let session_result = manager.load_session(session_id);
+    if let Err(e) = session_result {
+        let response = ServerMessage::SessionError {
+            message: format!("加载会话失败: {}", e),
+        };
+        sender
+            .send(Message::Text(serde_json::to_string(&response)?))
+            .await?;
+        return Ok(());
+    }
+
+    let session_data = session_result.unwrap();
+
+    // 2. 导出到指定格式
+    let export_result = match format {
+        "markdown" | "md" => manager.export_to_markdown(&session_data),
+        "html" => manager.export_to_html(&session_data),
+        _ => Err(anyhow::anyhow!("不支持的导出格式: {}", format)),
+    };
+
+    match export_result {
+        Ok(content) => {
+            // 3. 保存导出文件
+            let file_format = if format == "md" { "markdown" } else { format };
+            match manager.save_export(session_id, &content, file_format) {
+                Ok(export_path) => {
+                    let response = ServerMessage::SessionExported {
+                        session_id: session_id.to_string(),
+                        export_path: export_path.to_string_lossy().to_string(),
+                        format: file_format.to_string(),
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&response)?))
+                        .await?;
+                }
+                Err(e) => {
+                    let response = ServerMessage::SessionError {
+                        message: format!("保存导出文件失败: {}", e),
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&response)?))
+                        .await?;
+                }
+            }
+        }
+        Err(e) => {
+            let response = ServerMessage::SessionError {
+                message: format!("导出会话失败: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+    }
 
     Ok(())
 }

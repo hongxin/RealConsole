@@ -620,8 +620,18 @@ const TERMINAL_JS: &str = r#"
         }
 
         writeOutput(content) {
-            // 回合模式下跳过输出（已在回合卡片中显示）
-            if (this.viewMode === 'round') return;
+            // v1.40.0 Bug Fix: 回合模式下需要更新 currentRound.aiResponse
+            // 即使不在终端输出区域显示，也要同步到当前回合
+            if (this.viewMode === 'round') {
+                if (this.currentRound) {
+                    // 累积内容，不要覆盖（Intent 执行会发送多条 Output 消息）
+                    if (!this.currentRound.aiResponse) {
+                        this.currentRound.aiResponse = '';
+                    }
+                    this.currentRound.aiResponse += content;
+                }
+                return;
+            }
 
             // 自动检测 Markdown
             if (this.markdownRenderer.isMarkdown(content)) {
@@ -748,6 +758,12 @@ const TERMINAL_JS: &str = r#"
 
         writeStream(chunk) {
             this.streamBuffer += chunk;
+
+            // v1.40.0 Bug Fix: 在回合视图模式下，同步更新当前回合的 aiResponse
+            // 这样 completeRound 时才能正确渲染内容
+            if (this.viewMode === 'round' && this.currentRound) {
+                this.currentRound.aiResponse = this.streamBuffer;
+            }
         }
 
         finishStream() {
@@ -977,10 +993,19 @@ const TERMINAL_JS: &str = r#"
 
         completeRound(roundData) {
             const round = this.rounds.find(r => r.id === roundData.id);
-            if (!round) return;
+            if (!round) {
+                console.error(`Round not found: ${roundData.id}`);
+                return;
+            }
 
             const normalizedStatus = this.normalizeStatus(roundData.status);
-            round.aiResponse = roundData.ai_response || '';
+
+            // v1.40.0 Bug Fix: 不要覆盖前端已累积的 aiResponse（来自 Intent/意图拆解输出）
+            // 优先使用前端累积的内容，只有在前端没有累积内容时才使用后端的响应
+            if (!round.aiResponse || round.aiResponse === '') {
+                round.aiResponse = roundData.ai_response || '';
+            }
+
             round.executionTime = roundData.execution_time || 0;
             round.toolsUsed = roundData.tools_used || [];
             round.status = normalizedStatus;
@@ -988,30 +1013,41 @@ const TERMINAL_JS: &str = r#"
             // 更新 UI
             const statusSpan = round.element.querySelector('.round-status');
             statusSpan.textContent = this.getStatusIcon(normalizedStatus);
-            statusSpan.className = `round-status ${normalizedStatus}`;  // 移除 spinner-active
+            statusSpan.className = `round-status ${normalizedStatus}`;
 
             const timeSpan = round.element.querySelector('.round-time');
             timeSpan.textContent = `${roundData.execution_time.toFixed(2)}s`;
 
             const toolsSpan = round.element.querySelector('.round-tools');
-            if (toolsSpan) {  // Shell/System 命令可能没有 toolsSpan
+            if (toolsSpan) {
                 toolsSpan.innerHTML = this.renderTools(roundData.tools_used);
             }
 
             // 渲染输出内容
             const outputContent = round.element.querySelector('.output-content');
+
             if (round.aiResponse) {
                 // 根据回合类型选择渲染方式
                 if (round.roundType === RoundType.LLM) {
-                    // LLM 对话：使用 Markdown 渲染
-                    // v1.29.1: 追加而不是覆盖，保留意图卡片
+                    // LLM 对话：尝试 Markdown 渲染，失败则回退到纯文本
                     const responseDiv = document.createElement('div');
                     responseDiv.className = 'llm-response';
-                    responseDiv.innerHTML = this.markdownRenderer.render(round.aiResponse);
+
+                    // v1.40.0 Bug Fix: Markdown 渲染可能返回 null（非 Markdown 内容）
+                    // 例如 Intent 输出不包含 Markdown 标记，需要回退到纯文本显示
+                    const markdownHtml = this.markdownRenderer.render(round.aiResponse);
+                    if (markdownHtml) {
+                        responseDiv.innerHTML = markdownHtml;
+                    } else {
+                        // 回退到纯文本渲染（保留格式）
+                        const pre = document.createElement('pre');
+                        pre.className = 'terminal-text intent-output';
+                        pre.textContent = round.aiResponse;
+                        responseDiv.appendChild(pre);
+                    }
                     outputContent.appendChild(responseDiv);
                 } else {
                     // Shell/System 命令：使用 <pre> 保留格式
-                    // v1.29.1: 追加而不是覆盖，保留意图卡片
                     const pre = document.createElement('pre');
                     pre.className = 'terminal-text';
                     pre.textContent = round.aiResponse;
@@ -1650,6 +1686,7 @@ const TERMINAL_JS: &str = r#"
 
         showStepOutput(msg) {
             console.log(`[v1.29.3 DEBUG] Step output: ${msg.step_id}`, msg.output);
+            console.log(`[v1.40.0 DEBUG] viewMode: ${this.viewMode}, currentRound:`, this.currentRound);
 
             // 在步骤下方显示输出
             const stepElement = document.getElementById(`step-${msg.step_id}`);
@@ -1677,11 +1714,24 @@ const TERMINAL_JS: &str = r#"
             outputPre.textContent = msg.output;
             outputDiv.appendChild(outputPre);
 
+            // v1.40.0 Bug Fix: 在回合模式下，累积步骤输出到 currentRound.aiResponse
+            if (this.viewMode === 'round' && this.currentRound) {
+                // 累积所有步骤的输出
+                if (!this.currentRound.aiResponse) {
+                    this.currentRound.aiResponse = '';
+                }
+                this.currentRound.aiResponse += msg.output + '\n';
+                console.log(`[v1.40.0 DEBUG] Accumulated to currentRound.aiResponse, now length: ${this.currentRound.aiResponse.length}`);
+            } else {
+                console.warn(`[v1.40.0 WARN] Not accumulating: viewMode=${this.viewMode}, currentRound=${!!this.currentRound}`);
+            }
+
             this.scrollToBottom();
         }
 
         showPlanExecutionComplete(msg) {
             console.log(`[v1.29.3 DEBUG] Plan execution complete: ${msg.plan_id}, success=${msg.success}, executed=${msg.executed_count}, time=${msg.total_time}s`);
+            console.log(`[v1.40.0 DEBUG] viewMode: ${this.viewMode}, currentRound:`, this.currentRound);
 
             // 恢复按钮状态
             const card = document.querySelector(`[data-plan-id="${msg.plan_id}"]`);
@@ -1715,6 +1765,19 @@ const TERMINAL_JS: &str = r#"
                 </div>
             `;
             card.appendChild(summaryDiv);
+
+            // v1.40.0 Bug Fix: 在回合模式下，添加执行摘要到 currentRound.aiResponse
+            if (this.viewMode === 'round' && this.currentRound) {
+                const summary = `\n${msg.success ? '✅ 执行成功' : '⚠️ 执行完成（部分失败）'}\n执行了 ${msg.executed_count} 个步骤，用时 ${msg.total_time.toFixed(2)}s`;
+                if (!this.currentRound.aiResponse) {
+                    this.currentRound.aiResponse = summary;
+                } else {
+                    this.currentRound.aiResponse += summary;
+                }
+                console.log(`[v1.40.0 DEBUG] Added summary to currentRound.aiResponse, now length: ${this.currentRound.aiResponse.length}`);
+            } else {
+                console.warn(`[v1.40.0 WARN] Not adding summary: viewMode=${this.viewMode}, currentRound=${!!this.currentRound}`);
+            }
 
             this.scrollToBottom();
         }
@@ -2956,6 +3019,26 @@ body::before {
     border: none;
     padding: 0;
     color: rgba(240, 240, 240, 0.9);
+}
+
+/* v1.40.0: Intent 输出美化 */
+.intent-output {
+    background: rgba(10, 14, 39, 0.6);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 0.95em;
+    line-height: 1.6;
+    color: #f0f0f0;
+    box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.05);
+}
+
+/* Intent 名称高亮（🎯 图标行） */
+.intent-output::first-line {
+    color: #00f0ff;
+    font-weight: 500;
+    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
 }
 
 /* 响应式调整 */
