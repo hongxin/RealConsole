@@ -57,7 +57,27 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <button onclick="setLanguage('zh-CN')" id="btn-zh" class="active">中文</button>
                 <button onclick="setLanguage('en-US')" id="btn-en">English</button>
             </div>
+            <button id="session-menu-btn" class="session-btn" title="会话管理">💾 会话</button>
             <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合</button>
+        </div>
+    </div>
+    <!-- v1.40.0: 会话管理面板 -->
+    <div id="session-panel" class="session-panel hidden">
+        <div class="session-panel-overlay"></div>
+        <div class="session-panel-dialog">
+            <div class="session-panel-header">
+                <h3>💾 会话管理</h3>
+                <button id="session-panel-close" class="close-btn" title="关闭">×</button>
+            </div>
+            <div class="session-panel-content">
+                <div class="session-actions">
+                    <button id="save-session-btn" class="session-action-btn">💾 保存当前会话</button>
+                    <button id="refresh-sessions-btn" class="session-action-btn">🔄 刷新列表</button>
+                </div>
+                <div id="session-list" class="session-list">
+                    <div class="session-list-empty">加载中...</div>
+                </div>
+            </div>
         </div>
     </div>
     <div id="terminal-container">
@@ -412,6 +432,252 @@ const TERMINAL_JS: &str = r#"
         }
     }
 
+    // ========== v1.40.0: 会话管理器 ==========
+    class SessionManager {
+        constructor(terminal, websocket) {
+            this.terminal = terminal;
+            this.ws = websocket;
+            this.panel = null;
+            this.sessions = [];
+            this.currentSessionId = null;
+
+            this.init();
+        }
+
+        init() {
+            this.panel = document.getElementById('session-panel');
+            if (!this.panel) {
+                console.error('[SessionManager] 无法找到 session-panel 元素');
+                return;
+            }
+            this.bindEvents();
+        }
+
+        bindEvents() {
+            const menuBtn = document.getElementById('session-menu-btn');
+            const closeBtn = document.getElementById('session-panel-close');
+            const overlay = document.querySelector('.session-panel-overlay');
+            const saveBtn = document.getElementById('save-session-btn');
+            const refreshBtn = document.getElementById('refresh-sessions-btn');
+
+            if (menuBtn) {
+                menuBtn.onclick = () => this.show();
+            }
+
+            if (closeBtn) {
+                closeBtn.onclick = () => this.hide();
+            }
+
+            if (overlay) {
+                overlay.onclick = () => this.hide();
+            }
+
+            if (saveBtn) {
+                saveBtn.onclick = () => this.saveSession();
+            }
+
+            if (refreshBtn) {
+                refreshBtn.onclick = () => this.loadSessions();
+            }
+        }
+
+        show() {
+            this.panel.classList.remove('hidden');
+            this.loadSessions();
+        }
+
+        hide() {
+            this.panel.classList.add('hidden');
+        }
+
+        saveSession(name = null) {
+            const message = {
+                type: 'save_session',
+                name: name
+            };
+            this.ws.send(JSON.stringify(message));
+        }
+
+        loadSession(sessionId) {
+            if (!confirm('加载会话将替换当前内容，是否继续？')) {
+                return;
+            }
+
+            const message = {
+                type: 'load_session',
+                session_id: sessionId
+            };
+            this.ws.send(JSON.stringify(message));
+            this.hide();
+        }
+
+        loadSessions() {
+            const message = { type: 'list_sessions' };
+            this.ws.send(JSON.stringify(message));
+        }
+
+        deleteSession(sessionId, sessionName) {
+            if (!confirm(`确定删除会话 "${sessionName}"？`)) {
+                return;
+            }
+
+            const message = {
+                type: 'delete_session',
+                session_id: sessionId
+            };
+            this.ws.send(JSON.stringify(message));
+        }
+
+        exportSession(sessionId, format = 'markdown') {
+            const message = {
+                type: 'export_session',
+                session_id: sessionId,
+                format: format
+            };
+            this.ws.send(JSON.stringify(message));
+        }
+
+        handleSessionSaved(data) {
+            this.showNotification(`✅ 会话已保存: ${data.name}`);
+            this.loadSessions();
+        }
+
+        handleSessionLoaded(data) {
+            this.currentSessionId = data.session.id;
+            this.showNotification(`✅ 会话已加载: ${data.session.name}`);
+
+            this.terminal.clearAll();
+            if (data.session.rounds && data.session.rounds.length > 0) {
+                data.session.rounds.forEach(round => {
+                    this.terminal.createRound(round);
+                    this.terminal.completeRound(round);
+                });
+            }
+        }
+
+        handleSessionList(data) {
+            this.sessions = data.sessions;
+            this.renderSessionList();
+        }
+
+        handleSessionDeleted(data) {
+            this.showNotification(`✅ 会话已删除: ${data.session_id}`);
+            this.loadSessions();
+        }
+
+        handleSessionExported(data) {
+            this.showNotification(`✅ 会话已导出: ${data.file_path}`);
+            this.downloadFile(data.file_path, data.content);
+        }
+
+        handleSessionError(data) {
+            this.showNotification(`❌ 错误: ${data.message}`, 'error');
+        }
+
+        renderSessionList() {
+            const listContainer = document.getElementById('session-list');
+
+            if (this.sessions.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="session-list-empty">
+                        暂无保存的会话
+                    </div>
+                `;
+                return;
+            }
+
+            const html = this.sessions.map(session => this.renderSessionCard(session)).join('');
+            listContainer.innerHTML = html;
+
+            this.bindSessionCardEvents();
+        }
+
+        renderSessionCard(session) {
+            const date = new Date(session.created_at).toLocaleString('zh-CN');
+            const isCurrent = session.id === this.currentSessionId;
+            // 后端返回的是 SessionListItem，使用 round_count 字段
+            const roundCount = session.round_count || 0;
+
+            return `
+                <div class="session-card ${isCurrent ? 'current' : ''}" data-session-id="${session.id}">
+                    <div class="session-card-header">
+                        <h4 class="session-name">${this.escapeHtml(session.name)}</h4>
+                        ${isCurrent ? '<span class="current-badge">当前</span>' : ''}
+                    </div>
+                    <div class="session-card-info">
+                        <span class="session-date">📅 ${date}</span>
+                        <span class="session-rounds">💬 ${roundCount} 回合</span>
+                    </div>
+                    <div class="session-card-actions">
+                        <button class="session-card-btn load-btn" data-action="load">
+                            📂 加载
+                        </button>
+                        <button class="session-card-btn export-btn" data-action="export">
+                            📤 导出
+                        </button>
+                        <button class="session-card-btn delete-btn" data-action="delete">
+                            🗑️ 删除
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        bindSessionCardEvents() {
+            document.querySelectorAll('.session-card-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const card = btn.closest('.session-card');
+                    const sessionId = card.dataset.sessionId;
+                    const action = btn.dataset.action;
+                    const session = this.sessions.find(s => s.id === sessionId);
+
+                    switch (action) {
+                        case 'load':
+                            this.loadSession(sessionId);
+                            break;
+                        case 'export':
+                            this.exportSession(sessionId);
+                            break;
+                        case 'delete':
+                            this.deleteSession(sessionId, session.name);
+                            break;
+                    }
+                };
+            });
+        }
+
+        showNotification(message, type = 'success') {
+            const statusEl = document.getElementById('connection-status');
+            const originalText = statusEl.textContent;
+            const originalClass = statusEl.className;
+
+            statusEl.textContent = message;
+            statusEl.className = `notification ${type}`;
+
+            setTimeout(() => {
+                statusEl.textContent = originalText;
+                statusEl.className = originalClass;
+            }, 3000);
+        }
+
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        downloadFile(filename, content) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    }
+
     // ========== 混合终端核心 ==========
     class HybridTerminal {
         constructor(container) {
@@ -444,6 +710,9 @@ const TERMINAL_JS: &str = r#"
 
             // ===== v1.36.0: 态势测算分析动画 =====
             this.currentDivination = null;  // 当前的态势分析动画实例
+
+            // ===== v1.40.0: 会话管理 =====
+            this.sessionManager = null;  // WebSocket 连接后初始化
 
             this.init();
         }
@@ -812,6 +1081,16 @@ const TERMINAL_JS: &str = r#"
             this.streamBuffer = '';
             this.isStreaming = false;
             this.focusInput();
+        }
+
+        // v1.40.0: 清空所有内容（用于加载会话）
+        clearAll() {
+            this.rounds = [];
+            this.lines = [];
+            this.outputArea.innerHTML = '';
+            this.removeSpinner();
+            this.streamBuffer = '';
+            this.isStreaming = false;
         }
 
         escapeHtml(text) {
@@ -2018,6 +2297,9 @@ const TERMINAL_JS: &str = r#"
         terminal.writePlainText('\x1b[32m' + t('web.terminal.welcome') + '\x1b[0m\n' +
                                 '\x1b[36m' + t('web.terminal.usage_hint') + '\x1b[0m', true);
 
+        // v1.40.0: 初始化 SessionManager
+        terminal.sessionManager = new SessionManager(terminal, ws);
+
         // 应用初始语言设置
         updatePageText();
     };
@@ -2176,6 +2458,43 @@ const TERMINAL_JS: &str = r#"
             case 'plan_execution_complete':
                 // 计划执行完成
                 terminal.showPlanExecutionComplete(msg);
+                break;
+
+            // ===== v1.40.0: 会话管理消息 =====
+            case 'session_saved':
+                if (terminal.sessionManager) {
+                    terminal.sessionManager.handleSessionSaved(msg);
+                }
+                break;
+
+            case 'session_loaded':
+                if (terminal.sessionManager) {
+                    terminal.sessionManager.handleSessionLoaded(msg);
+                }
+                break;
+
+            case 'session_list':
+                if (terminal.sessionManager) {
+                    terminal.sessionManager.handleSessionList(msg);
+                }
+                break;
+
+            case 'session_deleted':
+                if (terminal.sessionManager) {
+                    terminal.sessionManager.handleSessionDeleted(msg);
+                }
+                break;
+
+            case 'session_exported':
+                if (terminal.sessionManager) {
+                    terminal.sessionManager.handleSessionExported(msg);
+                }
+                break;
+
+            case 'session_error':
+                if (terminal.sessionManager) {
+                    terminal.sessionManager.handleSessionError(msg);
+                }
                 break;
         }
     };
@@ -3944,5 +4263,239 @@ body::before {
     line-height: 1.6;
     font-family: 'SimSun', serif;
     font-style: italic;
+}
+
+/* ===== v1.40.0: 会话管理样式 ===== */
+
+/* 会话按钮 */
+.session-btn {
+    background: rgba(163, 113, 247, 0.1);
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    color: #A371F7;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.session-btn:hover {
+    background: rgba(163, 113, 247, 0.2);
+    border-color: rgba(163, 113, 247, 0.5);
+}
+
+/* 会话管理面板 */
+.session-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.session-panel.hidden {
+    display: none;
+}
+
+/* 半透明遮罩 */
+.session-panel-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+}
+
+/* 对话框 */
+.session-panel-dialog {
+    position: relative;
+    background: rgba(10, 14, 39, 0.95);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 头部 */
+.session-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.session-panel-header h3 {
+    margin: 0;
+    color: #00f0ff;
+    font-size: 1.2em;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 2em;
+    cursor: pointer;
+    transition: color 0.2s;
+    line-height: 1;
+    padding: 0;
+}
+
+.close-btn:hover {
+    color: #ff006e;
+}
+
+/* 内容区域 */
+.session-panel-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* 操作按钮区 */
+.session-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.session-action-btn {
+    flex: 1;
+    background: rgba(57, 255, 20, 0.1);
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    color: #39ff14;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.session-action-btn:hover {
+    background: rgba(57, 255, 20, 0.2);
+    border-color: rgba(57, 255, 20, 0.5);
+}
+
+/* 会话列表 */
+.session-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.session-list-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: #888;
+    padding: 40px 20px;
+    font-size: 1.1em;
+}
+
+/* 会话卡片 */
+.session-card {
+    background: rgba(10, 14, 39, 0.6);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.3s;
+}
+
+.session-card:hover {
+    border-color: rgba(0, 240, 255, 0.5);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+}
+
+.session-card.current {
+    border-color: rgba(57, 255, 20, 0.5);
+    background: rgba(57, 255, 20, 0.05);
+}
+
+.session-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.session-name {
+    margin: 0;
+    color: #f0f0f0;
+    font-size: 1em;
+}
+
+.current-badge {
+    background: rgba(57, 255, 20, 0.2);
+    color: #39ff14;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+}
+
+.session-card-info {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    color: #888;
+    font-size: 0.85em;
+}
+
+.session-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.session-card-btn {
+    flex: 1;
+    background: rgba(163, 113, 247, 0.1);
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    color: #A371F7;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s;
+}
+
+.session-card-btn:hover {
+    background: rgba(163, 113, 247, 0.2);
+    border-color: rgba(163, 113, 247, 0.5);
+}
+
+.session-card-btn.delete-btn {
+    color: #ff006e;
+    border-color: rgba(255, 0, 110, 0.3);
+    background: rgba(255, 0, 110, 0.05);
+}
+
+.session-card-btn.delete-btn:hover {
+    border-color: rgba(255, 0, 110, 0.5);
+    background: rgba(255, 0, 110, 0.1);
+}
+
+/* 通知样式 */
+.notification {
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+
+.notification.success {
+    background: rgba(57, 255, 20, 0.2);
+    color: #39ff14;
+}
+
+.notification.error {
+    background: rgba(255, 0, 110, 0.2);
+    color: #ff006e;
 }
 "#;
