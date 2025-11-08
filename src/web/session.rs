@@ -182,9 +182,9 @@ pub enum ServerMessage {
         understanding: String,
         step_count: usize,
         total_time: f64,
-        /// v1.36.0 新增：占卜结果
+        /// v1.36.2 新增：态势分析结果（替换 v1.36.0 的 divination）
         #[serde(skip_serializing_if = "Option::is_none")]
-        divination: Option<crate::agent::divination::DivinationResult>,
+        situation_analysis: Option<crate::agent::divination::SituationAnalysis>,
     },
 
     /// 步骤进度（执行中的步骤更新）
@@ -238,7 +238,9 @@ pub enum ServerMessage {
         total_time: f64,
     },
 
-    // ===== v1.36.0 新增：意图占卜系统消息 =====
+    // ===== v1.36.0 占卜消息（v1.36.2 已废弃，保留用于向后兼容） =====
+    // 以下消息类型已被 situation_analysis 字段替代，暂时注释掉
+    /*
     /// 占卜开始（起卦）
     #[serde(rename = "divination_start")]
     DivinationStart { plan_id: String },
@@ -263,6 +265,7 @@ pub enum ServerMessage {
         plan_id: String,
         result: crate::agent::divination::DivinationResult,
     },
+    */
 }
 
 /// Web 终端会话

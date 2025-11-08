@@ -863,19 +863,17 @@ const TERMINAL_JS: &str = r#"
             const header = document.createElement('div');
             header.className = 'round-header';
 
-            // 对于 Shell/System 命令，不显示工具使用
+            // ===== v1.36.2: 极简主义优化 - 直接平铺元素，减少嵌套 =====
             const toolsHtml = (round.roundType === 'llm')
                 ? `<span class="round-tools">${this.renderTools(round.toolsUsed)}</span>`
                 : '';
 
             header.innerHTML = `
-                <div class="round-info">
-                    <span class="round-number">${typeConfig.badge} #${round.index}</span>
-                    <span class="round-status ${round.status}">${this.getStatusIcon(round.status)}</span>
-                    <span class="round-time">${round.executionTime.toFixed(2)}s</span>
-                    ${toolsHtml}
-                    <span class="round-summary">${this.escapeHtml(round.userInput.substring(0, 50))}${round.userInput.length > 50 ? '...' : ''}</span>
-                </div>
+                <span class="round-badge">${typeConfig.badge}</span>
+                <span class="round-number">#${round.index}</span>
+                <span class="round-status ${round.status}">${this.getStatusIcon(round.status)}</span>
+                <span class="round-time">${round.executionTime.toFixed(2)}s</span>
+                ${toolsHtml}
                 <button class="round-toggle" data-action="collapse">▼</button>
             `;
 
@@ -883,21 +881,14 @@ const TERMINAL_JS: &str = r#"
             const content = document.createElement('div');
             content.className = 'round-content';
 
-            // 用户输入
+            // 用户输入（极简：直接显示内容，无额外包装）
             const inputDiv = document.createElement('div');
-            inputDiv.className = 'round-input';
-            inputDiv.innerHTML = `
-                <span class="round-input-label">${typeConfig.inputLabel}</span>
-                <div class="round-input-content">${this.escapeHtml(round.userInput)}</div>
-            `;
+            inputDiv.className = 'round-input-content';
+            inputDiv.textContent = round.userInput;
 
             // 输出
             const outputDiv = document.createElement('div');
-            outputDiv.className = 'round-output';
-            outputDiv.innerHTML = `
-                <span class="round-output-label">📤 Output:</span>
-                <div class="output-content"></div>
-            `;
+            outputDiv.className = 'output-content';
 
             content.appendChild(inputDiv);
             content.appendChild(outputDiv);
@@ -919,7 +910,7 @@ const TERMINAL_JS: &str = r#"
         getRoundTypeConfig(roundType) {
             const configs = {
                 [RoundType.LLM]: {
-                    badge: 'Round',
+                    badge: '🤖 Round',
                     inputLabel: '📥 Input:',
                     outputLabel: '📤 Output:'
                 },
@@ -1046,10 +1037,10 @@ const TERMINAL_JS: &str = r#"
             const button = document.getElementById('view-mode-toggle');
             if (button) {
                 if (this.viewMode === 'round') {
-                    button.textContent = '📊 回合模式';
+                    button.textContent = '📊 回合';
                     button.title = '切换到传统流式输出';
                 } else {
-                    button.textContent = '📜 传统模式';
+                    button.textContent = '📜 传统';
                     button.title = '切换到回合卡片视图';
                 }
             }
@@ -1095,6 +1086,55 @@ const TERMINAL_JS: &str = r#"
 
         // ===== v1.29.0: 意图拆解可视化方法 =====
 
+        // ===== v1.36.2: 渲染态势分析卡片（极简版）=====
+        renderSituationAnalysisCard(analysis) {
+            const card = document.createElement('div');
+            card.className = 'situation-analysis-card';
+
+            // 复杂度和风险的颜色标记
+            const riskClass = analysis.risk === 'High' ? 'high-risk' : analysis.risk === 'Medium' ? 'medium-risk' : 'low-risk';
+
+            // 标题行：核心指标一行显示
+            const header = `
+                <div class="situation-header">
+                    📊 <span class="complexity">${analysis.complexity.chinese_name}</span>
+                    <span class="divider">·</span>
+                    <span class="risk ${riskClass}">${analysis.risk.chinese_name}</span>
+                    <span class="divider">·</span>
+                    <span class="balance">${analysis.yin_yang_balance.is_balanced ? '平衡' : '失衡'}</span>
+                </div>
+            `;
+
+            // 总体评价（主要信息）
+            const summary = `<div class="situation-main">${analysis.is_ready_to_execute ? '✓' : '⚠'} ${this.escapeHtml(analysis.overall_summary)}</div>`;
+
+            // 问题和建议（只在有时显示，紧凑排列）
+            let alerts = '';
+
+            // 严重问题
+            const criticalIssues = analysis.sequence_validation.issues?.filter(i => i.severity === 'Critical') || [];
+            if (criticalIssues.length > 0) {
+                alerts += criticalIssues.map(i => `<div class="alert critical">⛔ ${i.message}</div>`).join('');
+            }
+
+            // 警告
+            const warnings = analysis.sequence_validation.issues?.filter(i => i.severity === 'Warning') || [];
+            if (warnings.length > 0) {
+                alerts += warnings.map(i => `<div class="alert warning">⚠️ ${i.message}</div>`).join('');
+            }
+
+            // 建议（最多显示2条，避免喧宾夺主）
+            if (analysis.suggestions && analysis.suggestions.length > 0) {
+                const topSuggestions = analysis.suggestions.slice(0, 2);
+                alerts += topSuggestions.map(s => `<div class="alert suggestion">💡 ${this.escapeHtml(s)}</div>`).join('');
+            }
+
+            // 组装卡片（极简结构）
+            card.innerHTML = `${header}${summary}${alerts}`;
+
+            return card;
+        }
+
         showIntentUnderstanding(msg) {
             // ===== v1.29.2: 存储计划数据 =====
             this.intentPlans.set(msg.plan_id, {
@@ -1134,13 +1174,22 @@ const TERMINAL_JS: &str = r#"
                     <button class="intent-edit-btn" data-plan-id="${msg.plan_id}">
                         ✏️ 修改计划
                     </button>
+                    <button class="intent-execute-btn" data-plan-id="${msg.plan_id}">
+                        ▶️ 执行计划
+                    </button>
                 </div>
             `;
 
-            // ===== v1.36.0: 插入态势分析卦象卡片（如果有）=====
-            const planData = this.intentPlans.get(msg.plan_id);
-            if (planData && planData.hexagramCard) {
-                card.insertBefore(planData.hexagramCard, card.firstChild);
+            // ===== v1.36.2: 插入态势分析卡片（如果有）=====
+            if (msg.situation_analysis) {
+                const analysisCard = this.renderSituationAnalysisCard(msg.situation_analysis);
+                // 插入到意图卡片的开头（header 之后）
+                const headerElement = card.querySelector('.intent-header');
+                if (headerElement && headerElement.nextSibling) {
+                    card.insertBefore(analysisCard, headerElement.nextSibling);
+                } else {
+                    card.insertBefore(analysisCard, card.firstChild.nextSibling || card.firstChild);
+                }
             }
 
             // ===== v1.29.1 修复：根据视图模式选择容器 =====
@@ -1175,6 +1224,14 @@ const TERMINAL_JS: &str = r#"
                 });
             }
 
+            // ===== v1.36.2: 添加执行按钮事件监听 =====
+            const executeBtn = card.querySelector('.intent-execute-btn');
+            if (executeBtn) {
+                executeBtn.addEventListener('click', () => {
+                    this.executePlan(msg.plan_id);
+                });
+            }
+
             this.scrollToBottom();
         }
 
@@ -1187,19 +1244,33 @@ const TERMINAL_JS: &str = r#"
             if (!stepElement) {
                 stepElement = document.createElement('div');
                 stepElement.id = `step-${msg.step_id}`;
-                stepElement.className = 'intent-step';
+                stepElement.className = 'intent-step expanded';
                 stepElement.innerHTML = `
-                    <div class="step-header">
+                    <div class="step-header" data-step-id="${msg.step_id}">
                         <span class="step-number">[${msg.step_index + 1}]</span>
                         <span class="step-description">${this.escapeHtml(msg.description)}</span>
                         <span class="step-status"></span>
+                        <span class="step-toggle">▼</span>
                     </div>
-                    <div class="step-meta">
-                        <span class="step-tool">🔧 ${this.escapeHtml(msg.tool)}</span>
-                        <span class="step-time"></span>
+                    <div class="step-details">
+                        <div class="step-meta">
+                            <span class="step-tool">🔧 ${this.escapeHtml(msg.tool)}</span>
+                            <span class="step-time"></span>
+                        </div>
                     </div>
                 `;
                 stepsContainer.appendChild(stepElement);
+
+                // ===== v1.36.2: 添加步骤折叠功能 =====
+                const stepHeader = stepElement.querySelector('.step-header');
+                const stepToggle = stepElement.querySelector('.step-toggle');
+                stepHeader.addEventListener('click', (e) => {
+                    // 如果点击的是checkbox，不触发折叠
+                    if (e.target.classList.contains('step-checkbox')) return;
+
+                    stepElement.classList.toggle('expanded');
+                    stepToggle.textContent = stepElement.classList.contains('expanded') ? '▼' : '▶';
+                });
 
                 // ===== v1.29.2: 存储步骤数据 =====
                 const plan = this.intentPlans.get(msg.plan_id);
@@ -2597,10 +2668,11 @@ body::before {
 }
 
 /* 回合头部 */
+/* ===== v1.36.2: 极简主义优化 ===== */
 .round-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 8px 12px;
     background: rgba(0, 240, 255, 0.05);
     border-bottom: 1px solid rgba(0, 240, 255, 0.2);
@@ -2612,21 +2684,19 @@ body::before {
     background: rgba(0, 240, 255, 0.08);
 }
 
-/* 回合信息容器 */
-.round-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1;
-    flex-wrap: wrap;
-}
-
-/* 回合编号 */
-.round-number {
+/* 回合徽章（类型图标+名称） */
+.round-badge {
     font-weight: 600;
     color: #00f0ff;
     font-size: 0.9em;
     text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+/* 回合编号 */
+.round-number {
+    font-weight: 500;
+    color: #888;
+    font-size: 0.85em;
 }
 
 /* 回合状态指示器 */
@@ -2712,19 +2782,9 @@ body::before {
     box-shadow: 0 0 8px rgba(255, 0, 110, 0.2);
 }
 
-/* 回合摘要 */
-.round-summary {
-    color: rgba(240, 240, 240, 0.7);
-    font-size: 0.85em;
-    font-style: italic;
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 400px;
-}
+/* 回合摘要 - 已移除，简化为扁平结构 */
 
-/* 折叠按钮 */
+/* 折叠按钮 - 固定在最右边 */
 .round-toggle {
     background: none;
     border: none;
@@ -2732,6 +2792,7 @@ body::before {
     font-size: 1.2em;
     cursor: pointer;
     padding: 4px 8px;
+    margin-left: auto;  /* 推到最右边 */
     transition: all 0.2s;
     text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
@@ -2765,18 +2826,9 @@ body::before {
     transform: rotate(-90deg);
 }
 
-/* 输入区域 */
+/* 输入区域 - 简化版，移除标签层 */
 .round-input {
     margin-bottom: 8px;
-}
-
-.round-input-label {
-    display: block;
-    color: #00f0ff;
-    font-size: 0.85em;
-    font-weight: 600;
-    margin-bottom: 4px;
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
 }
 
 .round-input-content {
@@ -2792,18 +2844,9 @@ body::before {
     box-shadow: -3px 0 10px rgba(0, 240, 255, 0.1);
 }
 
-/* 输出区域 */
+/* 输出区域 - 简化版，移除标签层 */
 .round-output {
     margin-top: 8px;
-}
-
-.round-output-label {
-    display: block;
-    color: #39ff14;
-    font-size: 0.85em;
-    font-weight: 600;
-    margin-bottom: 4px;
-    text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
 }
 
 .output-content {
@@ -2861,12 +2904,8 @@ body::before {
 
 /* 响应式调整 */
 @media (max-width: 768px) {
-    .round-info {
+    .round-header {
         gap: 8px;
-    }
-
-    .round-summary {
-        max-width: 200px;
     }
 
     .conversation-round {
@@ -3171,6 +3210,24 @@ body::before {
     align-items: center;
     gap: 0.5em;
     margin-bottom: 0.5em;
+    cursor: pointer;
+    user-select: none;
+    padding: 0.2em;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.step-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* v1.36.2: 步骤折叠图标 */
+.step-toggle {
+    color: #00f0ff;
+    font-size: 0.9em;
+    min-width: 1.2em;
+    text-align: center;
+    transition: transform 0.2s ease;
 }
 
 .step-number {
@@ -3189,6 +3246,32 @@ body::before {
     font-size: 1.2em;
     min-width: 1.5em;
     text-align: center;
+}
+
+/* v1.36.2: 步骤详情（可折叠） */
+.step-details {
+    max-height: 500px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    opacity: 1;
+}
+
+.intent-step:not(.expanded) .step-details {
+    max-height: 0;
+    opacity: 0;
+}
+
+/* v1.36.2: 折叠时也隐藏输出内容 */
+.intent-step:not(.expanded) .step-output {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.intent-step:not(.expanded) .step-header {
+    margin-bottom: 0;
 }
 
 /* 步骤元信息 */
@@ -3296,6 +3379,77 @@ body::before {
     transform: translateY(0);
 }
 
+/* ===== v1.36.2: 态势分析卡片样式（极简版）===== */
+.situation-analysis-card {
+    background: rgba(138, 43, 226, 0.03);
+    border-left: 3px solid rgba(138, 43, 226, 0.4);
+    border-radius: 4px;
+    padding: 0.6em 0.8em;
+    margin: 0.5em 0;
+    font-size: 0.85em;
+    line-height: 1.5;
+}
+
+/* 标题行 - 横向排列核心指标 */
+.situation-header {
+    color: #8a2be2;
+    font-weight: 500;
+    margin-bottom: 0.4em;
+}
+
+.situation-header .divider {
+    color: rgba(138, 43, 226, 0.4);
+    margin: 0 0.3em;
+}
+
+.situation-header .complexity {
+    color: #00f0ff;
+}
+
+.situation-header .risk {
+    font-weight: 600;
+}
+
+.situation-header .risk.low-risk {
+    color: #39ff14;
+}
+
+.situation-header .risk.medium-risk {
+    color: #ffb700;
+}
+
+.situation-header .risk.high-risk {
+    color: #ff006e;
+}
+
+.situation-header .balance {
+    color: #b0b0b0;
+}
+
+/* 主要信息 - 总体评价 */
+.situation-main {
+    color: #ffffff;
+    margin: 0.3em 0;
+}
+
+/* 问题和建议 - 紧凑显示 */
+.alert {
+    margin: 0.25em 0;
+    font-size: 0.9em;
+}
+
+.alert.critical {
+    color: #ff006e;
+}
+
+.alert.warning {
+    color: #ffb700;
+}
+
+.alert.suggestion {
+    color: #8a2be2;
+}
+
 .intent-cancel-btn, .intent-confirm-btn {
     padding: 0.5em 1em;
     border: 1px solid;
@@ -3375,13 +3529,17 @@ body::before {
 
 /* ===== v1.29.3: 步骤输出和执行摘要 ===== */
 
-/* 步骤输出 */
+/* 步骤输出 - v1.36.2: 添加折叠过渡效果 */
 .step-output {
     margin: 0.5em 0 0 2em;
     padding: 0.5em;
     background: rgba(0, 0, 0, 0.4);
     border-left: 2px solid rgba(0, 240, 255, 0.3);
     border-radius: 4px;
+    max-height: 2000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+    opacity: 1;
 }
 
 .step-output-content {

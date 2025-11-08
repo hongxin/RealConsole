@@ -858,8 +858,8 @@ async fn execute_decompose_command(
     if let Some(plan) = session.intent_router.try_match(query) {
         eprintln!("✨ [Intent] 快速识别成功，跳过 LLM 拆解");
 
-        // v1.36.0: 生成并发送态势测算分析动画（如果启用）
-        let divination_result = {
+        // v1.36.2: 生成态势测算分析结果（替换 v1.36.0 的占卜动画）
+        let situation_analysis = {
             // 读取配置（克隆以避免长时间持有锁）
             let divination_config = {
                 let agent = session.agent.read().await;
@@ -867,52 +867,12 @@ async fn execute_decompose_command(
             };
 
             if divination_config.enabled {
-                use crate::agent::divination::DivinationEngine;
+                use crate::agent::divination::SituationAnalyzer;
 
-                let result = DivinationEngine::divine(&plan);
-                let speed = &divination_config.animation_speed;
+                // 执行态势分析（无动画，直接生成结果）
+                let analysis = SituationAnalyzer::analyze(&plan);
 
-                // 发送占卜开始
-                sender
-                    .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStart {
-                        plan_id: plan.id.clone(),
-                    })?))
-                    .await?;
-                tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
-
-                // 发送演算步骤（如果启用）
-                if divination_config.show_yarrow_animation {
-                    for step in &result.yarrow_steps {
-                        sender
-                            .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStep {
-                                plan_id: plan.id.clone(),
-                                step: step.clone(),
-                            })?))
-                            .await?;
-                        tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
-                    }
-                }
-
-                // 发送卦象（如果启用）
-                if divination_config.show_hexagram {
-                    sender
-                        .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationHexagram {
-                            plan_id: plan.id.clone(),
-                            hexagram: result.hexagram.clone(),
-                        })?))
-                        .await?;
-                    tokio::time::sleep(tokio::time::Duration::from_millis(speed.hexagram_delay_ms())).await;
-                }
-
-                // 发送完整结果
-                sender
-                    .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationComplete {
-                        plan_id: plan.id.clone(),
-                        result: result.clone(),
-                    })?))
-                    .await?;
-
-                Some(result)
+                Some(analysis)
             } else {
                 None
             }
@@ -924,7 +884,7 @@ async fn execute_decompose_command(
             understanding: plan.understanding.clone(),
             step_count: plan.steps.len(),
             total_time: plan.total_estimated_time,
-            divination: divination_result,
+            situation_analysis,  // v1.36.2: 替换 divination
         };
         sender
             .send(Message::Text(serde_json::to_string(&understanding_msg)?))
@@ -982,7 +942,8 @@ async fn execute_decompose_command(
     match decomposer.decompose(query).await {
         Ok(plan) => {
             // v1.36.0: 生成并发送态势测算分析动画（如果启用）
-            let divination_result = {
+            // v1.36.2: 生成态势测算分析结果（替换 v1.36.0 的占卜动画）
+            let situation_analysis = {
                 // 读取配置（克隆以避免长时间持有锁）
                 let divination_config = {
                     let agent = session.agent.read().await;
@@ -990,52 +951,12 @@ async fn execute_decompose_command(
                 };
 
                 if divination_config.enabled {
-                    use crate::agent::divination::DivinationEngine;
+                    use crate::agent::divination::SituationAnalyzer;
 
-                    let result = DivinationEngine::divine(&plan);
-                    let speed = &divination_config.animation_speed;
+                    // 执行态势分析（无动画，直接生成结果）
+                    let analysis = SituationAnalyzer::analyze(&plan);
 
-                    // 发送占卜开始
-                    sender
-                        .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStart {
-                            plan_id: plan.id.clone(),
-                        })?))
-                        .await?;
-                    tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
-
-                    // 发送演算步骤（如果启用）
-                    if divination_config.show_yarrow_animation {
-                        for step in &result.yarrow_steps {
-                            sender
-                                .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStep {
-                                    plan_id: plan.id.clone(),
-                                    step: step.clone(),
-                                })?))
-                                .await?;
-                            tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
-                        }
-                    }
-
-                    // 发送卦象（如果启用）
-                    if divination_config.show_hexagram {
-                        sender
-                            .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationHexagram {
-                                plan_id: plan.id.clone(),
-                                hexagram: result.hexagram.clone(),
-                            })?))
-                            .await?;
-                        tokio::time::sleep(tokio::time::Duration::from_millis(speed.hexagram_delay_ms())).await;
-                    }
-
-                    // 发送完整结果
-                    sender
-                        .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationComplete {
-                            plan_id: plan.id.clone(),
-                            result: result.clone(),
-                        })?))
-                        .await?;
-
-                    Some(result)
+                    Some(analysis)
                 } else {
                     None
                 }
@@ -1047,7 +968,7 @@ async fn execute_decompose_command(
                 understanding: plan.understanding.clone(),
                 step_count: plan.steps.len(),
                 total_time: plan.total_estimated_time,
-                divination: divination_result,
+                situation_analysis,  // v1.36.2: 替换 divination
             };
             sender
                 .send(Message::Text(serde_json::to_string(&understanding_msg)?))

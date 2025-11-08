@@ -48,6 +48,9 @@ pub mod yarrow_stalks;
 pub mod yao_mapping;
 pub mod judgement_generator;
 pub mod divination_engine;
+pub mod step_analyzer;
+pub mod sequence_validator;
+pub mod situation_analyzer;
 
 // 重新导出主要类型，方便外部使用
 pub use trigram::Trigram;
@@ -56,6 +59,9 @@ pub use yarrow_stalks::{YarrowStep, YarrowStalksSimulator};
 pub use yao_mapping::{YaoPosition, StepYaoMapping};
 pub use judgement_generator::JudgementGenerator;
 pub use divination_engine::{DivinationEngine, DivinationResult};
+pub use step_analyzer::{StepNature, StepAnalyzer, YinYang};
+pub use sequence_validator::{SequenceValidation, SequenceValidator, SequenceIssue, SequenceSuggestion, IssueSeverity};
+pub use situation_analyzer::{SituationAnalyzer, SituationAnalysis, ComplexityLevel, RiskLevel};
 
 #[cfg(test)]
 mod integration_tests {
