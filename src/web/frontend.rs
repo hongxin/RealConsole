@@ -2987,15 +2987,13 @@ body::before {
 .markdown-content h4,
 .markdown-content h5,
 .markdown-content h6 {
-    /* 霓虹青色到粉色渐变标题 */
-    background: linear-gradient(90deg, #00f0ff 0%, #ff006e 100%);
+    /* 优雅紫金渐变标题 */
+    background: linear-gradient(90deg, #A371F7 0%, #F0B90B 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     font-weight: 600;
     margin: 0.8em 0 0.4em 0;
-    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
-    filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.4));
 }
 
 .line-markdown h1, .markdown-content h1 { font-size: 1.8em; }
@@ -3005,70 +3003,60 @@ body::before {
 .line-markdown h5, .markdown-content h5 { font-size: 1.0em; }
 .line-markdown h6, .markdown-content h6 { font-size: 0.9em; }
 
-/* 粗体 - 霓虹白色发光 */
+/* 粗体 - 优雅白色 */
 .line-markdown strong,
 .markdown-content strong {
-    color: #ffffff;
+    color: #E6EDF3;
     font-weight: 700;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
-/* 斜体 - 霓虹青色 */
+/* 斜体 - 柔和紫色 */
 .line-markdown em,
 .markdown-content em {
-    color: #00f0ff;
+    color: #C8A2F0;
     font-style: italic;
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
 }
 
-/* 内联代码 - 霓虹青色 + 发光边框 */
+/* 内联代码 - 紫色系 */
 .line-markdown code,
 .markdown-content code {
-    color: #00f0ff;
-    background-color: rgba(0, 240, 255, 0.08);
+    color: #A371F7;
+    background-color: rgba(163, 113, 247, 0.1);
     padding: 0.2em 0.4em;
     border-radius: 3px;
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    border: 1px solid rgba(163, 113, 247, 0.3);
     font-family: "Consolas", "Monaco", "Courier New", monospace;
     font-size: 0.9em;
-    box-shadow:
-        0 0 5px rgba(0, 240, 255, 0.2),
-        inset 0 0 5px rgba(0, 240, 255, 0.1);
 }
 
-/* 代码块 - 霓虹绿色 + 发光边框 */
+/* 代码块 - 柔和绿色，护眼 */
 .line-markdown pre,
 .markdown-content pre {
     background-color: rgba(0, 0, 0, 0.5);
     padding: 1em;
     border-radius: 5px;
-    border: 1px solid rgba(57, 255, 20, 0.3);
+    border: 1px solid rgba(48, 54, 61, 0.6);  /* GitHub 深灰边框 */
     overflow-x: auto;
     margin: 0.5em 0;
-    box-shadow:
-        0 0 10px rgba(57, 255, 20, 0.2),
-        inset 0 0 20px rgba(57, 255, 20, 0.05);
 }
 
 .line-markdown pre code,
 .markdown-content pre code {
-    color: #39ff14;
+    color: #51CF66;  /* 柔和绿色，护眼 */
     background: none;
     border: none;
     padding: 0;
     font-size: 0.95em;
-    box-shadow: none;
-    text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
 }
 
-/* 段落 - 霓虹青色 */
+/* 段落 - GitHub 白色，清晰易读 */
 .line-markdown p,
 .markdown-content p {
     margin: 0.5em 0;
-    color: rgba(0, 240, 255, 0.9);
+    color: #C9D1D9;  /* GitHub 浅灰白，护眼舒适 */
 }
 
-/* 列表 - 霓虹粉色 bullet */
+/* 列表 - 柔和紫色 bullet，护眼 */
 .line-markdown ul,
 .line-markdown ol,
 .markdown-content ul,
@@ -3079,70 +3067,62 @@ body::before {
 
 .line-markdown ul li::marker,
 .markdown-content ul li::marker {
-    color: #ff006e;
-    text-shadow: 0 0 5px rgba(255, 0, 110, 0.5);
+    color: #A371F7;  /* 紫色 marker，优雅 */
 }
 
 .line-markdown ol li::marker,
 .markdown-content ol li::marker {
-    color: #ff006e;
+    color: #A371F7;  /* 紫色 marker */
     font-weight: 600;
-    text-shadow: 0 0 5px rgba(255, 0, 110, 0.5);
 }
 
 .line-markdown li,
 .markdown-content li {
     margin: 0.3em 0;
-    color: rgba(0, 240, 255, 0.9);
+    color: #C9D1D9;  /* GitHub 浅灰白 */
 }
 
-/* 引用块 - 霓虹紫色边框 */
+/* 引用块 - 紫色边框，护眼 */
 .line-markdown blockquote,
 .markdown-content blockquote {
-    border-left: 3px solid rgba(162, 57, 234, 0.6);
+    border-left: 3px solid rgba(163, 113, 247, 0.5);  /* 紫色边框 */
     padding-left: 1em;
-    color: rgba(0, 240, 255, 0.7);
+    color: #8B949E;  /* GitHub 灰色，柔和 */
     margin: 0.5em 0;
     font-style: italic;
-    background: rgba(162, 57, 234, 0.05);
-    box-shadow: -3px 0 10px rgba(162, 57, 234, 0.2);
+    background: rgba(163, 113, 247, 0.05);
 }
 
-/* 链接 - 霓虹粉色 + 悬停发光 */
+/* 链接 - 紫色，简洁 */
 .line-markdown a,
 .markdown-content a {
-    color: #ff006e;
+    color: #A371F7;  /* 紫色链接 */
     text-decoration: none;
-    border-bottom: 1px solid rgba(255, 0, 110, 0.5);
-    text-shadow: 0 0 5px rgba(255, 0, 110, 0.3);
-    transition: all 0.3s ease;
+    border-bottom: 1px solid rgba(163, 113, 247, 0.4);
+    transition: all 0.2s ease;
 }
 
 .line-markdown a:hover,
 .markdown-content a:hover {
-    color: #ff3399;
-    border-bottom-color: #ff006e;
-    text-shadow:
-        0 0 10px rgba(255, 0, 110, 0.6),
-        0 0 20px rgba(255, 0, 110, 0.3);
+    color: #C8A2F0;  /* 浅紫色悬停 */
+    border-bottom-color: #A371F7;
 }
 
-/* 分隔线 - 霓虹发光 */
+/* 分隔线 - 灰色渐变，简洁 */
 .line-markdown hr,
 .markdown-content hr {
     border: none;
     height: 1px;
     background: linear-gradient(90deg,
         transparent 0%,
-        rgba(0, 240, 255, 0.5) 20%,
-        rgba(255, 0, 110, 0.5) 50%,
-        rgba(0, 240, 255, 0.5) 80%,
+        rgba(139, 148, 158, 0.3) 20%,
+        rgba(163, 113, 247, 0.4) 50%,
+        rgba(139, 148, 158, 0.3) 80%,
         transparent 100%);
     margin: 1em 0;
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
 }
 
-/* 表格 - 赛博朋克网格 */
+/* 表格 - GitHub 风格，简洁护眼 */
 .line-markdown table,
 .markdown-content table {
     border-collapse: collapse;
@@ -3154,35 +3134,32 @@ body::before {
 .line-markdown td,
 .markdown-content th,
 .markdown-content td {
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    border: 1px solid rgba(48, 54, 61, 0.5);  /* GitHub 深灰边框 */
     padding: 0.4em 0.8em;
     text-align: left;
-    color: rgba(0, 240, 255, 0.9);
+    color: #C9D1D9;  /* GitHub 浅灰白 */
 }
 
 .line-markdown th,
 .markdown-content th {
-    background-color: rgba(0, 240, 255, 0.1);
-    color: #00f0ff;
+    background-color: rgba(163, 113, 247, 0.08);  /* 紫色背景 */
+    color: #E6EDF3;  /* GitHub 白色 */
     font-weight: 600;
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.4);
-    box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1);
 }
 
 .line-markdown td,
 .markdown-content td {
-    background-color: rgba(0, 240, 255, 0.03);
+    background-color: rgba(48, 54, 61, 0.15);  /* 深灰背景 */
 }
 
-/* 图片 - 霓虹边框 */
+/* 图片 - 简洁边框 */
 .line-markdown img,
 .markdown-content img {
     max-width: 100%;
     height: auto;
     border-radius: 4px;
-    border: 2px solid rgba(0, 240, 255, 0.4);
+    border: 1px solid rgba(48, 54, 61, 0.6);  /* GitHub 深灰边框 */
     margin: 0.5em 0;
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
 }
 
 /* ========== v1.29.0: 意图拆解可视化样式 ========== */
