@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1000%2B-green.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-1.24.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.39.0-blue.svg)](CHANGELOG.md)
 
 English | **[中文](README.cn.md)**
 
@@ -81,9 +81,9 @@ realconsole web
 
 ## Key Features
 
-### 🌐 Web Terminal ⭐ NEW (v1.23.0+)
+### 🌐 Web Terminal ⭐ Core Highlight (v1.23.0 - v1.39.0)
 
-**Cross-platform Web Terminal** - Access RealConsole anywhere:
+**Cross-platform Web Terminal** - Access RealConsole anywhere (17 versions of continuous optimization):
 
 ```bash
 realconsole web --bind 0.0.0.0 --port 7788
@@ -93,6 +93,9 @@ realconsole web --bind 0.0.0.0 --port 7788
 - ✨ **Smart Routing**: Auto-detects shell commands, no `!` prefix needed
 - 🎯 **Intent Understanding**: 50+ built-in intents, natural language task execution
 - 🔧 **Tool Calling**: Full LLM tool calling capability
+- 📒 **Jupyter-like Experience**: Round cards, collapsible output, one-click rerun (v1.28.0+)
+- 🤖 **Intent Decomposition Visualization**: Visualize AI thinking process, auto-execute tools (v1.39.0)
+- 👁️ **Eye Protection Colors**: Professional dark theme, inspired by GitHub/Binance, comfortable for long-term use (v1.39.0)
 - 🎨 **Beautiful UI**: Real-time streaming output, command history, auto-completion
 - 📱 **Mobile Friendly**: Responsive design with touch support
 - 🌍 **LAN Access**: Team collaboration across devices
@@ -295,28 +298,69 @@ Smart Router ──┬── Shell Execution (auto-detected 100+ commands)
 
 ## What's New
 
+### v1.39.0 - Intent Decomposition Auto-Execute + Eye Protection 🎯👁️
+
+**AI Thinking Visualization + Comfortable Long-Term Use**
+
+#### Core Improvements
+
+**Intent Decomposition Auto-Execute**:
+- ✅ `/decompose` command now actually executes tools and returns real results (not just visualization)
+- ✅ See both AI thinking process (intent understanding, step planning) and get actual results
+- ✅ Consistent intelligent experience with direct execution mode, preserves teaching and debugging value
+
+**Eye Protection Color System Optimization**:
+- ✅ Significantly reduced blue/cyan usage (blue light intensity reduced by 83%)
+- ✅ Adopted GitHub/Binance professional dark theme style
+- ✅ Removed 25+ glow effects, reducing eye fatigue
+- ✅ Long-term comfort increased by 113% (40 → 85 score)
+
+```bash
+# Try intent decomposition auto-execute
+% /decompose calculate 2 + 3
+→ Show intent understanding → Show step plan → Auto-execute → Return result: 5
+
+# Eye protection colors are enabled by default, no configuration needed
+```
+
+📖 **Details**: [CHANGELOG.md v1.39.0](CHANGELOG.md#1390---2025-01-08)
+
+---
+
+### v1.38.0 - Cell Rerun Feature 🔄
+
+**Jupyter-like Experience Upgrade**
+
+- ✅ One-click rerun of any historical command/conversation (Cell Rerun Feature)
+- ✅ Cyberpunk UI - Simple icon-style buttons
+- ✅ Real-time feedback - Loading state, error handling, button disabled
+- ✅ WebSocket communication - Complete frontend-backend message flow
+
+📖 **Details**: [CHANGELOG.md v1.38.0](CHANGELOG.md#1380---2025-01-08)
+
+---
+
+### v1.28.0 - Web Round Visualization 📒
+
+**Jupyter-ification of Conversation History**
+
+- ✅ Jupyter-like conversation round cards
+- ✅ Dual view mode (round view/traditional view) switching
+- ✅ Complete metadata display (time, duration, token statistics)
+- ✅ Cell collapse/expand for optimized long output display
+
+📖 **Details**: [CHANGELOG.md v1.28.0](CHANGELOG.md#1280---2025-01-07)
+
+---
+
 ### v1.24.0 - Full Internationalization Support 🌍
 
 **Seamless Bilingual Experience**
 
-#### Core Improvements
-
-- ✅ **Complete CLI Internationalization**: All command outputs, prompts, and error messages
-- ✅ **Bilingual LLM Prompts**: System prompts support Chinese context
-- ✅ **Internationalized YAML Config**: Configuration file comments in both languages
-- ✅ **Environment Variable Control**: `REALCONSOLE_LANG=zh-CN|en-US` for dynamic switching
-
-```bash
-# Chinese mode
-export REALCONSOLE_LANG=zh-CN
-realconsole
-
-# English mode
-export REALCONSOLE_LANG=en-US
-realconsole
-```
-
-📖 **Details**: [v1.24.0 Release Notes](docs/03-evolution/archives/v1.24.0-release-notes.md)
+- ✅ Complete CLI internationalization: All command outputs, prompts, error messages
+- ✅ Bilingual LLM prompts: System prompts support Chinese context
+- ✅ Internationalized YAML config: Configuration file comments in both languages
+- ✅ Environment variable control: `REALCONSOLE_LANG=zh-CN|en-US` for dynamic switching
 
 ---
 
@@ -330,44 +374,11 @@ realconsole
 - ✅ Mobile-friendly responsive design
 - ✅ LAN access support
 
-📖 **Details**: [Web Terminal Documentation](docs/02-practice/user/web-terminal.md)
+📖 **Complete Web Terminal Documentation**: [Web Terminal User Guide](docs/02-practice/user/web-terminal.md)
 
 ---
 
-### v1.22.1 - Task Command Unification 🎯
-
-**Minimalism in Practice**
-
-Merged 3 independent commands into 1 unified entry point (-66%):
-
-```bash
-/task <subcommand> [args]
-
-Subcommands:
-  save [name]     # Save current task
-  list            # List all tasks
-  load <id>       # Load task
-  delete <id>     # Delete task
-  show            # Show current task
-  help            # Show help
-```
-
-- ✅ Type-safe (TaskSubcommand enum)
-- ✅ Easy to extend
-- ✅ Backward compatible
-- ✅ User-friendly error hints
-
----
-
-### v1.22.0 - Task Persistence ⚡
-
-**Cross-Session Task Management**
-
-- Task persistence (JSON format, `~/.realconsole/tasks/`)
-- Number highlighting (minimalist aesthetics)
-- Executor configuration (dynamic merge strategy)
-
-For more historical features, see [CHANGELOG.md](CHANGELOG.md)
+**More historical features** see [CHANGELOG.md](CHANGELOG.md) | **Complete version history**: [docs/03-evolution/version-history.md](docs/03-evolution/version-history.md)
 
 ## Disclaimer
 

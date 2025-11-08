@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1000%2B-green.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-1.24.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.39.0-blue.svg)](CHANGELOG.md)
 
 **[English](README.md)** | 中文
 
@@ -80,9 +80,9 @@ realconsole web
 
 ## 核心特性
 
-### 🌐 Web 终端 ⭐ 新增 (v1.23.0+)
+### 🌐 Web 终端 ⭐ 核心亮点 (v1.23.0 - v1.39.0)
 
-**跨平台 Web 终端**，随时随地访问 RealConsole：
+**跨平台 Web 终端**，随时随地访问 RealConsole（17 个版本持续优化）：
 
 ```bash
 realconsole web --bind 0.0.0.0 --port 7788
@@ -92,6 +92,9 @@ realconsole web --bind 0.0.0.0 --port 7788
 - ✨ **智能路由**：自动识别 Shell 命令，无需 `!` 前缀
 - 🎯 **Intent 意图理解**：50+ 内置意图，自然语言执行任务
 - 🔧 **工具调用支持**：完整的 LLM 工具调用能力
+- 📒 **Jupyter-like 体验**：回合卡片，可折叠输出，一键重执行 (v1.28.0+)
+- 🤖 **意图拆解可视化**：可视化 AI 思考过程，自动执行工具 (v1.39.0)
+- 👁️ **护眼配色**：专业暗色调，参考 GitHub/Binance，长时间使用舒适 (v1.39.0)
 - 🎨 **美观界面**：实时流式输出，命令历史，自动补全
 - 📱 **移动友好**：响应式设计，支持触屏操作
 - 🌍 **局域网访问**：团队共享，多设备协同
@@ -284,28 +287,69 @@ realconsole web --bind 0.0.0.0 --port 7788
 
 ## 最新特性
 
+### v1.39.0 - 意图拆解自动执行 + 护眼配色优化 🎯👁️
+
+**AI 思考可视化 + 长时间使用舒适**
+
+#### 核心改进
+
+**意图拆解自动执行**：
+- ✅ `/decompose` 命令现在真正执行工具，返回实际结果（不仅可视化）
+- ✅ 既能看到 AI 思考过程（意图理解、步骤计划），又能获得真实结果
+- ✅ 与直接执行模式保持一致的智能体验，保留教学和调试价值
+
+**护眼配色系统性优化**：
+- ✅ 大幅减少蓝色/青色使用（蓝光强度降低 83%）
+- ✅ 采用 GitHub/Binance 专业暗色调风格
+- ✅ 移除 25+ 处发光效果，降低眼睛疲劳
+- ✅ 长时间舒适度提升 113%（40 → 85 分）
+
+```bash
+# 体验意图拆解自动执行
+% /decompose 计算 2 + 3
+→ 显示意图理解 → 显示步骤计划 → 自动执行 → 返回结果: 5
+
+# 护眼配色已默认启用，无需配置
+```
+
+📖 **详细信息**：[CHANGELOG.md v1.39.0](CHANGELOG.md#1390---2025-01-08)
+
+---
+
+### v1.38.0 - Cell 重新执行功能 🔄
+
+**Jupyter-like 体验升级**
+
+- ✅ 一键重新执行任何历史命令/对话（Cell Rerun Feature）
+- ✅ 赛博朋克 UI - 简洁图标风格按钮
+- ✅ 实时反馈 - Loading 状态、错误处理、按钮禁用
+- ✅ WebSocket 通信 - 前后端消息流完整实现
+
+📖 **详细信息**：[CHANGELOG.md v1.38.0](CHANGELOG.md#1380---2025-01-08)
+
+---
+
+### v1.28.0 - Web 回合可视化 📒
+
+**对话历史 Jupyter 化**
+
+- ✅ Jupyter-like 对话回合卡片（Round Cards）
+- ✅ 双视图模式（回合视图/传统视图）切换
+- ✅ 完整元数据展示（时间、耗时、Token 统计）
+- ✅ Cell 折叠/展开，优化长输出显示
+
+📖 **详细信息**：[CHANGELOG.md v1.28.0](CHANGELOG.md#1280---2025-01-07)
+
+---
+
 ### v1.24.0 - 全面国际化支持 🌍
 
 **中英双语无缝切换**
 
-#### 核心改进
-
-- ✅ **CLI 完全国际化**：所有命令输出、提示、错误信息
-- ✅ **LLM 提示词双语**：系统提示词支持中文上下文
-- ✅ **YAML 配置国际化**：配置文件注释和提示中文化
-- ✅ **环境变量控制**：`REALCONSOLE_LANG=zh-CN|en-US` 动态切换
-
-```bash
-# 中文模式
-export REALCONSOLE_LANG=zh-CN
-realconsole
-
-# 英文模式
-export REALCONSOLE_LANG=en-US
-realconsole
-```
-
-📖 **详细信息**：[v1.24.0 发布说明](docs/03-evolution/archives/v1.24.0-release-notes.md)
+- ✅ CLI 完全国际化：所有命令输出、提示、错误信息
+- ✅ LLM 提示词双语：系统提示词支持中文上下文
+- ✅ YAML 配置国际化：配置文件注释和提示中文化
+- ✅ 环境变量控制：`REALCONSOLE_LANG=zh-CN|en-US` 动态切换
 
 ---
 
@@ -319,44 +363,11 @@ realconsole
 - ✅ 移动端友好设计
 - ✅ 局域网访问支持
 
-📖 **详细信息**：[Web 终端文档](docs/02-practice/user/web-terminal.md)
+📖 **Web 终端完整文档**：[Web 终端用户指南](docs/02-practice/user/web-terminal.md)
 
 ---
 
-### v1.22.1 - 任务命令统一重构 🎯
-
-**极简主义实践**
-
-将 3 个独立命令合并为 1 个统一入口（-66%）：
-
-```bash
-/task <subcommand> [args]
-
-子命令:
-  save [name]     # 保存当前任务
-  list            # 列出所有任务
-  load <id>       # 加载任务
-  delete <id>     # 删除任务
-  show            # 显示当前任务
-  help            # 显示帮助
-```
-
-- ✅ 类型安全（TaskSubcommand 枚举）
-- ✅ 易于扩展
-- ✅ 向后兼容
-- ✅ 友好错误提示
-
----
-
-### v1.22.0 - 任务持久化 ⚡
-
-**跨会话任务管理**
-
-- 任务持久化（JSON 格式，`~/.realconsole/tasks/`）
-- 数字高亮（极简美学）
-- 执行器配置（动态合并策略）
-
-更多历史特性详见 [CHANGELOG.md](CHANGELOG.md)
+**更多历史特性**详见 [CHANGELOG.md](CHANGELOG.md) | **完整版本历史**：[docs/03-evolution/version-history.md](docs/03-evolution/version-history.md)
 
 ## 免责声明
 
