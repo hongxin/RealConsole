@@ -11,6 +11,9 @@
 // ✨ v1.29.0: 意图拆解模块
 pub mod decomposition;
 
+// ✨ v1.36.0: 意图占卜系统
+pub mod divination;
+
 use crate::command::CommandRegistry;
 use crate::command_router::{CommandRouter, CommandType as RouterCommandType};
 use crate::config::Config;

@@ -69,6 +69,10 @@ pub struct Config {
     /// ✨ v1.23.0: Web 终端配置
     #[serde(default)]
     pub web: WebConfig,
+
+    /// ✨ v1.36.0: 态势测算分析系统配置
+    #[serde(default)]
+    pub divination: DivinationConfig,
 }
 
 fn default_prefix() -> String {
@@ -861,6 +865,7 @@ impl Default for Config {
             bagua: None, // ✨ 八卦记忆宫，默认关闭
             liangyyi: None, // ✨ v1.9.1: 两仪演化系统，默认使用默认配置
             web: WebConfig::default(), // ✨ v1.23.0: Web 终端，默认关闭
+            divination: DivinationConfig::default(), // ✨ v1.36.0: 态势测算分析系统，默认启用
         }
     }
 }
@@ -1131,6 +1136,175 @@ impl Default for WebConfig {
             bind: default_web_bind(),
             port: 7788,
             allowed_origins: default_web_allowed_origins(),
+        }
+    }
+}
+
+/// ✨ v1.36.0: 态势测算分析系统配置
+///
+/// 基于易经占卜智慧的意图分解可视化系统
+/// 通过八卦符号和演算动画，让 AI 的推理过程可见
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DivinationConfig {
+    /// 是否启用态势测算分析系统（默认: true）
+    #[serde(default = "default_divination_enabled")]
+    pub enabled: bool,
+
+    /// 动画速度（默认: normal）
+    /// - slow: 慢速（起卦 2s, 每步 200ms, 成卦 500ms）
+    /// - normal: 正常（起卦 1.2s, 每步 100ms, 成卦 300ms）
+    /// - fast: 快速（起卦 0.6s, 每步 50ms, 成卦 150ms）
+    /// - off: 关闭动画（直接显示结果）
+    #[serde(default = "default_animation_speed")]
+    pub animation_speed: AnimationSpeed,
+
+    /// 是否显示演算动画（默认: true）
+    /// 显示大衍、分二、挂一、揲四、归奇、成卦的数字变化
+    #[serde(default = "default_true")]
+    pub show_yarrow_animation: bool,
+
+    /// 是否显示卦象（默认: true）
+    /// 显示八卦符号和卦名
+    #[serde(default = "default_true")]
+    pub show_hexagram: bool,
+
+    /// 是否显示卦辞（默认: true）
+    /// 显示执行建议和智慧指引
+    #[serde(default = "default_true")]
+    pub show_judgement: bool,
+
+    /// 三元卦映射配置
+    #[serde(default)]
+    pub trigram_mapping: TrigramMappingConfig,
+
+    /// 主题风格（默认: classical）
+    #[serde(default)]
+    pub theme: DivinationTheme,
+}
+
+fn default_divination_enabled() -> bool {
+    true
+}
+
+fn default_animation_speed() -> AnimationSpeed {
+    AnimationSpeed::Normal
+}
+
+/// 动画速度枚举
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AnimationSpeed {
+    Slow,
+    Normal,
+    Fast,
+    Off,
+}
+
+impl Default for AnimationSpeed {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+impl AnimationSpeed {
+    /// 获取起卦阶段的时长（毫秒）
+    pub fn qigua_duration_ms(&self) -> u64 {
+        match self {
+            AnimationSpeed::Slow => 2000,
+            AnimationSpeed::Normal => 1200,
+            AnimationSpeed::Fast => 600,
+            AnimationSpeed::Off => 0,
+        }
+    }
+
+    /// 获取演算步骤的间隔（毫秒）
+    pub fn step_interval_ms(&self) -> u64 {
+        match self {
+            AnimationSpeed::Slow => 200,
+            AnimationSpeed::Normal => 100,
+            AnimationSpeed::Fast => 50,
+            AnimationSpeed::Off => 0,
+        }
+    }
+
+    /// 获取成卦阶段的延迟（毫秒）
+    pub fn hexagram_delay_ms(&self) -> u64 {
+        match self {
+            AnimationSpeed::Slow => 500,
+            AnimationSpeed::Normal => 300,
+            AnimationSpeed::Fast => 150,
+            AnimationSpeed::Off => 0,
+        }
+    }
+}
+
+/// 三元卦映射配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrigramMappingConfig {
+    /// 映射模式（默认: auto）
+    /// - auto: 自动根据工具名称映射
+    /// - manual: 手动配置映射规则
+    #[serde(default = "default_trigram_mode")]
+    pub mode: TrigramMappingMode,
+
+    /// 默认卦象（当无法自动映射时使用，默认: kun）
+    #[serde(default = "default_fallback_trigram")]
+    pub fallback: String,
+}
+
+fn default_trigram_mode() -> TrigramMappingMode {
+    TrigramMappingMode::Auto
+}
+
+fn default_fallback_trigram() -> String {
+    "kun".to_string()
+}
+
+/// 三元卦映射模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TrigramMappingMode {
+    Auto,
+    Manual,
+}
+
+impl Default for TrigramMappingConfig {
+    fn default() -> Self {
+        Self {
+            mode: TrigramMappingMode::Auto,
+            fallback: "kun".to_string(),
+        }
+    }
+}
+
+/// 态势测算分析主题
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DivinationTheme {
+    /// 古典风格（金色主题）
+    Classical,
+    /// 暗黑风格（紫色主题）
+    Dark,
+    /// 明亮风格（蓝色主题）
+    Light,
+}
+
+impl Default for DivinationTheme {
+    fn default() -> Self {
+        Self::Classical
+    }
+}
+
+impl Default for DivinationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            animation_speed: AnimationSpeed::Normal,
+            show_yarrow_animation: true,
+            show_hexagram: true,
+            show_judgement: true,
+            trigram_mapping: TrigramMappingConfig::default(),
+            theme: DivinationTheme::Classical,
         }
     }
 }

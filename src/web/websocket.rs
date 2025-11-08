@@ -858,13 +858,73 @@ async fn execute_decompose_command(
     if let Some(plan) = session.intent_router.try_match(query) {
         eprintln!("✨ [Intent] 快速识别成功，跳过 LLM 拆解");
 
-        // 直接发送 Intent 生成的执行计划（复用下面的发送逻辑）
-        // 1. 发送意图理解消息
+        // v1.36.0: 生成并发送态势测算分析动画（如果启用）
+        let divination_result = {
+            // 读取配置（克隆以避免长时间持有锁）
+            let divination_config = {
+                let agent = session.agent.read().await;
+                agent.config.divination.clone()
+            };
+
+            if divination_config.enabled {
+                use crate::agent::divination::DivinationEngine;
+
+                let result = DivinationEngine::divine(&plan);
+                let speed = &divination_config.animation_speed;
+
+                // 发送占卜开始
+                sender
+                    .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStart {
+                        plan_id: plan.id.clone(),
+                    })?))
+                    .await?;
+                tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
+
+                // 发送演算步骤（如果启用）
+                if divination_config.show_yarrow_animation {
+                    for step in &result.yarrow_steps {
+                        sender
+                            .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStep {
+                                plan_id: plan.id.clone(),
+                                step: step.clone(),
+                            })?))
+                            .await?;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
+                    }
+                }
+
+                // 发送卦象（如果启用）
+                if divination_config.show_hexagram {
+                    sender
+                        .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationHexagram {
+                            plan_id: plan.id.clone(),
+                            hexagram: result.hexagram.clone(),
+                        })?))
+                        .await?;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(speed.hexagram_delay_ms())).await;
+                }
+
+                // 发送完整结果
+                sender
+                    .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationComplete {
+                        plan_id: plan.id.clone(),
+                        result: result.clone(),
+                    })?))
+                    .await?;
+
+                Some(result)
+            } else {
+                None
+            }
+        };
+
+        // 1. 发送意图理解消息（包含态势测算分析结果）
         let understanding_msg = ServerMessage::IntentUnderstanding {
             plan_id: plan.id.clone(),
             understanding: plan.understanding.clone(),
             step_count: plan.steps.len(),
             total_time: plan.total_estimated_time,
+            divination: divination_result,
         };
         sender
             .send(Message::Text(serde_json::to_string(&understanding_msg)?))
@@ -921,12 +981,73 @@ async fn execute_decompose_command(
     // 调用拆解器
     match decomposer.decompose(query).await {
         Ok(plan) => {
-            // 1. 发送意图理解消息
+            // v1.36.0: 生成并发送态势测算分析动画（如果启用）
+            let divination_result = {
+                // 读取配置（克隆以避免长时间持有锁）
+                let divination_config = {
+                    let agent = session.agent.read().await;
+                    agent.config.divination.clone()
+                };
+
+                if divination_config.enabled {
+                    use crate::agent::divination::DivinationEngine;
+
+                    let result = DivinationEngine::divine(&plan);
+                    let speed = &divination_config.animation_speed;
+
+                    // 发送占卜开始
+                    sender
+                        .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStart {
+                            plan_id: plan.id.clone(),
+                        })?))
+                        .await?;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
+
+                    // 发送演算步骤（如果启用）
+                    if divination_config.show_yarrow_animation {
+                        for step in &result.yarrow_steps {
+                            sender
+                                .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationStep {
+                                    plan_id: plan.id.clone(),
+                                    step: step.clone(),
+                                })?))
+                                .await?;
+                            tokio::time::sleep(tokio::time::Duration::from_millis(speed.step_interval_ms())).await;
+                        }
+                    }
+
+                    // 发送卦象（如果启用）
+                    if divination_config.show_hexagram {
+                        sender
+                            .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationHexagram {
+                                plan_id: plan.id.clone(),
+                                hexagram: result.hexagram.clone(),
+                            })?))
+                            .await?;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(speed.hexagram_delay_ms())).await;
+                    }
+
+                    // 发送完整结果
+                    sender
+                        .send(Message::Text(serde_json::to_string(&ServerMessage::DivinationComplete {
+                            plan_id: plan.id.clone(),
+                            result: result.clone(),
+                        })?))
+                        .await?;
+
+                    Some(result)
+                } else {
+                    None
+                }
+            };
+
+            // 1. 发送意图理解消息（包含态势测算分析结果）
             let understanding_msg = ServerMessage::IntentUnderstanding {
                 plan_id: plan.id.clone(),
                 understanding: plan.understanding.clone(),
                 step_count: plan.steps.len(),
                 total_time: plan.total_estimated_time,
+                divination: divination_result,
             };
             sender
                 .send(Message::Text(serde_json::to_string(&understanding_msg)?))

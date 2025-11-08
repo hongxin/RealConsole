@@ -287,6 +287,131 @@ const TERMINAL_JS: &str = r#"
         }
     }
 
+    // ========== v1.36.0: 意图占卜动画系统 ==========
+    class DivinationAnimation {
+        constructor(container) {
+            this.container = container;
+            this.animationDiv = null;
+        }
+
+        async start(planId) {
+            // 创建动画容器
+            this.animationDiv = document.createElement('div');
+            this.animationDiv.className = 'divination-animation';
+            this.animationDiv.innerHTML = `
+                <div class="divination-stage qigua">
+                    <div class="dots-container">
+                        <span class="dot">⚪</span>
+                        <span class="dot">⚪</span>
+                        <span class="dot">⚪</span>
+                        <span class="dot">⚪</span>
+                        <span class="dot">⚪</span>
+                        <span class="dot">⚪</span>
+                    </div>
+                    <div class="stage-label">起卦</div>
+                </div>
+            `;
+            this.container.appendChild(this.animationDiv);
+
+            // 起卦动画：圆点旋转闪烁
+            await this.animateQiGua();
+        }
+
+        async animateQiGua() {
+            const dots = this.animationDiv.querySelectorAll('.dot');
+            let count = 0;
+
+            return new Promise(resolve => {
+                const interval = setInterval(() => {
+                    dots.forEach((dot, i) => {
+                        if (i <= count % 6) {
+                            dot.textContent = '⚫';
+                            dot.classList.add('active');
+                        } else {
+                            dot.textContent = '⚪';
+                            dot.classList.remove('active');
+                        }
+                    });
+
+                    count++;
+
+                    if (count > 12) {  // 两轮动画
+                        clearInterval(interval);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+
+        async showYarrowStep(step) {
+            // 切换到演算阶段
+            this.animationDiv.innerHTML = `
+                <div class="divination-stage yansuan">
+                    <div class="operation-name">${step.operation}</div>
+                    <div class="stalk-count">${step.value}</div>
+                    <div class="operation-desc">${step.description}</div>
+                    <div class="yarrow-visual">${'|'.repeat(Math.min(step.value, 49))}</div>
+                </div>
+            `;
+
+            // 数字变化动画
+            const countEl = this.animationDiv.querySelector('.stalk-count');
+            countEl.classList.add('changing');
+
+            await this.sleep(100);
+
+            countEl.classList.remove('changing');
+        }
+
+        async showHexagram(hexagram) {
+            // 切换到成卦阶段
+            this.animationDiv.innerHTML = `
+                <div class="divination-stage chenggua">
+                    <div class="hexagram-forming">
+                        <div class="hexagram-symbol"></div>
+                        <div class="hexagram-name">【${hexagram.name}】</div>
+                    </div>
+                </div>
+            `;
+
+            // 卦象生成动画（爻画逐个显示，从下往上）
+            const symbolEl = this.animationDiv.querySelector('.hexagram-symbol');
+            const lines = hexagram.symbol.split('\n');
+
+            for (const line of lines.reverse()) {
+                await this.sleep(100);
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'yao-line fade-in';
+                lineDiv.textContent = line;
+                symbolEl.insertBefore(lineDiv, symbolEl.firstChild);
+            }
+        }
+
+        complete(divinationResult) {
+            // 移除动画，显示最终卦象
+            this.animationDiv.remove();
+
+            // 在意图卡片顶部插入卦象信息
+            const hexagramCard = document.createElement('div');
+            hexagramCard.className = 'hexagram-card';
+            hexagramCard.innerHTML = `
+                <div class="hexagram-display">
+                    <div class="hexagram-symbol-large">${divinationResult.hexagram.symbol.replace(/\n/g, '<br>')}</div>
+                    <div class="hexagram-info">
+                        <div class="hexagram-name-large">【${divinationResult.hexagram.name}】</div>
+                        <div class="hexagram-judgement">${divinationResult.hexagram.judgement}</div>
+                    </div>
+                </div>
+            `;
+
+            return hexagramCard;
+        }
+
+        sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+    }
+
     // ========== 混合终端核心 ==========
     class HybridTerminal {
         constructor(container) {
@@ -316,6 +441,9 @@ const TERMINAL_JS: &str = r#"
 
             // ===== v1.29.3: 执行计划回调 =====
             this.onExecutePlan = null;     // 执行计划回调: (planId, enabledSteps) => void
+
+            // ===== v1.36.0: 态势测算分析动画 =====
+            this.currentDivination = null;  // 当前的态势分析动画实例
 
             this.init();
         }
@@ -1008,6 +1136,12 @@ const TERMINAL_JS: &str = r#"
                     </button>
                 </div>
             `;
+
+            // ===== v1.36.0: 插入态势分析卦象卡片（如果有）=====
+            const planData = this.intentPlans.get(msg.plan_id);
+            if (planData && planData.hexagramCard) {
+                card.insertBefore(planData.hexagramCard, card.firstChild);
+            }
 
             // ===== v1.29.1 修复：根据视图模式选择容器 =====
             if (this.viewMode === 'round' && this.currentRound && this.currentRound.element) {
@@ -1766,6 +1900,43 @@ const TERMINAL_JS: &str = r#"
                     terminal.createRound(round);
                     terminal.completeRound(round);
                 });
+                break;
+
+            // ===== v1.36.0: 态势测算分析消息 =====
+            case 'divination_start':
+                // 态势分析开始（起卦）
+                terminal.currentDivination = new DivinationAnimation(terminal.outputArea);
+                terminal.currentDivination.start(msg.plan_id);
+                break;
+
+            case 'divination_step':
+                // 演算步骤（实时动画）
+                if (terminal.currentDivination) {
+                    terminal.currentDivination.showYarrowStep(msg.step);
+                }
+                break;
+
+            case 'divination_hexagram':
+                // 卦象生成
+                if (terminal.currentDivination) {
+                    terminal.currentDivination.showHexagram(msg.hexagram);
+                }
+                break;
+
+            case 'divination_complete':
+                // 态势分析完成
+                if (terminal.currentDivination) {
+                    const hexagramCard = terminal.currentDivination.complete(msg.result);
+
+                    // 将卦象卡片保存到意图计划中，稍后在 intent_understanding 中使用
+                    if (!terminal.intentPlans.has(msg.plan_id)) {
+                        terminal.intentPlans.set(msg.plan_id, {});
+                    }
+                    const planData = terminal.intentPlans.get(msg.plan_id);
+                    planData.hexagramCard = hexagramCard;
+
+                    terminal.currentDivination = null;
+                }
                 break;
 
             // ===== v1.29.0: 意图拆解可视化消息 =====
@@ -3290,5 +3461,187 @@ body::before {
     50% {
         box-shadow: 0 0 15px 5px rgba(255, 183, 0, 0.2);
     }
+}
+
+/* ============================================
+   🔮 v1.36.0: 态势测算分析动画样式
+   基于易经八卦的可视化系统
+   ============================================ */
+
+.divination-animation {
+    background: linear-gradient(
+        135deg,
+        rgba(255, 215, 0, 0.05) 0%,
+        rgba(139, 69, 19, 0.05) 50%,
+        rgba(255, 215, 0, 0.05) 100%
+    );
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    border-radius: 16px;
+    padding: 32px;
+    margin: 20px 0;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.2);
+}
+
+.divination-stage {
+    text-align: center;
+    font-family: 'STKaiti', 'SimSun', serif;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 起卦阶段 */
+.dots-container {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.dot {
+    font-size: 32px;
+    transition: all 0.3s;
+}
+
+.dot.active {
+    transform: scale(1.2);
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
+}
+
+.stage-label {
+    font-size: 20px;
+    color: #FFD700;
+    margin-top: 16px;
+    opacity: 0.7;
+}
+
+/* 演算阶段 */
+.operation-name {
+    font-size: 20px;
+    color: #FFD700;
+    margin-bottom: 12px;
+}
+
+.stalk-count {
+    font-size: 80px;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow:
+        0 0 10px rgba(255, 215, 0, 0.6),
+        0 0 20px rgba(255, 215, 0, 0.4),
+        0 0 30px rgba(255, 215, 0, 0.2);
+    transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    line-height: 1;
+    margin: 16px 0;
+}
+
+.stalk-count.changing {
+    transform: scale(1.3) rotateY(180deg);
+    color: #FFA500;
+}
+
+.operation-desc {
+    font-size: 14px;
+    color: #CCC;
+    opacity: 0.6;
+    font-style: italic;
+    margin-top: 8px;
+}
+
+.yarrow-visual {
+    font-size: 12px;
+    color: #FFD700;
+    opacity: 0.3;
+    letter-spacing: 1px;
+    margin-top: 16px;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 成卦阶段 */
+.hexagram-forming {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.hexagram-symbol {
+    font-size: 60px;
+    line-height: 1.2;
+    color: #FFD700;
+}
+
+.yao-line {
+    opacity: 0;
+    animation: yaoFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes yaoFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.hexagram-name {
+    font-size: 24px;
+    color: #FFD700;
+    font-weight: bold;
+}
+
+/* 卦象卡片（最终显示） */
+.hexagram-card {
+    background: linear-gradient(
+        135deg,
+        rgba(255, 215, 0, 0.08) 0%,
+        rgba(139, 69, 19, 0.08) 100%
+    );
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.hexagram-display {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+}
+
+.hexagram-symbol-large {
+    font-size: 64px;
+    line-height: 1.2;
+    color: #FFD700;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+
+.hexagram-info {
+    flex: 1;
+    text-align: left;
+}
+
+.hexagram-name-large {
+    font-size: 22px;
+    color: #FFD700;
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-family: 'STKaiti', 'SimSun', serif;
+}
+
+.hexagram-judgement {
+    font-size: 14px;
+    color: #CCC;
+    line-height: 1.6;
+    font-family: 'SimSun', serif;
+    font-style: italic;
 }
 "#;

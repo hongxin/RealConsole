@@ -182,6 +182,9 @@ pub enum ServerMessage {
         understanding: String,
         step_count: usize,
         total_time: f64,
+        /// v1.36.0 新增：占卜结果
+        #[serde(skip_serializing_if = "Option::is_none")]
+        divination: Option<crate::agent::divination::DivinationResult>,
     },
 
     /// 步骤进度（执行中的步骤更新）
@@ -233,6 +236,32 @@ pub enum ServerMessage {
         executed_count: usize,
         skipped_count: usize,
         total_time: f64,
+    },
+
+    // ===== v1.36.0 新增：意图占卜系统消息 =====
+    /// 占卜开始（起卦）
+    #[serde(rename = "divination_start")]
+    DivinationStart { plan_id: String },
+
+    /// 演算步骤（实时动画数据）
+    #[serde(rename = "divination_step")]
+    DivinationStep {
+        plan_id: String,
+        step: crate::agent::divination::YarrowStep,
+    },
+
+    /// 卦象生成
+    #[serde(rename = "divination_hexagram")]
+    DivinationHexagram {
+        plan_id: String,
+        hexagram: crate::agent::divination::Hexagram,
+    },
+
+    /// 占卜完成
+    #[serde(rename = "divination_complete")]
+    DivinationComplete {
+        plan_id: String,
+        result: crate::agent::divination::DivinationResult,
     },
 }
 
