@@ -21,6 +21,7 @@
 
 pub mod server;
 pub mod session;
+pub mod session_manager; // v1.40.0: 会话持久化管理
 pub mod websocket;
 pub mod frontend;
 

@@ -128,6 +128,30 @@ pub enum ClientMessage {
     /// v1.38.0: 重新执行 Cell
     #[serde(rename = "rerun_cell")]
     RerunCell { round_id: String },
+
+    // ===== v1.40.0 新增：会话管理消息 =====
+    /// 保存当前会话
+    #[serde(rename = "save_session")]
+    SaveSession {
+        /// 可选的会话名称（如果不提供则自动生成）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+    },
+    /// 加载已保存的会话
+    #[serde(rename = "load_session")]
+    LoadSession { session_id: String },
+    /// 列出所有已保存的会话
+    #[serde(rename = "list_sessions")]
+    ListSessions,
+    /// 删除已保存的会话
+    #[serde(rename = "delete_session")]
+    DeleteSession { session_id: String },
+    /// 导出会话（支持 markdown, html 格式）
+    #[serde(rename = "export_session")]
+    ExportSession {
+        session_id: String,
+        format: String, // "markdown" 或 "html"
+    },
 }
 
 /// v1.29.3: 启用的步骤信息
@@ -245,6 +269,42 @@ pub enum ServerMessage {
         skipped_count: usize,
         total_time: f64,
     },
+
+    // ===== v1.40.0 新增：会话管理响应消息 =====
+    /// 会话已保存
+    #[serde(rename = "session_saved")]
+    SessionSaved {
+        session_id: String,
+        name: String,
+    },
+
+    /// 会话已加载
+    #[serde(rename = "session_loaded")]
+    SessionLoaded {
+        session: crate::web::session_manager::SerializableSession,
+    },
+
+    /// 会话列表
+    #[serde(rename = "session_list")]
+    SessionList {
+        sessions: Vec<crate::web::session_manager::SessionListItem>,
+    },
+
+    /// 会话已删除
+    #[serde(rename = "session_deleted")]
+    SessionDeleted { session_id: String },
+
+    /// 会话已导出
+    #[serde(rename = "session_exported")]
+    SessionExported {
+        session_id: String,
+        export_path: String,
+        format: String,
+    },
+
+    /// 会话操作错误
+    #[serde(rename = "session_error")]
+    SessionError { message: String },
 
     // ===== v1.36.0 占卜消息（v1.36.2 已废弃，保留用于向后兼容） =====
     // 以下消息类型已被 situation_analysis 字段替代，暂时注释掉
@@ -495,5 +555,71 @@ impl Session {
     /// 获取会话存活时长（秒）
     pub fn duration(&self) -> i64 {
         (chrono::Utc::now() - self.created_at).num_seconds()
+    }
+
+    // ===== v1.40.0 新增：会话持久化方法 =====
+
+    /// 转换为可序列化的会话数据
+    pub async fn to_serializable(&self) -> crate::web::session_manager::SerializableSession {
+        use crate::web::session_manager::{SerializableSession, SessionMetadata};
+
+        let rounds = self.get_rounds().await;
+        let name = Self::generate_session_name(&rounds);
+
+        // 使用最后一个回合的时间作为更新时间，如果没有回合则使用创建时间
+        let updated_at = rounds.last().map(|r| r.timestamp).unwrap_or(self.created_at);
+
+        // 计算元数据
+        let metadata = Some(SessionMetadata::from_rounds(&rounds));
+
+        SerializableSession {
+            id: self.id.clone(),
+            name,
+            created_at: self.created_at,
+            updated_at,
+            conversation_id: self.conversation_id.clone(),
+            rounds,
+            metadata,
+            version: env!("CARGO_PKG_VERSION").to_string(),
+        }
+    }
+
+    /// 从可序列化会话数据恢复会话（异步构造器）
+    pub async fn from_serializable(
+        serializable: crate::web::session_manager::SerializableSession,
+        config: Config,
+        registry: CommandRegistry,
+    ) -> Self {
+        // 创建基础会话
+        let mut session = Self::new(config, registry).await;
+
+        // 恢复会话数据
+        session.id = serializable.id;
+        session.created_at = serializable.created_at;
+        session.conversation_id = serializable.conversation_id;
+
+        // 恢复回合历史（在独立作用域中，确保锁被释放）
+        {
+            let mut rounds = session.rounds.write().await;
+            *rounds = serializable.rounds;
+        }
+
+        session
+    }
+
+    /// 生成会话名称（基于第一个回合的用户输入）
+    fn generate_session_name(rounds: &[ConversationRound]) -> String {
+        if let Some(first_round) = rounds.first() {
+            let input = &first_round.user_input;
+            // 截取前 30 个字符作为会话名称
+            if input.len() > 30 {
+                format!("{}...", &input[..30])
+            } else {
+                input.to_string()
+            }
+        } else {
+            // 如果没有回合，使用默认名称
+            format!("新会话 {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"))
+        }
     }
 }
