@@ -432,7 +432,308 @@ const TERMINAL_JS: &str = r#"
         }
     }
 
-    // ========== v1.40.0: 会话管理器 ==========
+    // ========== v1.40.0: 浏览器端会话持久化 ==========
+    /**
+     * LocalStorageManager - 浏览器端会话持久化
+     *
+     * 功能：
+     * 1. 自动保存当前会话到 LocalStorage
+     * 2. 页面刷新后自动恢复会话
+     * 3. 管理历史会话（列表、删除、清理）
+     * 4. 配置保留策略（数量、时间限制）
+     */
+    class LocalStorageManager {
+        constructor() {
+            this.currentSessionKey = 'realconsole_current_session';
+            this.historyKey = 'realconsole_session_history';
+            this.configKey = 'realconsole_session_config';
+
+            // 默认配置
+            this.defaultConfig = {
+                auto_save: true,           // 自动保存
+                max_history: 10,           // 最大历史数量
+                max_age_days: 30,          // 最大保留天数
+                save_on_exit: true,        // 退出时保存
+                auto_restore: true         // 自动恢复
+            };
+
+            this.config = this.loadConfig();
+            this.init();
+        }
+
+        init() {
+            // 页面加载时清理过期会话
+            this.cleanupOldSessions();
+            console.log('[LocalStorage] Initialized, config:', this.config);
+        }
+
+        // ========== 配置管理 ==========
+
+        loadConfig() {
+            try {
+                const json = localStorage.getItem(this.configKey);
+                if (json) {
+                    return { ...this.defaultConfig, ...JSON.parse(json) };
+                }
+            } catch (e) {
+                console.error('[LocalStorage] Failed to load config:', e);
+            }
+            return this.defaultConfig;
+        }
+
+        saveConfig(config) {
+            try {
+                this.config = { ...this.config, ...config };
+                localStorage.setItem(this.configKey, JSON.stringify(this.config));
+                console.log('[LocalStorage] Config saved:', this.config);
+            } catch (e) {
+                console.error('[LocalStorage] Failed to save config:', e);
+            }
+        }
+
+        // ========== 当前会话管理 ==========
+
+        saveCurrentSession(session) {
+            try {
+                const json = JSON.stringify(session);
+                localStorage.setItem(this.currentSessionKey, json);
+                console.log('[LocalStorage] Current session saved:', session.name, this.formatSize(json.length));
+                return true;
+            } catch (e) {
+                console.error('[LocalStorage] Failed to save current session:', e);
+                return false;
+            }
+        }
+
+        loadCurrentSession() {
+            try {
+                const json = localStorage.getItem(this.currentSessionKey);
+                if (json) {
+                    const session = JSON.parse(json);
+                    console.log('[LocalStorage] Current session loaded:', session.name);
+                    return session;
+                }
+            } catch (e) {
+                console.error('[LocalStorage] Failed to load current session:', e);
+            }
+            return null;
+        }
+
+        clearCurrentSession() {
+            try {
+                localStorage.removeItem(this.currentSessionKey);
+                console.log('[LocalStorage] Current session cleared');
+            } catch (e) {
+                console.error('[LocalStorage] Failed to clear current session:', e);
+            }
+        }
+
+        // ========== 历史会话管理 ==========
+
+        addToHistory(session) {
+            try {
+                const history = this.getHistory();
+
+                // 创建历史项
+                const historyItem = {
+                    id: session.id,
+                    name: session.name,
+                    created_at: session.created_at,
+                    updated_at: session.updated_at,
+                    round_count: session.rounds ? session.rounds.length : 0,
+                    preview: this.generatePreview(session.rounds),
+                    size: JSON.stringify(session).length
+                };
+
+                // 检查是否已存在
+                const existingIndex = history.findIndex(h => h.id === session.id);
+                if (existingIndex >= 0) {
+                    // 更新已有项
+                    history[existingIndex] = historyItem;
+                } else {
+                    // 添加新项
+                    history.push(historyItem);
+                }
+
+                // 保存历史列表
+                localStorage.setItem(this.historyKey, JSON.stringify(history));
+
+                // 保存完整会话数据
+                const sessionKey = `realconsole_session_${session.id}`;
+                localStorage.setItem(sessionKey, JSON.stringify(session));
+
+                // 执行清理策略
+                this.enforceMaxHistory();
+
+                console.log('[LocalStorage] Added to history:', session.name);
+                return true;
+            } catch (e) {
+                console.error('[LocalStorage] Failed to add to history:', e);
+                return false;
+            }
+        }
+
+        getHistory() {
+            try {
+                const json = localStorage.getItem(this.historyKey);
+                if (json) {
+                    const history = JSON.parse(json);
+                    // 按更新时间倒序排列
+                    return history.sort((a, b) =>
+                        new Date(b.updated_at) - new Date(a.updated_at)
+                    );
+                }
+            } catch (e) {
+                console.error('[LocalStorage] Failed to get history:', e);
+            }
+            return [];
+        }
+
+        getHistoryItem(id) {
+            try {
+                const sessionKey = `realconsole_session_${id}`;
+                const json = localStorage.getItem(sessionKey);
+                if (json) {
+                    return JSON.parse(json);
+                }
+            } catch (e) {
+                console.error('[LocalStorage] Failed to get history item:', e);
+            }
+            return null;
+        }
+
+        deleteHistoryItem(id) {
+            try {
+                // 删除历史列表项
+                const history = this.getHistory();
+                const newHistory = history.filter(h => h.id !== id);
+                localStorage.setItem(this.historyKey, JSON.stringify(newHistory));
+
+                // 删除完整会话数据
+                const sessionKey = `realconsole_session_${id}`;
+                localStorage.removeItem(sessionKey);
+
+                console.log('[LocalStorage] Deleted history item:', id);
+                return true;
+            } catch (e) {
+                console.error('[LocalStorage] Failed to delete history item:', e);
+                return false;
+            }
+        }
+
+        clearHistory() {
+            try {
+                const history = this.getHistory();
+
+                // 删除所有会话数据
+                history.forEach(item => {
+                    const sessionKey = `realconsole_session_${item.id}`;
+                    localStorage.removeItem(sessionKey);
+                });
+
+                // 清空历史列表
+                localStorage.removeItem(this.historyKey);
+
+                console.log('[LocalStorage] History cleared');
+                return true;
+            } catch (e) {
+                console.error('[LocalStorage] Failed to clear history:', e);
+                return false;
+            }
+        }
+
+        // ========== 清理策略 ==========
+
+        enforceMaxHistory() {
+            const history = this.getHistory();
+            if (history.length <= this.config.max_history) {
+                return;
+            }
+
+            // 删除最旧的项
+            const toDelete = history.length - this.config.max_history;
+            for (let i = 0; i < toDelete; i++) {
+                const item = history[history.length - 1 - i];
+                this.deleteHistoryItem(item.id);
+                console.log('[LocalStorage] Deleted old session (max_history):', item.name);
+            }
+        }
+
+        cleanupOldSessions() {
+            if (this.config.max_age_days <= 0) {
+                return;
+            }
+
+            const now = new Date();
+            const maxAge = this.config.max_age_days * 24 * 60 * 60 * 1000;
+            const history = this.getHistory();
+
+            history.forEach(item => {
+                const age = now - new Date(item.updated_at);
+                if (age > maxAge) {
+                    this.deleteHistoryItem(item.id);
+                    console.log('[LocalStorage] Deleted expired session:', item.name);
+                }
+            });
+        }
+
+        // ========== 辅助方法 ==========
+
+        generatePreview(rounds) {
+            if (!rounds || rounds.length === 0) {
+                return 'Empty session';
+            }
+
+            const firstRound = rounds[0];
+            const input = firstRound.user_input || '';
+
+            // 安全截取前 50 个字符
+            if (input.length > 50) {
+                return input.substring(0, 50) + '...';
+            }
+            return input;
+        }
+
+        formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+        }
+
+        generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        checkStorageQuota() {
+            try {
+                let total = 0;
+                for (let key in localStorage) {
+                    if (key.startsWith('realconsole_')) {
+                        total += localStorage[key].length;
+                    }
+                }
+
+                const totalMB = total / 1024 / 1024;
+                console.log('[LocalStorage] Storage usage:', totalMB.toFixed(2), 'MB');
+
+                // 如果超过 8MB，清理最旧的会话
+                if (totalMB > 8) {
+                    console.warn('[LocalStorage] Storage quota warning, cleaning up...');
+                    this.enforceMaxHistory();
+                }
+
+                return totalMB;
+            } catch (e) {
+                console.error('[LocalStorage] Failed to check storage quota:', e);
+                return 0;
+            }
+        }
+    }
+
+    // ========== v1.40.0: 服务器端会话管理器 ==========
     class SessionManager {
         constructor(terminal, websocket) {
             this.terminal = terminal;
