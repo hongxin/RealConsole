@@ -117,8 +117,10 @@ impl From<&SerializableSession> for SessionListItem {
             .last()
             .map(|r| {
                 let preview = &r.user_input;
-                if preview.len() > 50 {
-                    format!("{}...", &preview[..50])
+                // 使用字符边界安全的截取方式，避免切割到 UTF-8 字符中间
+                if preview.chars().count() > 50 {
+                    let truncated: String = preview.chars().take(50).collect();
+                    format!("{}...", truncated)
                 } else {
                     preview.clone()
                 }

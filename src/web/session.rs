@@ -612,9 +612,10 @@ impl Session {
     fn generate_session_name(rounds: &[ConversationRound]) -> String {
         if let Some(first_round) = rounds.first() {
             let input = &first_round.user_input;
-            // 截取前 30 个字符作为会话名称
-            if input.len() > 30 {
-                format!("{}...", &input[..30])
+            // 截取前 30 个字符作为会话名称（使用字符边界安全的方式）
+            if input.chars().count() > 30 {
+                let truncated: String = input.chars().take(30).collect();
+                format!("{}...", truncated)
             } else {
                 input.to_string()
             }
