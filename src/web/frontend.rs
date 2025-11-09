@@ -1191,6 +1191,7 @@ const TERMINAL_JS: &str = r#"
                 <span class="round-time">${round.executionTime.toFixed(2)}s</span>
                 ${toolsHtml}
                 <span style="margin-left: auto;"></span>
+                <button class="round-drag-handle" title="拖拽排序" draggable="true">☰</button>
                 <button class="round-rerun-btn" title="重新执行此 Cell">🔄</button>
                 <button class="round-delete-btn" title="删除此 Cell">🗑️</button>
                 <button class="round-toggle" data-action="collapse">▼</button>
@@ -1239,6 +1240,32 @@ const TERMINAL_JS: &str = r#"
                     this.deleteRound(round.id);
                 });
             }
+
+            // v1.42.0: 拖拽排序功能
+            const dragHandle = header.querySelector('.round-drag-handle');
+            if (dragHandle) {
+                // 拖拽开始：从手柄开始拖拽整个卡片
+                dragHandle.addEventListener('dragstart', (e) => {
+                    this.handleDragStart(e, round.id, roundDiv);
+                });
+
+                dragHandle.addEventListener('dragend', (e) => {
+                    this.handleDragEnd(e, roundDiv);
+                });
+            }
+
+            // 设置 round-card 作为拖拽目标
+            roundDiv.addEventListener('dragover', (e) => {
+                this.handleDragOver(e, roundDiv);
+            });
+
+            roundDiv.addEventListener('drop', (e) => {
+                this.handleDrop(e, round.id);
+            });
+
+            roundDiv.addEventListener('dragleave', (e) => {
+                this.handleDragLeave(e, roundDiv);
+            });
 
             return roundDiv;
         }
@@ -1444,6 +1471,104 @@ const TERMINAL_JS: &str = r#"
                 round.element.remove();
                 console.log(`[v1.41.0] Round #${round.index} deleted successfully`);
             }, 300);
+        }
+
+        // v1.42.0: 拖拽排序 - 开始拖拽
+        handleDragStart(e, roundId, element) {
+            console.log(`[v1.42.0] Drag start: ${roundId}`);
+            this.draggedRoundId = roundId;
+            this.draggedElement = element;
+
+            // 添加拖拽样式
+            element.classList.add('dragging');
+
+            // 设置拖拽数据
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', roundId);
+        }
+
+        // v1.42.0: 拖拽排序 - 拖拽结束
+        handleDragEnd(e, element) {
+            console.log(`[v1.42.0] Drag end`);
+
+            // 移除所有拖拽相关样式
+            element.classList.remove('dragging');
+            document.querySelectorAll('.conversation-round.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+
+            this.draggedRoundId = null;
+            this.draggedElement = null;
+        }
+
+        // v1.42.0: 拖拽排序 - 拖拽经过
+        handleDragOver(e, element) {
+            e.preventDefault(); // 允许放置
+
+            // 不允许拖到自己上面
+            if (this.draggedElement === element) {
+                return;
+            }
+
+            // 设置放置效果
+            e.dataTransfer.dropEffect = 'move';
+
+            // 添加视觉反馈
+            element.classList.add('drag-over');
+        }
+
+        // v1.42.0: 拖拽排序 - 离开拖拽区域
+        handleDragLeave(e, element) {
+            // 只在离开当前元素时移除样式（避免子元素触发）
+            if (e.target === element) {
+                element.classList.remove('drag-over');
+            }
+        }
+
+        // v1.42.0: 拖拽排序 - 放置
+        handleDrop(e, targetRoundId) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 移除视觉反馈
+            document.querySelectorAll('.conversation-round.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+
+            if (!this.draggedRoundId || this.draggedRoundId === targetRoundId) {
+                return;
+            }
+
+            console.log(`[v1.42.0] Drop: moving ${this.draggedRoundId} to ${targetRoundId}`);
+
+            // 找到源和目标的索引
+            const draggedIndex = this.rounds.findIndex(r => r.id === this.draggedRoundId);
+            const targetIndex = this.rounds.findIndex(r => r.id === targetRoundId);
+
+            if (draggedIndex === -1 || targetIndex === -1) {
+                console.error('[v1.42.0 ERROR] Round not found in array');
+                return;
+            }
+
+            // ⚠️ 重要：在更新数组之前保存目标元素引用
+            const targetElement = this.rounds[targetIndex].element;
+            const draggedElement = this.draggedElement;
+
+            // 更新 rounds 数组顺序
+            const [draggedRound] = this.rounds.splice(draggedIndex, 1);
+            this.rounds.splice(targetIndex, 0, draggedRound);
+
+            // 更新 DOM 顺序
+            // 插入到目标位置
+            if (draggedIndex < targetIndex) {
+                // 向下移动：插入到目标元素之后
+                targetElement.parentNode.insertBefore(draggedElement, targetElement.nextSibling);
+            } else {
+                // 向上移动：插入到目标元素之前
+                targetElement.parentNode.insertBefore(draggedElement, targetElement);
+            }
+
+            console.log(`[v1.42.0] Round reordered successfully`);
         }
 
         getStatusIcon(status) {
@@ -3296,6 +3421,42 @@ body::before {
     color: #ff006e;  /* 红色，表示危险操作 */
     opacity: 1;
     transform: scale(1.05);
+}
+
+/* v1.42.0: 拖拽手柄按钮 */
+.round-drag-handle {
+    background: none;
+    border: none;
+    color: #8B949E;  /* 默认灰色，低调 */
+    font-size: 1.2em;
+    cursor: grab;  /* 拖拽光标 */
+    padding: 4px 6px;
+    margin-right: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+    user-select: none;  /* 防止文本选中 */
+}
+
+.round-drag-handle:hover {
+    color: #58A6FF;  /* 蓝色高亮 */
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.round-drag-handle:active {
+    cursor: grabbing;  /* 抓取光标 */
+}
+
+/* v1.42.0: 拖拽状态样式 */
+.conversation-round.dragging {
+    opacity: 0.4;
+    transform: scale(0.95);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.conversation-round.drag-over {
+    border-top: 3px solid #58A6FF;  /* 蓝色插入指示线 */
+    padding-top: 8px;  /* 补偿边框高度 */
 }
 
 /* 折叠按钮 - 统一风格优化 */
