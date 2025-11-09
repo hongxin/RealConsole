@@ -1184,10 +1184,13 @@ const TERMINAL_JS: &str = r#"
                 ? `<span class="round-tools">${this.renderTools(round.toolsUsed)}</span>`
                 : '';
 
+            // v1.42.0: running 状态显示空span（用于飞轮动画），其他状态显示图标
+            const statusIcon = (round.status === 'running') ? '' : this.getStatusIcon(round.status);
+
             header.innerHTML = `
                 <span class="round-badge">${typeConfig.badge}</span>
                 <span class="round-number">#${round.index}</span>
-                <span class="round-status ${round.status}">${this.getStatusIcon(round.status)}</span>
+                <span class="round-status ${round.status}">${statusIcon}</span>
                 <span class="round-time">${round.executionTime.toFixed(2)}s</span>
                 ${toolsHtml}
                 <span style="margin-left: auto;"></span>
