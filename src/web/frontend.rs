@@ -2705,6 +2705,268 @@ const TERMINAL_JS: &str = r#"
         }
     }
 
+    // ===== v1.40.0 Phase 3: 会话历史管理 UI =====
+
+    /**
+     * SessionManager - 会话历史管理器
+     *
+     * 功能：
+     * 1. 显示历史会话列表
+     * 2. 加载/删除历史会话
+     * 3. 保存当前会话到历史
+     * 4. 格式化显示时间和大小
+     */
+    class SessionManager {
+        constructor(terminal) {
+            this.terminal = terminal;
+            this.listContainer = document.getElementById('session-list');
+            this.saveBtn = document.getElementById('save-session-btn');
+            this.refreshBtn = document.getElementById('refresh-sessions-btn');
+            this.panelCloseBtn = document.getElementById('session-panel-close');
+            this.panel = document.getElementById('session-panel');
+
+            this.setupEventListeners();
+        }
+
+        setupEventListeners() {
+            // 保存当前会话到历史
+            if (this.saveBtn) {
+                this.saveBtn.onclick = () => this.saveCurrentSession();
+            }
+
+            // 刷新会话列表
+            if (this.refreshBtn) {
+                this.refreshBtn.onclick = () => this.refreshSessionList();
+            }
+
+            // 关闭面板
+            if (this.panelCloseBtn) {
+                this.panelCloseBtn.onclick = () => this.closePanel();
+            }
+
+            // 点击遮罩层关闭
+            const overlay = this.panel?.querySelector('.session-panel-overlay');
+            if (overlay) {
+                overlay.onclick = () => this.closePanel();
+            }
+        }
+
+        /**
+         * 打开会话管理面板
+         */
+        openPanel() {
+            if (this.panel) {
+                this.panel.classList.remove('hidden');
+                this.refreshSessionList();
+            }
+        }
+
+        /**
+         * 关闭会话管理面板
+         */
+        closePanel() {
+            if (this.panel) {
+                this.panel.classList.add('hidden');
+            }
+        }
+
+        /**
+         * 保存当前会话到历史
+         */
+        saveCurrentSession() {
+            if (this.terminal.rounds.length === 0) {
+                alert('当前没有可保存的会话');
+                return;
+            }
+
+            // 构建会话对象
+            const session = {
+                id: this.terminal.sessionId || this.terminal.localStorage.generateUUID(),
+                name: this.terminal.generateSessionName(),
+                created_at: this.terminal.sessionCreatedAt || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                conversation_id: this.terminal.conversationId || 'local',
+                rounds: this.terminal.rounds.map(round => ({
+                    id: round.id,
+                    index: round.index,
+                    round_type: round.roundType,
+                    user_input: round.userInput,
+                    ai_response: round.aiResponse,
+                    tools_used: round.toolsUsed || [],
+                    execution_time: round.executionTime || 0,
+                    status: round.status,
+                    timestamp: round.timestamp,
+                    model: round.model
+                })),
+                version: '1.0'
+            };
+
+            // 保存到历史
+            try {
+                this.terminal.localStorage.addToHistory(session);
+                console.log('[SessionManager] Session saved to history:', session.name);
+
+                // 刷新列表
+                this.refreshSessionList();
+
+                // 提示用户
+                alert(`✅ 会话已保存到历史：${session.name}`);
+            } catch (error) {
+                console.error('[SessionManager] Failed to save session:', error);
+                alert('❌ 保存失败：' + error.message);
+            }
+        }
+
+        /**
+         * 刷新会话列表
+         */
+        refreshSessionList() {
+            if (!this.listContainer) return;
+
+            // 获取历史会话列表
+            const history = this.terminal.localStorage.getHistory();
+
+            if (!history || history.length === 0) {
+                this.listContainer.innerHTML = '<div class="session-list-empty">暂无保存的会话</div>';
+                return;
+            }
+
+            // 渲染列表
+            this.listContainer.innerHTML = history.map(item => this.renderSessionItem(item)).join('');
+
+            // 绑定事件
+            this.bindSessionItemEvents();
+        }
+
+        /**
+         * 渲染会话列表项
+         */
+        renderSessionItem(item) {
+            return `
+                <div class="session-item" data-id="${item.id}">
+                    <div class="session-item-header">
+                        <span class="session-name">${this.escapeHtml(item.name)}</span>
+                        <span class="session-rounds">💬 ${item.round_count} 回合</span>
+                    </div>
+                    <div class="session-item-meta">
+                        <span class="session-time">${this.formatTime(item.updated_at)}</span>
+                        <span class="session-size">${this.formatSize(item.size)}</span>
+                    </div>
+                    <div class="session-item-actions">
+                        <button class="session-load-btn" data-id="${item.id}" title="加载">📂 加载</button>
+                        <button class="session-delete-btn" data-id="${item.id}" title="删除">🗑️ 删除</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * 绑定会话列表项的事件
+         */
+        bindSessionItemEvents() {
+            // 加载按钮
+            const loadBtns = this.listContainer.querySelectorAll('.session-load-btn');
+            loadBtns.forEach(btn => {
+                btn.onclick = () => this.loadSession(btn.dataset.id);
+            });
+
+            // 删除按钮
+            const deleteBtns = this.listContainer.querySelectorAll('.session-delete-btn');
+            deleteBtns.forEach(btn => {
+                btn.onclick = () => this.deleteSession(btn.dataset.id);
+            });
+        }
+
+        /**
+         * 加载历史会话
+         */
+        loadSession(id) {
+            // 从 LocalStorage 加载完整会话数据
+            const fullSessionKey = `realconsole_session_${id}`;
+            const sessionJson = localStorage.getItem(fullSessionKey);
+
+            if (!sessionJson) {
+                alert('❌ 会话不存在');
+                return;
+            }
+
+            const session = JSON.parse(sessionJson);
+
+            // 如果当前有未保存的会话，提示用户
+            if (this.terminal.rounds.length > 0) {
+                if (!confirm('加载会话将覆盖当前内容，是否继续？\n\n建议先保存当前会话。')) {
+                    return;
+                }
+            }
+
+            // 恢复会话
+            this.terminal.restoreSession(session);
+
+            // 关闭面板
+            this.closePanel();
+
+            console.log('[SessionManager] Session loaded:', session.name);
+        }
+
+        /**
+         * 删除历史会话
+         */
+        deleteSession(id) {
+            if (!confirm('确认删除此会话？此操作无法撤销。')) {
+                return;
+            }
+
+            try {
+                this.terminal.localStorage.deleteHistoryItem(id);
+                console.log('[SessionManager] Session deleted:', id);
+
+                // 刷新列表
+                this.refreshSessionList();
+            } catch (error) {
+                console.error('[SessionManager] Failed to delete session:', error);
+                alert('❌ 删除失败：' + error.message);
+            }
+        }
+
+        /**
+         * 格式化时间
+         */
+        formatTime(isoString) {
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return '刚刚';
+            if (diffMins < 60) return `${diffMins} 分钟前`;
+            if (diffHours < 24) return `${diffHours} 小时前`;
+            if (diffDays < 7) return `${diffDays} 天前`;
+
+            // 超过 7 天，显示具体日期
+            return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+
+        /**
+         * 格式化大小
+         */
+        formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+        }
+
+        /**
+         * HTML 转义
+         */
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+
     // ========== i18n 国际化支持 ==========
     const I18N_TRANSLATIONS = {
         'zh-CN': {
@@ -2813,6 +3075,17 @@ const TERMINAL_JS: &str = r#"
         }
     } else {
         console.log('[Session] Auto-restore disabled in config');
+    }
+
+    // ===== v1.40.0 Phase 3: 初始化会话历史管理器 =====
+    const sessionManager = new SessionManager(terminal);
+
+    // 绑定会话管理按钮
+    const sessionMenuBtn = document.getElementById('session-menu-btn');
+    if (sessionMenuBtn) {
+        sessionMenuBtn.addEventListener('click', () => {
+            sessionManager.openPanel();
+        });
     }
 
     // ===== v1.28.0: 绑定视图模式切换按钮 =====
@@ -5192,6 +5465,85 @@ body::before {
 .session-card-btn.delete-btn:hover {
     border-color: rgba(255, 0, 110, 0.5);
     background: rgba(255, 0, 110, 0.1);
+}
+
+/* v1.40.0 Phase 3: 会话列表项样式 */
+.session-item {
+    background: rgba(10, 14, 39, 0.6);
+    border: 1px solid rgba(163, 113, 247, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.3s;
+}
+
+.session-item:hover {
+    border-color: rgba(163, 113, 247, 0.5);
+    box-shadow: 0 0 15px rgba(163, 113, 247, 0.2);
+    transform: translateY(-2px);
+}
+
+.session-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.session-item-header .session-name {
+    color: #E6EDF3;
+    font-size: 1em;
+    font-weight: 500;
+    margin: 0;
+}
+
+.session-rounds {
+    color: #8B949E;
+    font-size: 0.85em;
+}
+
+.session-item-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    color: #8B949E;
+    font-size: 0.85em;
+}
+
+.session-time, .session-size {
+    display: inline-block;
+}
+
+.session-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.session-load-btn, .session-delete-btn {
+    flex: 1;
+    background: rgba(163, 113, 247, 0.1);
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    color: #A371F7;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s;
+}
+
+.session-load-btn:hover, .session-delete-btn:hover {
+    background: rgba(163, 113, 247, 0.2);
+    border-color: rgba(163, 113, 247, 0.5);
+}
+
+.session-delete-btn {
+    color: #FF6B6B;
+    border-color: rgba(255, 107, 107, 0.3);
+    background: rgba(255, 107, 107, 0.05);
+}
+
+.session-delete-btn:hover {
+    border-color: rgba(255, 107, 107, 0.5);
+    background: rgba(255, 107, 107, 0.1);
 }
 
 /* 通知样式 */
