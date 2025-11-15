@@ -1017,7 +1017,16 @@ const TERMINAL_JS: &str = r#"
             // ===== v1.40.0: 会话管理 =====
             this.sessionManager = null;  // WebSocket 连接后初始化
 
+            // ===== v1.40.0 Phase 2: 浏览器端会话持久化 =====
+            this.localStorage = new LocalStorageManager();
+            this.sessionId = null;           // 会话 ID (UUID)
+            this.sessionCreatedAt = null;    // 会话创建时间
+            this.conversationId = null;      // 对话 ID (从服务器获取)
+
             this.init();
+
+            // 设置自动保存
+            this.setupAutoSave();
         }
 
         init() {
@@ -2545,6 +2554,155 @@ const TERMINAL_JS: &str = r#"
 
             this.scrollToBottom();
         }
+
+        // ===== v1.40.0 Phase 2: 浏览器端会话持久化方法 =====
+
+        /**
+         * 设置自动保存机制
+         */
+        setupAutoSave() {
+            console.log('[Session] Setting up auto-save...');
+
+            // 页面退出时保存
+            window.addEventListener('beforeunload', () => {
+                if (this.localStorage.config.save_on_exit && this.rounds.length > 0) {
+                    console.log('[Session] Saving session before unload...');
+                    this.saveCurrentSession();
+                }
+            });
+
+            // 定期自动保存（每 5 分钟）
+            if (this.localStorage.config.auto_save) {
+                setInterval(() => {
+                    if (this.rounds.length > 0) {
+                        console.log('[Session] Auto-saving session...');
+                        this.saveCurrentSession();
+                    }
+                }, 5 * 60 * 1000); // 5 分钟
+            }
+
+            console.log('[Session] Auto-save setup complete');
+        }
+
+        /**
+         * 保存当前会话到 LocalStorage
+         */
+        saveCurrentSession() {
+            if (this.rounds.length === 0) {
+                console.log('[Session] No rounds to save, skipping');
+                return;
+            }
+
+            // 如果还没有会话 ID，创建一个新的
+            if (!this.sessionId) {
+                this.sessionId = this.localStorage.generateUUID();
+                this.sessionCreatedAt = new Date().toISOString();
+                console.log('[Session] Created new session ID:', this.sessionId);
+            }
+
+            // 构建会话对象
+            const session = {
+                id: this.sessionId,
+                name: this.generateSessionName(),
+                created_at: this.sessionCreatedAt,
+                updated_at: new Date().toISOString(),
+                conversation_id: this.conversationId || 'local',
+                rounds: this.rounds.map(round => ({
+                    id: round.id,
+                    index: round.index,
+                    round_type: round.roundType,
+                    user_input: round.userInput,
+                    ai_response: round.aiResponse,
+                    tools_used: round.toolsUsed || [],
+                    execution_time: round.executionTime || 0,
+                    status: round.status,
+                    timestamp: round.timestamp,
+                    model: round.model
+                })),
+                metadata: {
+                    round_count: this.rounds.length,
+                    last_input: this.rounds[this.rounds.length - 1]?.userInput || ''
+                },
+                version: '1.0'
+            };
+
+            // 保存到 LocalStorage
+            try {
+                this.localStorage.saveCurrentSession(session);
+                console.log('[Session] Session saved:', session.name, `(${session.rounds.length} rounds)`);
+            } catch (error) {
+                console.error('[Session] Failed to save session:', error);
+            }
+        }
+
+        /**
+         * 从保存的会话恢复所有 Round
+         */
+        restoreSession(session) {
+            console.log('[Session] Restoring session:', session.name);
+
+            // 恢复会话元数据
+            this.sessionId = session.id;
+            this.conversationId = session.conversation_id;
+            this.sessionCreatedAt = session.created_at;
+
+            // 清空当前内容
+            this.clearAll();
+
+            // 恢复所有 Round
+            if (session.rounds && session.rounds.length > 0) {
+                session.rounds.forEach(round => {
+                    this.createRound(round);
+                    this.completeRound(round);
+                });
+
+                console.log('[Session] Restored', session.rounds.length, 'rounds');
+            }
+
+            // 滚动到底部
+            this.scrollToBottom();
+
+            // 显示通知（如果有通知系统的话）
+            console.log(`[Session] ✅ Session restored: ${session.name} (${session.rounds?.length || 0} rounds)`);
+        }
+
+        /**
+         * 智能生成会话名称
+         */
+        generateSessionName() {
+            if (this.rounds.length === 0) {
+                return '空会话';
+            }
+
+            // 获取第一个 Round 的输入
+            const firstInput = this.rounds[0].userInput || '';
+
+            // 截取前 30 个字符作为名称
+            let name = firstInput.slice(0, 30);
+
+            // 安全截取 UTF-8 字符串（避免截断 emoji 或多字节字符）
+            // 检查最后一个字符是否是高代理项（emoji 的一部分）
+            if (name.length > 0) {
+                const lastCharCode = name.charCodeAt(name.length - 1);
+                if (lastCharCode >= 0xD800 && lastCharCode <= 0xDBFF) {
+                    // 这是高代理项，需要移除以避免截断 emoji
+                    name = name.slice(0, -1);
+                }
+            }
+
+            // 如果超过 30 字符，添加省略号
+            if (firstInput.length > 30) {
+                name += '...';
+            }
+
+            // 如果名称为空，使用时间戳
+            if (!name || name.trim() === '') {
+                const now = new Date();
+                name = `会话 ${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+            }
+
+            return name;
+        }
     }
 
     // ========== i18n 国际化支持 ==========
@@ -2643,6 +2801,19 @@ const TERMINAL_JS: &str = r#"
 
     // 创建混合终端
     const terminal = new HybridTerminal(document.getElementById('terminal-container'));
+
+    // ===== v1.40.0 Phase 2: 自动恢复会话 =====
+    if (terminal.localStorage.config.auto_restore) {
+        const savedSession = terminal.localStorage.loadCurrentSession();
+        if (savedSession && savedSession.rounds && savedSession.rounds.length > 0) {
+            console.log('[Session] Auto-restoring session:', savedSession.name);
+            terminal.restoreSession(savedSession);
+        } else {
+            console.log('[Session] No saved session to restore');
+        }
+    } else {
+        console.log('[Session] Auto-restore disabled in config');
+    }
 
     // ===== v1.28.0: 绑定视图模式切换按钮 =====
     const viewModeToggle = document.getElementById('view-mode-toggle');

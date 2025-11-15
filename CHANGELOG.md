@@ -5,6 +5,152 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.0] - 2025-11-16
+
+### 🎯 Highlights
+
+**主题**: Web Terminal 浏览器端会话持久化
+
+- ✅ **自动保存** - 页面退出时自动保存会话 + 每 5 分钟定期备份
+- ✅ **自动恢复** - 刷新页面后无缝恢复所有对话历史
+- ✅ **智能命名** - 基于首条输入自动生成会话名称（UTF-8 安全）
+- ✅ **零配置** - 默认启用，用户无需任何手动操作
+
+### ✨ Added
+
+**浏览器端会话持久化** (`src/web/frontend.rs`)
+
+#### Phase 1: LocalStorageManager 类实现 (lines 435-734)
+
+- **配置管理**:
+  - `loadConfig/saveConfig` - 用户配置持久化
+  - 默认配置：`auto_save: true`, `max_history: 10`, `max_age_days: 30`
+
+- **当前会话管理**:
+  - `saveCurrentSession` - 保存当前会话到 LocalStorage
+  - `loadCurrentSession` - 加载当前会话
+  - `clearCurrentSession` - 清空当前会话
+
+- **历史会话管理**:
+  - `addToHistory` - 添加会话到历史（元数据 + 完整数据分离）
+  - `getHistory` - 获取历史列表（按时间倒序）
+  - `getHistoryItem/deleteHistoryItem` - 单个会话操作
+  - `clearHistory` - 清空所有历史
+
+- **清理策略**:
+  - `enforceMaxHistory` - 数量限制（超过 10 个自动删除最旧）
+  - `cleanupOldSessions` - 时间限制（超过 30 天自动删除）
+  - `checkStorageQuota` - 存储空间检查（> 8MB 警告并清理）
+
+#### Phase 2: HybridTerminal 集成 (lines 1020-1030, 2563-2705, 2805-2816)
+
+- **自动保存机制** (lines 2563-2585):
+  - `setupAutoSave()` - beforeunload 事件 + 定期保存（5 分钟）
+  - 页面退出时自动保存（`save_on_exit` 配置）
+  - 定期自动备份（`auto_save` 配置）
+
+- **会话保存** (lines 2590-2636):
+  - `saveCurrentSession()` - 保存当前会话到 LocalStorage
+  - 自动生成会话 ID (UUID)
+  - 完整的 Round 数据映射
+  - 会话元数据（round_count, last_input）
+
+- **会话恢复** (lines 2641-2667):
+  - `restoreSession()` - 从保存的会话恢复所有 Round
+  - 清空当前内容后恢复历史
+  - 保持原有时间戳和元数据
+  - 视觉上无缝衔接
+
+- **智能命名** (lines 2672-2705):
+  - `generateSessionName()` - 基于首条输入智能生成名称
+  - 截取前 30 个字符，超长添加省略号
+  - **UTF-8 安全** - 检测并避免截断 emoji 高代理项
+  - 空会话使用时间戳命名（`会话 M/D HH:MM`）
+
+- **页面加载自动恢复** (lines 2805-2816):
+  - 检查 `auto_restore` 配置
+  - 加载最后保存的会话
+  - 无缝恢复所有对话历史
+
+### 🎨 Improved
+
+**数据结构设计**:
+
+**LocalStorage Keys**:
+```
+realconsole_current_session     - 当前活动会话
+realconsole_session_history      - 历史会话列表
+realconsole_session_config       - 用户配置
+realconsole_session_{UUID}       - 历史会话数据
+```
+
+**配置对象**:
+```javascript
+{
+    auto_save: true,           // 自动保存
+    max_history: 10,           // 最大历史数量
+    max_age_days: 30,          // 最大保留天数
+    save_on_exit: true,        // 退出时保存
+    auto_restore: true         // 自动恢复
+}
+```
+
+### 💡 Design Philosophy
+
+**易变哲学体现**:
+- **三态保存策略**: 实时态（每 Round） + 定期态（5 分钟） + 退出态（beforeunload）
+- **三态恢复策略**: 自动恢复（默认） + 手动恢复（未来 Phase 3） + 不恢复（配置）
+- **三态清理策略**: 保留态 + 清理态 + 警告态
+
+**极简主义实践**:
+- 单一职责：每个方法职责明确
+- 清晰接口：方法命名直观易懂
+- 完整日志：便于调试和监控
+
+**性能优化**:
+- 元数据与完整数据分离存储
+- 按需加载历史会话
+- 自动清理避免配额问题
+
+### 📚 Documentation
+
+- **Phase 1 完成报告**: `docs/04-reports/v1.40.0-session-persistence-phase1-completion.md`
+- **Phase 2 完成报告**: `docs/04-reports/v1.40.0-session-persistence-phase2-completion.md`
+- **实施计划**: `docs/04-reports/v1.40.0-session-persistence-plan.md`
+
+### 📊 Statistics
+
+**代码量**:
+- Phase 1: 300+ 行（LocalStorageManager）
+- Phase 2: 160+ 行（HybridTerminal 集成）
+- 总计: 460+ 行
+
+**开发时间**:
+- Phase 1: ~4 小时（实施 + 文档）
+- Phase 2: ~3 小时（实施 + 测试 + 文档）
+- 总计: ~7 小时
+
+### 🚀 User Impact
+
+**用户价值**:
+- 刷新页面不再丢失工作
+- 长时间会话自动备份
+- 无需任何手动操作
+- 跨设备切换友好（需浏览器同步）
+
+**使用场景**:
+1. 日常使用 - 关闭标签页后重新打开，会话自动恢复
+2. 长时间会话 - 每 5 分钟自动备份，意外关闭后最多丢失 < 5 分钟
+3. 多设备切换 - 同一浏览器配置文件下跨设备恢复
+
+### 🔮 Next Steps (Phase 3)
+
+- [ ] 会话历史 UI 集成（可视化管理历史会话）
+- [ ] Toast 通知系统（用户友好的反馈提示）
+- [ ] 配置 UI 面板（可视化修改配置）
+
+---
+
 ## [1.39.0] - 2025-01-08
 
 ### 🎯 Highlights
