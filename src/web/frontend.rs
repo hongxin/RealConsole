@@ -83,6 +83,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     <div id="terminal-container">
         <!-- 混合终端：单一容器，统一滚动 -->
     </div>
+    <!-- v1.40.0: Toast 通知容器 -->
+    <div id="toast-container" class="toast-container"></div>
     <div id="status">
         <span id="connection-status" data-i18n="web.status.connecting">连接中...</span>
     </div>
@@ -160,6 +162,107 @@ const TERMINAL_JS: &str = r#"
                 return `<span class="${classes.join(' ')}">${escaped}</span>`;
             }
             return escaped;
+        }
+
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+
+    // ========== Toast 通知管理器 (v1.40.0) ==========
+    class ToastManager {
+        constructor() {
+            this.container = document.getElementById('toast-container');
+            this.toasts = [];
+            this.maxToasts = 5;
+            this.defaultDuration = 4000; // 4 秒
+        }
+
+        /**
+         * 显示 Toast 通知
+         * @param {string} type - 类型: success, error, info, warning
+         * @param {string} title - 标题
+         * @param {string} message - 消息内容（可选）
+         * @param {number} duration - 持续时间（毫秒），0 表示不自动关闭
+         */
+        show(type, title, message = '', duration = this.defaultDuration) {
+            // 限制最大数量
+            if (this.toasts.length >= this.maxToasts) {
+                this.remove(this.toasts[0]);
+            }
+
+            const toast = this.createToast(type, title, message);
+            this.container.appendChild(toast);
+            this.toasts.push(toast);
+
+            // 自动关闭
+            if (duration > 0) {
+                setTimeout(() => this.remove(toast), duration);
+            }
+
+            return toast;
+        }
+
+        createToast(type, title, message) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+
+            // 图标映射
+            const icons = {
+                success: '✓',
+                error: '✕',
+                info: 'ℹ',
+                warning: '⚠'
+            };
+
+            const icon = icons[type] || 'ℹ';
+
+            toast.innerHTML = `
+                <div class="toast-icon">${icon}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${this.escapeHtml(title)}</div>
+                    ${message ? `<div class="toast-message">${this.escapeHtml(message)}</div>` : ''}
+                </div>
+                <button class="toast-close" aria-label="关闭">×</button>
+            `;
+
+            // 关闭按钮事件
+            toast.querySelector('.toast-close').addEventListener('click', () => {
+                this.remove(toast);
+            });
+
+            return toast;
+        }
+
+        remove(toast) {
+            if (!toast || !this.toasts.includes(toast)) return;
+
+            toast.classList.add('toast-exit');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+                this.toasts = this.toasts.filter(t => t !== toast);
+            }, 300); // 等待退出动画完成
+        }
+
+        // 便捷方法
+        success(title, message = '', duration) {
+            return this.show('success', title, message, duration);
+        }
+
+        error(title, message = '', duration) {
+            return this.show('error', title, message, duration);
+        }
+
+        info(title, message = '', duration) {
+            return this.show('info', title, message, duration);
+        }
+
+        warning(title, message = '', duration) {
+            return this.show('warning', title, message, duration);
         }
 
         escapeHtml(text) {
@@ -2797,7 +2900,7 @@ const TERMINAL_JS: &str = r#"
          */
         saveCurrentSession() {
             if (this.terminal.rounds.length === 0) {
-                alert('当前没有可保存的会话');
+                this.terminal.toast.warning('无法保存', '当前没有可保存的会话');
                 return;
             }
 
@@ -2831,11 +2934,11 @@ const TERMINAL_JS: &str = r#"
                 // 刷新列表
                 this.refreshSessionList();
 
-                // 提示用户
-                alert(`✅ 会话已保存到历史：${session.name}`);
+                // Toast 成功提示
+                this.terminal.toast.success('会话已保存', session.name);
             } catch (error) {
                 console.error('[SessionManager] Failed to save session:', error);
-                alert('❌ 保存失败：' + error.message);
+                this.terminal.toast.error('保存失败', error.message);
             }
         }
 
@@ -2908,7 +3011,7 @@ const TERMINAL_JS: &str = r#"
             const sessionJson = localStorage.getItem(fullSessionKey);
 
             if (!sessionJson) {
-                alert('❌ 会话不存在');
+                this.terminal.toast.error('加载失败', '会话不存在');
                 return;
             }
 
@@ -2927,6 +3030,8 @@ const TERMINAL_JS: &str = r#"
             // 关闭面板
             this.closePanel();
 
+            // Toast 成功提示
+            this.terminal.toast.success('会话已加载', session.name);
             console.log('[SessionManager] Session loaded:', session.name);
         }
 
@@ -2944,9 +3049,12 @@ const TERMINAL_JS: &str = r#"
 
                 // 刷新列表
                 this.refreshSessionList();
+
+                // Toast 成功提示
+                this.terminal.toast.success('会话已删除', '会话已从历史记录中移除');
             } catch (error) {
                 console.error('[SessionManager] Failed to delete session:', error);
-                alert('❌ 删除失败：' + error.message);
+                this.terminal.toast.error('删除失败', error.message);
             }
         }
 
@@ -3085,6 +3193,11 @@ const TERMINAL_JS: &str = r#"
 
     // 创建混合终端
     const terminal = new HybridTerminal(document.getElementById('terminal-container'));
+
+    // ===== v1.40.0: 初始化 Toast 通知系统 =====
+    const toastManager = new ToastManager();
+    // 将 ToastManager 挂载到 terminal 对象，便于全局访问
+    terminal.toast = toastManager;
 
     // ===== v1.40.0 Phase 2: 自动恢复会话 =====
     if (terminal.localStorage.config.auto_restore) {
@@ -5572,5 +5685,162 @@ body::before {
 .notification.error {
     background: rgba(255, 0, 110, 0.2);
     color: #ff006e;
+}
+
+/* ============================================
+   Toast 通知系统 (v1.40.0)
+   极简白灰配色设计
+   ============================================ */
+.toast-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    min-width: 280px;
+    max-width: 400px;
+    padding: 12px 16px;
+    background: rgba(22, 27, 34, 0.95);
+    border: 1px solid rgba(230, 237, 243, 0.2);
+    border-radius: 8px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: toast-slide-in 0.3s ease-out;
+    transition: all 0.2s ease;
+}
+
+.toast:hover {
+    transform: translateX(-4px);
+    border-color: rgba(230, 237, 243, 0.3);
+}
+
+.toast.toast-exit {
+    animation: toast-slide-out 0.3s ease-in forwards;
+}
+
+.toast-icon {
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.toast-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.toast-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #E6EDF3;
+    line-height: 1.3;
+}
+
+.toast-message {
+    font-size: 13px;
+    color: #8B949E;
+    line-height: 1.4;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: #8B949E;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.toast-close:hover {
+    background: rgba(230, 237, 243, 0.1);
+    color: #E6EDF3;
+}
+
+/* Toast 类型变体 */
+.toast.toast-success {
+    border-left: 3px solid #7ee787;
+}
+
+.toast.toast-success .toast-icon {
+    color: #7ee787;
+}
+
+.toast.toast-error {
+    border-left: 3px solid #ff7b72;
+}
+
+.toast.toast-error .toast-icon {
+    color: #ff7b72;
+}
+
+.toast.toast-info {
+    border-left: 3px solid #79c0ff;
+}
+
+.toast.toast-info .toast-icon {
+    color: #79c0ff;
+}
+
+.toast.toast-warning {
+    border-left: 3px solid #ffa657;
+}
+
+.toast.toast-warning .toast-icon {
+    color: #ffa657;
+}
+
+/* 动画 */
+@keyframes toast-slide-in {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes toast-slide-out {
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .toast-container {
+        top: 60px;
+        right: 10px;
+        left: 10px;
+    }
+
+    .toast {
+        min-width: auto;
+        max-width: none;
+    }
 }
 "#;
