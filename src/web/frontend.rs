@@ -109,12 +109,14 @@ const TERMINAL_JS: &str = r#"
                 '34': 'blue',
                 '36': 'cyan',
                 '37': 'white',
+                '90': 'dimmed',
             };
         }
 
         parse(text) {
             // 解析 ANSI 转义序列为 HTML
-            const regex = /\x1b\[([0-9;]+)m/g;
+            // 支持两种格式：\x1b[XXm 和 [XXm（缺少 ESC 字符的情况）
+            const regex = /(?:\x1b)?\[([0-9;]+)m/g;
             let html = '';
             let lastIndex = 0;
             let currentClasses = [];
@@ -126,13 +128,17 @@ const TERMINAL_JS: &str = r#"
                     html += this.wrapWithClasses(content, currentClasses);
                 }
 
-                // 处理 ANSI 代码
+                // 处理 ANSI 代码（支持组合代码如 1;36）
                 const codeList = codes.split(';');
                 for (const code of codeList) {
                     if (code === '0') {
                         currentClasses = [];
                     } else if (this.ansiMap[code]) {
-                        currentClasses.push(`ansi-${this.ansiMap[code]}`);
+                        const className = `ansi-${this.ansiMap[code]}`;
+                        // 避免重复添加
+                        if (!currentClasses.includes(className)) {
+                            currentClasses.push(className);
+                        }
                     }
                 }
 
@@ -3916,6 +3922,11 @@ body::before {
 
 .ansi-white {
     color: #E6EDF3;  /* GitHub 白色 */
+}
+
+.ansi-dimmed {
+    color: #8B949E;  /* 灰色，低调 */
+    opacity: 0.7;
 }
 
 /* 滚动条样式 - 简洁优雅 */
