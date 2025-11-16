@@ -1678,10 +1678,11 @@ const TERMINAL_JS: &str = r#"
                     }
                     outputContent.appendChild(responseDiv);
                 } else {
-                    // Shell/System 命令：使用 <pre> 保留格式
+                    // Shell/System 命令：解析 ANSI 颜色代码并保留格式
                     const pre = document.createElement('pre');
                     pre.className = 'terminal-text';
-                    pre.textContent = round.aiResponse;
+                    // ✨ 使用 AnsiParser 解析 ANSI 转义序列
+                    pre.innerHTML = this.ansiParser.parse(round.aiResponse);
                     outputContent.appendChild(pre);
                 }
             }
@@ -3638,37 +3639,26 @@ body::before {
 
 #lang-switcher button {
     padding: 6px 12px;
-    /* 霓虹边框 */
-    border: 2px solid rgba(0, 240, 255, 0.4);
+    border: 1px solid rgba(230, 237, 243, 0.3);
     background: rgba(10, 14, 39, 0.5);
-    color: #00f0ff;
+    color: #E6EDF3;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.85em;
     font-weight: 500;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     backdrop-filter: blur(10px);
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
 }
 
 #lang-switcher button:hover {
-    background: rgba(0, 240, 255, 0.1);
-    border-color: rgba(0, 240, 255, 0.8);
-    transform: translateY(-2px);
-    box-shadow:
-        0 0 15px rgba(0, 240, 255, 0.4),
-        0 0 25px rgba(0, 240, 255, 0.2);
+    background: rgba(230, 237, 243, 0.1);
+    border-color: rgba(230, 237, 243, 0.5);
 }
 
 #lang-switcher button.active {
-    background: rgba(0, 240, 255, 0.15);
-    border-color: #00f0ff;
+    background: rgba(230, 237, 243, 0.15);
+    border-color: rgba(230, 237, 243, 0.6);
     font-weight: 600;
-    box-shadow:
-        0 0 20px rgba(0, 240, 255, 0.5),
-        0 0 30px rgba(0, 240, 255, 0.3),
-        inset 0 0 10px rgba(0, 240, 255, 0.2);
 }
 
 /* ===== v1.28.0: 视图模式切换按钮 ===== */
@@ -3682,27 +3672,21 @@ body::before {
 
 .view-mode-btn {
     padding: 6px 12px;
-    border: 2px solid rgba(255, 0, 110, 0.4);
+    border: 1px solid rgba(230, 237, 243, 0.3);
     background: rgba(10, 14, 39, 0.5);
-    color: #ff006e;
+    color: #E6EDF3;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.85em;
     font-weight: 500;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     backdrop-filter: blur(10px);
-    box-shadow: 0 0 10px rgba(255, 0, 110, 0.2);
-    text-shadow: 0 0 5px rgba(255, 0, 110, 0.3);
     white-space: nowrap;
 }
 
 .view-mode-btn:hover {
-    background: rgba(255, 0, 110, 0.1);
-    border-color: rgba(255, 0, 110, 0.8);
-    transform: translateY(-2px);
-    box-shadow:
-        0 0 15px rgba(255, 0, 110, 0.4),
-        0 0 25px rgba(255, 0, 110, 0.2);
+    background: rgba(230, 237, 243, 0.1);
+    border-color: rgba(230, 237, 243, 0.5);
 }
 
 #terminal-container {
@@ -5268,19 +5252,21 @@ body::before {
 
 /* 会话按钮 */
 .session-btn {
-    background: rgba(163, 113, 247, 0.1);
-    border: 1px solid rgba(163, 113, 247, 0.3);
-    color: #A371F7;
-    padding: 8px 16px;
+    background: rgba(10, 14, 39, 0.5);
+    border: 1px solid rgba(230, 237, 243, 0.3);
+    color: #E6EDF3;
+    padding: 6px 12px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 0.85em;
+    font-weight: 500;
     transition: all 0.2s;
+    backdrop-filter: blur(10px);
 }
 
 .session-btn:hover {
-    background: rgba(163, 113, 247, 0.2);
-    border-color: rgba(163, 113, 247, 0.5);
+    background: rgba(230, 237, 243, 0.1);
+    border-color: rgba(230, 237, 243, 0.5);
 }
 
 /* 会话管理面板 */
