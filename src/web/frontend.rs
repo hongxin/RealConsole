@@ -2979,6 +2979,7 @@ const TERMINAL_JS: &str = r#"
                     </div>
                     <div class="session-item-actions">
                         <button class="session-load-btn" data-id="${item.id}" title="加载">📂 加载</button>
+                        <button class="session-export-btn" data-id="${item.id}" title="导出">📤 导出</button>
                         <button class="session-delete-btn" data-id="${item.id}" title="删除">🗑️ 删除</button>
                     </div>
                 </div>
@@ -2993,6 +2994,12 @@ const TERMINAL_JS: &str = r#"
             const loadBtns = this.listContainer.querySelectorAll('.session-load-btn');
             loadBtns.forEach(btn => {
                 btn.onclick = () => this.loadSession(btn.dataset.id);
+            });
+
+            // 导出按钮
+            const exportBtns = this.listContainer.querySelectorAll('.session-export-btn');
+            exportBtns.forEach(btn => {
+                btn.onclick = () => this.exportSession(btn.dataset.id);
             });
 
             // 删除按钮
@@ -3056,6 +3063,114 @@ const TERMINAL_JS: &str = r#"
                 console.error('[SessionManager] Failed to delete session:', error);
                 this.terminal.toast.error('删除失败', error.message);
             }
+        }
+
+        /**
+         * 导出会话（浏览器端实现，支持 Markdown 和 JSON 格式）
+         */
+        exportSession(id) {
+            // 从 LocalStorage 加载完整会话数据
+            const fullSessionKey = `realconsole_session_${id}`;
+            const sessionJson = localStorage.getItem(fullSessionKey);
+
+            if (!sessionJson) {
+                this.terminal.toast.error('导出失败', '会话不存在');
+                return;
+            }
+
+            const session = JSON.parse(sessionJson);
+
+            // 询问导出格式
+            const format = prompt('请选择导出格式:\n\n1. Markdown (适合阅读和分享)\n2. JSON (适合备份和恢复)\n\n请输入 1 或 2:', '1');
+
+            if (!format) return; // 用户取消
+
+            if (format === '1') {
+                this.exportAsMarkdown(session);
+            } else if (format === '2') {
+                this.exportAsJSON(session);
+            } else {
+                this.terminal.toast.warning('导出取消', '无效的格式选择');
+            }
+        }
+
+        /**
+         * 导出为 Markdown 格式
+         */
+        exportAsMarkdown(session) {
+            let markdown = `# ${session.name}\n\n`;
+            markdown += `**创建时间**: ${new Date(session.created_at).toLocaleString('zh-CN')}\n`;
+            markdown += `**更新时间**: ${new Date(session.updated_at).toLocaleString('zh-CN')}\n`;
+            markdown += `**回合数**: ${session.rounds.length}\n\n`;
+            markdown += `---\n\n`;
+
+            session.rounds.forEach((round, index) => {
+                markdown += `## 回合 ${index + 1}\n\n`;
+
+                // 用户输入
+                if (round.user_input) {
+                    markdown += `**用户**: ${round.user_input}\n\n`;
+                }
+
+                // AI 响应
+                if (round.ai_response) {
+                    const roundTypeLabel = round.round_type === 'llm' ? 'AI' :
+                                         round.round_type === 'shell' ? 'Shell' : 'System';
+                    markdown += `**${roundTypeLabel}**:\n\n`;
+                    markdown += '```\n';
+                    markdown += round.ai_response;
+                    markdown += '\n```\n\n';
+                }
+
+                // 元数据
+                if (round.timestamp) {
+                    markdown += `*时间: ${new Date(round.timestamp).toLocaleString('zh-CN')}*\n\n`;
+                }
+
+                markdown += `---\n\n`;
+            });
+
+            // 下载文件
+            const filename = `${this.sanitizeFilename(session.name)}.md`;
+            this.downloadFile(filename, markdown, 'text/markdown');
+
+            this.terminal.toast.success('导出成功', `已导出为 ${filename}`);
+            console.log('[SessionManager] Session exported as Markdown:', filename);
+        }
+
+        /**
+         * 导出为 JSON 格式
+         */
+        exportAsJSON(session) {
+            const jsonContent = JSON.stringify(session, null, 2);
+            const filename = `${this.sanitizeFilename(session.name)}.json`;
+
+            this.downloadFile(filename, jsonContent, 'application/json');
+
+            this.terminal.toast.success('导出成功', `已导出为 ${filename}`);
+            console.log('[SessionManager] Session exported as JSON:', filename);
+        }
+
+        /**
+         * 下载文件到浏览器
+         */
+        downloadFile(filename, content, mimeType = 'text/plain') {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        /**
+         * 清理文件名（移除不安全字符）
+         */
+        sanitizeFilename(name) {
+            return name.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_');
         }
 
         /**
@@ -5643,11 +5758,11 @@ body::before {
     gap: 8px;
 }
 
-.session-load-btn, .session-delete-btn {
+.session-load-btn, .session-export-btn, .session-delete-btn {
     flex: 1;
-    background: rgba(163, 113, 247, 0.1);
-    border: 1px solid rgba(163, 113, 247, 0.3);
-    color: #A371F7;
+    background: rgba(230, 237, 243, 0.05);
+    border: 1px solid rgba(230, 237, 243, 0.2);
+    color: #E6EDF3;
     padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
@@ -5655,20 +5770,33 @@ body::before {
     transition: all 0.2s;
 }
 
-.session-load-btn:hover, .session-delete-btn:hover {
-    background: rgba(163, 113, 247, 0.2);
-    border-color: rgba(163, 113, 247, 0.5);
+.session-load-btn:hover, .session-export-btn:hover, .session-delete-btn:hover {
+    background: rgba(230, 237, 243, 0.1);
+    border-color: rgba(230, 237, 243, 0.3);
 }
 
+/* 导出按钮：信息色（蓝） */
+.session-export-btn {
+    color: #79c0ff;
+    border-color: rgba(121, 192, 255, 0.3);
+    background: rgba(121, 192, 255, 0.05);
+}
+
+.session-export-btn:hover {
+    border-color: rgba(121, 192, 255, 0.5);
+    background: rgba(121, 192, 255, 0.1);
+}
+
+/* 删除按钮：错误色（红） */
 .session-delete-btn {
-    color: #FF6B6B;
-    border-color: rgba(255, 107, 107, 0.3);
-    background: rgba(255, 107, 107, 0.05);
+    color: #ff7b72;
+    border-color: rgba(255, 123, 114, 0.3);
+    background: rgba(255, 123, 114, 0.05);
 }
 
 .session-delete-btn:hover {
-    border-color: rgba(255, 107, 107, 0.5);
-    background: rgba(255, 107, 107, 0.1);
+    border-color: rgba(255, 123, 114, 0.5);
+    background: rgba(255, 123, 114, 0.1);
 }
 
 /* 通知样式 */
