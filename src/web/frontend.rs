@@ -734,7 +734,7 @@ const TERMINAL_JS: &str = r#"
     }
 
     // ========== v1.40.0: 服务器端会话管理器 ==========
-    class SessionManager {
+    class ServerSessionManager {
         constructor(terminal, websocket) {
             this.terminal = terminal;
             this.ws = websocket;
@@ -2662,6 +2662,21 @@ const TERMINAL_JS: &str = r#"
             // 滚动到底部
             this.scrollToBottom();
 
+            // 🐛 Bug Fix: 确保输入框始终可见和可聚焦
+            // 恢复会话后，确保输入框正确初始化和聚焦
+            if (this.currentInput && this.currentInput.input) {
+                // 确保输入框在 DOM 中
+                if (!this.container.contains(this.currentInput.line)) {
+                    console.warn('[Session] Input field not in DOM, recreating...');
+                    this.createInputLine();
+                }
+                // 聚焦输入框
+                this.focusInput();
+            } else {
+                console.warn('[Session] Input field missing, recreating...');
+                this.createInputLine();
+            }
+
             // 显示通知（如果有通知系统的话）
             console.log(`[Session] ✅ Session restored: ${session.name} (${session.rounds?.length || 0} rounds)`);
         }
@@ -2716,7 +2731,7 @@ const TERMINAL_JS: &str = r#"
      * 3. 保存当前会话到历史
      * 4. 格式化显示时间和大小
      */
-    class SessionManager {
+    class BrowserSessionManager {
         constructor(terminal) {
             this.terminal = terminal;
             this.listContainer = document.getElementById('session-list');
@@ -3077,14 +3092,14 @@ const TERMINAL_JS: &str = r#"
         console.log('[Session] Auto-restore disabled in config');
     }
 
-    // ===== v1.40.0 Phase 3: 初始化会话历史管理器 =====
-    const sessionManager = new SessionManager(terminal);
+    // ===== v1.40.0 Phase 3: 初始化会话历史管理器（浏览器端）=====
+    const browserSessionManager = new BrowserSessionManager(terminal);
 
-    // 绑定会话管理按钮
+    // 绑定会话管理按钮（浏览器端历史管理）
     const sessionMenuBtn = document.getElementById('session-menu-btn');
     if (sessionMenuBtn) {
         sessionMenuBtn.addEventListener('click', () => {
-            sessionManager.openPanel();
+            browserSessionManager.openPanel();
         });
     }
 
@@ -3227,7 +3242,7 @@ const TERMINAL_JS: &str = r#"
                                 '\x1b[36m' + t('web.terminal.usage_hint') + '\x1b[0m', true);
 
         // v1.40.0: 初始化 SessionManager
-        terminal.sessionManager = new SessionManager(terminal, ws);
+        terminal.sessionManager = new ServerSessionManager(terminal, ws);
 
         // 应用初始语言设置
         updatePageText();
