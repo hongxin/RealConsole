@@ -74,6 +74,18 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                     <button id="save-session-btn" class="session-action-btn">💾 保存当前会话</button>
                     <button id="refresh-sessions-btn" class="session-action-btn">🔄 刷新列表</button>
                 </div>
+                <!-- v1.40.0: 搜索和筛选 -->
+                <div class="session-filters">
+                    <input type="text" id="session-search" class="session-search-input" placeholder="🔍 搜索会话名称...">
+                    <select id="session-sort" class="session-sort-select">
+                        <option value="updated_desc">最近更新</option>
+                        <option value="updated_asc">最早更新</option>
+                        <option value="created_desc">最新创建</option>
+                        <option value="created_asc">最早创建</option>
+                        <option value="rounds_desc">回合数多→少</option>
+                        <option value="rounds_asc">回合数少→多</option>
+                    </select>
+                </div>
                 <div id="session-list" class="session-list">
                     <div class="session-list-empty">加载中...</div>
                 </div>
@@ -2850,6 +2862,12 @@ const TERMINAL_JS: &str = r#"
             this.panelCloseBtn = document.getElementById('session-panel-close');
             this.panel = document.getElementById('session-panel');
 
+            // v1.40.0: 搜索和筛选
+            this.searchInput = document.getElementById('session-search');
+            this.sortSelect = document.getElementById('session-sort');
+            this.currentSearchTerm = '';
+            this.currentSortOrder = 'updated_desc';
+
             this.setupEventListeners();
         }
 
@@ -2873,6 +2891,22 @@ const TERMINAL_JS: &str = r#"
             const overlay = this.panel?.querySelector('.session-panel-overlay');
             if (overlay) {
                 overlay.onclick = () => this.closePanel();
+            }
+
+            // v1.40.0: 搜索输入框
+            if (this.searchInput) {
+                this.searchInput.oninput = (e) => {
+                    this.currentSearchTerm = e.target.value.toLowerCase();
+                    this.refreshSessionList();
+                };
+            }
+
+            // v1.40.0: 排序下拉框
+            if (this.sortSelect) {
+                this.sortSelect.onchange = (e) => {
+                    this.currentSortOrder = e.target.value;
+                    this.refreshSessionList();
+                };
             }
         }
 
@@ -2949,10 +2983,26 @@ const TERMINAL_JS: &str = r#"
             if (!this.listContainer) return;
 
             // 获取历史会话列表
-            const history = this.terminal.localStorage.getHistory();
+            let history = this.terminal.localStorage.getHistory();
 
             if (!history || history.length === 0) {
                 this.listContainer.innerHTML = '<div class="session-list-empty">暂无保存的会话</div>';
+                return;
+            }
+
+            // v1.40.0: 应用搜索筛选
+            if (this.currentSearchTerm) {
+                history = history.filter(item =>
+                    item.name.toLowerCase().includes(this.currentSearchTerm)
+                );
+            }
+
+            // v1.40.0: 应用排序
+            history = this.sortSessions(history, this.currentSortOrder);
+
+            // 检查筛选后是否有结果
+            if (history.length === 0) {
+                this.listContainer.innerHTML = '<div class="session-list-empty">未找到匹配的会话</div>';
                 return;
             }
 
@@ -3171,6 +3221,39 @@ const TERMINAL_JS: &str = r#"
          */
         sanitizeFilename(name) {
             return name.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_');
+        }
+
+        /**
+         * 排序会话列表 (v1.40.0)
+         */
+        sortSessions(sessions, sortOrder) {
+            const sorted = [...sessions]; // 创建副本避免修改原数组
+
+            switch (sortOrder) {
+                case 'updated_desc':
+                    sorted.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+                    break;
+                case 'updated_asc':
+                    sorted.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+                    break;
+                case 'created_desc':
+                    sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    break;
+                case 'created_asc':
+                    sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    break;
+                case 'rounds_desc':
+                    sorted.sort((a, b) => b.round_count - a.round_count);
+                    break;
+                case 'rounds_asc':
+                    sorted.sort((a, b) => a.round_count - b.round_count);
+                    break;
+                default:
+                    // 默认按更新时间降序
+                    sorted.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            }
+
+            return sorted;
         }
 
         /**
@@ -5609,6 +5692,56 @@ body::before {
 .session-action-btn:hover {
     background: rgba(57, 255, 20, 0.2);
     border-color: rgba(57, 255, 20, 0.5);
+}
+
+/* 搜索和筛选区 (v1.40.0) */
+.session-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.session-search-input {
+    flex: 2;
+    background: rgba(22, 27, 34, 0.6);
+    border: 1px solid rgba(230, 237, 243, 0.2);
+    color: #E6EDF3;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.session-search-input::placeholder {
+    color: #8B949E;
+}
+
+.session-search-input:focus {
+    outline: none;
+    border-color: rgba(121, 192, 255, 0.5);
+    background: rgba(22, 27, 34, 0.8);
+}
+
+.session-sort-select {
+    flex: 1;
+    background: rgba(22, 27, 34, 0.6);
+    border: 1px solid rgba(230, 237, 243, 0.2);
+    color: #E6EDF3;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.session-sort-select:hover {
+    border-color: rgba(230, 237, 243, 0.3);
+    background: rgba(22, 27, 34, 0.8);
+}
+
+.session-sort-select:focus {
+    outline: none;
+    border-color: rgba(121, 192, 255, 0.5);
 }
 
 /* 会话列表 */
