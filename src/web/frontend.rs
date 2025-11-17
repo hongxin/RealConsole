@@ -73,6 +73,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <div class="session-actions">
                     <button id="save-session-btn" class="session-action-btn">💾 保存当前会话</button>
                     <button id="refresh-sessions-btn" class="session-action-btn">🔄 刷新列表</button>
+                    <button id="clear-history-btn" class="session-action-btn session-clear-btn">🗑️ 清空历史</button>
                 </div>
                 <!-- v1.40.0: 搜索和筛选 -->
                 <div class="session-filters">
@@ -2859,6 +2860,7 @@ const TERMINAL_JS: &str = r#"
             this.listContainer = document.getElementById('session-list');
             this.saveBtn = document.getElementById('save-session-btn');
             this.refreshBtn = document.getElementById('refresh-sessions-btn');
+            this.clearHistoryBtn = document.getElementById('clear-history-btn');
             this.panelCloseBtn = document.getElementById('session-panel-close');
             this.panel = document.getElementById('session-panel');
 
@@ -2880,6 +2882,11 @@ const TERMINAL_JS: &str = r#"
             // 刷新会话列表
             if (this.refreshBtn) {
                 this.refreshBtn.onclick = () => this.refreshSessionList();
+            }
+
+            // v1.40.0: 清空历史
+            if (this.clearHistoryBtn) {
+                this.clearHistoryBtn.onclick = () => this.clearAllHistory();
             }
 
             // 关闭面板
@@ -3112,6 +3119,45 @@ const TERMINAL_JS: &str = r#"
             } catch (error) {
                 console.error('[SessionManager] Failed to delete session:', error);
                 this.terminal.toast.error('删除失败', error.message);
+            }
+        }
+
+        /**
+         * 清空所有历史会话 (v1.40.0)
+         */
+        clearAllHistory() {
+            // 获取当前历史数量
+            const history = this.terminal.localStorage.getHistory();
+            if (!history || history.length === 0) {
+                this.terminal.toast.info('无需清空', '当前没有保存的会话');
+                return;
+            }
+
+            // 二次确认，避免误操作
+            const confirmMessage = `确认清空所有历史会话？\n\n当前有 ${history.length} 个会话将被永久删除。\n\n此操作无法撤销！`;
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            try {
+                // 清空历史
+                this.terminal.localStorage.clearHistory();
+                console.log('[SessionManager] All history cleared');
+
+                // 刷新列表
+                this.refreshSessionList();
+
+                // 清空搜索框
+                if (this.searchInput) {
+                    this.searchInput.value = '';
+                    this.currentSearchTerm = '';
+                }
+
+                // Toast 成功提示
+                this.terminal.toast.success('历史已清空', `已删除 ${history.length} 个会话`);
+            } catch (error) {
+                console.error('[SessionManager] Failed to clear history:', error);
+                this.terminal.toast.error('清空失败', error.message);
             }
         }
 
@@ -5692,6 +5738,18 @@ body::before {
 .session-action-btn:hover {
     background: rgba(57, 255, 20, 0.2);
     border-color: rgba(57, 255, 20, 0.5);
+}
+
+/* 清空历史按钮：警告色 (v1.40.0) */
+.session-clear-btn {
+    color: #ff7b72;
+    border-color: rgba(255, 123, 114, 0.3);
+    background: rgba(255, 123, 114, 0.05);
+}
+
+.session-clear-btn:hover {
+    border-color: rgba(255, 123, 114, 0.5);
+    background: rgba(255, 123, 114, 0.15);
 }
 
 /* 搜索和筛选区 (v1.40.0) */
