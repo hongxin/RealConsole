@@ -59,6 +59,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             </div>
             <button id="session-menu-btn" class="session-btn" title="会话管理">💾 会话</button>
             <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合</button>
+            <button id="clear-screen-btn" class="clear-btn" title="清空当前对话">🗑️ 清空</button>
         </div>
     </div>
     <!-- v1.40.0: 会话管理面板 -->
@@ -3475,6 +3476,22 @@ const TERMINAL_JS: &str = r#"
         });
     }
 
+    // ===== v1.40.0: 绑定清空按钮 =====
+    const clearScreenBtn = document.getElementById('clear-screen-btn');
+    if (clearScreenBtn) {
+        clearScreenBtn.addEventListener('click', () => {
+            // 如果有未保存的内容，提示用户
+            if (terminal.rounds.length > 0) {
+                if (confirm('确认清空当前对话？\n\n未保存的内容将会丢失。')) {
+                    terminal.clearAll();
+                    terminal.toast.success('对话已清空', '可以开始新的对话了');
+                }
+            } else {
+                terminal.toast.info('无需清空', '当前没有对话内容');
+            }
+        });
+    }
+
     // WebSocket 连接
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -4050,6 +4067,26 @@ body::before {
 .view-mode-btn:hover {
     background: rgba(230, 237, 243, 0.1);
     border-color: rgba(230, 237, 243, 0.5);
+}
+
+/* 清空按钮 (v1.40.0) */
+.clear-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 123, 114, 0.3);
+    background: rgba(255, 123, 114, 0.05);
+    color: #ff7b72;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+}
+
+.clear-btn:hover {
+    background: rgba(255, 123, 114, 0.15);
+    border-color: rgba(255, 123, 114, 0.5);
 }
 
 #terminal-container {
