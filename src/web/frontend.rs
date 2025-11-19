@@ -857,6 +857,16 @@ const TERMINAL_JS: &str = r#"
     }
 
     // ========== v1.40.0: 服务器端会话管理器 ==========
+    /**
+     * ServerSessionManager - 服务器端会话管理
+     *
+     * 功能：通过 WebSocket 与服务器通信，管理服务器端存储的会话
+     * 存储：Rust 服务器端文件系统（~/.realconsole/sessions/）
+     * 结构：使用 session-card HTML 结构
+     * 特点：多设备同步、持久化存储、支持导出
+     *
+     * 注意：这是主要使用的会话管理系统，与 BrowserSessionManager 独立
+     */
     class ServerSessionManager {
         constructor(terminal, websocket) {
             this.terminal = terminal;
@@ -2874,13 +2884,18 @@ const TERMINAL_JS: &str = r#"
     // ===== v1.40.0 Phase 3: 会话历史管理 UI =====
 
     /**
-     * SessionManager - 会话历史管理器
+     * BrowserSessionManager - 浏览器端会话历史管理器
      *
-     * 功能：
-     * 1. 显示历史会话列表
-     * 2. 加载/删除历史会话
-     * 3. 保存当前会话到历史
-     * 4. 格式化显示时间和大小
+     * 功能：管理浏览器 LocalStorage 中的会话历史
+     * 存储：浏览器 LocalStorage（单设备、临时）
+     * 结构：使用 session-item HTML 结构
+     * 特点：快速访问、搜索筛选、导出功能、重命名支持
+     *
+     * 与 ServerSessionManager 的区别：
+     * - ServerSessionManager：服务器端存储，多设备同步，持久化
+     * - BrowserSessionManager：浏览器本地存储，单设备，临时缓存
+     *
+     * 注意：目前 Web 界面主要使用 ServerSessionManager
      */
     class BrowserSessionManager {
         constructor(terminal) {
@@ -6002,11 +6017,15 @@ body::before {
     background: rgba(163, 113, 247, 0.1);
     border: 1px solid rgba(163, 113, 247, 0.3);
     color: #A371F7;
-    padding: 6px 12px;
+    padding: 6px 8px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.85em;
+    font-size: 0.8em;
     transition: all 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .session-card-btn:hover {
