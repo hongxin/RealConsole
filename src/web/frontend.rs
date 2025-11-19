@@ -3037,6 +3037,7 @@ const TERMINAL_JS: &str = r#"
                     </div>
                     <div class="session-item-actions">
                         <button class="session-load-btn" data-id="${item.id}" title="加载">📂 加载</button>
+                        <button class="session-rename-btn" data-id="${item.id}" title="重命名">✏️ 重命名</button>
                         <button class="session-export-btn" data-id="${item.id}" title="导出">📤 导出</button>
                         <button class="session-delete-btn" data-id="${item.id}" title="删除">🗑️ 删除</button>
                     </div>
@@ -3052,6 +3053,12 @@ const TERMINAL_JS: &str = r#"
             const loadBtns = this.listContainer.querySelectorAll('.session-load-btn');
             loadBtns.forEach(btn => {
                 btn.onclick = () => this.loadSession(btn.dataset.id);
+            });
+
+            // 重命名按钮 (v1.40.0)
+            const renameBtns = this.listContainer.querySelectorAll('.session-rename-btn');
+            renameBtns.forEach(btn => {
+                btn.onclick = () => this.renameSession(btn.dataset.id);
             });
 
             // 导出按钮
@@ -3098,6 +3105,62 @@ const TERMINAL_JS: &str = r#"
             // Toast 成功提示
             this.terminal.toast.success('会话已加载', session.name);
             console.log('[SessionManager] Session loaded:', session.name);
+        }
+
+        /**
+         * 重命名会话 (v1.40.0)
+         */
+        renameSession(id) {
+            // 从 LocalStorage 加载完整会话数据
+            const fullSessionKey = `realconsole_session_${id}`;
+            const sessionJson = localStorage.getItem(fullSessionKey);
+
+            if (!sessionJson) {
+                this.terminal.toast.error('重命名失败', '会话不存在');
+                return;
+            }
+
+            const session = JSON.parse(sessionJson);
+            const oldName = session.name;
+
+            // 提示用户输入新名称
+            const newName = prompt('请输入新的会话名称:', oldName);
+
+            // 用户取消或输入空名称
+            if (!newName || newName.trim() === '') {
+                return;
+            }
+
+            const trimmedName = newName.trim();
+
+            // 名称未改变
+            if (trimmedName === oldName) {
+                this.terminal.toast.info('无需重命名', '名称未改变');
+                return;
+            }
+
+            try {
+                // 更新会话名称
+                session.name = trimmedName;
+                session.updated_at = new Date().toISOString();
+
+                // 保存回 LocalStorage
+                localStorage.setItem(fullSessionKey, JSON.stringify(session));
+
+                // 更新历史索引中的名称
+                this.terminal.localStorage.updateHistoryItemName(id, trimmedName);
+
+                console.log('[SessionManager] Session renamed:', oldName, '->', trimmedName);
+
+                // 刷新列表
+                this.refreshSessionList();
+
+                // Toast 成功提示
+                this.terminal.toast.success('重命名成功', trimmedName);
+            } catch (error) {
+                console.error('[SessionManager] Failed to rename session:', error);
+                this.terminal.toast.error('重命名失败', error.message);
+            }
         }
 
         /**
@@ -5986,7 +6049,7 @@ body::before {
     gap: 8px;
 }
 
-.session-load-btn, .session-export-btn, .session-delete-btn {
+.session-load-btn, .session-rename-btn, .session-export-btn, .session-delete-btn {
     flex: 1;
     background: rgba(230, 237, 243, 0.05);
     border: 1px solid rgba(230, 237, 243, 0.2);
@@ -5998,9 +6061,21 @@ body::before {
     transition: all 0.2s;
 }
 
-.session-load-btn:hover, .session-export-btn:hover, .session-delete-btn:hover {
+.session-load-btn:hover, .session-rename-btn:hover, .session-export-btn:hover, .session-delete-btn:hover {
     background: rgba(230, 237, 243, 0.1);
     border-color: rgba(230, 237, 243, 0.3);
+}
+
+/* 重命名按钮：警告色（橙） (v1.40.0) */
+.session-rename-btn {
+    color: #ffa657;
+    border-color: rgba(255, 166, 87, 0.3);
+    background: rgba(255, 166, 87, 0.05);
+}
+
+.session-rename-btn:hover {
+    border-color: rgba(255, 166, 87, 0.5);
+    background: rgba(255, 166, 87, 0.1);
 }
 
 /* 导出按钮：信息色（蓝） */
