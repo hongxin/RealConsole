@@ -240,6 +240,32 @@ impl SessionManager {
         Ok(())
     }
 
+    /// 重命名会话
+    pub fn rename_session(&self, id: &str, new_name: &str) -> Result<()> {
+        let file_path = self.sessions_dir.join(format!("session-{}.json", id));
+
+        // 读取会话文件
+        let content = fs::read_to_string(&file_path)
+            .with_context(|| format!("读取会话文件失败: {:?}", file_path))?;
+
+        // 解析 JSON
+        let mut session: SerializableSession = serde_json::from_str(&content)
+            .with_context(|| "解析会话文件失败")?;
+
+        // 更新名称
+        session.name = new_name.to_string();
+
+        // 保存回文件
+        let updated_content = serde_json::to_string_pretty(&session)
+            .with_context(|| "序列化会话失败")?;
+
+        fs::write(&file_path, updated_content)
+            .with_context(|| format!("写入会话文件失败: {:?}", file_path))?;
+
+        eprintln!("✅ 会话已重命名: {} -> {}", id, new_name);
+        Ok(())
+    }
+
     /// 导出会话为 Markdown
     pub fn export_to_markdown(&self, session: &SerializableSession) -> Result<String> {
         let mut md = String::new();

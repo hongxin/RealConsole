@@ -144,6 +144,9 @@ async fn handle_message(
         ClientMessage::DeleteSession { session_id } => {
             handle_delete_session(&session_id, sender).await?;
         }
+        ClientMessage::RenameSession { session_id, new_name } => {
+            handle_rename_session(&session_id, &new_name, sender).await?;
+        }
         ClientMessage::ExportSession { session_id, format } => {
             handle_export_session(&session_id, &format, sender).await?;
         }
@@ -1642,6 +1645,42 @@ async fn handle_list_sessions(
         Err(e) => {
             let response = ServerMessage::SessionError {
                 message: format!("列出会话失败: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 处理重命名会话
+async fn handle_rename_session(
+    session_id: &str,
+    new_name: &str,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::web::session_manager::SessionManager;
+
+    let manager = SessionManager::new()?;
+
+    match manager.rename_session(session_id, new_name) {
+        Ok(_) => {
+            let response = ServerMessage::SessionRenamed {
+                session_id: session_id.to_string(),
+                new_name: new_name.to_string(),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&response)?))
+                .await?;
+
+            // 重新发送会话列表
+            handle_list_sessions(sender).await?;
+        }
+        Err(e) => {
+            let response = ServerMessage::SessionError {
+                message: format!("重命名会话失败: {}", e),
             };
             sender
                 .send(Message::Text(serde_json::to_string(&response)?))

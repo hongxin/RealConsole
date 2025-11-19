@@ -146,6 +146,12 @@ pub enum ClientMessage {
     /// 删除已保存的会话
     #[serde(rename = "delete_session")]
     DeleteSession { session_id: String },
+    /// 重命名已保存的会话
+    #[serde(rename = "rename_session")]
+    RenameSession {
+        session_id: String,
+        new_name: String,
+    },
     /// 导出会话（支持 markdown, html 格式）
     #[serde(rename = "export_session")]
     ExportSession {
@@ -293,6 +299,13 @@ pub enum ServerMessage {
     /// 会话已删除
     #[serde(rename = "session_deleted")]
     SessionDeleted { session_id: String },
+
+    /// 会话已重命名
+    #[serde(rename = "session_renamed")]
+    SessionRenamed {
+        session_id: String,
+        new_name: String,
+    },
 
     /// 会话已导出
     #[serde(rename = "session_exported")]

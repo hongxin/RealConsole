@@ -940,6 +940,27 @@ const TERMINAL_JS: &str = r#"
             this.ws.send(JSON.stringify(message));
         }
 
+        renameSession(sessionId, currentName) {
+            const newName = prompt('请输入新的会话名称:', currentName);
+
+            if (!newName || newName.trim() === '') {
+                return;
+            }
+
+            const trimmedName = newName.trim();
+            if (trimmedName === currentName) {
+                this.showNotification('名称未改变', 'info');
+                return;
+            }
+
+            const message = {
+                type: 'rename_session',
+                session_id: sessionId,
+                new_name: trimmedName
+            };
+            this.ws.send(JSON.stringify(message));
+        }
+
         deleteSession(sessionId, sessionName) {
             if (!confirm(`确定删除会话 "${sessionName}"？`)) {
                 return;
@@ -1038,6 +1059,9 @@ const TERMINAL_JS: &str = r#"
                         <button class="session-card-btn load-btn" data-action="load">
                             📂 加载
                         </button>
+                        <button class="session-card-btn rename-btn" data-action="rename">
+                            ✏️ 重命名
+                        </button>
                         <button class="session-card-btn export-btn" data-action="export">
                             📤 导出
                         </button>
@@ -1061,6 +1085,9 @@ const TERMINAL_JS: &str = r#"
                     switch (action) {
                         case 'load':
                             this.loadSession(sessionId);
+                            break;
+                        case 'rename':
+                            this.renameSession(sessionId, session.name);
                             break;
                         case 'export':
                             this.exportSession(sessionId);
@@ -5985,6 +6012,17 @@ body::before {
 .session-card-btn:hover {
     background: rgba(163, 113, 247, 0.2);
     border-color: rgba(163, 113, 247, 0.5);
+}
+
+.session-card-btn.rename-btn {
+    color: #ffa657;
+    border-color: rgba(255, 166, 87, 0.3);
+    background: rgba(255, 166, 87, 0.05);
+}
+
+.session-card-btn.rename-btn:hover {
+    border-color: rgba(255, 166, 87, 0.5);
+    background: rgba(255, 166, 87, 0.1);
 }
 
 .session-card-btn.delete-btn {
