@@ -48,15 +48,20 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 </head>
 <body>
     <div id="header">
+        <div id="header-left-controls">
+            <div id="lang-switcher">
+                <select id="lang-select" class="lang-dropdown">
+                    <option value="zh-CN">🌐 中文</option>
+                    <option value="en-US">🌐 English</option>
+                </select>
+            </div>
+            <button id="theme-toggle-btn" class="theme-toggle-btn" title="切换主题">🌙 深色</button>
+        </div>
         <div id="header-content">
-            <h1 data-i18n="web.header.title">🌟 RealConsole Web 终端</h1>
+            <h1 data-i18n="web.header.title">🌟 RealConsole 睿境</h1>
             <p data-i18n="web.header.tagline">融合东方哲学智慧的智能 CLI Agent</p>
         </div>
-        <div id="header-controls">
-            <div id="lang-switcher">
-                <button onclick="setLanguage('zh-CN')" id="btn-zh" class="active">中文</button>
-                <button onclick="setLanguage('en-US')" id="btn-en">English</button>
-            </div>
+        <div id="header-right-controls">
             <button id="session-menu-btn" class="session-btn" title="会话管理">💾 会话</button>
             <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合</button>
             <button id="clear-screen-btn" class="clear-btn" title="清空当前对话">🗑️ 清空</button>
@@ -3451,7 +3456,7 @@ const TERMINAL_JS: &str = r#"
     const I18N_TRANSLATIONS = {
         'zh-CN': {
             'web.page.title': 'RealConsole Web 终端',
-            'web.header.title': '🌟 RealConsole Web 终端',
+            'web.header.title': '🌟 RealConsole 睿境',
             'web.header.tagline': '融合东方哲学智慧的智能 CLI Agent',
             'web.status.connecting': '连接中...',
             'web.status.connected': '已连接',
@@ -3463,7 +3468,7 @@ const TERMINAL_JS: &str = r#"
         },
         'en-US': {
             'web.page.title': 'RealConsole Web Terminal',
-            'web.header.title': '🌟 RealConsole Web Terminal',
+            'web.header.title': '🌟 RealConsole Notebook',
             'web.header.tagline': 'Intelligent CLI Agent Blending Eastern Philosophy Wisdom',
             'web.status.connecting': 'Connecting...',
             'web.status.connected': 'Connected',
@@ -3508,9 +3513,11 @@ const TERMINAL_JS: &str = r#"
         if (!I18N_TRANSLATIONS[lang]) return;
         currentLanguage = lang;
         updatePageText();
-        // 更新按钮状态
-        document.getElementById('btn-zh').classList.toggle('active', lang === 'zh-CN');
-        document.getElementById('btn-en').classList.toggle('active', lang === 'en-US');
+        // 更新下拉框选中值
+        const langSelect = document.getElementById('lang-select');
+        if (langSelect) {
+            langSelect.value = lang;
+        }
         // 刷新终端欢迎消息
         if (ws && ws.readyState === WebSocket.OPEN) {
             showWelcomeMessage();
@@ -3538,6 +3545,15 @@ const TERMINAL_JS: &str = r#"
 
     // 初始化语言（从浏览器检测）
     currentLanguage = getBrowserLanguage();
+
+    // 绑定语言下拉框事件
+    const langSelect = document.getElementById('lang-select');
+    if (langSelect) {
+        langSelect.value = currentLanguage;
+        langSelect.addEventListener('change', (e) => {
+            setLanguage(e.target.value);
+        });
+    }
 
     // ========== 终端核心 ==========
 
@@ -3954,13 +3970,59 @@ const TERMINAL_JS: &str = r#"
         }));
     };
 
-    // ========== 初始化 i18n ==========
-    // 页面加载完成后立即应用语言设置
+    // ========== 主题切换系统 (v1.43.0) ==========
+    let currentTheme = 'dark'; // 默认深色主题
+
+    // 从 LocalStorage 加载主题偏好
+    function loadTheme() {
+        const savedTheme = localStorage.getItem('realconsole-theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+            currentTheme = savedTheme;
+        }
+        applyTheme(currentTheme);
+    }
+
+    // 应用主题
+    function applyTheme(theme) {
+        const htmlRoot = document.getElementById('html-root');
+        const themeBtn = document.getElementById('theme-toggle-btn');
+
+        if (theme === 'light') {
+            htmlRoot.setAttribute('data-theme', 'light');
+            if (themeBtn) {
+                themeBtn.innerHTML = '☀️ 浅色';
+                themeBtn.title = '切换到深色主题';
+            }
+        } else {
+            htmlRoot.removeAttribute('data-theme');
+            if (themeBtn) {
+                themeBtn.innerHTML = '🌙 深色';
+                themeBtn.title = '切换到浅色主题';
+            }
+        }
+    }
+
+    // 切换主题
+    function toggleTheme() {
+        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(currentTheme);
+        localStorage.setItem('realconsole-theme', currentTheme);
+    }
+
+    // ========== 初始化 ==========
+    // 页面加载完成后立即应用设置
     window.addEventListener('DOMContentLoaded', () => {
+        // 初始化主题
+        loadTheme();
+
+        // 绑定主题切换按钮事件
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', toggleTheme);
+        }
+
+        // 初始化 i18n
         updatePageText();
-        // 根据初始语言设置按钮状态
-        document.getElementById('btn-zh').classList.toggle('active', currentLanguage === 'zh-CN');
-        document.getElementById('btn-en').classList.toggle('active', currentLanguage === 'en-US');
     });
 
 })();
@@ -3970,9 +4032,131 @@ const TERMINAL_JS: &str = r#"
 /// 内嵌的样式 CSS
 const STYLE_CSS: &str = r#"
 /* ============================================
-   🌃 Cyberpunk Theme - RealConsole v1.26.0
-   未来赛博朋克风格
+   🌓 Theme System - RealConsole v1.43.0
+   支持深色/浅色主题切换（币安风格）
    ============================================ */
+
+/* ===== CSS 变量定义：深色主题（默认） ===== */
+:root {
+    /* 背景色 */
+    --bg-primary: #0a0e27;
+    --bg-secondary: #0d1117;
+    --bg-tertiary: #1a0b2e;
+    --bg-grid: rgba(0, 240, 255, 0.03);
+    --bg-scanline: rgba(0, 0, 0, 0.15);
+
+    /* 表面色（卡片、面板） */
+    --surface-primary: rgba(10, 14, 39, 0.6);
+    --surface-secondary: rgba(5, 8, 20, 0.85);
+    --surface-tertiary: rgba(22, 27, 34, 0.5);
+    --surface-overlay: rgba(0, 0, 0, 0.7);
+
+    /* 文本色 */
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-muted: #888;
+    --text-title: #00f0ff;
+    --text-gradient-start: #00f0ff;
+    --text-gradient-end: #ff006e;
+
+    /* 边框色 */
+    --border-primary: rgba(0, 240, 255, 0.3);
+    --border-secondary: rgba(0, 240, 255, 0.2);
+    --border-muted: rgba(230, 237, 243, 0.2);
+    --border-hover: rgba(0, 240, 255, 0.5);
+
+    /* 主色调（紫色） */
+    --accent-primary: #A371F7;
+    --accent-primary-alpha-10: rgba(163, 113, 247, 0.1);
+    --accent-primary-alpha-30: rgba(163, 113, 247, 0.3);
+    --accent-primary-alpha-60: rgba(163, 113, 247, 0.6);
+
+    /* 功能色 */
+    --color-success: #39ff14;
+    --color-success-soft: #7ee787;
+    --color-warning: #F0B90B;
+    --color-error: #ff006e;
+    --color-error-soft: #ff7b72;
+    --color-info: #00f0ff;
+    --color-link: #58A6FF;
+
+    /* 阴影和发光 */
+    --shadow-glow-cyan: 0 0 20px rgba(0, 240, 255, 0.3);
+    --shadow-glow-purple: 0 0 15px rgba(163, 113, 247, 0.25);
+    --shadow-card: 0 0 15px rgba(0, 240, 255, 0.15);
+
+    /* 终端色 */
+    --terminal-output: rgb(240, 240, 240);
+    --terminal-command: rgba(0, 240, 255, 0.6);
+    --terminal-prompt: #F0B90B;
+    --terminal-input-bg: rgba(22, 27, 34, 0.5);
+    --terminal-border: #30363D;
+
+    /* 特殊效果 */
+    --scanline-opacity: 0.3;
+    --backdrop-blur: blur(10px);
+}
+
+/* ===== 浅色主题（币安风格） ===== */
+[data-theme="light"] {
+    /* 背景色 */
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #FAFAFA;
+    --bg-tertiary: #F5F5F5;
+    --bg-grid: rgba(0, 0, 0, 0.02);
+    --bg-scanline: rgba(0, 0, 0, 0);
+
+    /* 表面色（卡片、面板） */
+    --surface-primary: #FFFFFF;
+    --surface-secondary: #F8F9FA;
+    --surface-tertiary: #FFFFFF;
+    --surface-overlay: rgba(0, 0, 0, 0.5);
+
+    /* 文本色 */
+    --text-primary: #1E2329;
+    --text-secondary: #707A8A;
+    --text-muted: #B7BDC6;
+    --text-title: #1E2329;
+    --text-gradient-start: #8B5CF6;
+    --text-gradient-end: #9065DC;
+
+    /* 边框色 */
+    --border-primary: #EAECEF;
+    --border-secondary: #E6E8EA;
+    --border-muted: #EAECEF;
+    --border-hover: #C9CCD1;
+
+    /* 主色调（紫色 - 浅色模式下调整） */
+    --accent-primary: #8B5CF6;
+    --accent-primary-alpha-10: rgba(139, 92, 246, 0.1);
+    --accent-primary-alpha-30: rgba(139, 92, 246, 0.3);
+    --accent-primary-alpha-60: rgba(139, 92, 246, 0.6);
+
+    /* 功能色 */
+    --color-success: #0ECB81;
+    --color-success-soft: #0ECB81;
+    --color-warning: #F0B90B;
+    --color-error: #F6465D;
+    --color-error-soft: #F6465D;
+    --color-info: #1E88E5;
+    --color-link: #1E88E5;
+
+    /* 阴影和发光 */
+    --shadow-glow-cyan: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-glow-purple: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    /* 终端色 */
+    --terminal-output: #1E2329;
+    --terminal-command: #8B5CF6;
+    --terminal-prompt: #F0B90B;
+    --terminal-input-bg: #FFFFFF;
+    --terminal-border: #EAECEF;
+
+    /* 特殊效果 */
+    --scanline-opacity: 0;
+    --backdrop-blur: blur(0px);
+}
 
 * {
     margin: 0;
@@ -3988,32 +4172,33 @@ html, body {
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    /* 赛博朋克深色背景 + 动态网格 */
+    /* 主题化背景 + 动态网格 */
     background:
         repeating-linear-gradient(
             0deg,
-            rgba(0, 240, 255, 0.03) 0px,
+            var(--bg-grid) 0px,
             transparent 1px,
             transparent 40px,
-            rgba(0, 240, 255, 0.03) 41px
+            var(--bg-grid) 41px
         ),
         repeating-linear-gradient(
             90deg,
-            rgba(0, 240, 255, 0.03) 0px,
+            var(--bg-grid) 0px,
             transparent 1px,
             transparent 40px,
-            rgba(0, 240, 255, 0.03) 41px
+            var(--bg-grid) 41px
         ),
-        linear-gradient(135deg, #0a0e27 0%, #0d1117 50%, #1a0b2e 100%);
+        linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
     background-attachment: fixed;
     display: flex;
     flex-direction: column;
     padding: 10px;
     margin: 0;
     position: relative;
+    transition: background 0.3s ease;
 }
 
-/* 扫描线效果 */
+/* 扫描线效果（暗色主题专属） */
 body::before {
     content: '';
     position: fixed;
@@ -4023,14 +4208,14 @@ body::before {
     height: 100%;
     background: repeating-linear-gradient(
         0deg,
-        rgba(0, 0, 0, 0.15) 0px,
+        var(--bg-scanline) 0px,
         transparent 1px,
         transparent 2px,
-        rgba(0, 0, 0, 0.15) 3px
+        var(--bg-scanline) 3px
     );
     pointer-events: none;
     z-index: 9999;
-    opacity: 0.3;
+    opacity: var(--scanline-opacity);
     animation: scanlines 8s linear infinite;
 }
 
@@ -4046,36 +4231,68 @@ body::before {
     margin-bottom: 10px;
     padding: 8px 20px;
     flex-shrink: 0;
-    background: rgba(10, 14, 39, 0.6);
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
     border-radius: 8px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+    backdrop-filter: var(--backdrop-blur);
+    box-shadow: var(--shadow-glow-cyan);
     /* 与终端容器等宽对齐 */
     max-width: 1400px;
     width: 100%;
     margin-left: auto;
     margin-right: auto;
+    transition: all 0.3s ease;
 }
 
+/* 左侧控件区 */
+#header-left-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    flex: 1;
+}
+
+/* 中间标题内容区 */
 #header-content {
     text-align: center;
+    flex-shrink: 0;
+}
+
+/* 右侧控件区 */
+#header-right-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
     flex: 1;
+    justify-content: flex-end;
 }
 
 #header h1 {
     font-size: 1.5em;
     margin: 0 0 5px 0;
-    /* 霓虹发光效果 - 青色到粉色渐变 */
-    background: linear-gradient(90deg, #00f0ff 0%, #ff006e 100%);
+    /* 主题化渐变效果 */
+    background: linear-gradient(90deg, var(--text-gradient-start) 0%, var(--text-gradient-end) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    transition: all 0.3s ease;
+}
+
+/* 暗色主题专属：霓虹发光动画 */
+:root #header h1 {
     text-shadow:
         0 0 10px rgba(0, 240, 255, 0.5),
         0 0 20px rgba(0, 240, 255, 0.3),
         0 0 30px rgba(0, 240, 255, 0.2);
     animation: neon-pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 浅色主题：移除发光效果 */
+[data-theme="light"] #header h1 {
+    text-shadow: none;
+    animation: none;
 }
 
 @keyframes neon-pulse {
@@ -4112,66 +4329,116 @@ body::before {
 #header p {
     font-size: 0.9em;
     margin: 0;
-    color: #00f0ff;
+    color: var(--text-title);
+    transition: all 0.3s ease;
+}
+
+/* 暗色主题专属：tagline 发光效果 */
+:root #header p {
     text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
 }
 
+/* 浅色主题：移除发光效果 */
+[data-theme="light"] #header p {
+    text-shadow: none;
+}
+
+/* ===== 语言选择器（币安风格下拉） ===== */
 #lang-switcher {
-    display: flex;
-    gap: 8px;
+    position: relative;
     flex-shrink: 0;
 }
 
-#lang-switcher button {
-    padding: 6px 12px;
-    border: 1px solid rgba(230, 237, 243, 0.3);
-    background: rgba(10, 14, 39, 0.5);
-    color: #E6EDF3;
+.lang-dropdown {
+    padding: 6px 32px 6px 12px;
+    border: 1px solid var(--border-muted);
+    background: var(--surface-primary);
+    color: var(--text-primary);
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.85em;
     font-weight: 500;
     transition: all 0.2s ease;
-    backdrop-filter: blur(10px);
+    backdrop-filter: var(--backdrop-blur);
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    min-width: 120px;
 }
 
-#lang-switcher button:hover {
-    background: rgba(230, 237, 243, 0.1);
-    border-color: rgba(230, 237, 243, 0.5);
+/* 暗色主题：浅色箭头 */
+:root .lang-dropdown {
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L11 1" stroke="%23E6EDF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 }
 
-#lang-switcher button.active {
-    background: rgba(230, 237, 243, 0.15);
-    border-color: rgba(230, 237, 243, 0.6);
-    font-weight: 600;
+/* 浅色主题：深色箭头 */
+[data-theme="light"] .lang-dropdown {
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L6 6L11 1" stroke="%231E2329" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+}
+
+.lang-dropdown:hover {
+    border-color: var(--border-hover);
+}
+
+.lang-dropdown:focus {
+    outline: none;
+    border-color: var(--accent-primary-alpha-60);
+    background-color: var(--accent-primary-alpha-10);
+}
+
+.lang-dropdown option {
+    background: var(--surface-primary);
+    color: var(--text-primary);
+    padding: 8px;
+}
+
+/* ===== v1.43.0: 主题切换按钮（币安风格） ===== */
+.theme-toggle-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border-muted);
+    background: var(--surface-primary);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    backdrop-filter: var(--backdrop-blur);
+    white-space: nowrap;
+}
+
+.theme-toggle-btn:hover {
+    border-color: var(--border-hover);
+    background: var(--surface-tertiary);
+    transform: scale(1.05);
+}
+
+.theme-toggle-btn:active {
+    transform: scale(0.95);
 }
 
 /* ===== v1.28.0: 视图模式切换按钮 ===== */
 
-#header-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-}
-
 .view-mode-btn {
     padding: 6px 12px;
-    border: 1px solid rgba(230, 237, 243, 0.3);
-    background: rgba(10, 14, 39, 0.5);
-    color: #E6EDF3;
+    border: 1px solid var(--border-muted);
+    background: var(--surface-primary);
+    color: var(--text-primary);
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.85em;
     font-weight: 500;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    backdrop-filter: var(--backdrop-blur);
     white-space: nowrap;
 }
 
 .view-mode-btn:hover {
-    background: rgba(230, 237, 243, 0.1);
-    border-color: rgba(230, 237, 243, 0.5);
+    background: var(--surface-tertiary);
+    border-color: var(--border-hover);
 }
 
 /* 清空按钮 (v1.40.0) */
@@ -4179,13 +4446,13 @@ body::before {
     padding: 6px 12px;
     border: 1px solid rgba(255, 123, 114, 0.3);
     background: rgba(255, 123, 114, 0.05);
-    color: #ff7b72;
+    color: var(--color-error-soft);
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.85em;
     font-weight: 500;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    backdrop-filter: var(--backdrop-blur);
     white-space: nowrap;
 }
 
@@ -4197,14 +4464,11 @@ body::before {
 #terminal-container {
     flex: 1;
     /* 深色背景 */
-    background: rgba(5, 8, 20, 0.85);
+    background: var(--surface-secondary);
     border-radius: 8px;
     /* 霓虹青色边框 + 发光 */
-    border: 2px solid rgba(0, 240, 255, 0.5);
-    box-shadow:
-        0 0 20px rgba(0, 240, 255, 0.3),
-        0 0 40px rgba(0, 240, 255, 0.2),
-        inset 0 0 60px rgba(0, 240, 255, 0.05);
+    border: 2px solid var(--border-hover);
+    box-shadow: var(--shadow-glow-cyan);
     overflow: hidden;
     padding: 8px;
     max-width: 1400px;
@@ -4214,7 +4478,8 @@ body::before {
     display: flex;
     flex-direction: column;
     position: relative;
-    backdrop-filter: blur(10px);
+    backdrop-filter: var(--backdrop-blur);
+    transition: all 0.3s ease;
 }
 
 /* 终端容器脉动效果 - 已移除（极简主义） */
@@ -4262,7 +4527,7 @@ body::before {
     flex-direction: column;
     font-family: "Consolas", "Monaco", "Courier New", monospace;
     font-size: 14px;
-    color: rgb(240, 240, 240);
+    color: var(--terminal-output);
 }
 
 .terminal-output-area {
@@ -4280,7 +4545,7 @@ body::before {
 
 /* 输出行 */
 .line-output {
-    color: rgb(240, 240, 240);
+    color: var(--terminal-output);
 }
 
 .line-output .terminal-text {
@@ -4292,16 +4557,16 @@ body::before {
 
 /* 命令回显行 - 赛博朋克风格 */
 .line-command {
-    color: rgba(0, 240, 255, 0.6);
+    color: var(--terminal-command);
 }
 
 .line-command .prompt {
-    color: #F0B90B;  /* 币安金色，优雅提示 */
+    color: var(--terminal-prompt);
     font-weight: bold;
 }
 
 .line-command .command {
-    color: #E6EDF3;  /* GitHub 白色，清晰可读 */
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -4309,17 +4574,18 @@ body::before {
 .line-markdown {
     padding: 8px 0 8px 12px;
     /* 霓虹粉色左边框 + 发光 */
-    border-left: 3px solid #ff006e;
-    background: rgba(255, 0, 110, 0.05);
+    border-left: 3px solid var(--color-error);
+    background: var(--color-error-soft);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     line-height: 1.6;
     white-space: normal;
     box-shadow: -3px 0 10px rgba(255, 0, 110, 0.2);
+    transition: all 0.3s ease;
 }
 
 /* Spinner 行 - 优雅紫色脉动 */
 .line-spinner {
-    color: #A371F7;  /* GitHub 紫色，替代霓虹绿 */
+    color: var(--accent-primary);
     font-style: italic;
     animation: spinner-glow 1.5s ease-in-out infinite;
 }
@@ -4356,13 +4622,14 @@ body::before {
     align-items: center;
     padding: 8px 10px;
     /* 低调深灰分割线，GitHub 风格 */
-    border-top: 1px solid #30363D;
-    background: rgba(22, 27, 34, 0.5);
+    border-top: 1px solid var(--terminal-border);
+    background: var(--terminal-input-bg);
+    transition: all 0.3s ease;
 }
 
 .terminal-input-field .prompt {
     /* 币安金色提示符，优雅醒目 */
-    color: #F0B90B;
+    color: var(--terminal-prompt);
     font-weight: bold;
     margin-right: 8px;
     flex-shrink: 0;
@@ -4380,18 +4647,18 @@ body::before {
     border: none;
     outline: none;
     /* GitHub 白色，清晰可读 */
-    color: #E6EDF3;
+    color: var(--text-primary);
     font-family: inherit;
     font-size: inherit;
 }
 
 .terminal-input-field input::placeholder {
-    color: rgba(139, 148, 158, 0.5);  /* 低调灰色 */
+    color: var(--text-secondary);
 }
 
 /* ANSI 颜色类 - 护眼优雅色系 */
 .ansi-reset {
-    color: #E6EDF3;  /* GitHub 白色，护眼 */
+    color: var(--text-primary);
     font-weight: normal;
 }
 
@@ -4408,11 +4675,11 @@ body::before {
 }
 
 .ansi-yellow {
-    color: #F0B90B;  /* 币安金色，替代刺眼黄色 */
+    color: var(--color-warning);
 }
 
 .ansi-blue {
-    color: #A371F7;  /* 紫色替代蓝色，更护眼 */
+    color: var(--accent-primary);
 }
 
 .ansi-cyan {
@@ -4420,11 +4687,11 @@ body::before {
 }
 
 .ansi-white {
-    color: #E6EDF3;  /* GitHub 白色 */
+    color: var(--text-primary);
 }
 
 .ansi-dimmed {
-    color: #8B949E;  /* 灰色，低调 */
+    color: var(--text-secondary);
     opacity: 0.7;
 }
 
@@ -4439,12 +4706,13 @@ body::before {
 }
 
 .terminal-output-area::-webkit-scrollbar-thumb {
-    background: rgba(139, 148, 158, 0.3);  /* GitHub 灰色 */
+    background: rgba(139, 148, 158, 0.3);
     border-radius: 4px;
+    transition: all 0.3s ease;
 }
 
 .terminal-output-area::-webkit-scrollbar-thumb:hover {
-    background: rgba(163, 113, 247, 0.4);  /* 紫色高亮 */
+    background: var(--accent-primary-alpha-60);
 }
 
 #status {
@@ -4485,6 +4753,12 @@ body::before {
         padding: 8px 10px;
     }
 
+    #header-left-controls,
+    #header-right-controls {
+        width: 100%;
+        justify-content: center;
+    }
+
     #header-content h1 {
         font-size: 1.3em;
     }
@@ -4493,14 +4767,14 @@ body::before {
         font-size: 0.85em;
     }
 
-    #lang-switcher {
-        width: 100%;
-        justify-content: center;
+    .lang-dropdown {
+        flex: 1;
+        max-width: 150px;
     }
 
-    #lang-switcher button {
+    .theme-toggle-btn {
         flex: 1;
-        max-width: 120px;
+        max-width: 100px;
     }
 }
 
@@ -4513,17 +4787,17 @@ body::before {
 .conversation-round {
     margin: 12px 0;
     padding: 0;
-    background: rgba(10, 14, 39, 0.6);
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
     border-radius: 8px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+    backdrop-filter: var(--backdrop-blur);
+    box-shadow: var(--shadow-card);
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .conversation-round:hover {
-    border-color: rgba(0, 240, 255, 0.5);
+    border-color: var(--border-hover);
     box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
 }
 
@@ -4534,10 +4808,10 @@ body::before {
     align-items: center;
     gap: 12px;
     padding: 8px 12px;
-    background: rgba(0, 240, 255, 0.05);
-    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    background: var(--accent-primary-alpha-10);
+    border-bottom: 1px solid var(--border-secondary);
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.3s ease;
 }
 
 .round-header:hover {
@@ -4547,7 +4821,7 @@ body::before {
 /* 回合徽章（类型图标+名称） */
 .round-badge {
     font-weight: 600;
-    color: #00f0ff;
+    color: var(--text-title);
     font-size: 0.9em;
     text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
@@ -4555,7 +4829,7 @@ body::before {
 /* 回合编号 */
 .round-number {
     font-weight: 500;
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.85em;
 }
 
@@ -4572,24 +4846,24 @@ body::before {
 }
 
 .round-status.pending {
-    color: #888;
+    color: var(--text-muted);
     background: rgba(136, 136, 136, 0.1);
 }
 
 .round-status.running {
-    color: #00f0ff;
+    color: var(--color-info);
     background: rgba(0, 240, 255, 0.15);
     animation: status-pulse 1.5s ease-in-out infinite;
 }
 
 .round-status.success {
-    color: #39ff14;
+    color: var(--color-success);
     background: rgba(57, 255, 20, 0.15);
     text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
 }
 
 .round-status.error {
-    color: #ff006e;
+    color: var(--color-error);
     background: rgba(255, 0, 110, 0.15);
     text-shadow: 0 0 8px rgba(255, 0, 110, 0.6);
 }
@@ -4617,7 +4891,7 @@ body::before {
 
 /* 执行时间 */
 .round-time {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.85em;
     font-family: "Consolas", monospace;
 }
@@ -4633,11 +4907,12 @@ body::before {
 .tool-badge {
     display: inline-block;
     padding: 2px 8px;
-    background: rgba(163, 113, 247, 0.1);  /* 紫色背景，替代粉红 */
-    border: 1px solid rgba(163, 113, 247, 0.3);
+    background: var(--accent-primary-alpha-10);
+    border: 1px solid var(--accent-primary-alpha-30);
     border-radius: 12px;
     font-size: 0.75em;
-    color: #A371F7;  /* GitHub 紫色 */
+    color: var(--accent-primary);
+    transition: all 0.3s ease;
 }
 
 /* 回合摘要 - 已移除，简化为扁平结构 */
@@ -4646,17 +4921,17 @@ body::before {
 .round-rerun-btn {
     background: none;
     border: none;
-    color: #8B949E;  /* 低调的灰色，GitHub 风格 */
+    color: var(--text-secondary);
     font-size: 1.1em;
     cursor: pointer;
     padding: 4px 6px;
     margin-right: 4px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     opacity: 0.7;
 }
 
 .round-rerun-btn:hover {
-    color: #A371F7;  /* 紫色高亮，替代青色 */
+    color: var(--accent-primary);
     opacity: 1;
     transform: scale(1.05);
 }
@@ -4665,17 +4940,17 @@ body::before {
 .round-delete-btn {
     background: none;
     border: none;
-    color: #8B949E;  /* 默认灰色，低调 */
+    color: var(--text-secondary);
     font-size: 1.1em;
     cursor: pointer;
     padding: 4px 6px;
     margin-right: 4px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     opacity: 0.7;
 }
 
 .round-delete-btn:hover {
-    color: #ff006e;  /* 红色，表示危险操作 */
+    color: var(--color-error);
     opacity: 1;
     transform: scale(1.05);
 }
@@ -4684,18 +4959,18 @@ body::before {
 .round-drag-handle {
     background: none;
     border: none;
-    color: #8B949E;  /* 默认灰色，低调 */
+    color: var(--text-secondary);
     font-size: 1.2em;
     cursor: grab;  /* 拖拽光标 */
     padding: 4px 6px;
     margin-right: 4px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     opacity: 0.7;
     user-select: none;  /* 防止文本选中 */
 }
 
 .round-drag-handle:hover {
-    color: #58A6FF;  /* 蓝色高亮 */
+    color: var(--color-link);
     opacity: 1;
     transform: scale(1.05);
 }
@@ -4712,7 +4987,7 @@ body::before {
 }
 
 .conversation-round.drag-over {
-    border-top: 3px solid #58A6FF;  /* 蓝色插入指示线 */
+    border-top: 3px solid var(--color-link);
     padding-top: 8px;  /* 补偿边框高度 */
 }
 
@@ -4720,16 +4995,16 @@ body::before {
 .round-toggle {
     background: none;
     border: none;
-    color: #8B949E;  /* 低调的灰色，统一风格 */
+    color: var(--text-secondary);
     font-size: 1.2em;
     cursor: pointer;
     padding: 4px 8px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     opacity: 0.7;
 }
 
 .round-toggle:hover {
-    color: #A371F7;  /* 紫色高亮，替代绿色 */
+    color: var(--accent-primary);
     opacity: 1;
     transform: scale(1.05);
 }
@@ -4765,13 +5040,14 @@ body::before {
 .round-input-content {
     padding: 8px 12px;
     background: rgba(0, 240, 255, 0.05);
-    border-left: 3px solid #00f0ff;
+    border-left: 3px solid var(--text-title);
     border-radius: 4px;
-    color: rgba(240, 240, 240, 0.9);
+    color: var(--terminal-output);
     font-family: "Consolas", monospace;
     font-size: 0.9em;
     white-space: pre-wrap;
     word-wrap: break-word;
+    transition: all 0.3s ease;
     box-shadow: -3px 0 10px rgba(0, 240, 255, 0.1);
 }
 
@@ -5762,21 +6038,21 @@ body::before {
 
 /* 会话按钮 */
 .session-btn {
-    background: rgba(10, 14, 39, 0.5);
-    border: 1px solid rgba(230, 237, 243, 0.3);
-    color: #E6EDF3;
+    background: var(--surface-primary);
+    border: 1px solid var(--border-muted);
+    color: var(--text-primary);
     padding: 6px 12px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.85em;
     font-weight: 500;
-    transition: all 0.2s;
-    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    backdrop-filter: var(--backdrop-blur);
 }
 
 .session-btn:hover {
-    background: rgba(230, 237, 243, 0.1);
-    border-color: rgba(230, 237, 243, 0.5);
+    background: var(--surface-tertiary);
+    border-color: var(--border-hover);
 }
 
 /* 会话管理面板 */
@@ -5803,7 +6079,7 @@ body::before {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--surface-overlay);
     backdrop-filter: blur(5px);
 }
 
@@ -5811,7 +6087,7 @@ body::before {
 .session-panel-dialog {
     position: relative;
     background: rgba(10, 14, 39, 0.95);
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    border: 1px solid var(--border-primary);
     border-radius: 12px;
     width: 90%;
     max-width: 800px;
@@ -5819,6 +6095,7 @@ body::before {
     box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
     display: flex;
     flex-direction: column;
+    transition: all 0.3s ease;
 }
 
 /* 头部 */
@@ -5827,28 +6104,28 @@ body::before {
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    border-bottom: 1px solid var(--border-secondary);
 }
 
 .session-panel-header h3 {
     margin: 0;
-    color: #00f0ff;
+    color: var(--text-title);
     font-size: 1.2em;
 }
 
 .close-btn {
     background: none;
     border: none;
-    color: #888;
+    color: var(--text-muted);
     font-size: 2em;
     cursor: pointer;
-    transition: color 0.2s;
+    transition: all 0.3s ease;
     line-height: 1;
     padding: 0;
 }
 
 .close-btn:hover {
-    color: #ff006e;
+    color: var(--color-error);
 }
 
 /* 内容区域 */
@@ -5869,12 +6146,12 @@ body::before {
     flex: 1;
     background: rgba(57, 255, 20, 0.1);
     border: 1px solid rgba(57, 255, 20, 0.3);
-    color: #39ff14;
+    color: var(--color-success);
     padding: 10px 16px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.9em;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
 }
 
 .session-action-btn:hover {
@@ -5884,7 +6161,7 @@ body::before {
 
 /* 清空历史按钮：警告色 (v1.40.0) */
 .session-clear-btn {
-    color: #ff7b72;
+    color: var(--color-error-soft);
     border-color: rgba(255, 123, 114, 0.3);
     background: rgba(255, 123, 114, 0.05);
 }
@@ -5903,17 +6180,17 @@ body::before {
 
 .session-search-input {
     flex: 2;
-    background: rgba(22, 27, 34, 0.6);
-    border: 1px solid rgba(230, 237, 243, 0.2);
-    color: #E6EDF3;
+    background: var(--terminal-input-bg);
+    border: 1px solid var(--border-secondary);
+    color: var(--text-primary);
     padding: 8px 12px;
     border-radius: 6px;
     font-size: 0.9em;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
 }
 
 .session-search-input::placeholder {
-    color: #8B949E;
+    color: var(--text-secondary);
 }
 
 .session-search-input:focus {
@@ -5924,18 +6201,18 @@ body::before {
 
 .session-sort-select {
     flex: 1;
-    background: rgba(22, 27, 34, 0.6);
-    border: 1px solid rgba(230, 237, 243, 0.2);
-    color: #E6EDF3;
+    background: var(--terminal-input-bg);
+    border: 1px solid var(--border-secondary);
+    color: var(--text-primary);
     padding: 8px 12px;
     border-radius: 6px;
     font-size: 0.9em;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
 }
 
 .session-sort-select:hover {
-    border-color: rgba(230, 237, 243, 0.3);
+    border-color: var(--border-muted);
     background: rgba(22, 27, 34, 0.8);
 }
 
@@ -5954,23 +6231,23 @@ body::before {
 .session-list-empty {
     grid-column: 1 / -1;
     text-align: center;
-    color: #888;
+    color: var(--text-muted);
     padding: 40px 20px;
     font-size: 1.1em;
 }
 
 /* 会话卡片 */
 .session-card {
-    background: rgba(10, 14, 39, 0.6);
-    border: 1px solid rgba(0, 240, 255, 0.2);
+    background: var(--surface-primary);
+    border: 1px solid var(--border-secondary);
     border-radius: 8px;
     padding: 16px;
-    transition: all 0.3s;
+    transition: all 0.3s ease;
 }
 
 .session-card:hover {
-    border-color: rgba(0, 240, 255, 0.5);
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-card);
 }
 
 .session-card.current {
@@ -5993,7 +6270,7 @@ body::before {
 
 .current-badge {
     background: rgba(57, 255, 20, 0.2);
-    color: #39ff14;
+    color: var(--color-success);
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 0.75em;
@@ -6167,12 +6444,12 @@ body::before {
 
 .notification.success {
     background: rgba(57, 255, 20, 0.2);
-    color: #39ff14;
+    color: var(--color-success);
 }
 
 .notification.error {
     background: rgba(255, 0, 110, 0.2);
-    color: #ff006e;
+    color: var(--color-error);
 }
 
 /* ============================================
@@ -6196,7 +6473,7 @@ body::before {
     max-width: 400px;
     padding: 12px 16px;
     background: rgba(22, 27, 34, 0.95);
-    border: 1px solid rgba(230, 237, 243, 0.2);
+    border: 1px solid var(--border-secondary);
     border-radius: 8px;
     backdrop-filter: blur(12px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -6204,12 +6481,12 @@ body::before {
     align-items: flex-start;
     gap: 10px;
     animation: toast-slide-in 0.3s ease-out;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
 }
 
 .toast:hover {
     transform: translateX(-4px);
-    border-color: rgba(230, 237, 243, 0.3);
+    border-color: var(--border-muted);
 }
 
 .toast.toast-exit {
@@ -6233,20 +6510,20 @@ body::before {
 .toast-title {
     font-size: 14px;
     font-weight: 600;
-    color: #E6EDF3;
+    color: var(--text-primary);
     line-height: 1.3;
 }
 
 .toast-message {
     font-size: 13px;
-    color: #8B949E;
+    color: var(--text-secondary);
     line-height: 1.4;
 }
 
 .toast-close {
     background: none;
     border: none;
-    color: #8B949E;
+    color: var(--text-secondary);
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
@@ -6257,30 +6534,30 @@ body::before {
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     flex-shrink: 0;
 }
 
 .toast-close:hover {
     background: rgba(230, 237, 243, 0.1);
-    color: #E6EDF3;
+    color: var(--text-primary);
 }
 
 /* Toast 类型变体 */
 .toast.toast-success {
-    border-left: 3px solid #7ee787;
+    border-left: 3px solid var(--color-success-soft);
 }
 
 .toast.toast-success .toast-icon {
-    color: #7ee787;
+    color: var(--color-success-soft);
 }
 
 .toast.toast-error {
-    border-left: 3px solid #ff7b72;
+    border-left: 3px solid var(--color-error-soft);
 }
 
 .toast.toast-error .toast-icon {
-    color: #ff7b72;
+    color: var(--color-error-soft);
 }
 
 .toast.toast-info {
