@@ -9,14 +9,17 @@
 //! 支持的提供商：
 //! - Ollama (本地)
 //! - Deepseek (远程 API)
+//! - Gemini (Google AI)
 //! - OpenAI (兼容 API)
 
 mod deepseek;
+mod gemini;
 pub mod http_base;
 pub mod logger;
 mod ollama;
 
 pub use deepseek::DeepseekClient;
+pub use gemini::GeminiClient;
 pub use logger::{
     CallContext, LlmInteractionLog, LlmLogger, LlmLoggerConfig, LogStatistics, TokenUsage,
 };
