@@ -57,6 +57,17 @@ impl ConfigGenerator {
                     model
                 )
             }
+            LlmProviderChoice::Gemini { model, .. } => {
+                format!(
+                    r#"llm:
+  primary:
+    provider: gemini
+    model: {}
+    endpoint: https://generativelanguage.googleapis.com
+    api_key: ${{GEMINI_API_KEY}}"#,
+                    model
+                )
+            }
             LlmProviderChoice::Ollama { endpoint, model } => {
                 format!(
                     r#"llm:
@@ -148,6 +159,15 @@ intent:
                 lines.push(format!("DEEPSEEK_API_KEY={}", api_key));
                 if endpoint != "https://api.deepseek.com/v1" {
                     lines.push(format!("DEEPSEEK_ENDPOINT={}", endpoint));
+                }
+            }
+            LlmProviderChoice::Gemini {
+                api_key, endpoint, ..
+            } => {
+                lines.push("# Google Gemini API 配置".to_string());
+                lines.push(format!("GEMINI_API_KEY={}", api_key));
+                if endpoint != "https://generativelanguage.googleapis.com" {
+                    lines.push(format!("GEMINI_ENDPOINT={}", endpoint));
                 }
             }
             LlmProviderChoice::Ollama { endpoint, .. } => {

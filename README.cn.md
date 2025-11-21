@@ -32,7 +32,7 @@ cargo build --release
 ./target/release/realconsole
 ```
 
-**环境要求**：Rust 1.70+，LLM 提供商（[Ollama](https://ollama.ai/)/[Deepseek](https://platform.deepseek.com/)/[OpenAI](https://platform.openai.com/)）
+**环境要求**：Rust 1.70+，LLM 提供商（[Ollama](https://ollama.ai/)/[Deepseek](https://platform.deepseek.com/)/[Gemini](https://aistudio.google.com/)/[OpenAI](https://platform.openai.com/)）
 
 > 📖 **详细说明**：[安装指南](docs/02-practice/user/quickstart.md)
 
@@ -118,7 +118,7 @@ realconsole web --bind 0.0.0.0 --port 7788
 
 ### 🤖 智能对话
 
-- **LLM 集成**：支持 Ollama（本地）/ Deepseek / OpenAI
+- **LLM 集成**：支持 Ollama（本地）/ Deepseek / Gemini / OpenAI
 - **流式输出**：逐 Token 实时显示
 - **多轮上下文**：自动上下文管理（Auto/Manual/Disabled 模式）
 - **工具调用**：14+ 内置工具（计算器、文件操作、日期时间等）
@@ -397,7 +397,7 @@ cargo clippy
 ## 致谢
 
 - **灵感来源**：SmartConsole（Python 版本）
-- **社区**：Rust 社区，LLM 提供商（Ollama、Deepseek、OpenAI）
+- **社区**：Rust 社区，LLM 提供商（Ollama、Deepseek、Gemini、OpenAI）
 - **开发工具**：使用 [Claude Code](https://claude.com/claude-code) 构建
 
 ---

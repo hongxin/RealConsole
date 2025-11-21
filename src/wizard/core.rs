@@ -24,6 +24,11 @@ pub enum LlmProviderChoice {
         model: String,
         endpoint: String,
     },
+    Gemini {
+        api_key: String,
+        model: String,
+        endpoint: String,
+    },
     Ollama {
         endpoint: String,
         model: String,
@@ -121,6 +126,7 @@ impl ConfigWizard {
 
         let choices = vec![
             "Deepseek (远程 API，功能强大，推荐)",
+            "Gemini (Google AI，多模态支持)",
             "Ollama (本地模型，隐私优先)",
         ];
 
@@ -132,7 +138,8 @@ impl ConfigWizard {
 
         match selection {
             0 => self.prompt_deepseek_config().await,
-            1 => self.prompt_ollama_config().await,
+            1 => self.prompt_gemini_config().await,
+            2 => self.prompt_ollama_config().await,
             _ => unreachable!(),
         }
     }
@@ -170,6 +177,50 @@ impl ConfigWizard {
             api_key,
             model,
             endpoint: "https://api.deepseek.com/v1".to_string(),
+        })
+    }
+
+    /// 提示 Gemini 配置
+    async fn prompt_gemini_config(&self) -> Result<LlmProviderChoice> {
+        println!("\n💡 提示: 从 https://aistudio.google.com/app/apikey 获取 API Key\n");
+
+        let api_key: String = Password::with_theme(&self.theme)
+            .with_prompt("请输入 Gemini API Key")
+            .interact()?;
+
+        if api_key.trim().is_empty() {
+            anyhow::bail!("API Key 不能为空");
+        }
+
+        // 选择模型
+        let models = vec![
+            "gemini-2.5-flash (推荐，快速)",
+            "gemini-2.5-pro (高质量)",
+            "gemini-3-pro-preview (最新)",
+        ];
+
+        let model_idx = if self.mode == WizardMode::Complete {
+            Select::with_theme(&self.theme)
+                .with_prompt("选择 Gemini 模型")
+                .items(&models)
+                .default(0)
+                .interact()?
+        } else {
+            0 // 快速模式使用默认
+        };
+
+        let model = match model_idx {
+            0 => "gemini-2.5-flash",
+            1 => "gemini-2.5-pro",
+            2 => "gemini-3-pro-preview",
+            _ => "gemini-2.5-flash",
+        }
+        .to_string();
+
+        Ok(LlmProviderChoice::Gemini {
+            api_key,
+            model,
+            endpoint: "https://generativelanguage.googleapis.com".to_string(),
         })
     }
 

@@ -32,7 +32,7 @@ cargo build --release
 ./target/release/realconsole
 ```
 
-**Requirements**: Rust 1.70+, LLM Provider ([Ollama](https://ollama.ai/)/[Deepseek](https://platform.deepseek.com/)/[OpenAI](https://platform.openai.com/))
+**Requirements**: Rust 1.70+, LLM Provider ([Ollama](https://ollama.ai/)/[Deepseek](https://platform.deepseek.com/)/[Gemini](https://aistudio.google.com/)/[OpenAI](https://platform.openai.com/))
 
 > 📖 **Detailed instructions**: [Installation Guide](docs/02-practice/user/quickstart.md)
 
@@ -118,7 +118,7 @@ realconsole web --bind 0.0.0.0 --port 7788
 - **Dynamic Switching**: `REALCONSOLE_LANG=zh-CN|en-US` environment variable
 
 ### 🤖 Intelligent Conversation
-- **LLM Integration**: Ollama (local) / Deepseek / OpenAI support
+- **LLM Integration**: Ollama (local) / Deepseek / Gemini / OpenAI support
 - **Streaming Output**: Real-time token-by-token display
 - **Multi-turn Context**: Automatic context management (Auto/Manual/Disabled modes)
 - **Tool Calling**: 14+ built-in tools (calculator, file ops, datetime, etc.)
@@ -408,7 +408,7 @@ cargo clippy
 ## Acknowledgments
 
 - **Inspiration**: SmartConsole (Python version)
-- **Community**: Rust Community, LLM Providers (Ollama, Deepseek, OpenAI)
+- **Community**: Rust Community, LLM Providers (Ollama, Deepseek, Gemini, OpenAI)
 - **Development**: Built with [Claude Code](https://claude.com/claude-code)
 
 ---
