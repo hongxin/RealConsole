@@ -232,13 +232,15 @@ impl ConfigWizard {
 
         let choices = vec![
             format!("Deepseek{}", if recommendation.provider == "deepseek" { " ⭐ 推荐" } else { "" }),
+            format!("Gemini{}", if recommendation.provider == "gemini" { " ⭐ 推荐" } else { "" }),
             format!("Ollama{}", if recommendation.provider == "ollama" { " ⭐ 推荐" } else { "" }),
             "稍后配置".to_string(),
         ];
 
         let default_index = match recommendation.provider.as_str() {
             "deepseek" => 0,
-            "ollama" => 1,
+            "gemini" => 1,
+            "ollama" => 2,
             _ => 0,
         };
 
@@ -251,8 +253,9 @@ impl ConfigWizard {
 
         match selection {
             0 => self.prompt_deepseek_config().await,
-            1 => self.prompt_ollama_config().await,
-            2 => Ok(("none".to_string(), None, None, None)),
+            1 => self.prompt_gemini_config().await,
+            2 => self.prompt_ollama_config().await,
+            3 => Ok(("none".to_string(), None, None, None)),
             _ => unreachable!(),
         }
     }
@@ -304,6 +307,44 @@ impl ConfigWizard {
             Some(api_key),
             Some(model.to_string()),
             Some("https://api.deepseek.com".to_string()),
+        ))
+    }
+
+    /// Gemini 配置
+    async fn prompt_gemini_config(&self) -> Result<(String, Option<String>, Option<String>, Option<String>)> {
+        println!("\n{}", "💡 从 https://aistudio.google.com/app/apikey 获取 API Key".cyan());
+
+        let api_key: String = Input::with_theme(&self.theme)
+            .with_prompt("API Key")
+            .interact_text()
+            .context("API Key输入失败")?;
+
+        // 选择模型
+        let models = vec![
+            "gemini-2.5-flash (推荐，快速)",
+            "gemini-2.5-pro (高质量)",
+            "gemini-3-pro-preview (最新)",
+        ];
+
+        let model_selection = Select::with_theme(&self.theme)
+            .with_prompt("选择模型")
+            .items(&models)
+            .default(0)
+            .interact()
+            .context("模型选择失败")?;
+
+        let model = match model_selection {
+            0 => "gemini-2.5-flash",
+            1 => "gemini-2.5-pro",
+            2 => "gemini-3-pro-preview",
+            _ => "gemini-2.5-flash",
+        };
+
+        Ok((
+            "gemini".to_string(),
+            Some(api_key),
+            Some(model.to_string()),
+            Some("https://generativelanguage.googleapis.com".to_string()),
         ))
     }
 
@@ -539,6 +580,19 @@ impl ConfigWizard {
                         model, endpoint
                     )
                 }
+                "gemini" => {
+                    let model = result.llm_model.as_deref().unwrap_or("gemini-2.5-flash");
+                    let endpoint = result.llm_endpoint.as_deref().unwrap_or("https://generativelanguage.googleapis.com");
+                    format!(
+                        r#"llm:
+  primary:
+    provider: gemini
+    model: {}
+    endpoint: {}
+    api_key: ${{GEMINI_API_KEY}}"#,
+                        model, endpoint
+                    )
+                }
                 "ollama" => {
                     let model = result.llm_model.as_deref().unwrap_or("llama2");
                     let endpoint = result.llm_endpoint.as_deref().unwrap_or("http://localhost:11434");
@@ -592,7 +646,7 @@ intent:
 
 # 显示模式
 display:
-  mode: inline  # inline, overlay
+  mode: minimal  # minimal, standard, debug
 
 # 对话上下文
 conversation:
@@ -622,7 +676,13 @@ telemetry:
         let mut content = String::from("# RealConsole 环境变量\n# 请妥善保管，不要提交到版本控制\n\n");
 
         if let Some(api_key) = &result.llm_api_key {
-            content.push_str(&format!("DEEPSEEK_API_KEY={}\n", api_key));
+            let env_var_name = match result.llm_provider.as_str() {
+                "deepseek" => "DEEPSEEK_API_KEY",
+                "gemini" => "GEMINI_API_KEY",
+                "openai" => "OPENAI_API_KEY",
+                _ => "API_KEY", // fallback
+            };
+            content.push_str(&format!("{}={}\n", env_var_name, api_key));
         }
 
         Ok(content)

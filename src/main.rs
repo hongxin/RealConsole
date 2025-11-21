@@ -154,6 +154,29 @@ fn create_llm_client(
                     )
                 })
         }
+        "gemini" => {
+            let api_key = provider_config.api_key.as_ref().ok_or_else(|| {
+                i18n::t_with_args("llm.need_api_key", &[("provider", "Gemini")])
+            })?;
+            let model = provider_config
+                .model
+                .as_deref()
+                .unwrap_or("gemini-2.5-flash");
+            let endpoint = provider_config
+                .endpoint
+                .as_deref()
+                .unwrap_or("https://generativelanguage.googleapis.com");
+
+            llm::GeminiClient::new(api_key, model, endpoint)
+                .map(|client| Arc::new(client) as Arc<dyn llm::LlmClient>)
+                .map_err(|e| {
+                    format!(
+                        "{}: {}",
+                        i18n::t_with_args("llm.client_failed", &[("provider", "Gemini")]),
+                        e
+                    )
+                })
+        }
         other => Err(format!("{} {}", i18n::t("llm.unknown_provider"), other)),
     }
 }
