@@ -36,11 +36,13 @@ mod tests {
                 data: None,
                 axis_type: Some("value".to_string()),
             },
+            y_axis_secondary: None,  // v1.47.0
             series: vec![Series {
                 name: "系列1".to_string(),
                 data: vec![10.0, 20.0],
                 color: None,
                 points: None,
+                y_axis_index: None,  // v1.47.0
             }],
             options: ChartOptions {
                 show_legend: true,

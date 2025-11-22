@@ -102,6 +102,7 @@ impl CsvData {
             title: title.into(),
             x_axis: AxisConfig::category(x_data),
             y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,  // v1.47.0
             series,
             options: ChartOptions::default(),
             labels: None,

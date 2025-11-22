@@ -3046,7 +3046,54 @@ const TERMINAL_JS: &str = r#"
                         },
                     },
                 },
-                yAxis: isPie ? undefined : {
+                // v1.47.0: 双 Y 轴支持
+                yAxis: isPie ? undefined : (chartData.y_axis_secondary ? [
+                    // 主 Y 轴
+                    {
+                        type: chartData.y_axis.axis_type || 'value',
+                        name: chartData.y_axis.name,
+                        position: 'left',
+                        nameTextStyle: {
+                            color: themeColors.textSecondary,
+                        },
+                        axisLabel: {
+                            color: themeColors.text,
+                        },
+                        axisLine: {
+                            show: true,
+                            lineStyle: {
+                                color: themeColors.textSecondary,
+                            },
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: isDark ? 'rgba(139, 148, 158, 0.2)' : 'rgba(124, 124, 124, 0.2)',
+                            },
+                        },
+                    },
+                    // 副 Y 轴
+                    {
+                        type: chartData.y_axis_secondary.axis_type || 'value',
+                        name: chartData.y_axis_secondary.name,
+                        position: 'right',
+                        nameTextStyle: {
+                            color: themeColors.textSecondary,
+                        },
+                        axisLabel: {
+                            color: themeColors.text,
+                        },
+                        axisLine: {
+                            show: true,
+                            lineStyle: {
+                                color: themeColors.textSecondary,
+                            },
+                        },
+                        splitLine: {
+                            show: false,  // 副轴不显示分隔线，避免混乱
+                        },
+                    },
+                ] : {
+                    // 单 Y 轴
                     type: chartData.y_axis.axis_type || 'value',
                     name: chartData.y_axis.name,
                     nameTextStyle: {
@@ -3065,7 +3112,7 @@ const TERMINAL_JS: &str = r#"
                             color: isDark ? 'rgba(139, 148, 158, 0.2)' : 'rgba(124, 124, 124, 0.2)',
                         },
                     },
-                },
+                }),
                 // v1.45.0: 特殊图表类型的数据格式
                 series: isPie ? chartData.series.map((s, seriesIndex) => {
                     // 饼图数据格式：[{name, value, itemStyle}]
@@ -3144,6 +3191,11 @@ const TERMINAL_JS: &str = r#"
                                 ],
                             },
                         };
+                    }
+
+                    // v1.47.0: 双 Y 轴索引
+                    if (s.y_axis_index !== undefined && s.y_axis_index !== null) {
+                        seriesConfig.yAxisIndex = s.y_axis_index;
                     }
 
                     return seriesConfig;
@@ -7845,7 +7897,7 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 16px;
+    padding: 8px 20px;  /* v1.47.0: 与 header 等宽对齐 */
     background: rgba(13, 17, 23, 0.6);
     border-bottom: 1px solid rgba(163, 113, 247, 0.2);
     backdrop-filter: blur(8px);

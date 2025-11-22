@@ -12,8 +12,11 @@ pub struct ChartData {
     pub title: String,
     /// X轴配置
     pub x_axis: AxisConfig,
-    /// Y轴配置
+    /// Y轴配置（主轴）
     pub y_axis: AxisConfig,
+    /// v1.47.0: 副 Y 轴配置（可选，用于双 Y 轴图表）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y_axis_secondary: Option<AxisConfig>,
     /// 数据系列
     pub series: Vec<Series>,
     /// 图表选项
@@ -35,11 +38,13 @@ impl ChartData {
             title: title.into(),
             x_axis: AxisConfig::category(x_labels),
             y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,  // v1.47.0
             series: vec![Series {
                 name: "数据".to_string(),
                 data: y_data,
                 color: None,
                 points: None,
+                y_axis_index: None,  // v1.47.0
             }],
             options: ChartOptions::default(),
             labels: None,
@@ -192,6 +197,9 @@ pub struct Series {
     /// v1.45.0: 散点图数据点（可选，用于散点图的二维坐标）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub points: Option<Vec<(f64, f64)>>,
+    /// v1.47.0: Y 轴索引（可选，0=主轴, 1=副轴，默认0）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y_axis_index: Option<usize>,
 }
 
 impl Series {
@@ -202,6 +210,7 @@ impl Series {
             data,
             color: None,
             points: None,
+            y_axis_index: None,  // v1.47.0
         }
     }
 
@@ -212,12 +221,19 @@ impl Series {
             data: Vec::new(), // 散点图不使用 data 字段
             color: None,
             points: Some(points),
+            y_axis_index: None,  // v1.47.0
         }
     }
 
     /// 设置颜色
     pub fn with_color(mut self, color: impl Into<String>) -> Self {
         self.color = Some(color.into());
+        self
+    }
+
+    /// v1.47.0: 设置 Y 轴索引（0=主轴, 1=副轴）
+    pub fn with_y_axis_index(mut self, index: usize) -> Self {
+        self.y_axis_index = Some(index);
         self
     }
 }
@@ -301,6 +317,7 @@ mod tests {
             title: "市场份额".to_string(),
             x_axis: AxisConfig::value(None),
             y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,  // v1.47.0
             series: vec![Series::new("份额", vec![35.0, 25.0, 40.0])],
             options: ChartOptions::default(),
             labels: Some(vec!["产品A".to_string(), "产品B".to_string(), "产品C".to_string()]),
@@ -316,6 +333,7 @@ mod tests {
             title: "测试".to_string(),
             x_axis: AxisConfig::value(None),
             y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,  // v1.47.0
             series: vec![Series::new("数据", vec![1.0, 2.0])],
             options: ChartOptions::default(),
             labels: Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]), // 长度不匹配
@@ -332,6 +350,7 @@ mod tests {
             title: "身高体重分布".to_string(),
             x_axis: AxisConfig::value(Some("身高".to_string())),
             y_axis: AxisConfig::value(Some("体重".to_string())),
+            y_axis_secondary: None,  // v1.47.0
             series: vec![Series::new_scatter(
                 "人群A",
                 vec![(170.0, 65.0), (175.0, 70.0), (160.0, 55.0)],
@@ -350,6 +369,7 @@ mod tests {
             title: "测试".to_string(),
             x_axis: AxisConfig::value(None),
             y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,  // v1.47.0
             series: vec![Series::new("数据", vec![1.0, 2.0])], // 没有 points
             options: ChartOptions::default(),
             labels: None,
