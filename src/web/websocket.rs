@@ -338,6 +338,11 @@ async fn execute_shell_command(
 ) -> anyhow::Result<()> {
     let cmd = input.trim_start_matches('!').trim();
 
+    // ===== v1.44.0: 特殊处理图表命令 =====
+    if cmd.starts_with("chart ") || cmd == "chart" {
+        return execute_chart_command(cmd, session, sender).await;
+    }
+
     // ===== 创建回合 =====
     let round = session.create_round(
         crate::web::session::RoundType::Shell,
@@ -399,6 +404,179 @@ async fn execute_shell_command(
                 &round_id,
                 format!("Shell command execution failed: {}", e),
             ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// ===== v1.45.0: 解析 CSV 图表命令 =====
+///
+/// 格式：`!chart csv <file_path> --type <type> --x-col "col" --y-col "col1" --y-col "col2"`
+fn parse_csv_command(cmd: &str) -> anyhow::Result<crate::visualization::ChartData> {
+    use crate::visualization::{parse_csv_file, ChartType};
+
+    // 移除 "chart csv" 前缀
+    let cmd = cmd.trim_start_matches("chart").trim().trim_start_matches("csv").trim();
+
+    // 提取文件路径（第一个参数）
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.is_empty() {
+        return Err(anyhow::anyhow!("缺少 CSV 文件路径"));
+    }
+
+    let file_path = parts[0];
+    let args = &parts[1..].join(" ");
+
+    // 提取参数
+    let extract_arg = |name: &str| -> Option<String> {
+        let pattern = format!("{} ", name);
+        if let Some(start) = args.find(&pattern) {
+            let value_start = start + pattern.len();
+            let remaining = &args[value_start..];
+
+            if remaining.starts_with('"') {
+                if let Some(end) = remaining[1..].find('"') {
+                    return Some(remaining[1..=end].to_string());
+                }
+            } else {
+                return remaining.split_whitespace().next().map(|s| s.to_string());
+            }
+        }
+        None
+    };
+
+    // 获取图表类型
+    let chart_type_str = extract_arg("--type").unwrap_or_else(|| "line".to_string());
+    let chart_type = ChartType::from_str(&chart_type_str)
+        .ok_or_else(|| anyhow::anyhow!("无效的图表类型: {}", chart_type_str))?;
+
+    // 获取标题
+    let title = extract_arg("--title").unwrap_or_else(|| "CSV 数据图表".to_string());
+
+    // 获取 X 轴列名
+    let x_col = extract_arg("--x-col")
+        .ok_or_else(|| anyhow::anyhow!("缺少 --x-col 参数"))?;
+
+    // 获取所有 Y 轴列名
+    let mut y_cols = Vec::new();
+    let mut search_start = 0;
+    while let Some(start) = args[search_start..].find("--y-col ") {
+        let actual_start = search_start + start;
+        let value_start = actual_start + "--y-col ".len();
+        let remaining = &args[value_start..];
+
+        let col_name = if remaining.starts_with('"') {
+            if let Some(end) = remaining[1..].find('"') {
+                remaining[1..=end].to_string()
+            } else {
+                return Err(anyhow::anyhow!("--y-col 参数引号未闭合"));
+            }
+        } else {
+            remaining.split_whitespace().next().unwrap_or("").to_string()
+        };
+
+        y_cols.push(col_name);
+        search_start = value_start + 1;
+    }
+
+    if y_cols.is_empty() {
+        return Err(anyhow::anyhow!("至少需要一个 --y-col 参数"));
+    }
+
+    // 读取 CSV 文件
+    let csv_data = parse_csv_file(file_path)?;
+
+    // 转换为 ChartData
+    let y_col_refs: Vec<&str> = y_cols.iter().map(|s| s.as_str()).collect();
+    csv_data.to_chart_data(chart_type, title, &x_col, &y_col_refs)
+}
+
+/// ===== v1.44.0: 执行图表命令 =====
+///
+/// 处理 `!chart` 命令，解析参数并生成图表
+///
+/// ## 消息流程
+/// ```
+/// RoundStart(type: shell) → Chart(chart_data) → RoundComplete
+/// ```
+async fn execute_chart_command(
+    cmd: &str,
+    session: &Arc<Session>,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::visualization::{parse_csv_file, ChartCommandParser, ChartType};
+
+    // 创建回合
+    let round = session.create_round(
+        crate::web::session::RoundType::Shell,
+        cmd.to_string(),
+        "chart".to_string(),
+    ).await;
+    let round_id = round.id.clone();
+
+    // 发送 RoundStart 消息
+    let round_start_msg = ServerMessage::RoundStart {
+        round: round.clone(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&round_start_msg)?))
+        .await?;
+
+    // 记录开始时间
+    let start_time = Instant::now();
+
+    // v1.45.0: 检查是否是 CSV 命令
+    let chart_data_result = if cmd.trim_start_matches("chart").trim().starts_with("csv ") {
+        // CSV 命令：!chart csv <file> --type <type> --x-col "col" --y-col "col1" --y-col "col2"
+        parse_csv_command(cmd)
+    } else {
+        // 普通图表命令
+        ChartCommandParser::parse(cmd)
+    };
+
+    // 处理解析结果
+    match chart_data_result {
+        Ok(chart_data) => {
+            // 发送 Chart 消息
+            let chart_msg = ServerMessage::Chart {
+                round_id: round_id.clone(),
+                chart_data,
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&chart_msg)?))
+                .await?;
+
+            // 计算执行时间
+            let execution_time = start_time.elapsed().as_secs_f64();
+
+            // 完成回合
+            let success_msg = format!("✅ 图表生成成功");
+            if let Some(completed_round) = session.complete_round(
+                &round_id,
+                success_msg,
+                execution_time,
+                vec!["chart".to_string()],
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+        }
+        Err(e) => {
+            // 解析失败，标记回合失败
+            let error_msg = format!("❌ 图表命令解析失败\n\n{}\n\n使用示例:\n!chart line --title \"月度趋势\" --x-axis \"1月,2月,3月\" --series \"销售额:120,132,101\"", e);
+            if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
                 let round_complete_msg = ServerMessage::RoundComplete {
                     round: failed_round,
                 };

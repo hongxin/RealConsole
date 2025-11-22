@@ -5,6 +5,111 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.0] - 2025-01-22
+
+### 🎯 Highlights
+
+**主题**: 可视化功能 Phase 2 - 饼图、散点图和 CSV 文件支持
+
+- ✅ **饼图** - 完整支持扇区标签、百分比显示、悬停高亮
+- ✅ **散点图** - 支持单/多系列、坐标轴命名、悬停放大
+- ✅ **CSV 文件** - 直接从 CSV 文件生成图表，支持多列数据
+- ✅ **数据导出** - ECharts 内置功能（PNG 图片导出）
+- ✅ **图例交互** - 点击切换系列显示/隐藏
+- ✅ **视觉优化** - 图表卡片嵌入回合对话，支持折叠/展开
+
+### ✨ Added
+
+**饼图功能** (`src/visualization/`)
+
+- **数据结构** (`types.rs`):
+  - 添加 `labels: Option<Vec<String>>` 字段用于扇区名称
+  - 饼图特殊验证逻辑（labels 长度必须匹配 data）
+
+- **命令解析** (`parser.rs`):
+  - 支持 `--labels` 参数解析
+  - 命令格式: `!chart pie --title "标题" --labels "A,B,C" --series "名称:10,20,30"`
+  - 3 个单元测试（带/不带 labels，验证失败）
+
+- **前端渲染** (`frontend.rs`):
+  - 饼图数据格式: `{name, value, itemStyle}`
+  - 半径 60%，居中显示
+  - Tooltip 显示百分比格式
+  - 悬停阴影高亮效果
+
+**散点图功能** (`src/visualization/`)
+
+- **数据结构** (`types.rs`):
+  - 添加 `points: Option<Vec<(f64, f64)>>` 字段到 Series
+  - `Series::new_scatter()` 构造方法
+  - `ChartType` derive Copy trait（解决所有权问题）
+  - 散点图验证：points 不为空
+
+- **命令解析** (`parser.rs`):
+  - 支持 `--data` 参数（格式: `x1,y1 x2,y2 ...`）
+  - 支持 `--x-name` 和 `--y-name` 轴名称
+  - 支持多系列散点图（多个 `--data` 参数）
+  - 5 个单元测试（简单/多系列/大数据/验证失败）
+
+- **前端渲染** (`frontend.rs`):
+  - 散点大小 10px，悬停放大至 15px
+  - 数值轴（X/Y 都是 value 类型）
+  - 主题颜色自动适配
+  - 边框颜色跟随背景
+
+**CSV 文件支持** (`src/visualization/csv.rs`, 287 行)
+
+- **CSV 解析库**: 添加 `csv = "1.3"` 依赖 (`Cargo.toml`)
+
+- **CSV 模块** (新增):
+  - `CsvData` 结构体（headers + records）
+  - `parse_csv_file()` - 文件读取和解析
+  - `CsvData::to_chart_data()` - 转换为图表数据
+  - 支持列名或列索引访问
+  - 数据类型自动转换（字符串 → f64）
+  - 4 个单元测试
+
+- **命令集成** (`websocket.rs`):
+  - `parse_csv_command()` 函数（80 行）
+  - 命令格式: `!chart csv <文件路径> --type <类型> --x-col "列名" --y-col "列1" --y-col "列2"`
+  - 支持多个 `--y-col` 参数（多系列图表）
+  - 文件路径验证和友好错误提示
+
+**图表集成优化** (`src/web/`)
+
+- **回合卡片集成** (`frontend.rs:2837-2875`):
+  - 图表渲染到 Round 卡片内部的 `.output-content` 区域
+  - 支持随 Round 卡片折叠/展开
+  - 修复图表在卡片外部的问题
+
+- **CSS 视觉优化** (`frontend.rs:7367-7446`):
+  - 顶部强调色边框（2px 紫色）
+  - 增加顶部间距（20px）提升内容分隔
+  - 悬停微抬升效果（translateY -1px）
+  - 更流畅的过渡曲线（cubic-bezier）
+  - will-change 性能优化
+  - 响应式圆角调整（移动端 8px/6px）
+
+### 📊 Technical Statistics
+
+- **新增代码**: ~646 行
+- **修改代码**: ~112 行
+- **测试代码**: ~158 行（28 个单元测试，100% 通过）
+- **编译时间**: ~32-38 秒（release 模式）
+
+### 📝 Documentation
+
+- `docs/04-reports/visualization/phase2-implementation-plan.md` - 实施计划
+- `docs/04-reports/visualization/phase2-progress-report.md` - 进度报告
+- `scripts/test/test_chart_phase2.sh` - 端到端测试脚本（12 个测试用例）
+
+### 🔧 Fixed
+
+- 图表渲染位置错误（卡片外部 → 卡片内部）
+- ChartType 所有权问题（添加 Copy trait）
+
+---
+
 ## [1.40.0] - 2025-11-16
 
 ### 🎯 Highlights

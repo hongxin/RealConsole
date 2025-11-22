@@ -45,6 +45,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     <link rel="stylesheet" href="/static/style.css">
     <!-- Markdown 渲染支持 (v1.26.0) -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <!-- 可视化支持 (v1.44.0): Apache ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 </head>
 <body>
     <div id="header">
@@ -1227,13 +1229,22 @@ const TERMINAL_JS: &str = r#"
             input.autocomplete = 'off';
             input.spellcheck = false;
 
+            // v1.44.0: 语音输入按钮
+            const voiceBtn = document.createElement('button');
+            voiceBtn.className = 'voice-input-btn';
+            voiceBtn.innerHTML = '🎤';
+            voiceBtn.title = '点击开始语音输入 (Click to start voice input)';
+            voiceBtn.setAttribute('aria-label', 'Voice Input');
+
             line.appendChild(prompt);
             line.appendChild(input);
+            line.appendChild(voiceBtn);
 
-            this.currentInput = { line, input };
+            this.currentInput = { line, input, voiceBtn };
             this.container.appendChild(line);
 
             this.setupInputHandlers();
+            this.setupVoiceInput();
             this.focusInput();
         }
 
@@ -1285,6 +1296,102 @@ const TERMINAL_JS: &str = r#"
                         break;
                 }
             });
+        }
+
+        // v1.44.0: 语音输入功能
+        setupVoiceInput() {
+            const voiceBtn = this.currentInput.voiceBtn;
+            const input = this.currentInput.input;
+
+            // 检查浏览器是否支持语音识别
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                voiceBtn.disabled = true;
+                voiceBtn.title = '您的浏览器不支持语音识别 (Voice recognition not supported)';
+                voiceBtn.style.opacity = '0.3';
+                voiceBtn.style.cursor = 'not-allowed';
+                return;
+            }
+
+            // 初始化语音识别
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;  // 单次识别
+            recognition.interimResults = true;  // 显示临时结果
+            recognition.lang = 'zh-CN';  // 默认中文，会自动检测语言
+
+            let isRecording = false;
+            let finalTranscript = '';
+
+            // 点击按钮开始/停止录音
+            voiceBtn.addEventListener('click', () => {
+                if (isRecording) {
+                    recognition.stop();
+                } else {
+                    finalTranscript = input.value;  // 保存当前输入
+                    recognition.start();
+                }
+            });
+
+            // 开始录音
+            recognition.onstart = () => {
+                isRecording = true;
+                voiceBtn.classList.add('recording');
+                voiceBtn.innerHTML = '🔴';
+                voiceBtn.title = '点击停止录音 (Click to stop recording)';
+            };
+
+            // 识别结果
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                // 实时显示识别结果
+                input.value = finalTranscript + interimTranscript;
+            };
+
+            // 识别结束
+            recognition.onend = () => {
+                isRecording = false;
+                voiceBtn.classList.remove('recording');
+                voiceBtn.innerHTML = '🎤';
+                voiceBtn.title = '点击开始语音输入 (Click to start voice input)';
+
+                // 聚焦输入框
+                input.focus();
+            };
+
+            // 识别错误
+            recognition.onerror = (event) => {
+                console.error('语音识别错误:', event.error);
+                isRecording = false;
+                voiceBtn.classList.remove('recording');
+                voiceBtn.innerHTML = '🎤';
+
+                // 显示错误提示
+                if (event.error === 'not-allowed') {
+                    voiceBtn.title = '请允许麦克风权限 (Please allow microphone access)';
+                } else if (event.error === 'no-speech') {
+                    voiceBtn.title = '未检测到语音，请重试 (No speech detected)';
+                } else {
+                    voiceBtn.title = '语音识别错误，请重试 (Voice recognition error)';
+                }
+
+                // 3秒后恢复原始提示
+                setTimeout(() => {
+                    voiceBtn.title = '点击开始语音输入 (Click to start voice input)';
+                }, 3000);
+            };
+
+            // 保存识别对象供后续使用
+            this.voiceRecognition = recognition;
         }
 
         handleSubmit() {
@@ -2721,6 +2828,273 @@ const TERMINAL_JS: &str = r#"
             this.scrollToBottom();
         }
 
+        // ===== v1.44.0: 图表渲染方法 =====
+
+        /**
+         * 渲染 ECharts 图表
+         * @param {object} msg - 图表消息 { round_id, chart_data }
+         */
+        renderChart(msg) {
+            console.log(`[v1.45.0 DEBUG] Rendering chart for round: ${msg.round_id}`);
+
+            const chartData = msg.chart_data;
+
+            // v1.45.0: 找到对应的 Round 卡片
+            const roundElement = this.outputArea.querySelector(`[data-round-id="${msg.round_id}"]`);
+            if (!roundElement) {
+                console.error(`[v1.45.0 ERROR] Round element not found for: ${msg.round_id}`);
+                return;
+            }
+
+            // 找到 Round 卡片内的输出区域
+            const outputContent = roundElement.querySelector('.output-content');
+            if (!outputContent) {
+                console.error(`[v1.45.0 ERROR] Output content not found for round: ${msg.round_id}`);
+                return;
+            }
+
+            // 创建图表容器
+            const chartCard = document.createElement('div');
+            chartCard.className = 'chart-card';
+            chartCard.setAttribute('data-chart-type', chartData.chart_type);
+
+            // 添加图表标题
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'chart-title';
+            titleDiv.textContent = chartData.title;
+            chartCard.appendChild(titleDiv);
+
+            // 创建 ECharts 容器
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'chart-container';
+            chartContainer.style.width = '100%';
+            chartContainer.style.height = '400px';
+            chartCard.appendChild(chartContainer);
+
+            // v1.45.0: 添加到 Round 卡片的输出区域内部（而不是 outputArea）
+            outputContent.appendChild(chartCard);
+
+            // 初始化 ECharts
+            const chart = echarts.init(chartContainer);
+
+            // 转换为 ECharts option
+            const option = this.convertToEChartsOption(chartData);
+
+            // 渲染图表
+            chart.setOption(option);
+
+            // 响应式调整
+            window.addEventListener('resize', () => {
+                chart.resize();
+            });
+
+            // 主题切换时重新初始化
+            const observer = new MutationObserver(() => {
+                const currentTheme = document.getElementById('html-root').getAttribute('data-theme') || 'dark';
+                chart.dispose();
+                const newChart = echarts.init(chartContainer, currentTheme === 'dark' ? 'dark' : null);
+                newChart.setOption(this.convertToEChartsOption(chartData));
+            });
+            observer.observe(document.getElementById('html-root'), {
+                attributes: true,
+                attributeFilter: ['data-theme']
+            });
+
+            this.scrollToBottom();
+        }
+
+        /**
+         * 将 RealConsole ChartData 转换为 ECharts option
+         * @param {object} chartData - RealConsole 图表数据
+         * @returns {object} ECharts option
+         */
+        convertToEChartsOption(chartData) {
+            const currentTheme = document.getElementById('html-root').getAttribute('data-theme') || 'dark';
+            const isDark = currentTheme === 'dark';
+
+            // 三色主义配色
+            const themeColors = {
+                primary: isDark ? '#A371F7' : '#8B5CF6',    // Purple
+                success: '#0ECB81',                          // Green
+                warning: '#F0B90B',                          // Gold
+                text: isDark ? '#C9D1D9' : '#1C1C1C',
+                textSecondary: isDark ? '#8B949E' : '#7C7C7C',
+                background: isDark ? '#0D1117' : '#FFFFFF',
+            };
+
+            const defaultColors = [
+                themeColors.primary,
+                themeColors.success,
+                themeColors.warning,
+                '#FF6B9D',  // Pink
+                '#4ECDC4',  // Cyan
+                '#FFE66D',  // Yellow
+            ];
+
+            // v1.45.0: 特殊图表类型判断
+            const isPie = chartData.chart_type === 'pie';
+            const isScatter = chartData.chart_type === 'scatter';
+
+            return {
+                title: {
+                    text: chartData.title,
+                    textStyle: {
+                        color: themeColors.primary,
+                        fontSize: 18,
+                        fontWeight: 'bold',
+                    },
+                    left: 'center',
+                    top: 10,
+                },
+                tooltip: {
+                    trigger: isPie ? 'item' : 'axis',
+                    backgroundColor: isDark ? 'rgba(13, 17, 23, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    borderColor: themeColors.primary,
+                    textStyle: {
+                        color: themeColors.text,
+                    },
+                    // v1.45.0: 饼图 tooltip 格式
+                    formatter: isPie ? '{b}: {c} ({d}%)' : undefined,
+                },
+                legend: {
+                    show: chartData.options.show_legend,
+                    textStyle: {
+                        color: themeColors.textSecondary,
+                    },
+                    top: 40,
+                },
+                // v1.45.0: 饼图不需要 grid 和坐标轴
+                grid: isPie ? undefined : {
+                    left: '10%',
+                    right: '10%',
+                    bottom: '15%',
+                    top: chartData.options.show_legend ? '20%' : '15%',
+                    containLabel: true,
+                },
+                xAxis: isPie ? undefined : {
+                    type: chartData.x_axis.axis_type || 'category',
+                    data: chartData.x_axis.data,
+                    name: chartData.x_axis.name,
+                    nameTextStyle: {
+                        color: themeColors.textSecondary,
+                    },
+                    axisLabel: {
+                        color: themeColors.text,
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: themeColors.textSecondary,
+                        },
+                    },
+                },
+                yAxis: isPie ? undefined : {
+                    type: chartData.y_axis.axis_type || 'value',
+                    name: chartData.y_axis.name,
+                    nameTextStyle: {
+                        color: themeColors.textSecondary,
+                    },
+                    axisLabel: {
+                        color: themeColors.text,
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: themeColors.textSecondary,
+                        },
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: isDark ? 'rgba(139, 148, 158, 0.2)' : 'rgba(124, 124, 124, 0.2)',
+                        },
+                    },
+                },
+                // v1.45.0: 特殊图表类型的数据格式
+                series: isPie ? chartData.series.map((s, seriesIndex) => {
+                    // 饼图数据格式：[{name, value, itemStyle}]
+                    const pieData = s.data.map((value, dataIndex) => ({
+                        name: chartData.labels ? chartData.labels[dataIndex] : `项目${dataIndex + 1}`,
+                        value: value,
+                        itemStyle: {
+                            color: defaultColors[dataIndex % defaultColors.length],
+                        },
+                    }));
+
+                    return {
+                        name: s.name,
+                        type: 'pie',
+                        radius: '60%',
+                        center: ['50%', '55%'],
+                        data: pieData,
+                        label: {
+                            color: themeColors.text,
+                            formatter: '{b}: {d}%',
+                        },
+                        emphasis: {
+                            itemStyle: {
+                                shadowBlur: 10,
+                                shadowOffsetX: 0,
+                                shadowColor: 'rgba(0, 0, 0, 0.5)',
+                            },
+                        },
+                    };
+                }) : isScatter ? chartData.series.map((s, index) => {
+                    // v1.45.0: 散点图数据格式：[[x, y], [x, y], ...]
+                    return {
+                        name: s.name,
+                        type: 'scatter',
+                        data: s.points || [],  // points 是 [(x, y)] 格式，ECharts 可以直接使用
+                        symbolSize: 10,
+                        color: s.color || defaultColors[index % defaultColors.length],
+                        itemStyle: {
+                            borderWidth: 1,
+                            borderColor: isDark ? '#0D1117' : '#FFFFFF',
+                        },
+                        emphasis: {
+                            scale: true,
+                            scaleSize: 15,
+                        },
+                    };
+                }) : chartData.series.map((s, index) => ({
+                    name: s.name,
+                    type: chartData.chart_type.toLowerCase(),
+                    data: s.data,
+                    smooth: chartData.options.smooth,
+                    color: s.color || defaultColors[index % defaultColors.length],
+                    lineStyle: {
+                        width: 2,
+                    },
+                    itemStyle: {
+                        borderWidth: 2,
+                    },
+                })),
+                toolbox: chartData.options.show_toolbox ? {
+                    feature: {
+                        saveAsImage: {
+                            title: '保存图片',
+                            iconStyle: {
+                                borderColor: themeColors.primary,
+                            },
+                        },
+                        dataZoom: {
+                            title: {
+                                zoom: '区域缩放',
+                                back: '还原',
+                            },
+                            iconStyle: {
+                                borderColor: themeColors.primary,
+                            },
+                        },
+                        restore: {
+                            title: '还原',
+                            iconStyle: {
+                                borderColor: themeColors.primary,
+                            },
+                        },
+                    },
+                    right: 20,
+                } : undefined,
+            };
+        }
+
         // ===== v1.40.0 Phase 2: 浏览器端会话持久化方法 =====
 
         /**
@@ -3942,6 +4316,12 @@ const TERMINAL_JS: &str = r#"
                     terminal.sessionManager.handleSessionError(msg);
                 }
                 break;
+
+            // ===== v1.44.0: 可视化消息 =====
+            case 'chart':
+                // 图表数据：渲染 ECharts 图表
+                terminal.renderChart(msg);
+                break;
         }
     };
 
@@ -4036,13 +4416,13 @@ const STYLE_CSS: &str = r#"
    支持深色/浅色主题切换（币安风格）
    ============================================ */
 
-/* ===== CSS 变量定义：深色主题（默认） ===== */
+/* ===== CSS 变量定义：深色主题（默认） - 三色主义配色 ===== */
 :root {
     /* 背景色 */
     --bg-primary: #0a0e27;
     --bg-secondary: #0d1117;
     --bg-tertiary: #1a0b2e;
-    --bg-grid: rgba(0, 240, 255, 0.03);
+    --bg-grid: rgba(163, 113, 247, 0.03);
     --bg-scanline: rgba(0, 0, 0, 0.15);
 
     /* 表面色（卡片、面板） */
@@ -4055,39 +4435,39 @@ const STYLE_CSS: &str = r#"
     --text-primary: #E6EDF3;
     --text-secondary: #8B949E;
     --text-muted: #888;
-    --text-title: #00f0ff;
-    --text-gradient-start: #00f0ff;
-    --text-gradient-end: #ff006e;
+    --text-title: #A371F7;
+    --text-gradient-start: #A371F7;
+    --text-gradient-end: #C8A2F0;
 
-    /* 边框色 */
-    --border-primary: rgba(0, 240, 255, 0.3);
-    --border-secondary: rgba(0, 240, 255, 0.2);
+    /* 边框色 - 统一紫色系 */
+    --border-primary: rgba(163, 113, 247, 0.3);
+    --border-secondary: rgba(163, 113, 247, 0.2);
     --border-muted: rgba(230, 237, 243, 0.2);
-    --border-hover: rgba(0, 240, 255, 0.5);
+    --border-hover: rgba(163, 113, 247, 0.5);
 
-    /* 主色调（紫色） */
+    /* 主色调（紫色 - 智慧） */
     --accent-primary: #A371F7;
     --accent-primary-alpha-10: rgba(163, 113, 247, 0.1);
     --accent-primary-alpha-30: rgba(163, 113, 247, 0.3);
     --accent-primary-alpha-60: rgba(163, 113, 247, 0.6);
 
-    /* 功能色 */
-    --color-success: #39ff14;
+    /* 功能色 - 三色系统 */
+    --color-success: #39ff14;        /* 绿色 - 生机/成功 */
     --color-success-soft: #7ee787;
-    --color-warning: #F0B90B;
-    --color-error: #ff006e;
+    --color-warning: #F0B90B;        /* 金色 - 警示 */
+    --color-error: #ff7b72;          /* 红色 - 错误 */
     --color-error-soft: #ff7b72;
-    --color-info: #00f0ff;
-    --color-link: #58A6FF;
+    --color-active: #39ff14;         /* 绿色 - 活跃状态 */
+    --color-link: #A371F7;           /* 紫色 - 链接（统一） */
 
-    /* 阴影和发光 */
-    --shadow-glow-cyan: 0 0 20px rgba(0, 240, 255, 0.3);
+    /* 阴影和发光 - 统一紫色系 */
+    --shadow-glow-primary: 0 0 20px rgba(163, 113, 247, 0.3);
     --shadow-glow-purple: 0 0 15px rgba(163, 113, 247, 0.25);
-    --shadow-card: 0 0 15px rgba(0, 240, 255, 0.15);
+    --shadow-card: 0 0 15px rgba(163, 113, 247, 0.15);
 
     /* 终端色 */
     --terminal-output: rgb(240, 240, 240);
-    --terminal-command: rgba(0, 240, 255, 0.6);
+    --terminal-command: #A371F7;     /* 紫色 - 统一 */
     --terminal-prompt: #F0B90B;
     --terminal-input-bg: rgba(22, 27, 34, 0.5);
     --terminal-border: #30363D;
@@ -4097,58 +4477,58 @@ const STYLE_CSS: &str = r#"
     --backdrop-blur: blur(10px);
 }
 
-/* ===== 浅色主题（币安风格） ===== */
+/* ===== 浅色主题（Reddit 风格 + 紫色主题） - 三色主义配色 ===== */
 [data-theme="light"] {
-    /* 背景色 */
-    --bg-primary: #FFFFFF;
-    --bg-secondary: #FAFAFA;
-    --bg-tertiary: #F5F5F5;
-    --bg-grid: rgba(0, 0, 0, 0.02);
+    /* 背景色 - Reddit 风格：浅蓝灰主背景 + 纯白卡片 */
+    --bg-primary: #DAE0E6;           /* Reddit 浅蓝灰主背景 */
+    --bg-secondary: #F7F9FA;         /* 次要背景 */
+    --bg-tertiary: #E9EDF1;          /* 第三级背景 */
+    --bg-grid: rgba(0, 0, 0, 0.015); /* 极浅网格 */
     --bg-scanline: rgba(0, 0, 0, 0);
 
-    /* 表面色（卡片、面板） */
-    --surface-primary: #FFFFFF;
-    --surface-secondary: #F8F9FA;
-    --surface-tertiary: #FFFFFF;
+    /* 表面色（卡片、面板） - Reddit 风格纯白卡片 */
+    --surface-primary: #FFFFFF;      /* 纯白卡片背景 */
+    --surface-secondary: #FFFFFF;    /* 统一纯白 */
+    --surface-tertiary: #F8F9FA;     /* 悬停/次要表面 */
     --surface-overlay: rgba(0, 0, 0, 0.5);
 
-    /* 文本色 */
-    --text-primary: #1E2329;
-    --text-secondary: #707A8A;
-    --text-muted: #B7BDC6;
-    --text-title: #1E2329;
+    /* 文本色 - Reddit 风格高对比度 */
+    --text-primary: #1C1C1C;         /* Reddit 深灰黑主文字 */
+    --text-secondary: #7C7C7C;       /* Reddit 中灰次要文字 */
+    --text-muted: #A8A8A8;           /* Reddit 浅灰弱化文字 */
+    --text-title: #8B5CF6;           /* 保留紫色主题 */
     --text-gradient-start: #8B5CF6;
     --text-gradient-end: #9065DC;
 
-    /* 边框色 */
-    --border-primary: #EAECEF;
-    --border-secondary: #E6E8EA;
-    --border-muted: #EAECEF;
-    --border-hover: #C9CCD1;
+    /* 边框色 - Reddit 风格极浅边框 */
+    --border-primary: #EDEFF1;       /* Reddit 浅边框 */
+    --border-secondary: #CCCCCC;     /* 次要边框 */
+    --border-muted: #F0F0F0;         /* 极浅边框 */
+    --border-hover: #B3B3B3;         /* 悬停边框 */
 
-    /* 主色调（紫色 - 浅色模式下调整） */
+    /* 主色调（紫色 - 智慧） */
     --accent-primary: #8B5CF6;
     --accent-primary-alpha-10: rgba(139, 92, 246, 0.1);
     --accent-primary-alpha-30: rgba(139, 92, 246, 0.3);
     --accent-primary-alpha-60: rgba(139, 92, 246, 0.6);
 
-    /* 功能色 */
-    --color-success: #0ECB81;
+    /* 功能色 - 三色系统 */
+    --color-success: #0ECB81;        /* 绿色 - 生机/成功 */
     --color-success-soft: #0ECB81;
-    --color-warning: #F0B90B;
-    --color-error: #F6465D;
+    --color-warning: #F0B90B;        /* 金色 - 警示 */
+    --color-error: #F6465D;          /* 红色 - 错误 */
     --color-error-soft: #F6465D;
-    --color-info: #1E88E5;
-    --color-link: #1E88E5;
+    --color-active: #0ECB81;         /* 绿色 - 活跃状态 */
+    --color-link: #8B5CF6;           /* 紫色 - 链接（统一） */
 
-    /* 阴影和发光 */
-    --shadow-glow-cyan: 0 2px 8px rgba(0, 0, 0, 0.08);
+    /* 阴影和发光 - 统一样式 */
+    --shadow-glow-primary: 0 2px 8px rgba(0, 0, 0, 0.08);
     --shadow-glow-purple: 0 2px 8px rgba(0, 0, 0, 0.08);
     --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
 
     /* 终端色 */
     --terminal-output: #1E2329;
-    --terminal-command: #8B5CF6;
+    --terminal-command: #8B5CF6;     /* 紫色 - 统一 */
     --terminal-prompt: #F0B90B;
     --terminal-input-bg: #FFFFFF;
     --terminal-border: #EAECEF;
@@ -4283,9 +4663,9 @@ body::before {
 /* 暗色主题专属：霓虹发光动画 */
 :root #header h1 {
     text-shadow:
-        0 0 10px rgba(0, 240, 255, 0.5),
-        0 0 20px rgba(0, 240, 255, 0.3),
-        0 0 30px rgba(0, 240, 255, 0.2);
+        0 0 10px rgba(163, 113, 247, 0.5),
+        0 0 20px rgba(163, 113, 247, 0.3),
+        0 0 30px rgba(163, 113, 247, 0.2);
     animation: neon-pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
@@ -4299,30 +4679,30 @@ body::before {
     0%, 100% {
         filter: brightness(1);
         text-shadow:
-            0 0 10px rgba(0, 240, 255, 0.5),
-            0 0 20px rgba(0, 240, 255, 0.3),
-            0 0 30px rgba(0, 240, 255, 0.2);
+            0 0 10px rgba(163, 113, 247, 0.5),
+            0 0 20px rgba(163, 113, 247, 0.3),
+            0 0 30px rgba(163, 113, 247, 0.2);
     }
     25% {
         filter: brightness(1.05);
         text-shadow:
-            0 0 12px rgba(0, 240, 255, 0.6),
-            0 0 22px rgba(0, 240, 255, 0.4),
-            0 0 32px rgba(0, 240, 255, 0.25);
+            0 0 12px rgba(163, 113, 247, 0.6),
+            0 0 22px rgba(163, 113, 247, 0.4),
+            0 0 32px rgba(163, 113, 247, 0.25);
     }
     50% {
         filter: brightness(1.15);
         text-shadow:
-            0 0 15px rgba(0, 240, 255, 0.7),
-            0 0 25px rgba(0, 240, 255, 0.5),
-            0 0 35px rgba(0, 240, 255, 0.3);
+            0 0 15px rgba(163, 113, 247, 0.7),
+            0 0 25px rgba(163, 113, 247, 0.5),
+            0 0 35px rgba(163, 113, 247, 0.3);
     }
     75% {
         filter: brightness(1.05);
         text-shadow:
-            0 0 12px rgba(0, 240, 255, 0.6),
-            0 0 22px rgba(0, 240, 255, 0.4),
-            0 0 32px rgba(0, 240, 255, 0.25);
+            0 0 12px rgba(163, 113, 247, 0.6),
+            0 0 22px rgba(163, 113, 247, 0.4),
+            0 0 32px rgba(163, 113, 247, 0.25);
     }
 }
 
@@ -4335,7 +4715,7 @@ body::before {
 
 /* 暗色主题专属：tagline 发光效果 */
 :root #header p {
-    text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+    text-shadow: 0 0 10px rgba(163, 113, 247, 0.4);
 }
 
 /* 浅色主题：移除发光效果 */
@@ -4491,9 +4871,9 @@ body::before {
     right: -2px;
     bottom: -2px;
     background: linear-gradient(45deg,
-        rgba(0, 240, 255, 0.3) 0%,
-        rgba(255, 0, 110, 0.3) 50%,
-        rgba(0, 240, 255, 0.3) 100%);
+        rgba(163, 113, 247, 0.3) 0%,
+        rgba(163, 113, 247, 0.3) 50%,
+        rgba(163, 113, 247, 0.3) 100%);
     border-radius: 8px;
     z-index: -1;
     opacity: 0;
@@ -4573,13 +4953,13 @@ body::before {
 /* Markdown 行 - 融入终端的赛博朋克 Markdown 格式化 */
 .line-markdown {
     padding: 8px 0 8px 12px;
-    /* 霓虹粉色左边框 + 发光 */
-    border-left: 3px solid var(--color-error);
-    background: var(--color-error-soft);
+    /* 紫色左边框 + 发光 */
+    border-left: 3px solid var(--accent-primary);
+    background: var(--accent-primary-alpha-10);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     line-height: 1.6;
     white-space: normal;
-    box-shadow: -3px 0 10px rgba(255, 0, 110, 0.2);
+    box-shadow: -3px 0 10px var(--accent-primary-alpha-30);
     transition: all 0.3s ease;
 }
 
@@ -4654,6 +5034,65 @@ body::before {
 
 .terminal-input-field input::placeholder {
     color: var(--text-secondary);
+}
+
+/* v1.44.0: 语音输入按钮 */
+.voice-input-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    margin-left: 8px;
+    background: transparent;
+    border: 1px solid var(--border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.voice-input-btn:hover {
+    background: var(--surface-tertiary);
+    border-color: var(--border-hover);
+    transform: scale(1.1);
+}
+
+.voice-input-btn:active {
+    transform: scale(0.95);
+}
+
+/* 录音状态 */
+.voice-input-btn.recording {
+    border-color: #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+    animation: recording-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(255, 68, 68, 0);
+    }
+}
+
+/* 浅色主题覆盖 */
+[data-theme="light"] .voice-input-btn {
+    border-color: #EDEFF1;
+}
+
+[data-theme="light"] .voice-input-btn:hover {
+    background: #F7F9FA;
+    border-color: #B3B3B3;
+}
+
+[data-theme="light"] .voice-input-btn.recording {
+    border-color: #ff4444;
+    background: rgba(255, 68, 68, 0.08);
 }
 
 /* ANSI 颜色类 - 护眼优雅色系 */
@@ -4798,7 +5237,7 @@ body::before {
 
 .conversation-round:hover {
     border-color: var(--border-hover);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+    box-shadow: 0 0 20px rgba(163, 113, 247, 0.25);
 }
 
 /* 回合头部 */
@@ -4815,7 +5254,7 @@ body::before {
 }
 
 .round-header:hover {
-    background: rgba(0, 240, 255, 0.08);
+    background: rgba(57, 255, 20, 0.08);
 }
 
 /* 回合徽章（类型图标+名称） */
@@ -4823,7 +5262,7 @@ body::before {
     font-weight: 600;
     color: var(--text-title);
     font-size: 0.9em;
-    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+    text-shadow: 0 0 8px rgba(57, 255, 20, 0.4);
 }
 
 /* 回合编号 */
@@ -4851,8 +5290,8 @@ body::before {
 }
 
 .round-status.running {
-    color: var(--color-info);
-    background: rgba(0, 240, 255, 0.15);
+    color: var(--color-active);
+    background: rgba(57, 255, 20, 0.15);
     animation: status-pulse 1.5s ease-in-out infinite;
 }
 
@@ -5039,7 +5478,7 @@ body::before {
 
 .round-input-content {
     padding: 8px 12px;
-    background: rgba(0, 240, 255, 0.05);
+    background: var(--accent-primary-alpha-10);
     border-left: 3px solid var(--text-title);
     border-radius: 4px;
     color: var(--terminal-output);
@@ -5048,7 +5487,7 @@ body::before {
     white-space: pre-wrap;
     word-wrap: break-word;
     transition: all 0.3s ease;
-    box-shadow: -3px 0 10px rgba(0, 240, 255, 0.1);
+    box-shadow: -3px 0 10px var(--accent-primary-alpha-10);
 }
 
 /* 输出区域 - 简化版，移除标签层 */
@@ -5073,33 +5512,33 @@ body::before {
 .output-content h4,
 .output-content h5,
 .output-content h6 {
-    background: linear-gradient(90deg, #00f0ff 0%, #ff006e 100%);
+    background: linear-gradient(90deg, #A371F7 0%, #A371F7 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     font-weight: 600;
     margin: 0.8em 0 0.4em 0;
-    filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.4));
+    filter: drop-shadow(0 0 5px rgba(163, 113, 247, 0.4));
 }
 
 .output-content code {
-    color: #00f0ff;
-    background-color: rgba(0, 240, 255, 0.08);
+    color: var(--accent-primary);
+    background-color: var(--accent-primary-alpha-10);
     padding: 0.2em 0.4em;
     border-radius: 3px;
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    border: 1px solid var(--accent-primary-alpha-30);
     font-family: "Consolas", "Monaco", "Courier New", monospace;
     font-size: 0.9em;
 }
 
 .output-content pre {
     background: rgba(10, 14, 39, 0.8);
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    border: 1px solid var(--accent-primary-alpha-30);
     border-radius: 6px;
     padding: 12px;
     overflow-x: auto;
     margin: 8px 0;
-    box-shadow: inset 0 0 15px rgba(0, 240, 255, 0.1);
+    box-shadow: inset 0 0 15px var(--accent-primary-alpha-10);
 }
 
 .output-content pre code {
@@ -5112,21 +5551,21 @@ body::before {
 /* v1.40.0: Intent 输出美化 */
 .intent-output {
     background: rgba(10, 14, 39, 0.6);
-    border: 1px solid rgba(0, 240, 255, 0.2);
+    border: 1px solid var(--accent-primary-alpha-30);
     padding: 12px 16px;
     border-radius: 6px;
     font-family: "Consolas", "Monaco", "Courier New", monospace;
     font-size: 0.95em;
     line-height: 1.6;
     color: #f0f0f0;
-    box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.05);
+    box-shadow: inset 0 0 10px var(--accent-primary-alpha-10);
 }
 
 /* Intent 名称高亮（🎯 图标行） */
 .intent-output::first-line {
-    color: #00f0ff;
+    color: var(--accent-primary);
     font-weight: 500;
-    text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
+    text-shadow: 0 0 5px var(--accent-primary-alpha-30);
 }
 
 /* 响应式调整 */
@@ -5333,6 +5772,322 @@ body::before {
     margin: 0.5em 0;
 }
 
+/* ===== 浅色主题：Markdown 简洁样式覆盖（v1.43.0 - 去除晕光效果） ===== */
+[data-theme="light"] .line-markdown h1,
+[data-theme="light"] .line-markdown h2,
+[data-theme="light"] .line-markdown h3,
+[data-theme="light"] .line-markdown h4,
+[data-theme="light"] .line-markdown h5,
+[data-theme="light"] .line-markdown h6,
+[data-theme="light"] .markdown-content h1,
+[data-theme="light"] .markdown-content h2,
+[data-theme="light"] .markdown-content h3,
+[data-theme="light"] .markdown-content h4,
+[data-theme="light"] .markdown-content h5,
+[data-theme="light"] .markdown-content h6 {
+    /* 移除渐变效果，使用简洁的紫色 */
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: unset;
+    background-clip: unset;
+    color: #8B5CF6;  /* 纯紫色，简洁清晰 */
+}
+
+[data-theme="light"] .line-markdown strong,
+[data-theme="light"] .markdown-content strong {
+    color: #1C1C1C;  /* Reddit 深灰黑，清晰 */
+    font-weight: 700;
+}
+
+[data-theme="light"] .line-markdown em,
+[data-theme="light"] .markdown-content em {
+    color: #8B5CF6;  /* 紫色，简洁 */
+}
+
+[data-theme="light"] .line-markdown code,
+[data-theme="light"] .markdown-content code {
+    color: #8B5CF6;
+    background-color: #F7F9FA;  /* Reddit 浅背景 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+}
+
+[data-theme="light"] .line-markdown pre,
+[data-theme="light"] .markdown-content pre {
+    background-color: #F7F9FA;  /* Reddit 浅背景 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+}
+
+[data-theme="light"] .line-markdown pre code,
+[data-theme="light"] .markdown-content pre code {
+    color: #0ECB81;  /* 绿色代码，清晰 */
+}
+
+[data-theme="light"] .line-markdown p,
+[data-theme="light"] .markdown-content p {
+    color: #1C1C1C;  /* Reddit 深灰黑，清晰易读 */
+}
+
+[data-theme="light"] .line-markdown li,
+[data-theme="light"] .markdown-content li {
+    color: #1C1C1C;  /* Reddit 深灰黑，清晰 */
+}
+
+[data-theme="light"] .line-markdown blockquote,
+[data-theme="light"] .markdown-content blockquote {
+    border-left: 3px solid rgba(139, 92, 246, 0.4);
+    color: #7C7C7C;  /* Reddit 中灰次要文字 */
+    background: rgba(139, 92, 246, 0.03);
+}
+
+[data-theme="light"] .line-markdown a,
+[data-theme="light"] .markdown-content a {
+    color: #8B5CF6;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+[data-theme="light"] .line-markdown a:hover,
+[data-theme="light"] .markdown-content a:hover {
+    color: #9065DC;
+    border-bottom-color: #8B5CF6;
+}
+
+[data-theme="light"] .line-markdown hr,
+[data-theme="light"] .markdown-content hr {
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(139, 92, 246, 0.2) 20%,
+        rgba(139, 92, 246, 0.3) 50%,
+        rgba(139, 92, 246, 0.2) 80%,
+        transparent 100%);
+}
+
+[data-theme="light"] .line-markdown th,
+[data-theme="light"] .line-markdown td,
+[data-theme="light"] .markdown-content th,
+[data-theme="light"] .markdown-content td {
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+    color: #1C1C1C;             /* Reddit 深灰黑 */
+}
+
+[data-theme="light"] .line-markdown th,
+[data-theme="light"] .markdown-content th {
+    background-color: #F7F9FA;  /* Reddit 浅背景 */
+    color: #1C1C1C;             /* Reddit 深灰黑 */
+}
+
+[data-theme="light"] .line-markdown td,
+[data-theme="light"] .markdown-content td {
+    background-color: #FFFFFF;  /* Reddit 纯白 */
+}
+
+[data-theme="light"] .line-markdown img,
+[data-theme="light"] .markdown-content img {
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+}
+
+/* ===== 浅色主题：终端样式覆盖（v1.43.0 - Reddit 风格白色背景） ===== */
+
+/* 终端容器 - 纯白背景 */
+[data-theme="light"] #terminal-container {
+    background: #FFFFFF;  /* Reddit 纯白卡片背景 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);  /* 简洁阴影 */
+}
+
+/* 混合终端 - 统一浅色文字 */
+[data-theme="light"] .hybrid-terminal {
+    color: #1C1C1C;  /* Reddit 深灰黑 */
+}
+
+/* 终端输出区域 */
+[data-theme="light"] .terminal-output-area {
+    background: #FFFFFF;  /* 纯白背景 */
+}
+
+/* 输出行 - 深色文字 */
+[data-theme="light"] .line-output {
+    color: #1C1C1C;  /* Reddit 深灰黑 */
+}
+
+/* 命令回显行 - 紫色 */
+[data-theme="light"] .line-command {
+    color: #8B5CF6;  /* 紫色命令 */
+}
+
+[data-theme="light"] .line-command .prompt {
+    color: #F0B90B;  /* 金色提示符 */
+}
+
+[data-theme="light"] .line-command .command {
+    color: #1C1C1C;  /* 深色命令文本 */
+}
+
+/* 输入区域 */
+[data-theme="light"] .terminal-input-line {
+    background: #FFFFFF;  /* 纯白背景 */
+    border-top: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+}
+
+[data-theme="light"] .terminal-input-line input {
+    background: #F7F9FA;  /* Reddit 浅背景 */
+    color: #1C1C1C;  /* 深色文字 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+}
+
+[data-theme="light"] .terminal-input-line input:focus {
+    background: #FFFFFF;
+    border-color: #8B5CF6;  /* 紫色聚焦边框 */
+}
+
+/* 滚动条 - 浅色风格 */
+[data-theme="light"] .terminal-output-area::-webkit-scrollbar-track {
+    background: #F7F9FA;  /* Reddit 浅背景 */
+}
+
+[data-theme="light"] .terminal-output-area::-webkit-scrollbar-thumb {
+    background: #CCCCCC;  /* 浅灰滚动条 */
+}
+
+[data-theme="light"] .terminal-output-area::-webkit-scrollbar-thumb:hover {
+    background: #8B5CF6;  /* 紫色悬停 */
+}
+
+/* 输出内容的 pre 元素 - 关键：ls、pwd 等命令输出 */
+[data-theme="light"] .output-content pre {
+    background: #F7F9FA;  /* Reddit 浅背景 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+    box-shadow: none;  /* 移除内阴影 */
+}
+
+[data-theme="light"] .output-content pre code {
+    color: #1C1C1C;  /* Reddit 深灰黑文字 */
+}
+
+/* Intent 输出 */
+[data-theme="light"] .intent-output {
+    background: #F7F9FA;  /* Reddit 浅背景 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+    color: #1C1C1C;  /* 深色文字 */
+}
+
+/* terminal-text pre 元素 */
+[data-theme="light"] .terminal-text {
+    background: #FFFFFF;  /* 纯白背景 */
+    color: #1C1C1C;  /* 深色文字 */
+}
+
+[data-theme="light"] pre.terminal-text {
+    background: #FFFFFF;  /* 纯白背景 */
+    color: #1C1C1C;  /* 深色文字 */
+}
+
+/* ===== 浅色主题：Round 卡片样式覆盖（v1.43.0 - Reddit 风格） ===== */
+
+/* 回合卡片容器 */
+[data-theme="light"] .conversation-round {
+    background: #FFFFFF;  /* Reddit 纯白卡片 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);  /* 简洁阴影 */
+}
+
+[data-theme="light"] .conversation-round:hover {
+    border-color: #B3B3B3;  /* 悬停边框 */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);  /* 增强阴影 */
+}
+
+/* 回合头部 */
+[data-theme="light"] .round-header {
+    background: rgba(139, 92, 246, 0.05);  /* 极浅紫色背景 */
+    border-bottom: 1px solid #EDEFF1;
+}
+
+[data-theme="light"] .round-header:hover {
+    background: rgba(139, 92, 246, 0.08);  /* 悬停时稍深 */
+}
+
+/* 回合徽章 - 移除晕光 */
+[data-theme="light"] .round-badge {
+    color: #0ECB81;  /* 绿色徽章 */
+    text-shadow: none;  /* 移除晕光效果 */
+}
+
+/* 回合编号 */
+[data-theme="light"] .round-number {
+    color: #A8A8A8;  /* Reddit 浅灰弱化文字 */
+}
+
+/* 回合状态 - 移除晕光 */
+[data-theme="light"] .round-status.running {
+    color: #0ECB81;  /* 绿色运行状态 */
+    text-shadow: none;  /* 移除晕光效果 */
+}
+
+[data-theme="light"] .round-status.completed {
+    color: #0ECB81;  /* 绿色完成状态 */
+}
+
+[data-theme="light"] .round-status.pending {
+    color: #A8A8A8;  /* 浅灰待处理 */
+}
+
+/* 回合内容区 */
+[data-theme="light"] .round-content {
+    background: #FFFFFF;  /* 纯白背景 */
+    color: #1C1C1C;  /* 深色文字 */
+}
+
+/* 回合统计信息 */
+[data-theme="light"] .round-stats {
+    color: #7C7C7C;  /* Reddit 中灰次要文字 */
+}
+
+/* ===== 浅色主题：意图卡片样式覆盖（v1.43.0 - Reddit 风格） ===== */
+
+/* 意图卡片容器 */
+[data-theme="light"] .intent-card {
+    background: #FFFFFF;  /* Reddit 纯白卡片 */
+    border: 1px solid #EDEFF1;  /* Reddit 浅边框 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .intent-card.completed {
+    border-color: #0ECB81;  /* 绿色边框 */
+    background: #FFFFFF;
+}
+
+/* 意图标题 */
+[data-theme="light"] .intent-title {
+    color: #1C1C1C;  /* Reddit 深灰黑 */
+}
+
+/* 意图理解区域 */
+[data-theme="light"] .understanding-content {
+    background: #F7F9FA;  /* Reddit 浅背景 */
+    color: #1C1C1C;  /* 深色文字 */
+    border-left: 3px solid #F0B90B;  /* 金色边框 */
+}
+
+/* 意图步骤 */
+[data-theme="light"] .intent-step {
+    background: #F7F9FA;  /* Reddit 浅背景 */
+    border-left: 3px solid rgba(139, 92, 246, 0.3);
+}
+
+[data-theme="light"] .intent-step.running {
+    background: rgba(240, 185, 11, 0.08);  /* 浅金色背景 */
+    border-left-color: #F0B90B;
+}
+
+[data-theme="light"] .intent-step.completed {
+    background: rgba(14, 203, 129, 0.05);  /* 极浅绿色背景 */
+    border-left-color: #0ECB81;
+}
+
+/* 意图元信息 */
+[data-theme="light"] .intent-meta {
+    color: #7C7C7C;  /* Reddit 中灰次要文字 */
+}
+
 /* ========== v1.29.0: 意图拆解可视化样式 ========== */
 
 /* 意图卡片 */
@@ -5412,7 +6167,7 @@ body::before {
 /* 单个步骤 */
 .intent-step {
     background: rgba(0, 0, 0, 0.3);
-    border-left: 3px solid rgba(0, 240, 255, 0.3);
+    border-left: 3px solid var(--accent-primary-alpha-30);
     border-radius: 4px;
     margin: 0.5em 0;
     padding: 0.8em 1em;
@@ -5454,7 +6209,7 @@ body::before {
 
 /* v1.36.2: 步骤折叠图标 */
 .step-toggle {
-    color: #00f0ff;
+    color: var(--accent-primary);
     font-size: 0.9em;
     min-width: 1.2em;
     text-align: center;
@@ -5462,7 +6217,7 @@ body::before {
 }
 
 .step-number {
-    color: #00f0ff;
+    color: var(--accent-primary);
     font-weight: 600;
     min-width: 2em;
 }
@@ -5564,23 +6319,23 @@ body::before {
     gap: 0.5em;
     margin-top: 1em;
     padding-top: 1em;
-    border-top: 1px solid rgba(0, 240, 255, 0.2);
+    border-top: 1px solid var(--accent-primary-alpha-30);
 }
 
 .intent-edit-btn {
     padding: 0.5em 1em;
-    background: rgba(0, 240, 255, 0.1);
-    border: 1px solid rgba(0, 240, 255, 0.3);
+    background: var(--accent-primary-alpha-10);
+    border: 1px solid var(--accent-primary-alpha-30);
     border-radius: 4px;
-    color: #00f0ff;
+    color: var(--accent-primary);
     font-size: 0.9em;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .intent-edit-btn:hover {
-    background: rgba(0, 240, 255, 0.2);
-    border-color: rgba(0, 240, 255, 0.5);
+    background: var(--accent-primary-alpha-30);
+    border-color: var(--accent-primary-alpha-60);
     transform: translateY(-1px);
 }
 
@@ -5634,7 +6389,7 @@ body::before {
 }
 
 .situation-header .complexity {
-    color: #00f0ff;
+    color: var(--accent-primary);
 }
 
 .situation-header .risk {
@@ -5650,7 +6405,7 @@ body::before {
 }
 
 .situation-header .risk.high-risk {
-    color: #ff006e;
+    color: var(--color-error);
 }
 
 .situation-header .balance {
@@ -5670,7 +6425,7 @@ body::before {
 }
 
 .alert.critical {
-    color: #ff006e;
+    color: var(--color-error);
 }
 
 .alert.warning {
@@ -5728,7 +6483,7 @@ body::before {
     height: 1.2em;
     margin-right: 0.5em;
     cursor: pointer;
-    accent-color: #00f0ff;
+    accent-color: var(--accent-primary);
     transition: transform 0.2s ease;
 }
 
@@ -5738,7 +6493,7 @@ body::before {
 
 /* 编辑模式下的步骤hover效果 */
 .intent-step:has(.step-checkbox):hover {
-    background: rgba(0, 240, 255, 0.15);
+    background: var(--accent-primary-alpha-10);
     transform: translateX(2px);
 }
 
@@ -5765,7 +6520,7 @@ body::before {
     margin: 0.5em 0 0 2em;
     padding: 0.5em;
     background: rgba(0, 0, 0, 0.4);
-    border-left: 2px solid rgba(0, 240, 255, 0.3);
+    border-left: 2px solid var(--accent-primary-alpha-30);
     border-radius: 4px;
     max-height: 2000px;
     overflow: hidden;
@@ -6092,7 +6847,7 @@ body::before {
     width: 90%;
     max-width: 800px;
     max-height: 80vh;
-    box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+    box-shadow: 0 0 30px var(--accent-primary-alpha-30);
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease;
@@ -6606,6 +7361,87 @@ body::before {
     .toast {
         min-width: auto;
         max-width: none;
+    }
+}
+
+/* ========== v1.44.0: 图表可视化样式 ========== */
+/* ========== v1.45.0: 优化图表在回合卡片中的展示 ========== */
+
+/* 图表卡片 */
+.chart-card {
+    margin: 20px 0 16px 0;  /* v1.45.0: 增加顶部间距，更好地分隔内容 */
+    padding: 20px;
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-top: 2px solid var(--color-primary);  /* v1.45.0: 顶部强调色边框 */
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);  /* v1.45.0: 更流畅的过渡曲线 */
+    will-change: box-shadow, border-color;  /* v1.45.0: 性能优化 */
+}
+
+.chart-card:hover {
+    box-shadow: 0 4px 16px rgba(163, 113, 247, 0.15);
+    border-color: var(--color-primary);
+    transform: translateY(-1px);  /* v1.45.0: 悬停微抬升效果 */
+}
+
+/* 图表标题 */
+.chart-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-primary);
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+/* 图表容器 */
+.chart-container {
+    width: 100%;
+    min-height: 400px;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: height 0.3s ease;  /* v1.45.0: 响应式高度过渡 */
+    position: relative;  /* v1.45.0: 为 ECharts 提供定位上下文 */
+}
+
+/* 深色主题图表样式 */
+[data-theme="dark"] .chart-card {
+    background: rgba(13, 17, 23, 0.6);
+    border-color: rgba(163, 113, 247, 0.3);
+}
+
+[data-theme="dark"] .chart-container {
+    background: rgba(13, 17, 23, 0.8);
+}
+
+/* 浅色主题图表样式 */
+[data-theme="light"] .chart-card {
+    background: #FFFFFF;
+    border-color: #EDEFF1;
+}
+
+[data-theme="light"] .chart-container {
+    background: #F7F9FA;
+}
+
+/* 响应式图表 */
+@media (max-width: 768px) {
+    .chart-card {
+        padding: 12px;
+        margin: 16px 0 12px 0;  /* v1.45.0: 保持顶部间距一致性 */
+        border-radius: 8px;  /* v1.45.0: 小屏幕使用更小的圆角 */
+    }
+
+    .chart-title {
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+
+    .chart-container {
+        min-height: 300px;
+        border-radius: 6px;  /* v1.45.0: 匹配卡片圆角 */
     }
 }
 "#;

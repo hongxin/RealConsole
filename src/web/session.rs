@@ -7,6 +7,7 @@ use crate::command::CommandRegistry;
 use crate::config::Config;
 use crate::i18n;
 use crate::llm::{DeepseekClient, LlmClient, OllamaClient};
+use crate::visualization; // v1.44.0: 可视化系统
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -319,6 +320,16 @@ pub enum ServerMessage {
     /// 会话操作错误
     #[serde(rename = "session_error")]
     SessionError { message: String },
+
+    // ===== v1.44.0 新增：可视化消息 =====
+    /// 图表数据（用于数据可视化）
+    #[serde(rename = "chart")]
+    Chart {
+        /// 关联的回合 ID
+        round_id: String,
+        /// 图表数据
+        chart_data: visualization::ChartData,
+    },
 
     // ===== v1.36.0 占卜消息（v1.36.2 已废弃，保留用于向后兼容） =====
     // 以下消息类型已被 situation_analysis 字段替代，暂时注释掉

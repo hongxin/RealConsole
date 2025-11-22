@@ -48,6 +48,7 @@ mod tool_executor;
 mod trace_context; // ✨ v1.5.1: 追踪上下文（TraceContext, ExecutionSpan）
 mod tracer; // ✨ Phase 2 (Memory Redesign): 统一追踪系统
 mod utils; // ✨ Phase 2: 软阈值工具（连续场重构）
+mod visualization; // ✨ v1.44.0: 可视化系统（数据图表、Notebook）
 mod voice; // ✨ 语音播报系统
 mod web; // ✨ v1.23.0: Web 终端（浏览器访问）
 mod wizard;
@@ -100,7 +101,8 @@ enum Commands {
         path: bool,
     },
 
-    /// 启动 Web 终端服务（浏览器访问）
+    /// 启动 Web Notebook 服务（浏览器访问的智能终端）
+    #[command(alias = "notebook")]
     Web {
         /// 绑定地址（覆盖配置文件）
         #[arg(short, long)]

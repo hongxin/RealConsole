@@ -295,9 +295,14 @@ pub async fn execute_shell(command: &str) -> Result<String, RealError> {
         );
     }
 
-    // 限制输出大小
+    // 限制输出大小（UTF-8 安全截断）
     if result_text.len() > MAX_OUTPUT_SIZE {
-        result_text.truncate(MAX_OUTPUT_SIZE);
+        // 找到小于或等于 MAX_OUTPUT_SIZE 的最近字符边界
+        let mut truncate_pos = MAX_OUTPUT_SIZE;
+        while truncate_pos > 0 && !result_text.is_char_boundary(truncate_pos) {
+            truncate_pos -= 1;
+        }
+        result_text.truncate(truncate_pos);
         result_text.push_str("\n... (输出已截断)");
     }
 
