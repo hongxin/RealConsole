@@ -101,26 +101,62 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             </div>
         </div>
     </div>
-    <!-- v1.46.0: 文件上传区域 -->
-    <div id="file-upload-section" class="file-upload-section">
-        <div id="upload-area" class="upload-area">
-            <input type="file" id="file-input" accept=".csv" style="display: none;">
-            <div class="upload-prompt">
-                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <!-- v1.47.0: Jupyter 风格工具栏 -->
+    <div id="toolbar" class="toolbar">
+        <div class="toolbar-section toolbar-left">
+            <button id="upload-csv-btn" class="toolbar-btn" title="上传 CSV 文件">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="17 8 12 3 7 8"></polyline>
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
-                <p class="upload-text">拖拽 CSV 文件到此处或点击上传</p>
-                <p class="upload-hint">支持最大 1MB，建议使用小文件进行测试</p>
-            </div>
-            <div id="upload-status" class="upload-status hidden"></div>
+                <span>上传 CSV</span>
+            </button>
+            <button id="export-data-btn" class="toolbar-btn" title="导出数据">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>导出数据</span>
+            </button>
+            <div class="toolbar-divider"></div>
+            <button id="files-panel-btn" class="toolbar-btn" title="已上传文件">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                    <polyline points="13 2 13 9 20 9"></polyline>
+                </svg>
+                <span id="files-count">文件 (0)</span>
+            </button>
         </div>
-        <!-- 已上传文件列表 -->
-        <div id="uploaded-files" class="uploaded-files hidden">
+        <div class="toolbar-section toolbar-center">
+            <span class="toolbar-label">快速创建:</span>
+            <button class="toolbar-btn toolbar-btn-sm" data-chart-type="line" title="折线图">📈</button>
+            <button class="toolbar-btn toolbar-btn-sm" data-chart-type="bar" title="柱状图">📊</button>
+            <button class="toolbar-btn toolbar-btn-sm" data-chart-type="pie" title="饼图">🥧</button>
+            <button class="toolbar-btn toolbar-btn-sm" data-chart-type="scatter" title="散点图">📉</button>
+            <button class="toolbar-btn toolbar-btn-sm" data-chart-type="area" title="面积图">📊</button>
+        </div>
+        <div class="toolbar-section toolbar-right">
+            <button id="chart-config-btn" class="toolbar-btn" title="图表配置">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m5.2-13.2l-1.6 1.6m-7.2 7.2l-1.6 1.6m12.4 0l-1.6-1.6m-7.2-7.2l-1.6-1.6"></path>
+                </svg>
+                <span>配置</span>
+            </button>
+        </div>
+    </div>
+    <!-- v1.47.0: 文件上传隐藏输入 -->
+    <input type="file" id="file-input" accept=".csv" style="display: none;">
+    <!-- v1.47.0: 文件面板（侧边栏） -->
+    <div id="files-panel" class="files-panel hidden">
+        <div class="files-panel-header">
             <h4>📁 已上传文件</h4>
-            <div id="files-list" class="files-list"></div>
+            <button id="files-panel-close" class="close-btn">×</button>
         </div>
+        <div id="files-list" class="files-list"></div>
+        <div class="files-panel-empty hidden">暂无文件，点击"上传 CSV"添加</div>
     </div>
     <div id="terminal-container">
         <!-- 混合终端：单一容器，统一滚动 -->
@@ -4391,61 +4427,88 @@ const TERMINAL_JS: &str = r#"
         }
 
         init() {
-            const uploadArea = document.getElementById('upload-area');
+            // v1.47.0: 工具栏按钮事件
+            const uploadBtn = document.getElementById('upload-csv-btn');
             const fileInput = document.getElementById('file-input');
-            const uploadStatus = document.getElementById('upload-status');
+            const filesPanelBtn = document.getElementById('files-panel-btn');
+            const filesPanel = document.getElementById('files-panel');
+            const filesPanelClose = document.getElementById('files-panel-close');
 
-            if (!uploadArea || !fileInput) return;
+            if (!fileInput) return;
 
-            // 点击上传
-            uploadArea.addEventListener('click', () => {
-                fileInput.click();
-            });
+            // 上传按钮
+            if (uploadBtn) {
+                uploadBtn.addEventListener('click', () => {
+                    fileInput.click();
+                });
+            }
 
             // 文件选择
             fileInput.addEventListener('change', (e) => {
                 if (e.target.files && e.target.files[0]) {
                     this.uploadFile(e.target.files[0]);
+                    e.target.value = ''; // 重置以允许上传同名文件
                 }
             });
 
-            // 拖拽上传
-            uploadArea.addEventListener('dragover', (e) => {
+            // 文件面板切换
+            if (filesPanelBtn && filesPanel) {
+                filesPanelBtn.addEventListener('click', () => {
+                    filesPanel.classList.toggle('hidden');
+                });
+            }
+
+            // 关闭文件面板
+            if (filesPanelClose && filesPanel) {
+                filesPanelClose.addEventListener('click', () => {
+                    filesPanel.classList.add('hidden');
+                });
+            }
+
+            // 全局拖拽上传（拖到页面任意位置）
+            document.body.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                uploadArea.classList.add('dragover');
+                e.stopPropagation();
             });
 
-            uploadArea.addEventListener('dragleave', () => {
-                uploadArea.classList.remove('dragover');
-            });
-
-            uploadArea.addEventListener('drop', (e) => {
+            document.body.addEventListener('drop', (e) => {
                 e.preventDefault();
-                uploadArea.classList.remove('dragover');
+                e.stopPropagation();
 
                 if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    this.uploadFile(e.dataTransfer.files[0]);
+                    const file = e.dataTransfer.files[0];
+                    if (file.name.toLowerCase().endsWith('.csv')) {
+                        this.uploadFile(file);
+                    } else {
+                        terminal.toast.show('只支持 CSV 文件', 'error');
+                    }
                 }
+            });
+
+            // v1.47.0: 快速创建图表按钮
+            document.querySelectorAll('[data-chart-type]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const chartType = btn.getAttribute('data-chart-type');
+                    this.quickCreateChart(chartType);
+                });
             });
         }
 
         uploadFile(file) {
-            const uploadStatus = document.getElementById('upload-status');
-
             // 验证文件类型
             if (!file.name.toLowerCase().endsWith('.csv')) {
-                this.showStatus('error', '❌ 只支持 CSV 文件');
+                terminal.toast.show('只支持 CSV 文件', 'error');
                 return;
             }
 
             // 验证文件大小（1MB）
             if (file.size > 1024 * 1024) {
-                this.showStatus('error', `❌ 文件过大: ${(file.size / 1024 / 1024).toFixed(2)}MB，最大 1MB`);
+                terminal.toast.show(`文件过大: ${(file.size / 1024 / 1024).toFixed(2)}MB，最大 1MB`, 'error');
                 return;
             }
 
             // 显示加载状态
-            this.showStatus('loading', `📤 正在上传 ${file.name}...`);
+            terminal.toast.show(`正在上传 ${file.name}...`, 'info');
 
             // 读取文件内容
             const reader = new FileReader();
@@ -4461,7 +4524,7 @@ const TERMINAL_JS: &str = r#"
             };
 
             reader.onerror = () => {
-                this.showStatus('error', '❌ 文件读取失败');
+                terminal.toast.show('文件读取失败', 'error');
             };
 
             reader.readAsText(file);
@@ -4479,48 +4542,38 @@ const TERMINAL_JS: &str = r#"
             });
 
             // 显示成功状态
-            this.showStatus('success',
-                `✅ ${filename} 上传成功！文件 ID: ${file_id}\\n` +
-                `数据: ${preview.total_rows} 行 × ${preview.total_columns} 列`
+            terminal.toast.show(
+                `${filename} 上传成功！(${preview.total_rows}行×${preview.total_columns}列)`,
+                'success'
             );
 
             // 更新文件列表
             this.updateFilesList();
 
-            // 3秒后隐藏状态
-            setTimeout(() => {
-                this.hideStatus();
-            }, 3000);
-        }
-
-        showStatus(type, message) {
-            const uploadStatus = document.getElementById('upload-status');
-            if (!uploadStatus) return;
-
-            uploadStatus.className = `upload-status ${type}`;
-            uploadStatus.textContent = message;
-            uploadStatus.classList.remove('hidden');
-        }
-
-        hideStatus() {
-            const uploadStatus = document.getElementById('upload-status');
-            if (uploadStatus) {
-                uploadStatus.classList.add('hidden');
+            // 自动打开文件面板
+            const filesPanel = document.getElementById('files-panel');
+            if (filesPanel) {
+                filesPanel.classList.remove('hidden');
             }
         }
 
         updateFilesList() {
-            const uploadedFilesEl = document.getElementById('uploaded-files');
             const filesListEl = document.getElementById('files-list');
+            const filesEmpty = document.querySelector('.files-panel-empty');
+            const filesCount = document.getElementById('files-count');
 
-            if (!uploadedFilesEl || !filesListEl) return;
+            if (!filesListEl || !filesEmpty || !filesCount) return;
+
+            // 更新工具栏文件计数
+            filesCount.textContent = `文件 (${this.uploadedFiles.size})`;
 
             if (this.uploadedFiles.size === 0) {
-                uploadedFilesEl.classList.add('hidden');
+                filesListEl.innerHTML = '';
+                filesEmpty.classList.remove('hidden');
                 return;
             }
 
-            uploadedFilesEl.classList.remove('hidden');
+            filesEmpty.classList.add('hidden');
             filesListEl.innerHTML = '';
 
             // 按上传时间倒序
@@ -4543,7 +4596,7 @@ const TERMINAL_JS: &str = r#"
                     </div>
                     <div class="file-actions">
                         <button class="file-action-btn btn-preview" data-file-id="${file.id}">👁️ 预览</button>
-                        <button class="file-action-btn btn-copy" data-file-id="${file.id}">📋 复制命令</button>
+                        <button class="file-action-btn btn-copy" data-file-id="${file.id}">📋 复制</button>
                     </div>
                 `;
 
@@ -4605,12 +4658,65 @@ const TERMINAL_JS: &str = r#"
 
             // 复制到剪贴板
             navigator.clipboard.writeText(command).then(() => {
-                this.showStatus('success', `✅ 已复制命令到剪贴板:\\n${command}`);
-                setTimeout(() => this.hideStatus(), 2000);
+                terminal.toast.show('已复制命令到剪贴板', 'success');
             }).catch(() => {
                 // 降级方案：显示命令让用户手动复制
-                terminal.writeOutput(`\\n**📋 图表命令示例**\\n\\n\`\`\`bash\\n${command}\\n\`\`\`\\n\\n你可以修改列名和图表类型（line/bar/pie/scatter）`);
+                terminal.writeOutput(`\\n**📋 图表命令示例**\\n\\n\`\`\`bash\\n${command}\\n\`\`\`\\n\\n你可以修改列名和图表类型（line/bar/pie/scatter/area）`);
             });
+        }
+
+        quickCreateChart(chartType) {
+            // 检查是否有上传的文件
+            if (this.uploadedFiles.size === 0) {
+                terminal.toast.show('请先上传 CSV 文件', 'warning');
+                // 打开上传按钮提示
+                const uploadBtn = document.getElementById('upload-csv-btn');
+                if (uploadBtn) {
+                    uploadBtn.style.animation = 'pulse 0.5s ease-in-out 3';
+                    setTimeout(() => {
+                        uploadBtn.style.animation = '';
+                    }, 1500);
+                }
+                return;
+            }
+
+            // 获取最近上传的文件
+            const files = Array.from(this.uploadedFiles.values())
+                .sort((a, b) => b.uploadedAt - a.uploadedAt);
+            const latestFile = files[0];
+
+            // 获取列名
+            const { preview } = latestFile;
+            const xCol = preview.headers[0] || 'col1';
+            const yCol = preview.headers[1] || 'col2';
+
+            // 构建命令
+            const command = `!chart csv @${latestFile.id} --type ${chartType} --x-col "${xCol}" --y-col "${yCol}"`;
+
+            // 在终端显示命令提示
+            terminal.writeOutput(`\\n**📊 快速创建${this.getChartTypeName(chartType)}**\\n\\n执行命令: \`${command}\``);
+
+            // 自动执行命令（模拟用户输入）
+            setTimeout(() => {
+                const inputEl = document.querySelector('.input-area input');
+                if (inputEl) {
+                    inputEl.value = command;
+                    // 触发回车事件
+                    const event = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter' });
+                    inputEl.dispatchEvent(event);
+                }
+            }, 500);
+        }
+
+        getChartTypeName(type) {
+            const names = {
+                'line': '折线图',
+                'bar': '柱状图',
+                'pie': '饼图',
+                'scatter': '散点图',
+                'area': '面积图'
+            };
+            return names[type] || type;
         }
     }
 
@@ -7709,110 +7815,161 @@ body::before {
     }
 }
 
-/* ===== v1.46.0: 文件上传样式 ===== */
-.file-upload-section {
-    padding: 16px;
-    max-width: 900px;
-    margin: 0 auto;
+/* ===== v1.47.0: Jupyter 风格工具栏 ===== */
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(13, 17, 23, 0.6);
+    border-bottom: 1px solid rgba(163, 113, 247, 0.2);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 60px;
+    z-index: 90;
 }
 
-.upload-area {
-    border: 2px dashed rgba(163, 113, 247, 0.4);
-    border-radius: 12px;
-    padding: 40px 20px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background: rgba(13, 17, 23, 0.3);
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.upload-area:hover {
-    border-color: rgba(163, 113, 247, 0.7);
-    background: rgba(13, 17, 23, 0.5);
+.toolbar-left {
+    flex: 1;
 }
 
-.upload-area.dragover {
-    border-color: #A371F7;
+.toolbar-center {
+    flex: 0 0 auto;
+}
+
+.toolbar-right {
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    color: #E6EDF3;
     background: rgba(163, 113, 247, 0.1);
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.upload-icon {
-    width: 48px;
-    height: 48px;
-    margin: 0 auto 16px;
-    stroke: #A371F7;
+.toolbar-btn:hover {
+    background: rgba(163, 113, 247, 0.2);
+    border-color: rgba(163, 113, 247, 0.5);
+    transform: translateY(-1px);
+}
+
+.toolbar-btn:active {
+    transform: translateY(0);
+}
+
+.toolbar-btn-sm {
+    padding: 4px 8px;
+    font-size: 18px;
+    min-width: 36px;
+    justify-content: center;
+}
+
+.toolbar-icon {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
     stroke-width: 2;
 }
 
-.upload-text {
-    font-size: 16px;
-    color: #E6EDF3;
-    margin: 0 0 8px 0;
-    font-weight: 500;
-}
-
-.upload-hint {
-    font-size: 13px;
+.toolbar-label {
+    font-size: 12px;
     color: #7D8590;
-    margin: 0;
-}
-
-.upload-status {
-    margin-top: 16px;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 14px;
-}
-
-.upload-status.success {
-    background: rgba(46, 160, 67, 0.15);
-    color: #3FB950;
-    border: 1px solid rgba(46, 160, 67, 0.3);
-}
-
-.upload-status.error {
-    background: rgba(248, 81, 73, 0.15);
-    color: #F85149;
-    border: 1px solid rgba(248, 81, 73, 0.3);
-}
-
-.upload-status.loading {
-    background: rgba(163, 113, 247, 0.15);
-    color: #A371F7;
-    border: 1px solid rgba(163, 113, 247, 0.3);
-}
-
-.uploaded-files {
-    margin-top: 24px;
-}
-
-.uploaded-files h4 {
-    font-size: 15px;
-    color: #E6EDF3;
-    margin: 0 0 12px 0;
+    margin-right: 8px;
     font-weight: 500;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(163, 113, 247, 0.2);
+    margin: 0 8px;
+}
+
+/* 文件面板（侧边栏） */
+.files-panel {
+    position: fixed;
+    top: 128px;
+    right: 0;
+    width: 320px;
+    max-height: calc(100vh - 180px);
+    background: rgba(13, 17, 23, 0.95);
+    border-left: 1px solid rgba(163, 113, 247, 0.3);
+    border-radius: 12px 0 0 12px;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+}
+
+.files-panel:not(.hidden) {
+    transform: translateX(0);
+}
+
+.files-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid rgba(163, 113, 247, 0.2);
+}
+
+.files-panel-header h4 {
+    font-size: 14px;
+    color: #E6EDF3;
+    margin: 0;
+    font-weight: 600;
 }
 
 .files-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    gap: 8px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+}
+
+.files-panel-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: #7D8590;
+    font-size: 13px;
 }
 
 .file-item {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: rgba(13, 17, 23, 0.4);
-    border: 1px solid rgba(163, 113, 247, 0.3);
+    flex-direction: column;
+    padding: 12px;
+    background: rgba(13, 17, 23, 0.6);
+    border: 1px solid rgba(163, 113, 247, 0.2);
     border-radius: 8px;
     transition: all 0.2s ease;
+    gap: 8px;
 }
 
 .file-item:hover {
-    background: rgba(13, 17, 23, 0.6);
-    border-color: rgba(163, 113, 247, 0.5);
+    background: rgba(13, 17, 23, 0.8);
+    border-color: rgba(163, 113, 247, 0.4);
 }
 
 .file-info {
@@ -7848,14 +8005,16 @@ body::before {
 
 .file-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .file-action-btn {
-    padding: 6px 12px;
-    font-size: 12px;
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 11px;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
@@ -7870,7 +8029,6 @@ body::before {
 
 .btn-preview:hover {
     background: rgba(88, 166, 255, 0.25);
-    border-color: rgba(88, 166, 255, 0.5);
 }
 
 .btn-copy {
@@ -7881,49 +8039,55 @@ body::before {
 
 .btn-copy:hover {
     background: rgba(163, 113, 247, 0.25);
-    border-color: rgba(163, 113, 247, 0.5);
 }
 
-.btn-delete {
-    background: rgba(248, 81, 73, 0.15);
-    color: #F85149;
-    border: 1px solid rgba(248, 81, 73, 0.3);
+/* 浅色主题工具栏样式 */
+[data-theme="light"] .toolbar {
+    background: rgba(255, 255, 255, 0.9);
+    border-bottom-color: #D0D7DE;
 }
 
-.btn-delete:hover {
-    background: rgba(248, 81, 73, 0.25);
-    border-color: rgba(248, 81, 73, 0.5);
-}
-
-/* 浅色主题文件上传样式 */
-[data-theme="light"] .upload-area {
-    background: #F7F9FA;
-    border-color: rgba(163, 113, 247, 0.3);
-}
-
-[data-theme="light"] .upload-area:hover {
-    background: #EDEFF1;
-}
-
-[data-theme="light"] .upload-text {
+[data-theme="light"] .toolbar-btn {
     color: #1F2328;
+    background: rgba(163, 113, 247, 0.08);
 }
 
-[data-theme="light"] .upload-hint {
+[data-theme="light"] .toolbar-btn:hover {
+    background: rgba(163, 113, 247, 0.15);
+}
+
+[data-theme="light"] .toolbar-label {
     color: #656D76;
 }
 
-[data-theme="light"] .uploaded-files h4 {
+[data-theme="light"] .toolbar-divider {
+    background: #D0D7DE;
+}
+
+[data-theme="light"] .files-panel {
+    background: rgba(255, 255, 255, 0.95);
+    border-left-color: #D0D7DE;
+}
+
+[data-theme="light"] .files-panel-header {
+    border-bottom-color: #D0D7DE;
+}
+
+[data-theme="light"] .files-panel-header h4 {
     color: #1F2328;
 }
 
+[data-theme="light"] .files-panel-empty {
+    color: #656D76;
+}
+
 [data-theme="light"] .file-item {
-    background: #FFFFFF;
+    background: #F7F9FA;
     border-color: #D0D7DE;
 }
 
 [data-theme="light"] .file-item:hover {
-    background: #F7F9FA;
+    background: #EDEFF1;
 }
 
 [data-theme="light"] .file-name {
@@ -7934,29 +8098,40 @@ body::before {
     color: #656D76;
 }
 
-/* 响应式文件上传 */
+/* 响应式工具栏 */
 @media (max-width: 768px) {
-    .file-upload-section {
-        padding: 12px;
+    .toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px;
     }
 
-    .upload-area {
-        padding: 30px 16px;
+    .toolbar-section {
+        flex-wrap: wrap;
     }
 
-    .file-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-    }
-
-    .file-actions {
+    .toolbar-center {
+        order: 3;
         width: 100%;
-        justify-content: space-between;
+        justify-content: center;
+        padding-top: 8px;
+        border-top: 1px solid rgba(163, 113, 247, 0.2);
     }
 
-    .file-action-btn {
-        flex: 1;
+    .toolbar-btn span {
+        display: none;
+    }
+
+    .toolbar-btn {
+        padding: 8px;
+    }
+
+    .files-panel {
+        width: 100%;
+        max-width: 100%;
+        top: 60px;
+        max-height: calc(100vh - 120px);
+        border-radius: 0;
     }
 }
 "#;

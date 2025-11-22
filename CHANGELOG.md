@@ -5,6 +5,97 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.0] - 2025-01-23
+
+### 🎯 Highlights
+
+**主题**: Jupyter 风格工具栏 - UI 重构与快速图表创建
+
+- ✅ **Jupyter 风格工具栏** - 紧凑、美观、极简的菜单栏设计
+- ✅ **三段式布局** - 左侧文件操作、中间快速创建、右侧配置（一分为三哲学）
+- ✅ **侧边栏文件面板** - 滑入式文件列表，节省垂直空间
+- ✅ **快速创建图表** - 工具栏一键创建折线图、柱状图、饼图、散点图、面积图
+- ✅ **全局拖拽上传** - 页面任意位置拖拽 CSV 文件即可上传
+- ✅ **智能提示** - 无文件时，快速创建按钮会提示先上传文件
+
+### ✨ Added
+
+**工具栏 UI** (`src/web/frontend.rs` - HTML)
+
+- **三段式工具栏结构**:
+  - **左侧** (`toolbar-left`): 上传 CSV、导出数据、文件面板按钮
+  - **中间** (`toolbar-center`): 快速创建按钮（📈📊🥧📉📊）
+  - **右侧** (`toolbar-right`): 图表配置按钮
+- **侧边栏文件面板**: 固定右侧，滑入动画，显示已上传文件列表
+- **隐藏文件输入**: `<input type="file">` 通过工具栏按钮触发
+
+**工具栏样式** (`src/web/frontend.rs` - CSS ~320 行)
+
+- `.toolbar`: 粘性定位，毛玻璃效果（backdrop-filter: blur），三段式 flexbox
+- `.toolbar-btn`: 统一按钮风格，悬停效果，深色/浅色主题支持
+- `.toolbar-divider`: 分隔线
+- `.files-panel`: 固定侧边栏，滑入动画（transform: translateX）
+- `.files-panel-empty`: 空状态提示
+- 响应式设计: 移动端自动调整布局，隐藏按钮文字
+
+**工具栏交互逻辑** (`src/web/frontend.rs` - JavaScript)
+
+- **`FileUploadManager` 类更新**:
+  - `init()`: 绑定工具栏按钮事件（上传、文件面板切换、关闭）
+  - `quickCreateChart(chartType)`: 快速创建图表（检查文件 → 获取最新文件 → 自动填充命令 → 执行）
+  - `getChartTypeName(type)`: 图表类型中文名称映射
+  - 全局拖拽上传：`document.body` 监听 dragover/drop 事件
+  - 快速创建按钮：`[data-chart-type]` 属性绑定
+
+- **`updateFilesList()` 重构**:
+  - 更新工具栏文件计数徽章 (`files-count`)
+  - 侧边栏文件列表渲染
+  - 空状态切换 (`files-panel-empty`)
+
+- **`handleFileUploaded()` 更新**:
+  - 使用 Toast 通知替代旧的 upload-status
+  - 上传成功自动打开文件面板
+
+- **`uploadFile()` 简化**:
+  - 移除旧的 upload-status 依赖
+  - 全面使用 `terminal.toast.show()` 显示状态
+
+- **`copyChartCommand()` 优化**:
+  - 简化成功提示（Toast）
+  - 支持 area（面积图）类型
+
+### 📈 Improvements
+
+- **UI 紧凑性**:
+  - 移除占据空间的文件上传区域
+  - 工具栏仅占用 ~40px 高度
+  - 文件面板按需显示，不占据主界面空间
+
+- **交互体验**:
+  - 快速创建按钮：一键创建图表，自动填充命令
+  - 智能提示：无文件时提示上传，按钮脉冲动画（pulse）
+  - 自动打开文件面板：上传成功后自动展开
+  - 全局拖拽：页面任意位置拖拽上传
+
+- **设计一致性**:
+  - 遵循 Jupyter Notebook 设计理念
+  - 工具栏成为未来功能扩展的标准模式
+  - 一分为三哲学：工具栏三段式布局（左/中/右）
+
+### 🧪 Testing
+
+- ✅ 编译通过（cargo build --release）
+- ✅ 库测试通过（1374 passed, 21 ignored）
+
+### 📝 Notes
+
+- **极简主义**: 工具栏仅保留核心功能按钮，避免视觉混乱
+- **一分为三**: 工具栏三段式布局，清晰分离不同功能类别
+- **设计模式**: 此工具栏设计成为未来所有功能添加的标准模式
+- **为 P1 铺路**: 面积图快速创建按钮已就位，等待后端实现
+
+---
+
 ## [1.46.0] - 2025-01-22
 
 ### 🎯 Highlights
