@@ -75,6 +75,16 @@
 - 翻译资源：`locales/*.yaml`
 - 使用：`i18n::t("key")` / `i18n::t_with_args("key", &[("param", "value")])`
 
+**版本管理**（一致性原则）：
+- **单一事实源**：`Cargo.toml` 中的 `version` 字段是权威版本号
+- **发布前同步**：创建 Git tag 前必须确保以下文件版本一致：
+  - `Cargo.toml` - version = "X.Y.Z"
+  - `README.md` + `README.cn.md` - badge/version-X.Y.Z
+  - `CHANGELOG.md` - ## [X.Y.Z] - YYYY-MM-DD（最新条目）
+  - Git tag - vX.Y.Z
+- **检查命令**：`grep "version.*1\." Cargo.toml README*.md && git describe --tags`
+- **原子性**：版本号更新和代码变更应在同一提交中完成
+
 **根目录管理**（极简原则）：
 - **保留**：README（.md/.cn.md）、CLAUDE.md、CHANGELOG.md、LICENSE、Cargo.toml、配置文件（.env.example, realconsole.yaml）、构建脚本（Makefile, install.sh, uninstall.sh）
 - **归档**：发布说明 → `docs/03-evolution/archives/vX.Y.Z-release-notes.md`，开发报告 → `docs/04-reports/`
