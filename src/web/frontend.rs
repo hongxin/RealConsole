@@ -101,6 +101,27 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             </div>
         </div>
     </div>
+    <!-- v1.46.0: 文件上传区域 -->
+    <div id="file-upload-section" class="file-upload-section">
+        <div id="upload-area" class="upload-area">
+            <input type="file" id="file-input" accept=".csv" style="display: none;">
+            <div class="upload-prompt">
+                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p class="upload-text">拖拽 CSV 文件到此处或点击上传</p>
+                <p class="upload-hint">支持最大 1MB，建议使用小文件进行测试</p>
+            </div>
+            <div id="upload-status" class="upload-status hidden"></div>
+        </div>
+        <!-- 已上传文件列表 -->
+        <div id="uploaded-files" class="uploaded-files hidden">
+            <h4>📁 已上传文件</h4>
+            <div id="files-list" class="files-list"></div>
+        </div>
+    </div>
     <div id="terminal-container">
         <!-- 混合终端：单一容器，统一滚动 -->
     </div>
@@ -4120,6 +4141,9 @@ const TERMINAL_JS: &str = r#"
         // v1.40.0: 初始化 SessionManager
         terminal.sessionManager = new ServerSessionManager(terminal, ws);
 
+        // v1.46.0: 初始化 FileUploadManager
+        terminal.fileUploadManager = new FileUploadManager(ws);
+
         // 应用初始语言设置
         updatePageText();
     };
@@ -4322,6 +4346,14 @@ const TERMINAL_JS: &str = r#"
                 // 图表数据：渲染 ECharts 图表
                 terminal.renderChart(msg);
                 break;
+
+            // ===== v1.46.0: 文件上传消息 =====
+            case 'file_uploaded':
+                // 文件上传成功
+                if (terminal.fileUploadManager) {
+                    terminal.fileUploadManager.handleFileUploaded(msg);
+                }
+                break;
         }
     };
 
@@ -4349,6 +4381,238 @@ const TERMINAL_JS: &str = r#"
             enabled_steps: enabledSteps
         }));
     };
+
+    // ========== 文件上传管理器 (v1.46.0) ==========
+    class FileUploadManager {
+        constructor(ws) {
+            this.ws = ws;
+            this.uploadedFiles = new Map(); // file_id -> file info
+            this.init();
+        }
+
+        init() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const uploadStatus = document.getElementById('upload-status');
+
+            if (!uploadArea || !fileInput) return;
+
+            // 点击上传
+            uploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // 文件选择
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    this.uploadFile(e.target.files[0]);
+                }
+            });
+
+            // 拖拽上传
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    this.uploadFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        uploadFile(file) {
+            const uploadStatus = document.getElementById('upload-status');
+
+            // 验证文件类型
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                this.showStatus('error', '❌ 只支持 CSV 文件');
+                return;
+            }
+
+            // 验证文件大小（1MB）
+            if (file.size > 1024 * 1024) {
+                this.showStatus('error', `❌ 文件过大: ${(file.size / 1024 / 1024).toFixed(2)}MB，最大 1MB`);
+                return;
+            }
+
+            // 显示加载状态
+            this.showStatus('loading', `📤 正在上传 ${file.name}...`);
+
+            // 读取文件内容
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+
+                // 发送到后端
+                this.ws.send(JSON.stringify({
+                    type: 'upload_file',
+                    filename: file.name,
+                    content: content
+                }));
+            };
+
+            reader.onerror = () => {
+                this.showStatus('error', '❌ 文件读取失败');
+            };
+
+            reader.readAsText(file);
+        }
+
+        handleFileUploaded(msg) {
+            const { file_id, filename, preview } = msg;
+
+            // 保存文件信息
+            this.uploadedFiles.set(file_id, {
+                id: file_id,
+                filename,
+                preview,
+                uploadedAt: new Date()
+            });
+
+            // 显示成功状态
+            this.showStatus('success',
+                `✅ ${filename} 上传成功！文件 ID: ${file_id}\\n` +
+                `数据: ${preview.total_rows} 行 × ${preview.total_columns} 列`
+            );
+
+            // 更新文件列表
+            this.updateFilesList();
+
+            // 3秒后隐藏状态
+            setTimeout(() => {
+                this.hideStatus();
+            }, 3000);
+        }
+
+        showStatus(type, message) {
+            const uploadStatus = document.getElementById('upload-status');
+            if (!uploadStatus) return;
+
+            uploadStatus.className = `upload-status ${type}`;
+            uploadStatus.textContent = message;
+            uploadStatus.classList.remove('hidden');
+        }
+
+        hideStatus() {
+            const uploadStatus = document.getElementById('upload-status');
+            if (uploadStatus) {
+                uploadStatus.classList.add('hidden');
+            }
+        }
+
+        updateFilesList() {
+            const uploadedFilesEl = document.getElementById('uploaded-files');
+            const filesListEl = document.getElementById('files-list');
+
+            if (!uploadedFilesEl || !filesListEl) return;
+
+            if (this.uploadedFiles.size === 0) {
+                uploadedFilesEl.classList.add('hidden');
+                return;
+            }
+
+            uploadedFilesEl.classList.remove('hidden');
+            filesListEl.innerHTML = '';
+
+            // 按上传时间倒序
+            const files = Array.from(this.uploadedFiles.values())
+                .sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div class="file-info">
+                        <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                            <polyline points="13 2 13 9 20 9"></polyline>
+                        </svg>
+                        <div class="file-details">
+                            <div class="file-name">${file.filename}</div>
+                            <div class="file-meta">${file.preview.total_rows} 行 × ${file.preview.total_columns} 列 | ID: ${file.id}</div>
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="file-action-btn btn-preview" data-file-id="${file.id}">👁️ 预览</button>
+                        <button class="file-action-btn btn-copy" data-file-id="${file.id}">📋 复制命令</button>
+                    </div>
+                `;
+
+                // 预览按钮
+                const previewBtn = fileItem.querySelector('.btn-preview');
+                previewBtn.addEventListener('click', () => {
+                    this.showPreview(file);
+                });
+
+                // 复制命令按钮
+                const copyBtn = fileItem.querySelector('.btn-copy');
+                copyBtn.addEventListener('click', () => {
+                    this.copyChartCommand(file);
+                });
+
+                filesListEl.appendChild(fileItem);
+            });
+        }
+
+        showPreview(file) {
+            const { preview } = file;
+
+            // 构建表格 HTML
+            let tableHtml = '<table style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px;">';
+
+            // Header
+            tableHtml += '<tr style="background: rgba(163, 113, 247, 0.2);">';
+            preview.headers.forEach(h => {
+                tableHtml += `<th style="padding: 8px; border: 1px solid rgba(163, 113, 247, 0.3); font-weight: 600;">${h}</th>`;
+            });
+            tableHtml += '</tr>';
+
+            // Rows
+            preview.rows.forEach(row => {
+                tableHtml += '<tr>';
+                row.forEach(cell => {
+                    tableHtml += `<td style="padding: 8px; border: 1px solid rgba(163, 113, 247, 0.2);">${cell}</td>`;
+                });
+                tableHtml += '</tr>';
+            });
+
+            tableHtml += '</table>';
+
+            if (preview.total_rows > 10) {
+                tableHtml += `<p style="color: #7D8590; font-size: 12px; margin: 5px 0;">仅显示前 10 行，共 ${preview.total_rows} 行</p>`;
+            }
+
+            // 在终端中显示
+            terminal.writeOutput(`\\n**📊 数据预览: ${file.filename}**\\n\\n${tableHtml}`);
+        }
+
+        copyChartCommand(file) {
+            // 获取第一个数值列作为示例
+            const { preview } = file;
+            const xCol = preview.headers[0] || 'col1';
+            const yCol = preview.headers[1] || 'col2';
+
+            const command = `!chart csv @${file.id} --type line --x-col "${xCol}" --y-col "${yCol}"`;
+
+            // 复制到剪贴板
+            navigator.clipboard.writeText(command).then(() => {
+                this.showStatus('success', `✅ 已复制命令到剪贴板:\\n${command}`);
+                setTimeout(() => this.hideStatus(), 2000);
+            }).catch(() => {
+                // 降级方案：显示命令让用户手动复制
+                terminal.writeOutput(`\\n**📋 图表命令示例**\\n\\n\`\`\`bash\\n${command}\\n\`\`\`\\n\\n你可以修改列名和图表类型（line/bar/pie/scatter）`);
+            });
+        }
+    }
 
     // ========== 主题切换系统 (v1.43.0) ==========
     let currentTheme = 'dark'; // 默认深色主题
@@ -7442,6 +7706,257 @@ body::before {
     .chart-container {
         min-height: 300px;
         border-radius: 6px;  /* v1.45.0: 匹配卡片圆角 */
+    }
+}
+
+/* ===== v1.46.0: 文件上传样式 ===== */
+.file-upload-section {
+    padding: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.upload-area {
+    border: 2px dashed rgba(163, 113, 247, 0.4);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(13, 17, 23, 0.3);
+}
+
+.upload-area:hover {
+    border-color: rgba(163, 113, 247, 0.7);
+    background: rgba(13, 17, 23, 0.5);
+}
+
+.upload-area.dragover {
+    border-color: #A371F7;
+    background: rgba(163, 113, 247, 0.1);
+}
+
+.upload-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    stroke: #A371F7;
+    stroke-width: 2;
+}
+
+.upload-text {
+    font-size: 16px;
+    color: #E6EDF3;
+    margin: 0 0 8px 0;
+    font-weight: 500;
+}
+
+.upload-hint {
+    font-size: 13px;
+    color: #7D8590;
+    margin: 0;
+}
+
+.upload-status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.upload-status.success {
+    background: rgba(46, 160, 67, 0.15);
+    color: #3FB950;
+    border: 1px solid rgba(46, 160, 67, 0.3);
+}
+
+.upload-status.error {
+    background: rgba(248, 81, 73, 0.15);
+    color: #F85149;
+    border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+.upload-status.loading {
+    background: rgba(163, 113, 247, 0.15);
+    color: #A371F7;
+    border: 1px solid rgba(163, 113, 247, 0.3);
+}
+
+.uploaded-files {
+    margin-top: 24px;
+}
+
+.uploaded-files h4 {
+    font-size: 15px;
+    color: #E6EDF3;
+    margin: 0 0 12px 0;
+    font-weight: 500;
+}
+
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(13, 17, 23, 0.4);
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.file-item:hover {
+    background: rgba(13, 17, 23, 0.6);
+    border-color: rgba(163, 113, 247, 0.5);
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.file-icon {
+    width: 24px;
+    height: 24px;
+    stroke: #58A6FF;
+    stroke-width: 2;
+}
+
+.file-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.file-name {
+    font-size: 14px;
+    color: #E6EDF3;
+    font-weight: 500;
+}
+
+.file-meta {
+    font-size: 12px;
+    color: #7D8590;
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.file-action-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    font-weight: 500;
+}
+
+.btn-preview {
+    background: rgba(88, 166, 255, 0.15);
+    color: #58A6FF;
+    border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.btn-preview:hover {
+    background: rgba(88, 166, 255, 0.25);
+    border-color: rgba(88, 166, 255, 0.5);
+}
+
+.btn-copy {
+    background: rgba(163, 113, 247, 0.15);
+    color: #A371F7;
+    border: 1px solid rgba(163, 113, 247, 0.3);
+}
+
+.btn-copy:hover {
+    background: rgba(163, 113, 247, 0.25);
+    border-color: rgba(163, 113, 247, 0.5);
+}
+
+.btn-delete {
+    background: rgba(248, 81, 73, 0.15);
+    color: #F85149;
+    border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+.btn-delete:hover {
+    background: rgba(248, 81, 73, 0.25);
+    border-color: rgba(248, 81, 73, 0.5);
+}
+
+/* 浅色主题文件上传样式 */
+[data-theme="light"] .upload-area {
+    background: #F7F9FA;
+    border-color: rgba(163, 113, 247, 0.3);
+}
+
+[data-theme="light"] .upload-area:hover {
+    background: #EDEFF1;
+}
+
+[data-theme="light"] .upload-text {
+    color: #1F2328;
+}
+
+[data-theme="light"] .upload-hint {
+    color: #656D76;
+}
+
+[data-theme="light"] .uploaded-files h4 {
+    color: #1F2328;
+}
+
+[data-theme="light"] .file-item {
+    background: #FFFFFF;
+    border-color: #D0D7DE;
+}
+
+[data-theme="light"] .file-item:hover {
+    background: #F7F9FA;
+}
+
+[data-theme="light"] .file-name {
+    color: #1F2328;
+}
+
+[data-theme="light"] .file-meta {
+    color: #656D76;
+}
+
+/* 响应式文件上传 */
+@media (max-width: 768px) {
+    .file-upload-section {
+        padding: 12px;
+    }
+
+    .upload-area {
+        padding: 30px 16px;
+    }
+
+    .file-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .file-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .file-action-btn {
+        flex: 1;
     }
 }
 "#;

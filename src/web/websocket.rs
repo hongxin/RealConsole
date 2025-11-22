@@ -150,6 +150,10 @@ async fn handle_message(
         ClientMessage::ExportSession { session_id, format } => {
             handle_export_session(&session_id, &format, sender).await?;
         }
+        // ===== v1.46.0: 文件上传 =====
+        ClientMessage::UploadFile { filename, content } => {
+            handle_upload_file(session, filename, content, sender).await?;
+        }
     }
     Ok(())
 }
@@ -419,20 +423,25 @@ async fn execute_shell_command(
 
 /// ===== v1.45.0: 解析 CSV 图表命令 =====
 ///
-/// 格式：`!chart csv <file_path> --type <type> --x-col "col" --y-col "col1" --y-col "col2"`
-fn parse_csv_command(cmd: &str) -> anyhow::Result<crate::visualization::ChartData> {
+/// 格式：`!chart csv <file_path|@file_id> --type <type> --x-col "col" --y-col "col1" --y-col "col2"`
+///
+/// v1.46.0: 支持 @file_id 语法（上传文件）
+fn parse_csv_command(
+    cmd: &str,
+    session: &Arc<Session>,
+) -> anyhow::Result<crate::visualization::ChartData> {
     use crate::visualization::{parse_csv_file, ChartType};
 
     // 移除 "chart csv" 前缀
     let cmd = cmd.trim_start_matches("chart").trim().trim_start_matches("csv").trim();
 
-    // 提取文件路径（第一个参数）
+    // 提取文件路径/ID（第一个参数）
     let parts: Vec<&str> = cmd.split_whitespace().collect();
     if parts.is_empty() {
-        return Err(anyhow::anyhow!("缺少 CSV 文件路径"));
+        return Err(anyhow::anyhow!("缺少 CSV 文件路径或文件 ID（如 @uploaded_001）"));
     }
 
-    let file_path = parts[0];
+    let file_path_or_id = parts[0];
     let args = &parts[1..].join(" ");
 
     // 提取参数
@@ -491,8 +500,24 @@ fn parse_csv_command(cmd: &str) -> anyhow::Result<crate::visualization::ChartDat
         return Err(anyhow::anyhow!("至少需要一个 --y-col 参数"));
     }
 
-    // 读取 CSV 文件
-    let csv_data = parse_csv_file(file_path)?;
+    // v1.46.0: 支持 @file_id 语法
+    let csv_data = if file_path_or_id.starts_with('@') {
+        // 从上传文件中读取（去掉 @ 前缀）
+        let file_id = file_path_or_id.trim_start_matches('@');
+
+        // 获取文件内容
+        let content = session.uploaded_files.get(file_id)
+            .map_err(|e| anyhow::anyhow!("无法获取上传文件 {}: {}", file_id, e))?;
+
+        // 解析 CSV 字符串
+        let (headers, records) = parse_csv_string(&content)?;
+
+        // 构建 CsvData
+        crate::visualization::CsvData { headers, records }
+    } else {
+        // 从文件系统读取
+        parse_csv_file(file_path_or_id)?
+    };
 
     // 转换为 ChartData
     let y_col_refs: Vec<&str> = y_cols.iter().map(|s| s.as_str()).collect();
@@ -535,8 +560,9 @@ async fn execute_chart_command(
 
     // v1.45.0: 检查是否是 CSV 命令
     let chart_data_result = if cmd.trim_start_matches("chart").trim().starts_with("csv ") {
-        // CSV 命令：!chart csv <file> --type <type> --x-col "col" --y-col "col1" --y-col "col2"
-        parse_csv_command(cmd)
+        // CSV 命令：!chart csv <file|@file_id> --type <type> --x-col "col" --y-col "col1" --y-col "col2"
+        // v1.46.0: 支持 @file_id 语法
+        parse_csv_command(cmd, session)
     } else {
         // 普通图表命令
         ChartCommandParser::parse(cmd)
@@ -1968,4 +1994,133 @@ async fn handle_export_session(
     }
 
     Ok(())
+}
+
+/// ===== v1.46.0: 处理文件上传 =====
+///
+/// 功能：
+/// - 解析 CSV 内容
+/// - 生成预览数据（前 10 行）
+/// - 存储到内存（LRU 缓存）
+/// - 返回文件 ID 和预览
+async fn handle_upload_file(
+    session: &Arc<Session>,
+    filename: String,
+    content: String,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use crate::web::session::FilePreview;
+
+    // 1. 验证文件格式（只支持 CSV）
+    if !filename.to_lowercase().ends_with(".csv") {
+        let error_msg = ServerMessage::Error {
+            content: format!("❌ 不支持的文件格式: {}\n提示: 当前只支持 CSV 文件", filename),
+        };
+        sender
+            .send(Message::Text(serde_json::to_string(&error_msg)?))
+            .await?;
+        return Ok(());
+    }
+
+    // 2. 解析 CSV 内容
+    let csv_result = parse_csv_string(&content);
+    let (headers, records) = match csv_result {
+        Ok(data) => data,
+        Err(e) => {
+            let error_msg = ServerMessage::Error {
+                content: format!("❌ CSV 解析失败: {}\n提示: 请检查文件格式是否正确", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&error_msg)?))
+                .await?;
+            return Ok(());
+        }
+    };
+
+    // 3. 生成预览数据（前 10 行）
+    let preview_rows = records
+        .iter()
+        .take(10)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let preview = FilePreview {
+        headers: headers.clone(),
+        rows: preview_rows,
+        total_rows: records.len(),
+        total_columns: headers.len(),
+    };
+
+    // 4. 存储文件到内存
+    let file_id = match session.uploaded_files.add(filename.clone(), content) {
+        Ok(id) => id,
+        Err(e) => {
+            let error_msg = ServerMessage::Error {
+                content: format!("❌ 文件存储失败: {}", e),
+            };
+            sender
+                .send(Message::Text(serde_json::to_string(&error_msg)?))
+                .await?;
+            return Ok(());
+        }
+    };
+
+    // 5. 返回成功消息
+    let response = ServerMessage::FileUploaded {
+        file_id: file_id.clone(),
+        filename,
+        preview,
+    };
+
+    sender
+        .send(Message::Text(serde_json::to_string(&response)?))
+        .await?;
+
+    println!("✅ [FileUpload] File uploaded successfully: {}", file_id);
+
+    Ok(())
+}
+
+/// 解析 CSV 字符串内容
+///
+/// # 返回
+/// - `Result<(Vec<String>, Vec<Vec<String>>)>`: (headers, records)
+fn parse_csv_string(content: &str) -> anyhow::Result<(Vec<String>, Vec<Vec<String>>)> {
+    use std::io::Cursor;
+
+    // 使用 csv crate 读取字符串
+    let cursor = Cursor::new(content);
+    let mut reader = csv::Reader::from_reader(cursor);
+
+    // 读取 headers
+    let headers = reader
+        .headers()
+        .map_err(|e| anyhow::anyhow!("无法读取 CSV header: {}", e))?
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
+    if headers.is_empty() {
+        return Err(anyhow::anyhow!("CSV 文件为空"));
+    }
+
+    // 读取所有记录
+    let mut records = Vec::new();
+    for result in reader.records() {
+        let record = result.map_err(|e| anyhow::anyhow!("读取 CSV 记录失败: {}", e))?;
+        let row: Vec<String> = record.iter().map(|s| s.to_string()).collect();
+
+        // 验证列数匹配
+        if row.len() != headers.len() {
+            return Err(anyhow::anyhow!(
+                "CSV 数据列数不一致：期望 {} 列，实际 {} 列",
+                headers.len(),
+                row.len()
+            ));
+        }
+
+        records.push(row);
+    }
+
+    Ok((headers, records))
 }

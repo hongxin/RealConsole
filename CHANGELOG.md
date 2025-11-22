@@ -5,6 +5,91 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.0] - 2025-01-22
+
+### 🎯 Highlights
+
+**主题**: 可视化功能 Phase 3 - 浏览器文件上传与数据预览
+
+- ✅ **浏览器文件上传** - 拖拽或点击上传 CSV 文件（最大 1MB）
+- ✅ **LRU 文件缓存** - 内存存储，最多 10 个文件，自动淘汰最旧文件
+- ✅ **数据表格预览** - 实时显示前 10 行数据，包含行列统计
+- ✅ **@file_id 语法** - 图表命令支持引用上传文件（如 `!chart csv @uploaded_001 ...`）
+- ✅ **一键复制命令** - 自动生成图表命令模板
+- ✅ **深色/浅色主题** - 文件上传 UI 完美适配两种主题
+
+### ✨ Added
+
+**后端文件上传系统** (`src/web/`)
+
+- **文件存储管理器** (`uploaded_files.rs` - 254 行):
+  - `UploadedFiles` 结构体：LRU 缓存，Arc<RwLock<>> 线程安全
+  - `UploadedFile`: 文件元数据（id, filename, content, size, uploaded_at）
+  - `add()`: 文件存储，自动 LRU 淘汰，大小限制（1MB/文件，5MB 总计）
+  - `get()`: 根据 file_id 获取内容
+  - `list()`: 列出所有文件
+  - `remove()`, `clear()`: 文件管理
+  - 5 个单元测试（add/get、大小限制、LRU 淘汰、列表、删除）
+
+- **WebSocket 消息类型** (`session.rs`):
+  - `ClientMessage::UploadFile { filename, content }` - 客户端上传消息
+  - `ServerMessage::FileUploaded { file_id, filename, preview }` - 服务器响应
+  - `FilePreview` 结构体：headers, rows, total_rows, total_columns
+
+- **消息处理器** (`websocket.rs`):
+  - `handle_upload_file()`: 处理文件上传，验证格式/大小，解析 CSV，生成预览
+  - `parse_csv_string()`: 解析 CSV 字符串内容
+  - `parse_csv_command()`: 扩展支持 `@file_id` 语法（如 `@uploaded_001`）
+
+**前端文件上传 UI** (`src/web/frontend.rs`)
+
+- **HTML 结构**:
+  - 文件上传区域（拖拽 + 点击）
+  - 上传状态提示（成功/错误/加载中）
+  - 已上传文件列表
+
+- **CSS 样式** (250+ 行):
+  - `.upload-area`: 虚线边框，悬停效果，拖拽高亮
+  - `.file-item`: 文件卡片，包含元数据和操作按钮
+  - 深色/浅色主题适配
+  - 响应式设计（移动端友好）
+
+- **JavaScript 逻辑** (`FileUploadManager` 类 - 230 行):
+  - `uploadFile()`: 文件读取，验证格式/大小，WebSocket 发送
+  - `handleFileUploaded()`: 处理服务器响应，更新文件列表
+  - `updateFilesList()`: 动态渲染文件卡片
+  - `showPreview()`: 数据表格预览（HTML table，前 10 行）
+  - `copyChartCommand()`: 一键复制图表命令到剪贴板
+  - 拖拽事件处理（dragover/dragleave/drop）
+
+### 📈 Improvements
+
+- **用户体验**:
+  - 无需手动创建 CSV 文件，直接在浏览器上传
+  - 实时数据预览，所见即所得
+  - 文件 ID 自动生成（uploaded_001, uploaded_002...）
+  - 命令模板自动生成，降低学习成本
+
+- **技术质量**:
+  - LRU 缓存算法，内存占用可控
+  - 文件大小限制（单文件 1MB，总计 5MB）
+  - 线程安全（Arc<RwLock<>>）
+  - 完整单元测试覆盖
+
+### 🧪 Testing
+
+- ✅ 文件上传单元测试（5 个）
+- ✅ 全部库测试通过（1388 passed, 22 ignored）
+
+### 📝 Notes
+
+- **极简主义**: 仅支持 CSV 格式，聚焦核心需求
+- **一分为三**: 文件状态（pending/uploading/uploaded）清晰分离
+- **性能优化**: LRU 缓存，避免内存溢出
+- **安全设计**: 大小限制，防止恶意文件
+
+---
+
 ## [1.45.0] - 2025-01-22
 
 ### 🎯 Highlights

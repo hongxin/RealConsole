@@ -159,6 +159,16 @@ pub enum ClientMessage {
         session_id: String,
         format: String, // "markdown" 或 "html"
     },
+
+    // ===== v1.46.0 新增：文件上传功能 =====
+    /// 上传 CSV 文件
+    #[serde(rename = "upload_file")]
+    UploadFile {
+        /// 文件名
+        filename: String,
+        /// 文件内容（CSV 格式的文本）
+        content: String,
+    },
 }
 
 /// v1.29.3: 启用的步骤信息
@@ -171,6 +181,19 @@ pub struct EnabledStep {
     /// 工具参数（可选，JSON 格式）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<serde_json::Value>,
+}
+
+/// v1.46.0: 文件预览数据
+#[derive(Debug, Serialize, Clone)]
+pub struct FilePreview {
+    /// 列名（CSV header）
+    pub headers: Vec<String>,
+    /// 前 N 行数据（示例）
+    pub rows: Vec<Vec<String>>,
+    /// 总行数
+    pub total_rows: usize,
+    /// 列数
+    pub total_columns: usize,
 }
 
 /// 消息类型（Server → Client）
@@ -331,6 +354,18 @@ pub enum ServerMessage {
         chart_data: visualization::ChartData,
     },
 
+    // ===== v1.46.0 新增：文件上传响应 =====
+    /// 文件上传成功（返回文件 ID 和预览数据）
+    #[serde(rename = "file_uploaded")]
+    FileUploaded {
+        /// 文件 ID（用于后续图表命令）
+        file_id: String,
+        /// 文件名
+        filename: String,
+        /// 数据预览
+        preview: FilePreview,
+    },
+
     // ===== v1.36.0 占卜消息（v1.36.2 已废弃，保留用于向后兼容） =====
     // 以下消息类型已被 situation_analysis 字段替代，暂时注释掉
     /*
@@ -377,6 +412,8 @@ pub struct Session {
     pub conversation_id: String,
     /// 对话回合列表（v1.28.0 新增）
     pub rounds: Arc<RwLock<Vec<ConversationRound>>>,
+    /// 上传文件管理器（v1.46.0 新增）
+    pub uploaded_files: crate::web::uploaded_files::UploadedFiles,
 }
 
 impl Session {
@@ -407,6 +444,7 @@ impl Session {
             llm_init_error,
             conversation_id,
             rounds: Arc::new(RwLock::new(Vec::new())),
+            uploaded_files: crate::web::uploaded_files::UploadedFiles::new(), // v1.46.0
         }
     }
 
