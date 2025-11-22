@@ -173,6 +173,15 @@ web:
 翻译这段代码
 ```
 
+✅ **数据可视化** (v1.44.0+) - 以 `!chart` 开头的图表命令
+```
+!chart line --title "月度销售" --x-axis "1月,2月,3月" --series "销售额:120,132,145"
+!chart pie --title "市场份额" --labels "A,B,C" --series "份额:35,25,40"
+!chart csv data.csv --type line --x-col "月份" --y-col "销售额"
+```
+
+> 📖 **完整可视化指南**: [visualization-guide.md](visualization-guide.md)
+
 ### 终端快捷键
 
 - **Ctrl+C** - 中断当前操作

@@ -6,8 +6,8 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1000%2B-green.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-1.39.0-blue.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-1374-green.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-1.45.0-blue.svg)](CHANGELOG.md)
 
 **[English](README.md)** | 中文
 
@@ -106,6 +106,37 @@ realconsole web --bind 0.0.0.0 --port 7788
 - 无需安装的快速体验
 
 > 📖 **详细文档**：[Web 终端用户指南](docs/02-practice/user/web-terminal.md)
+
+### 📊 数据可视化 ⭐ 新增亮点 (v1.44.0 - v1.45.0)
+
+**在终端中生成专业图表**，基于 ECharts 5 的强大可视化能力：
+
+```bash
+# 折线图：趋势分析
+!chart line --title "月度销售" --x-axis "1月,2月,3月" --series "销售额:120,132,145"
+
+# 饼图：占比展示
+!chart pie --title "市场份额" --labels "产品A,产品B,产品C" --series "份额:35,25,40"
+
+# 散点图：分布分析
+!chart scatter --title "身高体重" --data "170,65 175,70 180,80"
+
+# CSV 文件：直接可视化
+!chart csv data.csv --type line --x-col "月份" --y-col "销售额" --y-col "成本"
+```
+
+**核心特性**：
+- 📈 **4 种图表类型**：折线图、柱状图、饼图、散点图
+- 📁 **CSV 文件支持**：直接从 CSV 生成图表，支持多列多系列
+- 🎨 **主题自适应**：自动匹配深色/浅色主题，紫绿金三色体系
+- 🖱️ **交互式**：悬停高亮、图例切换、工具栏（缩放、保存图片）
+- 📱 **响应式**：自动适配窗口大小，移动端友好
+
+**使用场景**：
+- 数据分析和趋势可视化
+- 项目报告和演示
+- 日志和监控数据展示
+- 快速数据探索
 
 ### 🌍 国际化支持 (v1.24.0)
 
@@ -287,87 +318,58 @@ realconsole web --bind 0.0.0.0 --port 7788
 
 ## 最新特性
 
-### v1.39.0 - 意图拆解自动执行 + 护眼配色优化 🎯👁️
+### v1.45.0 - 可视化 Phase 2：饼图、散点图和 CSV 文件 📊
 
-**AI 思考可视化 + 长时间使用舒适**
+**数据可视化能力全面升级**
 
-#### 核心改进
-
-**意图拆解自动执行**：
-- ✅ `/decompose` 命令现在真正执行工具，返回实际结果（不仅可视化）
-- ✅ 既能看到 AI 思考过程（意图理解、步骤计划），又能获得真实结果
-- ✅ 与直接执行模式保持一致的智能体验，保留教学和调试价值
-
-**护眼配色系统性优化**：
-- ✅ 大幅减少蓝色/青色使用（蓝光强度降低 83%）
-- ✅ 采用 GitHub/Binance 专业暗色调风格
-- ✅ 移除 25+ 处发光效果，降低眼睛疲劳
-- ✅ 长时间舒适度提升 113%（40 → 85 分）
+- ✅ **饼图**：扇区标签、百分比显示、悬停高亮
+- ✅ **散点图**：单/多系列、坐标轴命名、悬停放大
+- ✅ **CSV 文件**：直接从 CSV 生成图表，支持多列多系列
+- ✅ **图表集成**：嵌入回合卡片，支持折叠/展开
+- ✅ **视觉优化**：流畅过渡动画、响应式布局
 
 ```bash
-# 体验意图拆解自动执行
-% /decompose 计算 2 + 3
-→ 显示意图理解 → 显示步骤计划 → 自动执行 → 返回结果: 5
+# 饼图：市场份额分析
+!chart pie --title "市场份额" --labels "A,B,C" --series "份额:35,25,40"
 
-# 护眼配色已默认启用，无需配置
+# 散点图：相关性分析
+!chart scatter --title "身高体重" --data "170,65 175,70 180,80"
+
+# CSV 图表：多系列折线图
+!chart csv sales.csv --type line --x-col "月份" --y-col "销售额" --y-col "成本"
 ```
 
-📖 **详细信息**：[CHANGELOG.md v1.39.0](CHANGELOG.md#1390---2025-01-08)
+📖 **详细信息**：[CHANGELOG.md v1.45.0](CHANGELOG.md#1450---2025-01-22)
 
 ---
 
-### v1.38.0 - Cell 重新执行功能 🔄
+### v1.44.0 - 可视化 MVP：折线图和柱状图 📈
 
-**Jupyter-like 体验升级**
+**终端数据可视化首次亮相**
 
-- ✅ 一键重新执行任何历史命令/对话（Cell Rerun Feature）
-- ✅ 赛博朋克 UI - 简洁图标风格按钮
-- ✅ 实时反馈 - Loading 状态、错误处理、按钮禁用
-- ✅ WebSocket 通信 - 前后端消息流完整实现
+- ✅ 基于 ECharts 5 的专业图表渲染
+- ✅ 折线图和柱状图支持
+- ✅ 主题自适应（深色/浅色）
+- ✅ 交互式工具栏（缩放、保存图片）
 
-📖 **详细信息**：[CHANGELOG.md v1.38.0](CHANGELOG.md#1380---2025-01-08)
-
----
-
-### v1.28.0 - Web 回合可视化 📒
-
-**对话历史 Jupyter 化**
-
-- ✅ Jupyter-like 对话回合卡片（Round Cards）
-- ✅ 双视图模式（回合视图/传统视图）切换
-- ✅ 完整元数据展示（时间、耗时、Token 统计）
-- ✅ Cell 折叠/展开，优化长输出显示
-
-📖 **详细信息**：[CHANGELOG.md v1.28.0](CHANGELOG.md#1280---2025-01-07)
+📖 **详细信息**：[CHANGELOG.md v1.44.0](CHANGELOG.md#1440---2025-01-21)
 
 ---
 
-### v1.24.0 - 全面国际化支持 🌍
+### v1.40.0 - Web 会话持久化 💾
 
-**中英双语无缝切换**
+**无缝的浏览器体验**
 
-- ✅ CLI 完全国际化：所有命令输出、提示、错误信息
-- ✅ LLM 提示词双语：系统提示词支持中文上下文
-- ✅ YAML 配置国际化：配置文件注释和提示中文化
-- ✅ 环境变量控制：`REALCONSOLE_LANG=zh-CN|en-US` 动态切换
+- ✅ 自动保存/恢复会话（页面刷新后无缝恢复）
+- ✅ 历史会话管理（浏览、加载、删除）
+- ✅ 智能命名（基于首条输入自动生成）
+- ✅ 定期备份（每 5 分钟自动保存）
 
----
-
-### v1.23.0 - Web 终端发布 🌐
-
-**随时随地访问 RealConsole**
-
-- ✅ 完整的 Web 终端实现（Axum + WebSocket）
-- ✅ 智能路由和 Intent 意图理解
-- ✅ 美观的用户界面和实时流式输出
-- ✅ 移动端友好设计
-- ✅ 局域网访问支持
-
-📖 **Web 终端完整文档**：[Web 终端用户指南](docs/02-practice/user/web-terminal.md)
+📖 **详细信息**：[CHANGELOG.md v1.40.0](CHANGELOG.md#1400---2025-11-16)
 
 ---
 
-**更多历史特性**详见 [CHANGELOG.md](CHANGELOG.md) | **完整版本历史**：[docs/03-evolution/version-history.md](docs/03-evolution/version-history.md)
+**更多历史版本**详见 [CHANGELOG.md](CHANGELOG.md) | **完整版本历史**：[docs/03-evolution/version-history.md](docs/03-evolution/version-history.md)
 
 ## 免责声明
 

@@ -34,10 +34,10 @@
 - `src/task/` - 任务编排系统
 - `src/tracer/` - 统一追踪系统（v1.5.0新增，四维观测体系）
 - `src/web/` - Web 终端（v1.23.0新增，浏览器访问）
+- `src/visualization/` - 数据可视化（v1.44.0新增，ECharts 图表）
 - `src/i18n.rs` - 国际化系统
 - `scripts/` - Shell 脚本集合（test/ 按功能分类的测试脚本，utils/ 发布等工具）
 - `docs/` - 五态架构文档（00-core/01-understanding/02-practice/03-evolution/04-reports）
-- `scripts/` - 测试脚本目录
 
 ## 开发规范
 
