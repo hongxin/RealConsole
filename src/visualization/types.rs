@@ -118,6 +118,8 @@ pub enum ChartType {
     Pie,
     /// 散点图
     Scatter,
+    /// 面积图 (v1.47.0)
+    Area,
 }
 
 impl ChartType {
@@ -128,6 +130,7 @@ impl ChartType {
             "bar" => Some(Self::Bar),
             "pie" => Some(Self::Pie),
             "scatter" => Some(Self::Scatter),
+            "area" => Some(Self::Area),  // v1.47.0
             _ => None,
         }
     }

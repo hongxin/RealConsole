@@ -2991,6 +2991,8 @@ const TERMINAL_JS: &str = r#"
             // v1.45.0: 特殊图表类型判断
             const isPie = chartData.chart_type === 'pie';
             const isScatter = chartData.chart_type === 'scatter';
+            // v1.47.0: 面积图判断
+            const isArea = chartData.chart_type === 'area';
 
             return {
                 title: {
@@ -3110,19 +3112,42 @@ const TERMINAL_JS: &str = r#"
                             scaleSize: 15,
                         },
                     };
-                }) : chartData.series.map((s, index) => ({
-                    name: s.name,
-                    type: chartData.chart_type.toLowerCase(),
-                    data: s.data,
-                    smooth: chartData.options.smooth,
-                    color: s.color || defaultColors[index % defaultColors.length],
-                    lineStyle: {
-                        width: 2,
-                    },
-                    itemStyle: {
-                        borderWidth: 2,
-                    },
-                })),
+                }) : chartData.series.map((s, index) => {
+                    // v1.47.0: 面积图需要 line 类型 + areaStyle
+                    const seriesConfig = {
+                        name: s.name,
+                        type: isArea ? 'line' : chartData.chart_type.toLowerCase(),
+                        data: s.data,
+                        smooth: chartData.options.smooth,
+                        color: s.color || defaultColors[index % defaultColors.length],
+                        lineStyle: {
+                            width: 2,
+                        },
+                        itemStyle: {
+                            borderWidth: 2,
+                        },
+                    };
+
+                    // v1.47.0: 面积图添加 areaStyle（渐变填充）
+                    if (isArea) {
+                        const color = s.color || defaultColors[index % defaultColors.length];
+                        seriesConfig.areaStyle = {
+                            color: {
+                                type: 'linear',
+                                x: 0,
+                                y: 0,
+                                x2: 0,
+                                y2: 1,
+                                colorStops: [
+                                    { offset: 0, color: color + '80' },  // 50% opacity at top
+                                    { offset: 1, color: color + '10' },  // 6% opacity at bottom
+                                ],
+                            },
+                        };
+                    }
+
+                    return seriesConfig;
+                }),
                 toolbox: chartData.options.show_toolbox ? {
                     feature: {
                         saveAsImage: {
