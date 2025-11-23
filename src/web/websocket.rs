@@ -1109,6 +1109,30 @@ async fn execute_llm_chat(
                     .await?;
             }
 
+            // ✨ v1.52.0: 检测并处理 ImageData（远程运维图像显示）
+            let (final_content, image_data_opt) = extract_and_process_image_data(&final_content);
+
+            // 如果检测到 ImageData，发送 Image 消息
+            if let Some(image_data) = image_data_opt {
+                // 添加到会话的图像历史
+                session
+                    .add_image_to_history(
+                        image_data.clone(),
+                        Some(round_id.clone()),
+                        input.to_string(),
+                    )
+                    .await;
+
+                // 发送 Image 消息
+                let image_msg = ServerMessage::Image {
+                    round_id: round_id.clone(),
+                    image_data,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&image_msg)?))
+                    .await?;
+            }
+
             // ===== v1.28.0: 提取使用的工具 =====
             let tools_used = extract_tools_from_response(&llm_response);
 
@@ -2188,6 +2212,19 @@ async fn handle_load_session(
                         .await?;
                 }
             }
+
+            // v1.52.0: 为历史会话中的每个图像发送 Image 消息
+            for image_entry in &serializable.image_history {
+                if let Some(ref round_id) = image_entry.round_id {
+                    let image_msg = ServerMessage::Image {
+                        round_id: round_id.clone(),
+                        image_data: image_entry.image_data.clone(),
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&image_msg)?))
+                        .await?;
+                }
+            }
         }
         Err(e) => {
             let response = ServerMessage::SessionError {
@@ -2640,4 +2677,73 @@ fn convert_tool_params_to_chart_data(params: serde_json::Value) -> anyhow::Resul
         indicators,
         heatmap_data: None,
     })
+}
+
+/// ✨ v1.52.0: 提取并处理图像数据
+///
+/// 注意: 此函数在 remove_debug_info 之后调用,所以不能依赖 __DEBUG__ 标记
+fn extract_and_process_image_data(content: &str) -> (String, Option<crate::visualization::ImageData>) {
+    // 检测 __IMAGE__ 标记
+    if let Some(start) = content.find("__IMAGE__") {
+        let image_section = &content[start + 9..]; // Skip "__IMAGE__"
+
+        // 提取 ImageData JSON 部分（格式：__IMAGE_DATA__:{json}）
+        if let Some(data_pos) = image_section.find("__IMAGE_DATA__:") {
+            let json_str = &image_section[data_pos + 15..]; // Skip "__IMAGE_DATA__:"
+
+            // 直接解析为 ImageData (serde_json 会自动处理JSON边界)
+            match serde_json::from_str::<crate::visualization::ImageData>(json_str) {
+                Ok(image_data) => {
+                    // 验证数据
+                    if let Err(e) = image_data.validate() {
+                        eprintln!("[v1.52.0] ImageData 验证失败: {}", e);
+                        return (content.to_string(), None);
+                    }
+
+                    // 清理内容（移除 __IMAGE__ 部分）
+                    let clean_content = content[..start].trim().to_string();
+
+                    return (clean_content, Some(image_data));
+                }
+                Err(e) => {
+                    eprintln!("[v1.52.0] ImageData JSON 解析失败: {}", e);
+                    eprintln!("[v1.52.0] JSON 字符串前100个字符: {}", &json_str.chars().take(100).collect::<String>());
+                    return (content.to_string(), None);
+                }
+            }
+        }
+    }
+    (content.to_string(), None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_image_data_with_complete_json() {
+        // 模拟完整的图像响应（已经过 remove_debug_info 处理，没有 __DEBUG__）
+        let test_json = r#"{"image_type":"base64","mime_type":"image/png","data":"iVBORw0KGgo=","alt_text":"test.png","filename":"test.png","size_bytes":100}"#;
+        let content = format!("✅ 图像已加载__IMAGE____IMAGE_DATA__:{}", test_json);
+
+        let (cleaned, image_opt) = extract_and_process_image_data(&content);
+
+        assert!(image_opt.is_some(), "应该成功提取图像数据");
+        let image = image_opt.unwrap();
+        assert_eq!(image.image_type, "base64");
+        assert_eq!(image.mime_type, "image/png");
+        assert_eq!(image.alt_text, "test.png");
+        assert_eq!(cleaned.trim(), "✅ 图像已加载");
+    }
+
+    #[test]
+    fn test_extract_image_data_invalid_json() {
+        // 无效的 JSON
+        let content = "✅ 图像已加载__IMAGE____IMAGE_DATA__:{invalid json}__DEBUG__{\"rounds\":[]}";
+
+        let (cleaned, image_opt) = extract_and_process_image_data(content);
+
+        assert!(image_opt.is_none(), "无效 JSON 应该提取失败");
+        assert_eq!(cleaned, content);
+    }
 }
