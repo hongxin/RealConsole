@@ -10,7 +10,7 @@ use super::types::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
 use serde::{Deserialize, Serialize};
 
 /// 图表模板分类
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TemplateCategory {
     /// 业务分析
@@ -142,6 +142,20 @@ impl TemplateEngine {
                     || t.tags.iter().any(|tag| tag.to_lowercase().contains(&keyword_lower))
             })
             .collect()
+    }
+
+    /// 获取分类统计
+    pub fn category_summary(&self) -> Vec<(TemplateCategory, usize)> {
+        use std::collections::HashMap;
+
+        let mut counts: HashMap<TemplateCategory, usize> = HashMap::new();
+        for template in &self.templates {
+            *counts.entry(template.category).or_insert(0) += 1;
+        }
+
+        let mut summary: Vec<(TemplateCategory, usize)> = counts.into_iter().collect();
+        summary.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+        summary
     }
 
     /// 加载内置模板

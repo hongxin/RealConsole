@@ -537,7 +537,7 @@ async fn execute_chart_command(
     session: &Arc<Session>,
     sender: &mut futures::stream::SplitSink<WebSocket, Message>,
 ) -> anyhow::Result<()> {
-    use crate::visualization::{parse_csv_file, ChartCommandParser, ChartType};
+    use crate::visualization::{parse_csv_file, ChartCommand, ChartCommandParser, ChartType, TemplateEngine};
 
     // 创建回合
     let round = session.create_round(
@@ -558,20 +558,19 @@ async fn execute_chart_command(
     // 记录开始时间
     let start_time = Instant::now();
 
-    // v1.45.0: 检查是否是 CSV 命令
-    let chart_data_result = if cmd.trim_start_matches("chart").trim().starts_with("csv ") {
+    // v1.50.0: 统一命令解析入口
+    let command_result = if cmd.trim_start_matches("chart").trim().starts_with("csv ") {
         // CSV 命令：!chart csv <file|@file_id> --type <type> --x-col "col" --y-col "col1" --y-col "col2"
-        // v1.46.0: 支持 @file_id 语法
-        parse_csv_command(cmd, session)
+        parse_csv_command(cmd, session).map(ChartCommand::Create)
     } else {
-        // 普通图表命令
-        ChartCommandParser::parse(cmd)
+        // 使用新的统一解析器（支持模板命令）
+        ChartCommandParser::parse_command(cmd)
     };
 
-    // 处理解析结果
-    match chart_data_result {
-        Ok(chart_data) => {
-            // 发送 Chart 消息
+    // 处理命令结果
+    match command_result {
+        Ok(ChartCommand::Create(chart_data)) => {
+            // 图表创建命令：发送 Chart 消息
             let chart_msg = ServerMessage::Chart {
                 round_id: round_id.clone(),
                 chart_data,
@@ -580,10 +579,7 @@ async fn execute_chart_command(
                 .send(Message::Text(serde_json::to_string(&chart_msg)?))
                 .await?;
 
-            // 计算执行时间
             let execution_time = start_time.elapsed().as_secs_f64();
-
-            // 完成回合
             let success_msg = format!("✅ 图表生成成功");
             if let Some(completed_round) = session.complete_round(
                 &round_id,
@@ -599,9 +595,112 @@ async fn execute_chart_command(
                     .await?;
             }
         }
+        Ok(ChartCommand::ListTemplates { category }) => {
+            // v1.50.0: 列出模板命令
+            let engine = TemplateEngine::new();
+            let templates = if let Some(cat) = category {
+                engine.filter_by_category(cat)
+            } else {
+                engine.all_templates().iter().collect()
+            };
+
+            // 格式化输出
+            let mut output = String::new();
+            output.push_str("📊 **可用图表模板**\n\n");
+
+            if let Some(cat) = category {
+                output.push_str(&format!("**分类**: {:?}\n\n", cat));
+            } else {
+                let summary = engine.category_summary();
+                output.push_str(&format!("**总计**: {} 个模板 (", templates.len()));
+                output.push_str(&summary.iter()
+                    .map(|(cat, count)| format!("{:?}: {}", cat, count))
+                    .collect::<Vec<_>>()
+                    .join(", "));
+                output.push_str(")\n\n");
+            }
+
+            for template in templates {
+                output.push_str(&format!("### `{}`\n", template.id));
+                output.push_str(&format!("**{}** - {}\n", template.name, template.description));
+                output.push_str(&format!("💡 {}\n", template.usage_hint));
+                output.push_str(&format!("🏷️ {}\n", template.tags.join(", ")));
+                output.push_str(&format!("📈 图表类型: {:?}\n\n", template.placeholder_data.chart_type));
+                output.push_str(&format!("**使用**: `!chart use {}`\n\n", template.id));
+                output.push_str("---\n\n");
+            }
+
+            output.push_str("\n💡 **提示**:\n");
+            output.push_str("- 使用 `!chart templates <category>` 查看特定分类\n");
+            output.push_str("- 分类: business, technical, team, academic, exploration\n");
+            output.push_str("- 使用 `!chart use <template-id>` 应用模板创建图表\n");
+
+            let execution_time = start_time.elapsed().as_secs_f64();
+            if let Some(completed_round) = session.complete_round(
+                &round_id,
+                output,
+                execution_time,
+                vec!["chart".to_string(), "templates".to_string()],
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+        }
+        Ok(ChartCommand::UseTemplate { template_id }) => {
+            // v1.50.0: 使用模板命令
+            let engine = TemplateEngine::new();
+            if let Some(template) = engine.find_by_id(&template_id) {
+                // 发送 Chart 消息（使用模板的占位数据）
+                let chart_msg = ServerMessage::Chart {
+                    round_id: round_id.clone(),
+                    chart_data: template.placeholder_data.clone(),
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&chart_msg)?))
+                    .await?;
+
+                let execution_time = start_time.elapsed().as_secs_f64();
+                let success_msg = format!("✅ 已应用模板: **{}**\n\n{}\n\n💡 这是示例数据，请根据实际需求修改",
+                    template.name, template.description);
+                if let Some(completed_round) = session.complete_round(
+                    &round_id,
+                    success_msg,
+                    execution_time,
+                    vec!["chart".to_string(), "template".to_string()],
+                ).await {
+                    let round_complete_msg = ServerMessage::RoundComplete {
+                        round: completed_round,
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                        .await?;
+                }
+            } else {
+                // 模板不存在（理论上不会到这里，因为 parse_use_command 已经验证）
+                let error_msg = format!("❌ 模板 '{}' 不存在", template_id);
+                if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
+                    let round_complete_msg = ServerMessage::RoundComplete {
+                        round: failed_round,
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                        .await?;
+                }
+            }
+        }
         Err(e) => {
             // 解析失败，标记回合失败
-            let error_msg = format!("❌ 图表命令解析失败\n\n{}\n\n使用示例:\n!chart line --title \"月度趋势\" --x-axis \"1月,2月,3月\" --series \"销售额:120,132,101\"", e);
+            let error_msg = format!(
+                "❌ 图表命令解析失败\n\n{}\n\n**使用示例**:\n\
+                - 创建图表: `!chart line --title \"月度趋势\" --x-axis \"1月,2月,3月\" --series \"销售额:120,132,101\"`\n\
+                - 查看模板: `!chart templates`\n\
+                - 使用模板: `!chart use sales-trend`",
+                e
+            );
             if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
                 let round_complete_msg = ServerMessage::RoundComplete {
                     round: failed_round,
