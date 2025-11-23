@@ -26,6 +26,9 @@
 - **[context-mode-best-practices.md](user/context-mode-best-practices.md)** - 上下文模式最佳实践
 - **[workflow-migration-guide.md](user/workflow-migration-guide.md)** - Workflow Intent 迁移指南（实验性）
 
+**可视化系统**:
+- **[visualization-tutorial.md](user/visualization-tutorial.md)** - 📊 数据可视化完全教程（易经+素书+极简智慧）
+
 **配置管理**:
 - **[llm-setup.md](user/llm-setup.md)** - LLM配置指南
 - **[env-config.md](user/env-config.md)** - 环境变量配置
@@ -51,7 +54,8 @@
 ## 🎯 推荐路径
 
 **新用户**: quickstart.md → user-guide.md → tool-calling-guide.md
-**进阶用户**: context-mode-best-practices.md → intent-dsl-guide.md
+**进阶用户**: context-mode-best-practices.md → intent-dsl-guide.md → visualization-tutorial.md
+**数据分析**: visualization-tutorial.md（从基础到高级，融合东方智慧）
 **开发者**: developer-guide.md → tool-development.md → api-reference.md
 
 ---
