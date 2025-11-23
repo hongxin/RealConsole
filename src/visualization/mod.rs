@@ -12,7 +12,7 @@ pub mod templates;
 pub mod types;
 
 pub use csv::{parse_csv_file, CsvData};
-pub use parser::ChartCommandParser;
+pub use parser::{ChartCommand, ChartCommandParser};
 pub use templates::{ChartTemplate, TemplateCategory, TemplateEngine};
 pub use types::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
 

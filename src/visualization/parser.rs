@@ -1,14 +1,104 @@
 //! Chart 命令解析器
 //!
 //! v1.44.0: 解析 !chart 命令并生成 ChartData
+//! v1.50.0: 支持模板命令 (templates, use)
 
 use crate::visualization::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
+use crate::visualization::{TemplateCategory, TemplateEngine};
 use anyhow::{anyhow, Result};
+
+/// Chart 命令类型
+#[derive(Debug)]
+pub enum ChartCommand {
+    /// 创建图表
+    Create(ChartData),
+    /// 列出模板
+    ListTemplates { category: Option<TemplateCategory> },
+    /// 使用模板
+    UseTemplate { template_id: String },
+}
 
 /// Chart 命令解析器
 pub struct ChartCommandParser;
 
 impl ChartCommandParser {
+    /// v1.50.0: 解析 chart 命令（统一入口）
+    ///
+    /// 支持的命令：
+    /// - `!chart line ...` - 创建图表
+    /// - `!chart templates [category]` - 列出模板
+    /// - `!chart use <id>` - 使用模板
+    pub fn parse_command(command: &str) -> Result<ChartCommand> {
+        let command = command.trim_start_matches("chart").trim();
+
+        if command.starts_with("templates") {
+            Self::parse_templates_command(command)
+        } else if command.starts_with("use") {
+            Self::parse_use_command(command)
+        } else {
+            // 原有的图表创建命令
+            Self::parse(command).map(ChartCommand::Create)
+        }
+    }
+
+    /// v1.50.0: 解析 templates 命令
+    ///
+    /// 格式：
+    /// - `templates` - 列出所有模板
+    /// - `templates business` - 列出业务分析类模板
+    /// - `templates technical` - 列出技术监控类模板
+    /// - `templates team` - 列出团队管理类模板
+    /// - `templates academic` - 列出学术研究类模板
+    /// - `templates exploration` - 列出数据探索类模板
+    fn parse_templates_command(command: &str) -> Result<ChartCommand> {
+        let parts: Vec<&str> = command.split_whitespace().collect();
+
+        let category = if parts.len() > 1 {
+            let category_str = parts[1].to_lowercase();
+            Some(match category_str.as_str() {
+                "business" => TemplateCategory::Business,
+                "technical" => TemplateCategory::Technical,
+                "team" => TemplateCategory::Team,
+                "academic" => TemplateCategory::Academic,
+                "exploration" => TemplateCategory::Exploration,
+                _ => return Err(anyhow!(
+                    "无效的模板分类: {}，支持: business, technical, team, academic, exploration",
+                    category_str
+                )),
+            })
+        } else {
+            None
+        };
+
+        Ok(ChartCommand::ListTemplates { category })
+    }
+
+    /// v1.50.0: 解析 use 命令
+    ///
+    /// 格式：`use <template-id>`
+    /// 示例：`use sales-trend`
+    fn parse_use_command(command: &str) -> Result<ChartCommand> {
+        let template_id = command
+            .trim_start_matches("use")
+            .trim()
+            .to_string();
+
+        if template_id.is_empty() {
+            return Err(anyhow!("缺少模板 ID，使用格式: !chart use <template-id>"));
+        }
+
+        // 验证模板是否存在
+        let engine = TemplateEngine::new();
+        if engine.find_by_id(&template_id).is_none() {
+            return Err(anyhow!(
+                "模板 '{}' 不存在，使用 '!chart templates' 查看可用模板",
+                template_id
+            ));
+        }
+
+        Ok(ChartCommand::UseTemplate { template_id })
+    }
+
     /// 解析 chart 命令
     ///
     /// 示例命令：
@@ -470,5 +560,97 @@ mod tests {
         let result = ChartCommandParser::parse(cmd);
 
         assert!(result.is_err());
+    }
+
+    // v1.50.0: 模板命令测试
+    #[test]
+    fn test_list_all_templates() {
+        let cmd = "chart templates";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListTemplates { category } => {
+                assert!(category.is_none());
+            }
+            _ => panic!("Expected ListTemplates command"),
+        }
+    }
+
+    #[test]
+    fn test_list_templates_by_category() {
+        let cmd = "chart templates business";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListTemplates { category } => {
+                assert!(matches!(category, Some(TemplateCategory::Business)));
+            }
+            _ => panic!("Expected ListTemplates command with Business category"),
+        }
+
+        // 测试其他分类
+        let cmd2 = "chart templates technical";
+        let result2 = ChartCommandParser::parse_command(cmd2).unwrap();
+        match result2 {
+            ChartCommand::ListTemplates { category } => {
+                assert!(matches!(category, Some(TemplateCategory::Technical)));
+            }
+            _ => panic!("Expected ListTemplates command with Technical category"),
+        }
+    }
+
+    #[test]
+    fn test_list_templates_invalid_category() {
+        let cmd = "chart templates invalid";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("无效的模板分类"));
+    }
+
+    #[test]
+    fn test_use_template() {
+        let cmd = "chart use sales-trend";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::UseTemplate { template_id } => {
+                assert_eq!(template_id, "sales-trend");
+            }
+            _ => panic!("Expected UseTemplate command"),
+        }
+    }
+
+    #[test]
+    fn test_use_template_missing_id() {
+        let cmd = "chart use";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("缺少模板 ID"));
+    }
+
+    #[test]
+    fn test_use_template_not_found() {
+        let cmd = "chart use nonexistent-template";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("不存在"));
+    }
+
+    #[test]
+    fn test_parse_command_backward_compatibility() {
+        // 确保原有的图表创建命令仍然工作
+        let cmd = r#"chart line --title "测试" --series "1,2,3""#;
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::Create(chart_data) => {
+                assert_eq!(chart_data.title, "测试");
+                assert_eq!(chart_data.chart_type, ChartType::Line);
+            }
+            _ => panic!("Expected ChartCommand::Create"),
+        }
     }
 }
