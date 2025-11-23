@@ -1085,11 +1085,13 @@ async fn execute_llm_chat(
             // 🧹 清理 DEBUG 信息（Web 用户不需要看到）
             let clean_content = remove_debug_info(&llm_response.text);
 
-            // ✨ v1.51.0: 检测并处理 ChartData（自然语言驱动可视化）
-            let (final_content, chart_data_opt) = extract_and_process_chart_data(&clean_content);
+            // ✨ v1.51.0 / v1.53.0: 检测并处理 ChartData（自然语言驱动可视化）
+            let chart_extractor = ChartExtractor;
+            let chart_result = chart_extractor.extract(&clean_content);
+            let final_content = chart_result.clean_content;
 
             // 如果检测到 ChartData，发送 Chart 消息
-            if let Some(chart_data) = chart_data_opt {
+            if let Some(chart_data) = chart_result.metadata {
                 // 添加到会话的图表历史
                 session
                     .add_chart_to_history(
@@ -1109,11 +1111,13 @@ async fn execute_llm_chat(
                     .await?;
             }
 
-            // ✨ v1.52.0: 检测并处理 ImageData（远程运维图像显示）
-            let (final_content, image_data_opt) = extract_and_process_image_data(&final_content);
+            // ✨ v1.52.0 / v1.53.0: 检测并处理 ImageData（远程运维图像显示）
+            let image_extractor = ImageExtractor;
+            let image_result = image_extractor.extract(&final_content);
+            let final_content = image_result.clean_content;
 
             // 如果检测到 ImageData，发送 Image 消息
-            if let Some(image_data) = image_data_opt {
+            if let Some(image_data) = image_result.metadata {
                 // 添加到会话的图像历史
                 session
                     .add_image_to_history(
@@ -2533,9 +2537,65 @@ fn parse_csv_string(content: &str) -> anyhow::Result<(Vec<String>, Vec<Vec<Strin
     Ok((headers, records))
 }
 
+// ==================== v1.53.0: 元数据提取器统一架构 ====================
+
+use crate::web::metadata_extractor::{MetadataExtractor, ExtractionResult};
+
+/// v1.53.0: Chart 元数据提取器
+struct ChartExtractor;
+
+impl MetadataExtractor for ChartExtractor {
+    type Metadata = ChartData;
+
+    fn primary_marker(&self) -> &'static str {
+        "__CHART__"
+    }
+
+    fn data_marker(&self) -> &'static str {
+        "__CHART_DATA__:"
+    }
+
+    fn parse_metadata(&self, json_str: &str) -> anyhow::Result<ChartData> {
+        // 解析工具参数 JSON
+        let params: serde_json::Value = serde_json::from_str(json_str)?;
+
+        // 转换为 ChartData（复用现有转换逻辑）
+        convert_tool_params_to_chart_data(params)
+    }
+}
+
+/// v1.53.0: Image 元数据提取器
+struct ImageExtractor;
+
+impl MetadataExtractor for ImageExtractor {
+    type Metadata = crate::visualization::ImageData;
+
+    fn primary_marker(&self) -> &'static str {
+        "__IMAGE__"
+    }
+
+    fn data_marker(&self) -> &'static str {
+        "__IMAGE_DATA__:"
+    }
+
+    fn parse_metadata(&self, json_str: &str) -> anyhow::Result<crate::visualization::ImageData> {
+        // 直接反序列化
+        Ok(serde_json::from_str(json_str)?)
+    }
+
+    fn validate(&self, metadata: &crate::visualization::ImageData) -> anyhow::Result<()> {
+        // 使用现有验证逻辑 (转换 String 错误为 anyhow::Error)
+        metadata.validate().map_err(|e| anyhow::anyhow!(e))
+    }
+}
+
+// ==================== v1.51.0/v1.52.0: 原始提取函数（待废弃） ====================
+
 /// ✨ v1.51.0: 检测并处理响应中的 ChartData 标记
 ///
 /// 从响应文本中提取 ChartData JSON，构造 ChartData 对象，并返回清理后的文本
+///
+/// ⚠️ DEPRECATED (v1.53.0): 使用 ChartExtractor 替代
 fn extract_and_process_chart_data(response: &str) -> (String, Option<ChartData>) {
     // 检测 __CHART__ 标记
     if let Some(chart_pos) = response.find("__CHART__") {
@@ -2682,6 +2742,8 @@ fn convert_tool_params_to_chart_data(params: serde_json::Value) -> anyhow::Resul
 /// ✨ v1.52.0: 提取并处理图像数据
 ///
 /// 注意: 此函数在 remove_debug_info 之后调用,所以不能依赖 __DEBUG__ 标记
+///
+/// ⚠️ DEPRECATED (v1.53.0): 使用 ImageExtractor 替代
 fn extract_and_process_image_data(content: &str) -> (String, Option<crate::visualization::ImageData>) {
     // 检测 __IMAGE__ 标记
     if let Some(start) = content.find("__IMAGE__") {

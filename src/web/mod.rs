@@ -25,5 +25,6 @@ pub mod session_manager; // v1.40.0: 会话持久化管理
 pub mod websocket;
 pub mod frontend;
 pub mod uploaded_files; // v1.46.0: 文件上传管理
+pub mod metadata_extractor; // v1.53.0: 元数据提取器统一架构
 
 pub use server::WebServer;
