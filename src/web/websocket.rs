@@ -12,6 +12,7 @@ use crate::config::Config;
 use crate::dsl::intent::IntentMatch;
 use crate::i18n;
 use crate::services::{LlmRequest, Service};
+use crate::visualization::types::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
 use crate::web::session::{ClientMessage, EnabledStep, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
@@ -1084,6 +1085,30 @@ async fn execute_llm_chat(
             // 🧹 清理 DEBUG 信息（Web 用户不需要看到）
             let clean_content = remove_debug_info(&llm_response.text);
 
+            // ✨ v1.51.0: 检测并处理 ChartData（自然语言驱动可视化）
+            let (final_content, chart_data_opt) = extract_and_process_chart_data(&clean_content);
+
+            // 如果检测到 ChartData，发送 Chart 消息
+            if let Some(chart_data) = chart_data_opt {
+                // 添加到会话的图表历史
+                session
+                    .add_chart_to_history(
+                        chart_data.clone(),
+                        Some(round_id.clone()),
+                        format!("自然语言: {}", input),
+                    )
+                    .await;
+
+                // 发送 Chart 消息
+                let chart_msg = ServerMessage::Chart {
+                    round_id: round_id.clone(),
+                    chart_data,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&chart_msg)?))
+                    .await?;
+            }
+
             // ===== v1.28.0: 提取使用的工具 =====
             let tools_used = extract_tools_from_response(&llm_response);
 
@@ -1091,7 +1116,7 @@ async fn execute_llm_chat(
             if let Some(completed_round) = session
                 .complete_round(
                     &round_id,
-                    clean_content.clone(),
+                    final_content.clone(),
                     execution_time,
                     tools_used,
                 )
@@ -1107,7 +1132,7 @@ async fn execute_llm_chat(
             }
 
             let msg = ServerMessage::Output {
-                content: clean_content,
+                content: final_content,
             };
             sender
                 .send(Message::Text(serde_json::to_string(&msg)?))
@@ -2448,4 +2473,150 @@ fn parse_csv_string(content: &str) -> anyhow::Result<(Vec<String>, Vec<Vec<Strin
     }
 
     Ok((headers, records))
+}
+
+/// ✨ v1.51.0: 检测并处理响应中的 ChartData 标记
+///
+/// 从响应文本中提取 ChartData JSON，构造 ChartData 对象，并返回清理后的文本
+fn extract_and_process_chart_data(response: &str) -> (String, Option<ChartData>) {
+    // 检测 __CHART__ 标记
+    if let Some(chart_pos) = response.find("__CHART__") {
+        // 提取 ChartData JSON 部分
+        let chart_section = &response[chart_pos + 9..]; // Skip "__CHART__"
+
+        if let Some(data_pos) = chart_section.find("__CHART_DATA__:") {
+            let json_str = &chart_section[data_pos + 15..]; // Skip "__CHART_DATA__:"
+
+            // 解析工具参数 JSON
+            if let Ok(params) = serde_json::from_str::<serde_json::Value>(json_str) {
+                // 转换工具参数为 ChartData
+                if let Ok(chart_data) = convert_tool_params_to_chart_data(params) {
+                    // 清理响应文本（移除 __CHART__ 部分）
+                    let clean_response = response[..chart_pos].trim().to_string();
+                    return (clean_response, Some(chart_data));
+                }
+            }
+        }
+    }
+
+    // 没有检测到 ChartData 或解析失败
+    (response.to_string(), None)
+}
+
+/// ✨ v1.51.0: 将工具参数转换为 ChartData
+///
+/// 将 LLM 调用 create_chart 工具的参数转换为 ChartData 结构
+fn convert_tool_params_to_chart_data(params: serde_json::Value) -> anyhow::Result<ChartData> {
+    // 提取参数
+    let chart_type_str = params["chart_type"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("缺少 chart_type 参数"))?;
+    let title = params["title"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("缺少 title 参数"))?
+        .to_string();
+
+    // 解析图表类型
+    let chart_type = match chart_type_str {
+        "line" => ChartType::Line,
+        "bar" => ChartType::Bar,
+        "pie" => ChartType::Pie,
+        "scatter" => ChartType::Scatter,
+        "area" => ChartType::Area,
+        "bubble" => ChartType::Bubble,
+        "radar" => ChartType::Radar,
+        "heatmap" => ChartType::Heatmap,
+        _ => return Err(anyhow::anyhow!("不支持的图表类型: {}", chart_type_str)),
+    };
+
+    // 解析 X 轴标签（可选）
+    let x_labels = if let Some(labels) = params["x_labels"].as_array() {
+        labels
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
+    } else {
+        vec![]
+    };
+
+    // 解析数据系列
+    let series_array = params["series"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("缺少 series 参数"))?;
+
+    let mut series = Vec::new();
+    for s in series_array {
+        let name = s["name"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("series 缺少 name 字段"))?
+            .to_string();
+        let data = s["data"]
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("series 缺少 data 字段"))?
+            .iter()
+            .filter_map(|v| v.as_f64())
+            .collect();
+
+        series.push(Series {
+            name,
+            data,
+            color: None,
+            points: None,
+            sizes: None,
+            y_axis_index: None, // 默认使用主 Y 轴
+            chart_type: None,
+        });
+    }
+
+    // 构造 X 轴配置
+    let x_axis = AxisConfig {
+        name: None,
+        data: if x_labels.is_empty() { None } else { Some(x_labels) },
+        axis_type: Some("category".to_string()),
+    };
+
+    // 构造 Y 轴配置
+    let y_axis = AxisConfig {
+        name: None,
+        data: None,
+        axis_type: Some("value".to_string()),
+    };
+
+    // 解析饼图标签（可选）
+    let labels = if let Some(labels_arr) = params["labels"].as_array() {
+        Some(
+            labels_arr
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect(),
+        )
+    } else {
+        None
+    };
+
+    // 解析雷达图指标（可选）
+    let indicators = if let Some(indicators_arr) = params["indicators"].as_array() {
+        Some(
+            indicators_arr
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect(),
+        )
+    } else {
+        None
+    };
+
+    // 构造 ChartData
+    Ok(ChartData {
+        chart_type,
+        title,
+        x_axis,
+        y_axis,
+        y_axis_secondary: None,
+        series,
+        options: ChartOptions::default(),
+        labels,
+        indicators,
+        heatmap_data: None,
+    })
 }

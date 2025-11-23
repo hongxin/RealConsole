@@ -330,6 +330,15 @@ impl ToolExecutor {
                 ));
             }
 
+            // ✨ v1.51.0: 检测工具结果中的特殊标记（如 ChartData）
+            let mut chart_data = None;
+            for result in &tool_results {
+                if result.content.starts_with("__CHART_DATA__:") {
+                    chart_data = Some(result.content.clone());
+                    break;
+                }
+            }
+
             // ✨ 记录本轮对话信息（用于 debug）
             let round_duration = round_start.elapsed().as_millis() as u64;
             conversation_rounds.push(ConversationRound {
@@ -357,6 +366,17 @@ impl ToolExecutor {
                 message_count: messages.len(),
                 duration_ms: round_duration,
             });
+
+            // ✨ v1.51.0: 如果检测到 ChartData，附加到最终响应中
+            if let Some(chart_json) = chart_data {
+                // 返回带有 ChartData 标记的响应
+                let debug_info = Self::encode_debug_info(&conversation_rounds);
+                return Ok(format!("{}__DEBUG__{}__CHART__{}",
+                    "✅ 图表已生成",
+                    debug_info,
+                    chart_json
+                ));
+            }
 
             // 继续下一轮迭代
         }
