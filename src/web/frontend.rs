@@ -3160,10 +3160,13 @@ const TERMINAL_JS: &str = r#"
                         },
                     };
                 }) : chartData.series.map((s, index) => {
-                    // v1.47.0: 面积图需要 line 类型 + areaStyle
+                    // v1.47.0: 混合图表 - 系列可以指定自己的图表类型
+                    const seriesChartType = s.chart_type || chartData.chart_type;
+                    const seriesIsArea = seriesChartType === 'area';
+
                     const seriesConfig = {
                         name: s.name,
-                        type: isArea ? 'line' : chartData.chart_type.toLowerCase(),
+                        type: seriesIsArea ? 'line' : seriesChartType.toLowerCase(),
                         data: s.data,
                         smooth: chartData.options.smooth,
                         color: s.color || defaultColors[index % defaultColors.length],
@@ -3176,7 +3179,7 @@ const TERMINAL_JS: &str = r#"
                     };
 
                     // v1.47.0: 面积图添加 areaStyle（渐变填充）
-                    if (isArea) {
+                    if (seriesIsArea) {
                         const color = s.color || defaultColors[index % defaultColors.length];
                         seriesConfig.areaStyle = {
                             color: {

@@ -43,6 +43,7 @@ mod tests {
                 color: None,
                 points: None,
                 y_axis_index: None,  // v1.47.0
+                chart_type: None,    // v1.47.0
             }],
             options: ChartOptions {
                 show_legend: true,

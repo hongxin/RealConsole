@@ -45,6 +45,7 @@ impl ChartData {
                 color: None,
                 points: None,
                 y_axis_index: None,  // v1.47.0
+                chart_type: None,    // v1.47.0
             }],
             options: ChartOptions::default(),
             labels: None,
@@ -200,6 +201,9 @@ pub struct Series {
     /// v1.47.0: Y 轴索引（可选，0=主轴, 1=副轴，默认0）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub y_axis_index: Option<usize>,
+    /// v1.47.0: 系列图表类型（可选，用于混合图表。如果指定，覆盖 ChartData 的 chart_type）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chart_type: Option<ChartType>,
 }
 
 impl Series {
@@ -211,6 +215,7 @@ impl Series {
             color: None,
             points: None,
             y_axis_index: None,  // v1.47.0
+            chart_type: None,    // v1.47.0
         }
     }
 
@@ -222,6 +227,7 @@ impl Series {
             color: None,
             points: Some(points),
             y_axis_index: None,  // v1.47.0
+            chart_type: None,    // v1.47.0
         }
     }
 
@@ -234,6 +240,12 @@ impl Series {
     /// v1.47.0: 设置 Y 轴索引（0=主轴, 1=副轴）
     pub fn with_y_axis_index(mut self, index: usize) -> Self {
         self.y_axis_index = Some(index);
+        self
+    }
+
+    /// v1.47.0: 设置系列图表类型（用于混合图表）
+    pub fn with_chart_type(mut self, chart_type: ChartType) -> Self {
+        self.chart_type = Some(chart_type);
         self
     }
 }
