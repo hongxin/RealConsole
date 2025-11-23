@@ -1279,6 +1279,9 @@ const TERMINAL_JS: &str = r#"
             // ===== v1.48.0: 图表实例跟踪（用于 SVG 导出）=====
             this.charts = [];                // 存储所有图表实例: [{ chart, title, createdAt }]
 
+            // ===== v1.51.0: 图表数据追踪（用于 localStorage 持久化）=====
+            this.chartDataByRound = {};      // 存储每个 round 的 chartData: { round_id: chart_data }
+
             this.init();
 
             // 设置自动保存
@@ -1764,6 +1767,8 @@ const TERMINAL_JS: &str = r#"
             this.removeSpinner();
             this.streamBuffer = '';
             this.isStreaming = false;
+            // v1.51.0: 清空图表数据追踪
+            this.chartDataByRound = {};
         }
 
         // v1.48.0: 导出 SVG 矢量图
@@ -3022,6 +3027,9 @@ const TERMINAL_JS: &str = r#"
 
             const chartData = msg.chart_data;
 
+            // v1.51.0: 保存图表数据到追踪器（用于 localStorage 持久化）
+            this.chartDataByRound[msg.round_id] = chartData;
+
             // v1.45.0: 找到对应的 Round 卡片
             const roundElement = this.outputArea.querySelector(`[data-round-id="${msg.round_id}"]`);
             if (!roundElement) {
@@ -3579,6 +3587,8 @@ const TERMINAL_JS: &str = r#"
                     timestamp: round.timestamp,
                     model: round.model
                 })),
+                // v1.51.0: 保存图表数据
+                charts: this.chartDataByRound,
                 metadata: {
                     round_count: this.rounds.length,
                     last_input: this.rounds[this.rounds.length - 1]?.userInput || ''
@@ -3609,6 +3619,9 @@ const TERMINAL_JS: &str = r#"
             // 清空当前内容
             this.clearAll();
 
+            // v1.51.0: 恢复图表数据映射
+            this.chartDataByRound = session.charts || {};
+
             // 恢复所有 Round
             if (session.rounds && session.rounds.length > 0) {
                 session.rounds.forEach(round => {
@@ -3617,6 +3630,15 @@ const TERMINAL_JS: &str = r#"
                 });
 
                 console.log('[Session] Restored', session.rounds.length, 'rounds');
+            }
+
+            // v1.51.0: 恢复图表（重新渲染每个图表）
+            if (this.chartDataByRound && Object.keys(this.chartDataByRound).length > 0) {
+                console.log('[v1.51.0] Restoring charts:', Object.keys(this.chartDataByRound).length);
+                for (const [round_id, chart_data] of Object.entries(this.chartDataByRound)) {
+                    // 重新渲染图表
+                    this.renderChart({ round_id, chart_data });
+                }
             }
 
             // 滚动到底部

@@ -2155,18 +2155,39 @@ async fn handle_load_session(
 
     match manager.load_session(session_id) {
         Ok(serializable) => {
-            // 恢复会话数据到当前会话（只恢复回合历史）
+            // 恢复会话数据到当前会话（恢复回合历史和图表历史）
             {
                 let mut rounds = session.rounds.write().await;
                 *rounds = serializable.rounds.clone();
             }
 
+            // v1.51.0: 恢复图表历史
+            {
+                let mut chart_history = session.chart_history.write().await;
+                *chart_history = serializable.chart_history.clone();
+            }
+
+            // 发送 SessionLoaded 消息
             let response = ServerMessage::SessionLoaded {
-                session: serializable,
+                session: serializable.clone(),
             };
             sender
                 .send(Message::Text(serde_json::to_string(&response)?))
                 .await?;
+
+            // v1.51.0: 为历史会话中的每个图表发送 Chart 消息
+            // 这样前端在加载会话时就能正确渲染图表
+            for chart_entry in &serializable.chart_history {
+                if let Some(ref round_id) = chart_entry.round_id {
+                    let chart_msg = ServerMessage::Chart {
+                        round_id: round_id.clone(),
+                        chart_data: chart_entry.chart_data.clone(),
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&chart_msg)?))
+                        .await?;
+                }
+            }
         }
         Err(e) => {
             let response = ServerMessage::SessionError {

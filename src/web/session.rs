@@ -708,6 +708,9 @@ impl Session {
         // 计算元数据
         let metadata = Some(SessionMetadata::from_rounds(&rounds));
 
+        // v1.51.0: 获取图表历史
+        let chart_history = self.chart_history.read().await.clone();
+
         SerializableSession {
             id: self.id.clone(),
             name,
@@ -715,6 +718,7 @@ impl Session {
             updated_at,
             conversation_id: self.conversation_id.clone(),
             rounds,
+            chart_history,
             metadata,
             version: env!("CARGO_PKG_VERSION").to_string(),
         }
@@ -738,6 +742,12 @@ impl Session {
         {
             let mut rounds = session.rounds.write().await;
             *rounds = serializable.rounds;
+        }
+
+        // v1.51.0: 恢复图表历史（在独立作用域中，确保锁被释放）
+        {
+            let mut chart_history = session.chart_history.write().await;
+            *chart_history = serializable.chart_history;
         }
 
         session

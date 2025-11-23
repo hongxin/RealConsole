@@ -2,7 +2,7 @@
 //!
 //! v1.40.0 新增：支持会话的保存、加载、列表、删除和导出功能
 
-use crate::web::session::ConversationRound;
+use crate::web::session::{ChartHistoryEntry, ConversationRound};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -30,6 +30,10 @@ pub struct SerializableSession {
 
     /// 对话回合列表
     pub rounds: Vec<ConversationRound>,
+
+    /// 图表历史记录（v1.51.0 新增）
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chart_history: Vec<ChartHistoryEntry>,
 
     /// 元数据
     #[serde(skip_serializing_if = "Option::is_none")]
