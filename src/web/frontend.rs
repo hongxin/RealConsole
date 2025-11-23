@@ -7983,7 +7983,7 @@ body::before {
 .files-panel {
     position: fixed;
     top: 128px;
-    right: 0;
+    right: 10px;  /* v1.47.0: 与 terminal-container 等宽对齐（body padding: 10px） */
     width: 320px;
     max-height: calc(100vh - 180px);
     background: rgba(13, 17, 23, 0.95);
