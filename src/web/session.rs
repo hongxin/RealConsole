@@ -196,6 +196,38 @@ pub struct FilePreview {
     pub total_columns: usize,
 }
 
+/// v1.51.0: 图表历史记录
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChartHistoryEntry {
+    /// 历史记录 ID
+    pub id: String,
+    /// 创建时间
+    pub timestamp: DateTime<Utc>,
+    /// 图表数据
+    pub chart_data: visualization::ChartData,
+    /// 关联的回合 ID
+    pub round_id: Option<String>,
+    /// 用于创建该图表的命令
+    pub command: String,
+    /// 图表标题（快速查看）
+    pub title: String,
+}
+
+impl ChartHistoryEntry {
+    /// 创建新的历史记录
+    pub fn new(chart_data: visualization::ChartData, round_id: Option<String>, command: String) -> Self {
+        let title = chart_data.title.clone();
+        Self {
+            id: format!("chart-{}", Uuid::new_v4()),
+            timestamp: Utc::now(),
+            chart_data,
+            round_id,
+            command,
+            title,
+        }
+    }
+}
+
 /// 消息类型（Server → Client）
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -414,6 +446,8 @@ pub struct Session {
     pub rounds: Arc<RwLock<Vec<ConversationRound>>>,
     /// 上传文件管理器（v1.46.0 新增）
     pub uploaded_files: crate::web::uploaded_files::UploadedFiles,
+    /// 图表历史记录（v1.51.0 新增）
+    pub chart_history: Arc<RwLock<Vec<ChartHistoryEntry>>>,
 }
 
 impl Session {
@@ -445,6 +479,7 @@ impl Session {
             conversation_id,
             rounds: Arc::new(RwLock::new(Vec::new())),
             uploaded_files: crate::web::uploaded_files::UploadedFiles::new(), // v1.46.0
+            chart_history: Arc::new(RwLock::new(Vec::new())), // v1.51.0
         }
     }
 
@@ -514,6 +549,44 @@ impl Session {
     pub async fn round_count(&self) -> usize {
         let rounds = self.rounds.read().await;
         rounds.len()
+    }
+
+    // ===== v1.51.0 新增：图表历史管理方法 =====
+
+    /// 添加图表到历史记录
+    pub async fn add_chart_to_history(&self, chart_data: visualization::ChartData, round_id: Option<String>, command: String) -> ChartHistoryEntry {
+        let entry = ChartHistoryEntry::new(chart_data, round_id, command);
+        let mut history = self.chart_history.write().await;
+        history.push(entry.clone());
+        entry
+    }
+
+    /// 获取所有图表历史记录
+    pub async fn get_chart_history(&self) -> Vec<ChartHistoryEntry> {
+        let history = self.chart_history.read().await;
+        history.clone()
+    }
+
+    /// 根据 ID 获取图表历史记录
+    pub async fn get_chart_by_id(&self, chart_id: &str) -> Option<ChartHistoryEntry> {
+        let history = self.chart_history.read().await;
+        history.iter().find(|entry| entry.id == chart_id).cloned()
+    }
+
+    /// 获取最近 N 个图表历史记录
+    pub async fn get_recent_charts(&self, limit: usize) -> Vec<ChartHistoryEntry> {
+        let history = self.chart_history.read().await;
+        history.iter()
+            .rev()
+            .take(limit)
+            .cloned()
+            .collect()
+    }
+
+    /// 获取图表历史记录数量
+    pub async fn chart_history_count(&self) -> usize {
+        let history = self.chart_history.read().await;
+        history.len()
     }
 
     /// 配置 Agent 的 LLM

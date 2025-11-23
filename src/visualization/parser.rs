@@ -23,6 +23,10 @@ pub enum ChartCommand {
     },
     /// 使用示例 (v1.51.0)
     UseExample { example_id: String },
+    /// 列出图表历史 (v1.51.0)
+    ListHistory { limit: Option<usize> },
+    /// 回忆/恢复历史图表 (v1.51.0)
+    RecallChart { chart_id: String },
 }
 
 /// Chart 命令解析器
@@ -37,6 +41,8 @@ impl ChartCommandParser {
     /// - `!chart use <id>` - 使用模板
     /// - `!chart examples [category] [difficulty]` - 列出示例 (v1.51.0)
     /// - `!chart example <id>` - 使用示例 (v1.51.0)
+    /// - `!chart history [limit]` - 列出图表历史 (v1.51.0)
+    /// - `!chart recall <id>` - 回忆/恢复历史图表 (v1.51.0)
     pub fn parse_command(command: &str) -> Result<ChartCommand> {
         let command = command.trim_start_matches("chart").trim();
 
@@ -48,6 +54,10 @@ impl ChartCommandParser {
             Self::parse_examples_command(command)
         } else if command.starts_with("example ") {
             Self::parse_use_example_command(command)
+        } else if command.starts_with("history") {
+            Self::parse_history_command(command)
+        } else if command.starts_with("recall") {
+            Self::parse_recall_command(command)
         } else {
             // 原有的图表创建命令
             Self::parse(command).map(ChartCommand::Create)
@@ -176,6 +186,45 @@ impl ChartCommandParser {
         }
 
         Ok(ChartCommand::UseExample { example_id })
+    }
+
+    /// v1.51.0: 解析 history 命令
+    ///
+    /// 格式：
+    /// - `history` - 列出所有图表历史
+    /// - `history 10` - 列出最近 10 个图表历史
+    fn parse_history_command(command: &str) -> Result<ChartCommand> {
+        let parts: Vec<&str> = command.split_whitespace().collect();
+
+        let limit = if parts.len() > 1 {
+            let limit_str = parts[1];
+            match limit_str.parse::<usize>() {
+                Ok(n) if n > 0 => Some(n),
+                Ok(_) => return Err(anyhow!("历史记录数量必须大于 0")),
+                Err(_) => return Err(anyhow!("无效的数量: {}，请输入正整数", limit_str)),
+            }
+        } else {
+            None
+        };
+
+        Ok(ChartCommand::ListHistory { limit })
+    }
+
+    /// v1.51.0: 解析 recall 命令
+    ///
+    /// 格式：`recall <chart-id>`
+    /// 示例：`recall chart-abc123`
+    fn parse_recall_command(command: &str) -> Result<ChartCommand> {
+        let chart_id = command
+            .trim_start_matches("recall")
+            .trim()
+            .to_string();
+
+        if chart_id.is_empty() {
+            return Err(anyhow!("缺少图表 ID，使用格式: !chart recall <chart-id>"));
+        }
+
+        Ok(ChartCommand::RecallChart { chart_id })
     }
 
     /// 解析 chart 命令
@@ -829,5 +878,63 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("不存在"));
+    }
+
+    // v1.51.0: 历史命令测试
+    #[test]
+    fn test_list_all_history() {
+        let cmd = "chart history";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListHistory { limit } => {
+                assert!(limit.is_none());
+            }
+            _ => panic!("Expected ListHistory command"),
+        }
+    }
+
+    #[test]
+    fn test_list_history_with_limit() {
+        let cmd = "chart history 10";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListHistory { limit } => {
+                assert_eq!(limit, Some(10));
+            }
+            _ => panic!("Expected ListHistory command with limit=10"),
+        }
+    }
+
+    #[test]
+    fn test_list_history_invalid_limit() {
+        let cmd = "chart history abc";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("无效的数量"));
+    }
+
+    #[test]
+    fn test_recall_chart() {
+        let cmd = "chart recall chart-abc123";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::RecallChart { chart_id } => {
+                assert_eq!(chart_id, "chart-abc123");
+            }
+            _ => panic!("Expected RecallChart command"),
+        }
+    }
+
+    #[test]
+    fn test_recall_chart_missing_id() {
+        let cmd = "chart recall";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("缺少图表 ID"));
     }
 }

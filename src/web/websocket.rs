@@ -570,6 +570,9 @@ async fn execute_chart_command(
     // 处理命令结果
     match command_result {
         Ok(ChartCommand::Create(chart_data)) => {
+            // v1.51.0: 添加到历史记录
+            session.add_chart_to_history(chart_data.clone(), Some(round_id.clone()), cmd.to_string()).await;
+
             // 图表创建命令：发送 Chart 消息
             let chart_msg = ServerMessage::Chart {
                 round_id: round_id.clone(),
@@ -821,6 +824,96 @@ async fn execute_chart_command(
                 }
             }
         }
+        Ok(ChartCommand::ListHistory { limit }) => {
+            // v1.51.0: 列出图表历史
+            let history = if let Some(n) = limit {
+                session.get_recent_charts(n).await
+            } else {
+                session.get_chart_history().await
+            };
+
+            let mut output = String::new();
+            output.push_str("📜 **图表历史记录**\n\n");
+            output.push_str(&format!("**总计**: {} 个图表\n\n", history.len()));
+
+            if history.is_empty() {
+                output.push_str("暂无图表历史记录。\n");
+            } else {
+                for entry in history.iter().rev() {
+                    output.push_str(&format!("### `{}`\n", entry.id));
+                    output.push_str(&format!("**{}**\n", entry.title));
+                    output.push_str(&format!("📅 {}\n", entry.timestamp.format("%Y-%m-%d %H:%M:%S")));
+                    output.push_str(&format!("📈 类型: {:?}\n", entry.chart_data.chart_type));
+                    output.push_str(&format!("**命令**: `{}`\n", entry.command));
+                    output.push_str(&format!("\n**恢复**: `!chart recall {}`\n\n", entry.id));
+                    output.push_str("---\n\n");
+                }
+            }
+
+            output.push_str("\n💡 **提示**:\n");
+            output.push_str("- 使用 `!chart history <N>` 查看最近 N 个图表\n");
+            output.push_str("- 使用 `!chart recall <id>` 恢复历史图表\n");
+
+            let execution_time = start_time.elapsed().as_secs_f64();
+            if let Some(completed_round) = session.complete_round(
+                &round_id,
+                output,
+                execution_time,
+                vec!["chart".to_string(), "history".to_string()],
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+        }
+        Ok(ChartCommand::RecallChart { chart_id }) => {
+            // v1.51.0: 恢复历史图表
+            if let Some(entry) = session.get_chart_by_id(&chart_id).await {
+                // 发送 Chart 消息
+                let chart_msg = ServerMessage::Chart {
+                    round_id: round_id.clone(),
+                    chart_data: entry.chart_data.clone(),
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&chart_msg)?))
+                    .await?;
+
+                let execution_time = start_time.elapsed().as_secs_f64();
+                let success_msg = format!(
+                    "✅ 已恢复图表: **{}**\n\n📅 创建时间: {}\n📈 类型: {:?}\n\n**原始命令**: `{}`",
+                    entry.title,
+                    entry.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                    entry.chart_data.chart_type,
+                    entry.command
+                );
+                if let Some(completed_round) = session.complete_round(
+                    &round_id,
+                    success_msg,
+                    execution_time,
+                    vec!["chart".to_string(), "recall".to_string()],
+                ).await {
+                    let round_complete_msg = ServerMessage::RoundComplete {
+                        round: completed_round,
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                        .await?;
+                }
+            } else {
+                let error_msg = format!("❌ 图表 '{}' 不存在，使用 `!chart history` 查看可用图表", chart_id);
+                if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
+                    let round_complete_msg = ServerMessage::RoundComplete {
+                        round: failed_round,
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                        .await?;
+                }
+            }
+        }
         Err(e) => {
             // 解析失败，标记回合失败
             let error_msg = format!(
@@ -829,7 +922,9 @@ async fn execute_chart_command(
                 - 查看模板: `!chart templates`\n\
                 - 使用模板: `!chart use sales-trend`\n\
                 - 查看示例: `!chart examples`\n\
-                - 使用示例: `!chart example simple-sales`",
+                - 使用示例: `!chart example simple-sales`\n\
+                - 查看历史: `!chart history`\n\
+                - 恢复图表: `!chart recall <id>`",
                 e
             );
             if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
