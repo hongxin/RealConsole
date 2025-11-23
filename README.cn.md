@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1410-green.svg)](tests/)
-[![Version](https://img.shields.io/badge/version-1.47.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.48.0-blue.svg)](CHANGELOG.md)
 
 **[English](README.md)** | 中文
 

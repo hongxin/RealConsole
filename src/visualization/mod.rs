@@ -42,6 +42,7 @@ mod tests {
                 data: vec![10.0, 20.0],
                 color: None,
                 points: None,
+                sizes: None,         // v1.48.0
                 y_axis_index: None,  // v1.47.0
                 chart_type: None,    // v1.47.0
             }],

@@ -175,6 +175,7 @@ impl ChartCommandParser {
                 data,
                 color: None,
                 points: None, // v1.45.0: 散点图坐标（将在后续实现）
+                sizes: None,  // v1.48.0: 气泡图大小
                 y_axis_index: None,  // v1.47.0
                 chart_type: None,    // v1.47.0
             })
@@ -186,6 +187,7 @@ impl ChartCommandParser {
                 data,
                 color: None,
                 points: None, // v1.45.0: 散点图坐标（将在后续实现）
+                sizes: None,  // v1.48.0: 气泡图大小
                 y_axis_index: None,  // v1.47.0
                 chart_type: None,    // v1.47.0
             })

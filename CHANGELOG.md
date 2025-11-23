@@ -5,6 +5,108 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.0] - 2025-01-23
+
+### 🎯 Highlights
+
+**主题**: Phase 3 P2 - 高质量导出与气泡图支持
+
+- ✅ **SVG 矢量图导出** - 高质量矢量图形，支持无损缩放，适合论文/PPT
+- ✅ **气泡图 (Bubble Chart)** - 三维数据可视化，支持 (x, y, size) 数据
+- ✅ **SVG 渲染器** - ECharts 默认使用 SVG 渲染，保证导出质量
+- ✅ **图表实例跟踪** - 追踪所有图表实例，支持智能导出
+
+### ✨ Added
+
+**SVG 导出功能** (`src/web/frontend.rs`)
+
+- **工具栏导出按钮**:
+  - 新增"导出 SVG"按钮（toolbar-right 区域）
+  - 层叠图标设计，符合矢量图概念
+  - Tooltip: "导出高质量矢量图"
+
+- **图表实例跟踪** (`HybridTerminal` 类):
+  - `this.charts = []`: 存储所有图表实例 `[{ chart, title, chartType, createdAt }]`
+  - `renderChart()` 更新：创建图表时自动追加到 charts 数组
+  - 主题切换时更新图表实例引用
+
+- **SVG 导出逻辑** (`exportSVG()` 方法):
+  - 检查图表存在性，无图表时 Toast 提示
+  - 获取最新图表实例
+  - 从 DOM 提取 SVG 元素 (`chart.getDom().querySelector('svg')`)
+  - 添加 XML 命名空间 (`xmlns`, `xmlns:xlink`)
+  - 使用 `XMLSerializer` 序列化 SVG
+  - 创建 Blob 并触发下载
+  - 文件名格式：`{标题}_{图表类型}_{时间戳}.svg`
+  - 成功/失败 Toast 通知
+
+- **ECharts SVG 渲染器**:
+  - `echarts.init(container, theme, { renderer: 'svg' })`: 默认使用 SVG 而非 Canvas
+  - 保证所有图表可导出为真正的矢量图
+  - 主题切换时同样使用 SVG 渲染器
+
+**气泡图支持** (`src/visualization/types.rs`, `src/visualization/parser.rs`, `src/web/frontend.rs`)
+
+- **数据结构扩展** (`types.rs`):
+  - `ChartType::Bubble`: 新增气泡图类型
+  - `Series.sizes: Option<Vec<f64>>`: 气泡大小数据
+  - `Series::new_bubble()`: 创建气泡图系列的便捷方法
+  - `ChartType::from_str("bubble")`: 解析"bubble"字符串
+
+- **数据验证** (`types.rs::validate()`):
+  - 气泡图特殊验证：检查 `points` 和 `sizes` 存在性
+  - 验证 `points` 和 `sizes` 长度一致
+  - 详细错误提示（列名、长度）
+
+- **前端渲染** (`src/web/frontend.rs`):
+  - `isBubble` 判断变量
+  - 气泡图数据转换：`[(x, y)] + [size]` → `[[x, y, size], ...]`
+  - 动态 `symbolSize`: 使用平方根缩放算法 (`Math.sqrt(data[2]) * 3`)
+  - 气泡样式：半透明 (opacity: 0.7)，避免重叠遮挡
+  - 强调效果：悬停放大 1.2 倍，不透明度 100%
+  - 边框样式：适配深色/浅色主题
+
+- **工具栏快速创建**:
+  - 新增气泡图按钮 🫧 (`data-chart-type="bubble"`)
+  - 与其他图表类型统一交互逻辑
+
+### 📈 Improvements
+
+- **导出质量**:
+  - SVG 格式：无损缩放，适合高分辨率打印
+  - 矢量图形：文件小，渲染快，编辑友好
+  - 兼容性：支持所有现代浏览器和设计软件（Adobe Illustrator、Inkscape 等）
+
+- **气泡图可视化**:
+  - 三维数据表达：X 轴、Y 轴、气泡大小
+  - 智能缩放：使用平方根避免气泡过大
+  - 视觉层次：半透明气泡，减少视觉混乱
+  - 交互体验：悬停高亮，清晰展示数据
+
+- **图表管理**:
+  - 自动追踪所有创建的图表
+  - 智能选择最新图表进行导出
+  - 主题切换时正确更新图表引用
+
+### 🧪 Testing
+
+- ✅ 编译通过（cargo build --release）
+- ✅ 库测试通过（所有现有测试）
+- ✅ SVG 导出功能手动测试
+- ✅ 气泡图渲染手动测试
+
+### 📝 Notes
+
+- **Phase 3 P2 完成**: SVG 导出 + 气泡图，完成体验优化阶段
+- **SVG 优势**: 相比 PNG，SVG 文件更小、缩放无损、可编辑
+- **气泡图应用场景**:
+  - 人口统计（年龄 × 收入 × 人数）
+  - 销售分析（时间 × 利润率 × 销售额）
+  - 性能监控（延迟 × 吞吐量 × 负载）
+- **未来扩展**: Phase 3 P3 可考虑更多图表类型（雷达图、热力图等）
+
+---
+
 ## [1.47.0] - 2025-01-23
 
 ### 🎯 Highlights

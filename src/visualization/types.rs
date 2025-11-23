@@ -44,6 +44,7 @@ impl ChartData {
                 data: y_data,
                 color: None,
                 points: None,
+                sizes: None,         // v1.48.0
                 y_axis_index: None,  // v1.47.0
                 chart_type: None,    // v1.47.0
             }],
@@ -94,6 +95,44 @@ impl ChartData {
             return Ok(());
         }
 
+        // v1.48.0: 气泡图特殊验证
+        if self.chart_type == ChartType::Bubble {
+            for series in &self.series {
+                // 检查 points 存在
+                if let Some(points) = &series.points {
+                    if points.is_empty() {
+                        return Err(format!("气泡图系列 '{}' 的坐标点不能为空", series.name));
+                    }
+                    // 检查 sizes 存在
+                    if let Some(sizes) = &series.sizes {
+                        if sizes.is_empty() {
+                            return Err(format!("气泡图系列 '{}' 的气泡大小不能为空", series.name));
+                        }
+                        // 检查 points 和 sizes 长度一致
+                        if points.len() != sizes.len() {
+                            return Err(format!(
+                                "气泡图系列 '{}' 的坐标点数量({})与气泡大小数量({})不匹配",
+                                series.name,
+                                points.len(),
+                                sizes.len()
+                            ));
+                        }
+                    } else {
+                        return Err(format!(
+                            "气泡图系列 '{}' 必须包含 sizes 数据",
+                            series.name
+                        ));
+                    }
+                } else {
+                    return Err(format!(
+                        "气泡图系列 '{}' 必须包含 points 数据",
+                        series.name
+                    ));
+                }
+            }
+            return Ok(());
+        }
+
         // 折线图和柱状图：检查系列数据长度与 X 轴匹配
         if let Some(x_data) = &self.x_axis.data {
             for series in &self.series {
@@ -126,6 +165,8 @@ pub enum ChartType {
     Scatter,
     /// 面积图 (v1.47.0)
     Area,
+    /// 气泡图 (v1.48.0 - Phase 3 P2)
+    Bubble,
 }
 
 impl ChartType {
@@ -137,6 +178,7 @@ impl ChartType {
             "pie" => Some(Self::Pie),
             "scatter" => Some(Self::Scatter),
             "area" => Some(Self::Area),  // v1.47.0
+            "bubble" => Some(Self::Bubble),  // v1.48.0
             _ => None,
         }
     }
@@ -198,6 +240,9 @@ pub struct Series {
     /// v1.45.0: 散点图数据点（可选，用于散点图的二维坐标）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub points: Option<Vec<(f64, f64)>>,
+    /// v1.48.0: 气泡大小（可选，用于气泡图，与 points 配合使用）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sizes: Option<Vec<f64>>,
     /// v1.47.0: Y 轴索引（可选，0=主轴, 1=副轴，默认0）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub y_axis_index: Option<usize>,
@@ -214,6 +259,7 @@ impl Series {
             data,
             color: None,
             points: None,
+            sizes: None,         // v1.48.0
             y_axis_index: None,  // v1.47.0
             chart_type: None,    // v1.47.0
         }
@@ -226,8 +272,22 @@ impl Series {
             data: Vec::new(), // 散点图不使用 data 字段
             color: None,
             points: Some(points),
+            sizes: None,         // v1.48.0
             y_axis_index: None,  // v1.47.0
             chart_type: None,    // v1.47.0
+        }
+    }
+
+    /// v1.48.0: 创建气泡图系列
+    pub fn new_bubble(name: impl Into<String>, points: Vec<(f64, f64)>, sizes: Vec<f64>) -> Self {
+        Self {
+            name: name.into(),
+            data: Vec::new(), // 气泡图不使用 data 字段
+            color: None,
+            points: Some(points),
+            sizes: Some(sizes),
+            y_axis_index: None,
+            chart_type: None,
         }
     }
 

@@ -136,8 +136,16 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <button class="toolbar-btn toolbar-btn-sm" data-chart-type="pie" title="饼图">🥧</button>
             <button class="toolbar-btn toolbar-btn-sm" data-chart-type="scatter" title="散点图">📉</button>
             <button class="toolbar-btn toolbar-btn-sm" data-chart-type="area" title="面积图">📊</button>
+            <button class="toolbar-btn toolbar-btn-sm" data-chart-type="bubble" title="气泡图">🫧</button>
         </div>
         <div class="toolbar-section toolbar-right">
+            <button id="export-svg-btn" class="toolbar-btn" title="导出高质量矢量图">
+                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+                <span>导出 SVG</span>
+            </button>
             <button id="chart-config-btn" class="toolbar-btn" title="图表配置">
                 <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="12" cy="12" r="3"></circle>
@@ -1247,6 +1255,9 @@ const TERMINAL_JS: &str = r#"
             this.sessionCreatedAt = null;    // 会话创建时间
             this.conversationId = null;      // 对话 ID (从服务器获取)
 
+            // ===== v1.48.0: 图表实例跟踪（用于 SVG 导出）=====
+            this.charts = [];                // 存储所有图表实例: [{ chart, title, createdAt }]
+
             this.init();
 
             // 设置自动保存
@@ -1732,6 +1743,62 @@ const TERMINAL_JS: &str = r#"
             this.removeSpinner();
             this.streamBuffer = '';
             this.isStreaming = false;
+        }
+
+        // v1.48.0: 导出 SVG 矢量图
+        exportSVG() {
+            // 检查是否有图表
+            if (this.charts.length === 0) {
+                this.toast.show('暂无图表可导出，请先创建图表', 'warning');
+                return;
+            }
+
+            // 获取最新的图表
+            const latestChartInfo = this.charts[this.charts.length - 1];
+            const { chart, title, chartType } = latestChartInfo;
+
+            try {
+                // 从 SVG 渲染器获取 SVG DOM 元素
+                const svgElement = chart.getDom().querySelector('svg');
+
+                if (!svgElement) {
+                    this.toast.show('无法提取 SVG 内容', 'error');
+                    return;
+                }
+
+                // 克隆 SVG 元素
+                const svgClone = svgElement.cloneNode(true);
+
+                // 添加 XML 命名空间
+                svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+                // 序列化 SVG
+                const serializer = new XMLSerializer();
+                const svgString = serializer.serializeToString(svgClone);
+
+                // 创建 Blob
+                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+
+                // 生成文件名（使用图表标题和时间戳）
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                const safeTitle = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+                const filename = `${safeTitle}_${chartType}_${timestamp}.svg`;
+
+                // 创建下载链接
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                link.click();
+
+                // 释放 URL
+                URL.revokeObjectURL(link.href);
+
+                this.toast.show(`已导出 SVG 文件: ${filename}`, 'success');
+            } catch (error) {
+                console.error('[SVG Export Error]', error);
+                this.toast.show(`导出失败: ${error.message}`, 'error');
+            }
         }
 
         escapeHtml(text) {
@@ -2931,14 +2998,23 @@ const TERMINAL_JS: &str = r#"
             // v1.45.0: 添加到 Round 卡片的输出区域内部（而不是 outputArea）
             outputContent.appendChild(chartCard);
 
-            // 初始化 ECharts
-            const chart = echarts.init(chartContainer);
+            // v1.48.0: 初始化 ECharts（使用 SVG 渲染器以支持 SVG 导出）
+            const currentTheme = document.getElementById('html-root').getAttribute('data-theme') || 'dark';
+            const chart = echarts.init(chartContainer, currentTheme === 'dark' ? 'dark' : null, { renderer: 'svg' });
 
             // 转换为 ECharts option
             const option = this.convertToEChartsOption(chartData);
 
             // 渲染图表
             chart.setOption(option);
+
+            // v1.48.0: 存储图表实例用于 SVG 导出
+            this.charts.push({
+                chart: chart,
+                title: chartData.title,
+                chartType: chartData.chart_type,
+                createdAt: new Date()
+            });
 
             // 响应式调整
             window.addEventListener('resize', () => {
@@ -2947,10 +3023,16 @@ const TERMINAL_JS: &str = r#"
 
             // 主题切换时重新初始化
             const observer = new MutationObserver(() => {
-                const currentTheme = document.getElementById('html-root').getAttribute('data-theme') || 'dark';
+                const newTheme = document.getElementById('html-root').getAttribute('data-theme') || 'dark';
                 chart.dispose();
-                const newChart = echarts.init(chartContainer, currentTheme === 'dark' ? 'dark' : null);
+                const newChart = echarts.init(chartContainer, newTheme === 'dark' ? 'dark' : null, { renderer: 'svg' });
                 newChart.setOption(this.convertToEChartsOption(chartData));
+
+                // v1.48.0: 更新存储的图表实例
+                const chartIndex = this.charts.findIndex(c => c.chart === chart);
+                if (chartIndex !== -1) {
+                    this.charts[chartIndex].chart = newChart;
+                }
             });
             observer.observe(document.getElementById('html-root'), {
                 attributes: true,
@@ -2993,6 +3075,8 @@ const TERMINAL_JS: &str = r#"
             const isScatter = chartData.chart_type === 'scatter';
             // v1.47.0: 面积图判断
             const isArea = chartData.chart_type === 'area';
+            // v1.48.0: 气泡图判断
+            const isBubble = chartData.chart_type === 'bubble';
 
             return {
                 title: {
@@ -3157,6 +3241,36 @@ const TERMINAL_JS: &str = r#"
                         emphasis: {
                             scale: true,
                             scaleSize: 15,
+                        },
+                    };
+                }) : isBubble ? chartData.series.map((s, index) => {
+                    // v1.48.0: 气泡图数据格式：[[x, y, size], [x, y, size], ...]
+                    // 将 points [(x,y)] 和 sizes [size] 合并为 [[x,y,size], ...]
+                    const bubbleData = (s.points || []).map((point, i) => {
+                        const size = s.sizes && s.sizes[i] ? s.sizes[i] : 10;
+                        return [point[0], point[1], size];
+                    });
+
+                    return {
+                        name: s.name,
+                        type: 'scatter',
+                        data: bubbleData,
+                        symbolSize: function (data) {
+                            // data[2] 是气泡大小，需要归一化到合适的像素范围
+                            return Math.sqrt(data[2]) * 3;  // 平方根缩放，避免过大
+                        },
+                        color: s.color || defaultColors[index % defaultColors.length],
+                        itemStyle: {
+                            borderWidth: 1,
+                            borderColor: isDark ? '#0D1117' : '#FFFFFF',
+                            opacity: 0.7,  // 气泡半透明，避免重叠遮挡
+                        },
+                        emphasis: {
+                            scale: true,
+                            scaleSize: 1.2,
+                            itemStyle: {
+                                opacity: 1,
+                            },
                         },
                     };
                 }) : chartData.series.map((s, index) => {
@@ -4578,6 +4692,14 @@ const TERMINAL_JS: &str = r#"
             if (exportBtn) {
                 exportBtn.addEventListener('click', () => {
                     this.exportData();
+                });
+            }
+
+            // v1.48.0: 导出 SVG 按钮
+            const exportSvgBtn = document.getElementById('export-svg-btn');
+            if (exportSvgBtn) {
+                exportSvgBtn.addEventListener('click', () => {
+                    terminal.exportSVG();
                 });
             }
         }
