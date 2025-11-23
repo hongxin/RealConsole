@@ -141,6 +141,43 @@ impl ChartData {
             return Ok(());
         }
 
+        // v1.49.0: 雷达图特殊验证
+        if self.chart_type == ChartType::Radar {
+            // 检查 indicators 存在且不为空
+            if let Some(indicators) = &self.indicators {
+                if indicators.is_empty() {
+                    return Err("雷达图必须包含至少一个指标维度".to_string());
+                }
+                // 检查系列数据长度与指标数量匹配
+                for series in &self.series {
+                    if series.data.len() != indicators.len() {
+                        return Err(format!(
+                            "雷达图系列 '{}' 数据长度({})与指标数量({})不匹配",
+                            series.name,
+                            series.data.len(),
+                            indicators.len()
+                        ));
+                    }
+                }
+            } else {
+                return Err("雷达图必须包含 indicators 数据".to_string());
+            }
+            return Ok(());
+        }
+
+        // v1.49.0: 热力图特殊验证
+        if self.chart_type == ChartType::Heatmap {
+            // 检查 heatmap_data 存在且不为空
+            if let Some(heatmap_data) = &self.heatmap_data {
+                if heatmap_data.is_empty() {
+                    return Err("热力图必须包含热力数据".to_string());
+                }
+            } else {
+                return Err("热力图必须包含 heatmap_data".to_string());
+            }
+            return Ok(());
+        }
+
         // 折线图和柱状图：检查系列数据长度与 X 轴匹配
         if let Some(x_data) = &self.x_axis.data {
             for series in &self.series {

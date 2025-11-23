@@ -7,11 +7,13 @@
 // - 支持多种图表类型（折线、柱状、饼图、散点等）
 
 pub mod csv;
+pub mod examples;
 pub mod parser;
 pub mod templates;
 pub mod types;
 
 pub use csv::{parse_csv_file, CsvData};
+pub use examples::{ChartExample, ExampleDifficulty, ExampleLibrary};
 pub use parser::{ChartCommand, ChartCommandParser};
 pub use templates::{ChartTemplate, TemplateCategory, TemplateEngine};
 pub use types::{AxisConfig, ChartData, ChartOptions, ChartType, Series};

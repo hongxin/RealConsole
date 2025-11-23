@@ -4,7 +4,7 @@
 //! v1.50.0: 支持模板命令 (templates, use)
 
 use crate::visualization::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
-use crate::visualization::{TemplateCategory, TemplateEngine};
+use crate::visualization::{ExampleDifficulty, ExampleLibrary, TemplateCategory, TemplateEngine};
 use anyhow::{anyhow, Result};
 
 /// Chart 命令类型
@@ -16,6 +16,13 @@ pub enum ChartCommand {
     ListTemplates { category: Option<TemplateCategory> },
     /// 使用模板
     UseTemplate { template_id: String },
+    /// 列出示例 (v1.51.0)
+    ListExamples {
+        category: Option<TemplateCategory>,
+        difficulty: Option<ExampleDifficulty>,
+    },
+    /// 使用示例 (v1.51.0)
+    UseExample { example_id: String },
 }
 
 /// Chart 命令解析器
@@ -28,6 +35,8 @@ impl ChartCommandParser {
     /// - `!chart line ...` - 创建图表
     /// - `!chart templates [category]` - 列出模板
     /// - `!chart use <id>` - 使用模板
+    /// - `!chart examples [category] [difficulty]` - 列出示例 (v1.51.0)
+    /// - `!chart example <id>` - 使用示例 (v1.51.0)
     pub fn parse_command(command: &str) -> Result<ChartCommand> {
         let command = command.trim_start_matches("chart").trim();
 
@@ -35,6 +44,10 @@ impl ChartCommandParser {
             Self::parse_templates_command(command)
         } else if command.starts_with("use") {
             Self::parse_use_command(command)
+        } else if command.starts_with("examples") {
+            Self::parse_examples_command(command)
+        } else if command.starts_with("example ") {
+            Self::parse_use_example_command(command)
         } else {
             // 原有的图表创建命令
             Self::parse(command).map(ChartCommand::Create)
@@ -97,6 +110,72 @@ impl ChartCommandParser {
         }
 
         Ok(ChartCommand::UseTemplate { template_id })
+    }
+
+    /// v1.51.0: 解析 examples 命令
+    ///
+    /// 格式：
+    /// - `examples` - 列出所有示例
+    /// - `examples business` - 列出业务分析类示例
+    /// - `examples beginner` - 列出初级难度示例
+    /// - `examples business beginner` - 列出业务分析类初级难度示例
+    fn parse_examples_command(command: &str) -> Result<ChartCommand> {
+        let parts: Vec<&str> = command.split_whitespace().collect();
+
+        let mut category = None;
+        let mut difficulty = None;
+
+        // 解析可选的 category 和 difficulty 参数
+        for i in 1..parts.len() {
+            let param = parts[i].to_lowercase();
+
+            // 尝试解析为分类
+            match param.as_str() {
+                "business" => category = Some(TemplateCategory::Business),
+                "technical" => category = Some(TemplateCategory::Technical),
+                "team" => category = Some(TemplateCategory::Team),
+                "academic" => category = Some(TemplateCategory::Academic),
+                "exploration" => category = Some(TemplateCategory::Exploration),
+                // 尝试解析为难度
+                "beginner" => difficulty = Some(ExampleDifficulty::Beginner),
+                "intermediate" => difficulty = Some(ExampleDifficulty::Intermediate),
+                "advanced" => difficulty = Some(ExampleDifficulty::Advanced),
+                _ => {
+                    return Err(anyhow!(
+                        "无效的参数: {}，支持分类: business/technical/team/academic/exploration，难度: beginner/intermediate/advanced",
+                        param
+                    ))
+                }
+            }
+        }
+
+        Ok(ChartCommand::ListExamples { category, difficulty })
+    }
+
+    /// v1.51.0: 解析 example 命令
+    ///
+    /// 格式：`example <example-id>`
+    /// 示例：`example simple-sales`
+    fn parse_use_example_command(command: &str) -> Result<ChartCommand> {
+        let example_id = command
+            .trim_start_matches("example")
+            .trim()
+            .to_string();
+
+        if example_id.is_empty() {
+            return Err(anyhow!("缺少示例 ID，使用格式: !chart example <example-id>"));
+        }
+
+        // 验证示例是否存在
+        let library = ExampleLibrary::new();
+        if library.find_by_id(&example_id).is_none() {
+            return Err(anyhow!(
+                "示例 '{}' 不存在，使用 '!chart examples' 查看可用示例",
+                example_id
+            ));
+        }
+
+        Ok(ChartCommand::UseExample { example_id })
     }
 
     /// 解析 chart 命令
@@ -652,5 +731,103 @@ mod tests {
             }
             _ => panic!("Expected ChartCommand::Create"),
         }
+    }
+
+    // v1.51.0: 示例命令测试
+    #[test]
+    fn test_list_all_examples() {
+        let cmd = "chart examples";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListExamples { category, difficulty } => {
+                assert!(category.is_none());
+                assert!(difficulty.is_none());
+            }
+            _ => panic!("Expected ListExamples command"),
+        }
+    }
+
+    #[test]
+    fn test_list_examples_by_category() {
+        let cmd = "chart examples business";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListExamples { category, difficulty } => {
+                assert!(matches!(category, Some(TemplateCategory::Business)));
+                assert!(difficulty.is_none());
+            }
+            _ => panic!("Expected ListExamples command with Business category"),
+        }
+    }
+
+    #[test]
+    fn test_list_examples_by_difficulty() {
+        let cmd = "chart examples beginner";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListExamples { category, difficulty } => {
+                assert!(category.is_none());
+                assert!(matches!(difficulty, Some(ExampleDifficulty::Beginner)));
+            }
+            _ => panic!("Expected ListExamples command with Beginner difficulty"),
+        }
+    }
+
+    #[test]
+    fn test_list_examples_by_category_and_difficulty() {
+        let cmd = "chart examples business intermediate";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::ListExamples { category, difficulty } => {
+                assert!(matches!(category, Some(TemplateCategory::Business)));
+                assert!(matches!(difficulty, Some(ExampleDifficulty::Intermediate)));
+            }
+            _ => panic!("Expected ListExamples command with Business category and Intermediate difficulty"),
+        }
+    }
+
+    #[test]
+    fn test_list_examples_invalid_param() {
+        let cmd = "chart examples invalid";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("无效的参数"));
+    }
+
+    #[test]
+    fn test_use_example() {
+        let cmd = "chart example simple-sales";
+        let result = ChartCommandParser::parse_command(cmd).unwrap();
+
+        match result {
+            ChartCommand::UseExample { example_id } => {
+                assert_eq!(example_id, "simple-sales");
+            }
+            _ => panic!("Expected UseExample command"),
+        }
+    }
+
+    #[test]
+    fn test_use_example_missing_id() {
+        let cmd = "chart example";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        // 这个命令会被解析为 "chart example"，由于不以 "example " 开头，
+        // 会尝试作为图表类型解析，导致错误
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_use_example_not_found() {
+        let cmd = "chart example nonexistent-example";
+        let result = ChartCommandParser::parse_command(cmd);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("不存在"));
     }
 }

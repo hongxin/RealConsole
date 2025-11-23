@@ -692,13 +692,144 @@ async fn execute_chart_command(
                 }
             }
         }
+        Ok(ChartCommand::ListExamples { category, difficulty }) => {
+            // v1.51.0: 列出示例命令
+            use crate::visualization::ExampleLibrary;
+
+            let library = ExampleLibrary::new();
+            let mut examples: Vec<_> = library.all_examples().to_vec();
+
+            // 应用过滤器
+            if let Some(cat) = category {
+                examples.retain(|ex| ex.category == cat);
+            }
+            if let Some(diff) = difficulty {
+                examples.retain(|ex| ex.difficulty == diff);
+            }
+
+            // 格式化输出
+            let mut output = String::new();
+            output.push_str("📚 **图表示例库**\n\n");
+
+            if category.is_some() || difficulty.is_some() {
+                output.push_str("**过滤条件**: ");
+                if let Some(cat) = category {
+                    output.push_str(&format!("分类={:?} ", cat));
+                }
+                if let Some(diff) = difficulty {
+                    output.push_str(&format!("难度={:?}", diff));
+                }
+                output.push_str("\n\n");
+            } else {
+                let cat_summary = library.category_summary();
+                let diff_summary = library.difficulty_summary();
+                output.push_str(&format!("**总计**: {} 个示例\n", examples.len()));
+                output.push_str(&format!("**按分类**: {}\n",
+                    cat_summary.iter()
+                        .map(|(cat, count)| format!("{:?}({})", cat, count))
+                        .collect::<Vec<_>>()
+                        .join(", ")));
+                output.push_str(&format!("**按难度**: {}\n\n",
+                    diff_summary.iter()
+                        .map(|(diff, count)| format!("{:?}({})", diff, count))
+                        .collect::<Vec<_>>()
+                        .join(", ")));
+            }
+
+            for example in &examples {
+                output.push_str(&format!("### `{}`\n", example.id));
+                output.push_str(&format!("**{}** - {}\n", example.title, example.description));
+                output.push_str(&format!("🎯 难度: {:?} | 📁 分类: {:?}\n", example.difficulty, example.category));
+                output.push_str(&format!("📈 图表类型: {:?}\n", example.chart_data.chart_type));
+                output.push_str(&format!("🏷️ 标签: {}\n", example.tags.join(", ")));
+                output.push_str("\n**学习要点**:\n");
+                for (i, point) in example.learning_points.iter().enumerate() {
+                    output.push_str(&format!("{}. {}\n", i + 1, point));
+                }
+                output.push_str(&format!("\n**使用**: `!chart example {}`\n\n", example.id));
+                output.push_str("---\n\n");
+            }
+
+            output.push_str("\n💡 **提示**:\n");
+            output.push_str("- 使用 `!chart examples <category>` 查看特定分类\n");
+            output.push_str("- 使用 `!chart examples <difficulty>` 查看特定难度\n");
+            output.push_str("- 分类: business, technical, team, academic, exploration\n");
+            output.push_str("- 难度: beginner, intermediate, advanced\n");
+            output.push_str("- 使用 `!chart example <example-id>` 查看并应用示例\n");
+
+            let execution_time = start_time.elapsed().as_secs_f64();
+            if let Some(completed_round) = session.complete_round(
+                &round_id,
+                output,
+                execution_time,
+                vec!["chart".to_string(), "examples".to_string()],
+            ).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: completed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+        }
+        Ok(ChartCommand::UseExample { example_id }) => {
+            // v1.51.0: 使用示例命令
+            use crate::visualization::ExampleLibrary;
+
+            let library = ExampleLibrary::new();
+            if let Some(example) = library.find_by_id(&example_id) {
+                // 发送 Chart 消息（使用示例的数据）
+                let chart_msg = ServerMessage::Chart {
+                    round_id: round_id.clone(),
+                    chart_data: example.chart_data.clone(),
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&chart_msg)?))
+                    .await?;
+
+                let execution_time = start_time.elapsed().as_secs_f64();
+                let mut success_msg = format!("✅ 已应用示例: **{}**\n\n{}\n\n", example.title, example.description);
+                success_msg.push_str("**学习要点**:\n");
+                for (i, point) in example.learning_points.iter().enumerate() {
+                    success_msg.push_str(&format!("{}. {}\n", i + 1, point));
+                }
+                success_msg.push_str(&format!("\n**代码示例**:\n```\n{}\n```", example.code_snippet));
+
+                if let Some(completed_round) = session.complete_round(
+                    &round_id,
+                    success_msg,
+                    execution_time,
+                    vec!["chart".to_string(), "example".to_string()],
+                ).await {
+                    let round_complete_msg = ServerMessage::RoundComplete {
+                        round: completed_round,
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                        .await?;
+                }
+            } else {
+                // 示例不存在（理论上不会到这里，因为 parse_use_example_command 已经验证）
+                let error_msg = format!("❌ 示例 '{}' 不存在", example_id);
+                if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
+                    let round_complete_msg = ServerMessage::RoundComplete {
+                        round: failed_round,
+                    };
+                    sender
+                        .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                        .await?;
+                }
+            }
+        }
         Err(e) => {
             // 解析失败，标记回合失败
             let error_msg = format!(
                 "❌ 图表命令解析失败\n\n{}\n\n**使用示例**:\n\
                 - 创建图表: `!chart line --title \"月度趋势\" --x-axis \"1月,2月,3月\" --series \"销售额:120,132,101\"`\n\
                 - 查看模板: `!chart templates`\n\
-                - 使用模板: `!chart use sales-trend`",
+                - 使用模板: `!chart use sales-trend`\n\
+                - 查看示例: `!chart examples`\n\
+                - 使用示例: `!chart example simple-sales`",
                 e
             );
             if let Some(failed_round) = session.fail_round(&round_id, error_msg).await {
