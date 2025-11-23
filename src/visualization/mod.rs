@@ -8,10 +8,12 @@
 
 pub mod csv;
 pub mod parser;
+pub mod templates;
 pub mod types;
 
 pub use csv::{parse_csv_file, CsvData};
 pub use parser::ChartCommandParser;
+pub use templates::{ChartTemplate, TemplateCategory, TemplateEngine};
 pub use types::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
 
 /// 可视化模块版本
