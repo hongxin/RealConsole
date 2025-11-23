@@ -370,11 +370,12 @@ impl ToolExecutor {
             // ✨ v1.51.0: 如果检测到 ChartData，附加到最终响应中
             if let Some(chart_json) = chart_data {
                 // 返回带有 ChartData 标记的响应
+                // 注意：__CHART__ 必须在 __DEBUG__ 前面，因为 remove_debug_info 会移除 __DEBUG__ 及其后面的内容
                 let debug_info = Self::encode_debug_info(&conversation_rounds);
-                return Ok(format!("{}__DEBUG__{}__CHART__{}",
+                return Ok(format!("{}__CHART__{}__DEBUG__{}",
                     "✅ 图表已生成",
-                    debug_info,
-                    chart_json
+                    chart_json,
+                    debug_info
                 ));
             }
 
