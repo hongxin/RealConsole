@@ -228,6 +228,34 @@ impl ChartHistoryEntry {
     }
 }
 
+/// v1.52.0: 图像历史记录
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ImageHistoryEntry {
+    /// 历史记录 ID
+    pub id: String,
+    /// 创建时间
+    pub timestamp: DateTime<Utc>,
+    /// 图像数据
+    pub image_data: visualization::ImageData,
+    /// 关联的回合 ID
+    pub round_id: Option<String>,
+    /// 用于显示该图像的命令
+    pub command: String,
+}
+
+impl ImageHistoryEntry {
+    /// 创建新的图像历史记录
+    pub fn new(image_data: visualization::ImageData, round_id: Option<String>, command: String) -> Self {
+        Self {
+            id: format!("image-{}", Uuid::new_v4()),
+            timestamp: Utc::now(),
+            image_data,
+            round_id,
+            command,
+        }
+    }
+}
+
 /// 消息类型（Server → Client）
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -386,6 +414,16 @@ pub enum ServerMessage {
         chart_data: visualization::ChartData,
     },
 
+    // ===== v1.52.0 新增：图像显示消息 =====
+    /// 图像数据（用于远程运维场景）
+    #[serde(rename = "image")]
+    Image {
+        /// 关联的回合 ID
+        round_id: String,
+        /// 图像数据
+        image_data: visualization::ImageData,
+    },
+
     // ===== v1.46.0 新增：文件上传响应 =====
     /// 文件上传成功（返回文件 ID 和预览数据）
     #[serde(rename = "file_uploaded")]
@@ -448,6 +486,8 @@ pub struct Session {
     pub uploaded_files: crate::web::uploaded_files::UploadedFiles,
     /// 图表历史记录（v1.51.0 新增）
     pub chart_history: Arc<RwLock<Vec<ChartHistoryEntry>>>,
+    /// 图像历史记录（v1.52.0 新增）
+    pub image_history: Arc<RwLock<Vec<ImageHistoryEntry>>>,
 }
 
 impl Session {
@@ -480,6 +520,7 @@ impl Session {
             rounds: Arc::new(RwLock::new(Vec::new())),
             uploaded_files: crate::web::uploaded_files::UploadedFiles::new(), // v1.46.0
             chart_history: Arc::new(RwLock::new(Vec::new())), // v1.51.0
+            image_history: Arc::new(RwLock::new(Vec::new())), // v1.52.0
         }
     }
 
@@ -586,6 +627,49 @@ impl Session {
     /// 获取图表历史记录数量
     pub async fn chart_history_count(&self) -> usize {
         let history = self.chart_history.read().await;
+        history.len()
+    }
+
+    // ===== v1.52.0 新增：图像历史管理方法 =====
+
+    /// 添加图像到历史记录
+    pub async fn add_image_to_history(
+        &self,
+        image_data: visualization::ImageData,
+        round_id: Option<String>,
+        command: String,
+    ) -> ImageHistoryEntry {
+        let entry = ImageHistoryEntry::new(image_data, round_id, command);
+        let mut history = self.image_history.write().await;
+        history.push(entry.clone());
+        entry
+    }
+
+    /// 获取所有图像历史记录
+    pub async fn get_image_history(&self) -> Vec<ImageHistoryEntry> {
+        let history = self.image_history.read().await;
+        history.clone()
+    }
+
+    /// 根据 ID 获取图像历史记录
+    pub async fn get_image_by_id(&self, image_id: &str) -> Option<ImageHistoryEntry> {
+        let history = self.image_history.read().await;
+        history.iter().find(|entry| entry.id == image_id).cloned()
+    }
+
+    /// 获取最近 N 个图像历史记录
+    pub async fn get_recent_images(&self, limit: usize) -> Vec<ImageHistoryEntry> {
+        let history = self.image_history.read().await;
+        history.iter()
+            .rev()
+            .take(limit)
+            .cloned()
+            .collect()
+    }
+
+    /// 获取图像历史记录数量
+    pub async fn image_history_count(&self) -> usize {
+        let history = self.image_history.read().await;
         history.len()
     }
 
@@ -710,6 +794,8 @@ impl Session {
 
         // v1.51.0: 获取图表历史
         let chart_history = self.chart_history.read().await.clone();
+        // v1.52.0: 获取图像历史
+        let image_history = self.image_history.read().await.clone();
 
         SerializableSession {
             id: self.id.clone(),
@@ -719,6 +805,7 @@ impl Session {
             conversation_id: self.conversation_id.clone(),
             rounds,
             chart_history,
+            image_history,
             metadata,
             version: env!("CARGO_PKG_VERSION").to_string(),
         }
@@ -748,6 +835,12 @@ impl Session {
         {
             let mut chart_history = session.chart_history.write().await;
             *chart_history = serializable.chart_history;
+        }
+
+        // v1.52.0: 恢复图像历史（在独立作用域中，确保锁被释放）
+        {
+            let mut image_history = session.image_history.write().await;
+            *image_history = serializable.image_history;
         }
 
         session

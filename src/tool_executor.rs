@@ -339,6 +339,15 @@ impl ToolExecutor {
                 }
             }
 
+            // ✨ v1.52.0: 检测图像数据标记
+            let mut image_data = None;
+            for result in &tool_results {
+                if result.content.starts_with("__IMAGE_DATA__:") {
+                    image_data = Some(result.content.clone());
+                    break;
+                }
+            }
+
             // ✨ 记录本轮对话信息（用于 debug）
             let round_duration = round_start.elapsed().as_millis() as u64;
             conversation_rounds.push(ConversationRound {
@@ -375,6 +384,16 @@ impl ToolExecutor {
                 return Ok(format!("{}__CHART__{}__DEBUG__{}",
                     "✅ 图表已生成",
                     chart_json,
+                    debug_info
+                ));
+            }
+
+            // ✨ v1.52.0: 如果检测到 ImageData，附加到最终响应中
+            if let Some(image_json) = image_data {
+                let debug_info = Self::encode_debug_info(&conversation_rounds);
+                return Ok(format!("{}__IMAGE__{}__DEBUG__{}",
+                    "✅ 图像已加载",
+                    image_json,
                     debug_info
                 ));
             }

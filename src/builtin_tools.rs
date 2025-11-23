@@ -26,6 +26,7 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry) {
     register_count_files_tool(registry); // ✨ v1.35.0: 文件统计工具
     lunar_tool::register_lunar_tool(registry); // ✨ 农历工具
     register_chart_tool(registry); // ✨ v1.51.0: 图表可视化工具（自然语言驱动）
+    register_view_image(registry); // ✨ v1.52.0: 图像查看工具（远程运维）
 }
 
 /// 注册计算器工具
@@ -1101,6 +1102,117 @@ fn register_chart_tool(registry: &mut ToolRegistry) {
             // 工具执行逻辑
             // 返回特殊标记，让 WebSocket 处理器识别并发送 Chart 消息
             Ok(format!("__CHART_DATA__:{}", args.to_string()))
+        },
+    );
+
+    registry.register(tool);
+}
+
+/// v1.52.0: 注册图像查看工具（远程运维场景）
+///
+/// 用于在 Web Terminal 中显示服务器上的图像文件
+/// 支持常见图像格式：PNG, JPG, JPEG, GIF, WebP, SVG, BMP
+fn register_view_image(registry: &mut ToolRegistry) {
+    let tool = Tool::new(
+        "view_image",
+        "在浏览器中显示服务器上的图像文件。支持格式: PNG, JPG, JPEG, GIF, WebP, SVG, BMP。用于远程运维时查看服务器上的截图、图表、日志等图像。",
+        vec![
+            Parameter {
+                name: "path".to_string(),
+                param_type: ParameterType::String,
+                description: "图像文件路径（绝对路径或相对于当前目录的相对路径）".to_string(),
+                required: true,
+                default: None,
+            },
+            Parameter {
+                name: "alt_text".to_string(),
+                param_type: ParameterType::String,
+                description: "图像替代文本（可选，用于无障碍访问）".to_string(),
+                required: false,
+                default: None,
+            },
+        ],
+        |args: JsonValue| {
+            let path_str = args["path"]
+                .as_str()
+                .ok_or("path 必须是字符串")?;
+
+            let alt_text = args.get("alt_text")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            // 展开路径（支持 ~ 和相对路径）
+            let path = shellexpand::tilde(path_str);
+            let file_path = Path::new(path.as_ref());
+
+            // 检查文件是否存在
+            if !file_path.exists() {
+                return Err(format!("文件不存在: {}", path_str).into());
+            }
+
+            if !file_path.is_file() {
+                return Err(format!("路径不是文件: {}", path_str).into());
+            }
+
+            // 检测图像格式
+            let extension = file_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.to_lowercase())
+                .ok_or("无法识别文件扩展名")?;
+
+            let mime_type = match extension.as_str() {
+                "png" => "image/png",
+                "jpg" | "jpeg" => "image/jpeg",
+                "gif" => "image/gif",
+                "webp" => "image/webp",
+                "svg" => "image/svg+xml",
+                "bmp" => "image/bmp",
+                _ => {
+                    return Err(format!(
+                        "不支持的图像格式: .{}。支持的格式: PNG, JPG, JPEG, GIF, WebP, SVG, BMP",
+                        extension
+                    )
+                    .into());
+                }
+            };
+
+            // 读取文件内容
+            let file_data = fs::read(file_path)
+                .map_err(|e| format!("读取文件失败: {}", e))?;
+
+            // 检查文件大小（限制 10MB）
+            const MAX_SIZE: usize = 10 * 1024 * 1024; // 10MB
+            if file_data.len() > MAX_SIZE {
+                return Err(format!(
+                    "文件过大: {:.2} MB（最大支持 10 MB）",
+                    file_data.len() as f64 / (1024.0 * 1024.0)
+                )
+                .into());
+            }
+
+            // 转换为 base64
+            use base64::{engine::general_purpose, Engine as _};
+            let base64_data = general_purpose::STANDARD.encode(&file_data);
+
+            // 构造 ImageData JSON
+            let image_data = json!({
+                "image_type": "base64",
+                "mime_type": mime_type,
+                "data": base64_data,
+                "alt_text": alt_text.unwrap_or_else(|| file_path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("图像")
+                    .to_string()),
+                "filename": file_path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+                "size_bytes": file_data.len(),
+            });
+
+            // 返回特殊标记，让 WebSocket 处理器识别并发送 Image 消息
+            Ok(format!("__IMAGE_DATA__:{}", image_data.to_string()))
         },
     );
 

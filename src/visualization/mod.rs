@@ -16,7 +16,7 @@ pub use csv::{parse_csv_file, CsvData};
 pub use examples::{ChartExample, ExampleDifficulty, ExampleLibrary};
 pub use parser::{ChartCommand, ChartCommandParser};
 pub use templates::{ChartTemplate, TemplateCategory, TemplateEngine};
-pub use types::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
+pub use types::{AxisConfig, ChartData, ChartOptions, ChartType, Series, ImageData};
 
 /// 可视化模块版本
 pub const VERSION: &str = "1.0.0";

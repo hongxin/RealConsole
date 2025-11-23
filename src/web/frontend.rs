@@ -1281,6 +1281,8 @@ const TERMINAL_JS: &str = r#"
 
             // ===== v1.51.0: 图表数据追踪（用于 localStorage 持久化）=====
             this.chartDataByRound = {};      // 存储每个 round 的 chartData: { round_id: chart_data }
+            // ===== v1.52.0: 图像数据追踪（用于 localStorage 持久化）=====
+            this.imageDataByRound = {};      // 存储每个 round 的 imageData: { round_id: image_data }
 
             this.init();
 
@@ -1769,6 +1771,8 @@ const TERMINAL_JS: &str = r#"
             this.isStreaming = false;
             // v1.51.0: 清空图表数据追踪
             this.chartDataByRound = {};
+            // v1.52.0: 清空图像数据追踪
+            this.imageDataByRound = {};
         }
 
         // v1.48.0: 导出 SVG 矢量图
@@ -1827,7 +1831,7 @@ const TERMINAL_JS: &str = r#"
             }
         }
 
-        // v1.49.0: 导出 PNG 图片
+        // v1.52.0: 导出 PNG 图片（修复 SVG 渲染器不支持 getDataURL 的问题）
         exportPNG() {
             // 检查是否有图表
             if (this.charts.length === 0) {
@@ -1840,25 +1844,82 @@ const TERMINAL_JS: &str = r#"
             const { chart, title, chartType } = latestChartInfo;
 
             try {
-                // 使用 ECharts getDataURL API 获取 PNG 图片（Base64）
-                const dataURL = chart.getDataURL({
-                    type: 'png',
-                    pixelRatio: 2,  // 2倍分辨率，提高清晰度
-                    backgroundColor: '#fff'  // 白色背景（PNG 默认透明）
+                // 获取当前图表的 option（从 SVG 渲染器）
+                const option = chart.getOption();
+
+                // 创建临时的隐藏容器用于 Canvas 渲染
+                const tempContainer = document.createElement('div');
+                tempContainer.style.width = '1200px';  // 固定宽度，提高导出质量
+                tempContainer.style.height = '600px';  // 固定高度
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';  // 移出可视区域
+                tempContainer.style.top = '0';
+                document.body.appendChild(tempContainer);
+
+                // 使用 Canvas 渲染器初始化临时图表
+                const currentTheme = document.getElementById('html-root').getAttribute('data-theme') || 'dark';
+                const tempChart = echarts.init(tempContainer, currentTheme === 'dark' ? 'dark' : null, {
+                    renderer: 'canvas'  // 关键：使用 Canvas 渲染器以支持 getDataURL
                 });
 
-                // 生成文件名（使用图表标题和时间戳）
-                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-                const safeTitle = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
-                const filename = `${safeTitle}_${chartType}_${timestamp}.png`;
+                // 设置 option（禁用动画以加快渲染）
+                const exportOption = {
+                    ...option,
+                    animation: false  // 关键：禁用动画，确保立即渲染完成
+                };
+                tempChart.setOption(exportOption);
 
-                // 创建下载链接
-                const link = document.createElement('a');
-                link.href = dataURL;
-                link.download = filename;
-                link.click();
+                // 监听渲染完成事件
+                const exportWithTimeout = () => {
+                    try {
+                        // 使用 Canvas 渲染器的 getDataURL API 获取 PNG 图片（Base64）
+                        const dataURL = tempChart.getDataURL({
+                            type: 'png',
+                            pixelRatio: 2,  // 2倍分辨率，提高清晰度
+                            backgroundColor: '#fff'  // 白色背景（PNG 默认透明）
+                        });
 
-                this.toast.show(`已导出 PNG 文件: ${filename}`, 'success');
+                        // 生成文件名（使用图表标题和时间戳）
+                        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                        const safeTitle = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+                        const filename = `${safeTitle}_${chartType}_${timestamp}.png`;
+
+                        // 创建下载链接
+                        const link = document.createElement('a');
+                        link.href = dataURL;
+                        link.download = filename;
+                        link.click();
+
+                        this.toast.show(`已导出 PNG 文件: ${filename}`, 'success');
+                    } catch (exportError) {
+                        console.error('[PNG Export Error]', exportError);
+                        this.toast.show(`导出失败: ${exportError.message}`, 'error');
+                    } finally {
+                        // 清理：销毁临时图表和容器
+                        tempChart.dispose();
+                        document.body.removeChild(tempContainer);
+                    }
+                };
+
+                // 等待 ECharts 渲染完成
+                // 策略 1: 监听 'finished' 事件（ECharts 4.0+）
+                let exported = false;
+                tempChart.on('finished', () => {
+                    if (!exported) {
+                        exported = true;
+                        exportWithTimeout();
+                    }
+                });
+
+                // 策略 2: 备用超时（防止事件未触发）
+                setTimeout(() => {
+                    if (!exported) {
+                        exported = true;
+                        console.warn('[PNG Export] Fallback to timeout export');
+                        exportWithTimeout();
+                    }
+                }, 500);  // 500ms 超时保护
+
             } catch (error) {
                 console.error('[PNG Export Error]', error);
                 this.toast.show(`导出失败: ${error.message}`, 'error');
@@ -3110,6 +3171,75 @@ const TERMINAL_JS: &str = r#"
         }
 
         /**
+         * ✨ v1.52.0: 渲染图像
+         * @param {object} msg - 图像消息 { round_id, image_data }
+         */
+        renderImage(msg) {
+            console.log(`[v1.52.0] Rendering image for round: ${msg.round_id}`);
+            const imageData = msg.image_data;
+
+            // 保存图像数据到追踪器
+            this.imageDataByRound[msg.round_id] = imageData;
+
+            // 找到 Round 卡片
+            const roundElement = this.outputArea.querySelector(`[data-round-id="${msg.round_id}"]`);
+            if (!roundElement) {
+                console.error(`[v1.52.0 ERROR] Round not found: ${msg.round_id}`);
+                return;
+            }
+
+            const outputContent = roundElement.querySelector('.output-content');
+            if (!outputContent) {
+                console.error(`[v1.52.0 ERROR] Output content not found`);
+                return;
+            }
+
+            // 创建图像容器
+            const imageCard = document.createElement('div');
+            imageCard.className = 'image-card';
+
+            // 创建图像元素
+            const img = document.createElement('img');
+            img.className = 'display-image';
+            img.alt = imageData.alt_text || '图像';
+
+            // 设置图像源
+            if (imageData.image_type === 'base64') {
+                img.src = `data:${imageData.mime_type};base64,${imageData.data}`;
+            } else if (imageData.image_type === 'url') {
+                img.src = imageData.data;
+            }
+
+            // 加载处理
+            img.onload = () => imageCard.classList.add('loaded');
+            img.onerror = () => {
+                imageCard.classList.add('error');
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'image-error';
+                errorMsg.textContent = `图像加载失败: ${imageData.filename || ''}`;
+                imageCard.appendChild(errorMsg);
+            };
+
+            imageCard.appendChild(img);
+
+            // 添加文件名说明
+            if (imageData.filename) {
+                const caption = document.createElement('div');
+                caption.className = 'image-caption';
+                let text = imageData.filename;
+                if (imageData.size_bytes) {
+                    const sizeMB = (imageData.size_bytes / (1024 * 1024)).toFixed(2);
+                    text += ` (${sizeMB} MB)`;
+                }
+                caption.textContent = text;
+                imageCard.appendChild(caption);
+            }
+
+            outputContent.appendChild(imageCard);
+            this.scrollToBottom();
+        }
+
+        /**
          * 将 RealConsole ChartData 转换为 ECharts option
          * @param {object} chartData - RealConsole 图表数据
          * @returns {object} ECharts option
@@ -3589,6 +3719,8 @@ const TERMINAL_JS: &str = r#"
                 })),
                 // v1.51.0: 保存图表数据
                 charts: this.chartDataByRound,
+                // v1.52.0: 保存图像数据
+                images: this.imageDataByRound,
                 metadata: {
                     round_count: this.rounds.length,
                     last_input: this.rounds[this.rounds.length - 1]?.userInput || ''
@@ -3621,6 +3753,8 @@ const TERMINAL_JS: &str = r#"
 
             // v1.51.0: 恢复图表数据映射
             this.chartDataByRound = session.charts || {};
+            // v1.52.0: 恢复图像数据映射
+            this.imageDataByRound = session.images || {};
 
             // 恢复所有 Round
             if (session.rounds && session.rounds.length > 0) {
@@ -3638,6 +3772,15 @@ const TERMINAL_JS: &str = r#"
                 for (const [round_id, chart_data] of Object.entries(this.chartDataByRound)) {
                     // 重新渲染图表
                     this.renderChart({ round_id, chart_data });
+                }
+            }
+
+            // v1.52.0: 恢复图像（重新渲染每个图像）
+            if (this.imageDataByRound && Object.keys(this.imageDataByRound).length > 0) {
+                console.log('[v1.52.0] Restoring images:', Object.keys(this.imageDataByRound).length);
+                for (const [round_id, image_data] of Object.entries(this.imageDataByRound)) {
+                    // 重新渲染图像
+                    this.renderImage({ round_id, image_data });
                 }
             }
 
@@ -4766,6 +4909,12 @@ const TERMINAL_JS: &str = r#"
             case 'chart':
                 // 图表数据：渲染 ECharts 图表
                 terminal.renderChart(msg);
+                break;
+
+            // ===== v1.52.0: 图像显示 =====
+            case 'image':
+                // 图像数据：渲染图像
+                terminal.renderImage(msg);
                 break;
 
             // ===== v1.46.0: 文件上传消息 =====
@@ -8310,6 +8459,59 @@ body::before {
         min-height: 300px;
         border-radius: 6px;  /* v1.45.0: 匹配卡片圆角 */
     }
+}
+
+/* ===== v1.52.0: 图像显示样式 ===== */
+.image-card {
+    margin: 1rem 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.image-card:hover {
+    box-shadow: 0 4px 16px rgba(163, 113, 247, 0.15);
+    border-color: var(--color-primary);
+}
+
+.display-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    cursor: zoom-in;
+    transition: transform 0.3s;
+}
+
+.display-image:hover {
+    transform: scale(1.02);
+}
+
+.image-caption {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-color);
+    background: rgba(163, 113, 247, 0.05);
+}
+
+.image-error {
+    padding: 2rem;
+    text-align: center;
+    color: var(--error-color);
+    font-size: 0.9rem;
+}
+
+[data-theme="dark"] .image-card {
+    background: rgba(13, 17, 23, 0.6);
+    border-color: rgba(163, 113, 247, 0.3);
+}
+
+[data-theme="light"] .image-card {
+    background: #FFFFFF;
+    border-color: #EDEFF1;
 }
 
 /* ===== v1.47.0: Jupyter 风格工具栏 ===== */

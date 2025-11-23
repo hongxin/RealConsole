@@ -2,7 +2,7 @@
 //!
 //! v1.40.0 新增：支持会话的保存、加载、列表、删除和导出功能
 
-use crate::web::session::{ChartHistoryEntry, ConversationRound};
+use crate::web::session::{ChartHistoryEntry, ImageHistoryEntry, ConversationRound};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -34,6 +34,10 @@ pub struct SerializableSession {
     /// 图表历史记录（v1.51.0 新增）
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chart_history: Vec<ChartHistoryEntry>,
+
+    /// 图像历史记录（v1.52.0 新增）
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub image_history: Vec<ImageHistoryEntry>,
 
     /// 元数据
     #[serde(skip_serializing_if = "Option::is_none")]

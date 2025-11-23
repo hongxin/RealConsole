@@ -1,5 +1,6 @@
 // 可视化数据类型定义
 // v1.44.0: 基础图表数据结构
+// v1.52.0: 添加图像数据结构（远程运维场景）
 
 use serde::{Deserialize, Serialize};
 
@@ -379,6 +380,96 @@ impl Default for ChartOptions {
             show_toolbox: true,
             smooth: false,
         }
+    }
+}
+
+// ==================== v1.52.0: 图像数据结构 ====================
+
+/// v1.52.0: 图像数据（用于远程运维场景）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageData {
+    /// 图像类型：base64 或 url
+    pub image_type: String,
+    /// MIME 类型：image/png, image/jpeg, image/gif, etc.
+    pub mime_type: String,
+    /// 图像数据（base64 编码字符串或 URL）
+    pub data: String,
+    /// 替代文本（用于无障碍访问和加载失败时显示）
+    pub alt_text: String,
+    /// 文件名（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+    /// 文件大小（字节，可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<usize>,
+}
+
+impl ImageData {
+    /// 创建 base64 图像
+    pub fn from_base64(
+        mime_type: impl Into<String>,
+        data: impl Into<String>,
+        alt_text: impl Into<String>,
+    ) -> Self {
+        Self {
+            image_type: "base64".to_string(),
+            mime_type: mime_type.into(),
+            data: data.into(),
+            alt_text: alt_text.into(),
+            filename: None,
+            size_bytes: None,
+        }
+    }
+
+    /// 创建 URL 图像
+    pub fn from_url(url: impl Into<String>, alt_text: impl Into<String>) -> Self {
+        Self {
+            image_type: "url".to_string(),
+            mime_type: "image/unknown".to_string(),
+            data: url.into(),
+            alt_text: alt_text.into(),
+            filename: None,
+            size_bytes: None,
+        }
+    }
+
+    /// 设置文件名
+    pub fn with_filename(mut self, filename: impl Into<String>) -> Self {
+        self.filename = Some(filename.into());
+        self
+    }
+
+    /// 设置文件大小
+    pub fn with_size(mut self, size_bytes: usize) -> Self {
+        self.size_bytes = Some(size_bytes);
+        self
+    }
+
+    /// 验证数据有效性
+    pub fn validate(&self) -> Result<(), String> {
+        // 检查 image_type
+        match self.image_type.as_str() {
+            "base64" | "url" => {}
+            _ => return Err(format!("无效的图像类型: {}", self.image_type)),
+        }
+
+        // 检查 data 不为空
+        if self.data.is_empty() {
+            return Err("图像数据不能为空".to_string());
+        }
+
+        // base64 类型检查大小限制（10MB）
+        if self.image_type == "base64" {
+            const MAX_BASE64_LEN: usize = 14_000_000; // ~10MB base64 编码后
+            if self.data.len() > MAX_BASE64_LEN {
+                return Err(format!(
+                    "Base64 数据过大: {} 字符（最大约 10MB）",
+                    self.data.len()
+                ));
+            }
+        }
+
+        Ok(())
     }
 }
 
