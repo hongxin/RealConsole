@@ -106,6 +106,8 @@ impl CsvData {
             series,
             options: ChartOptions::default(),
             labels: None,
+            indicators: None,  // v1.49.0
+            heatmap_data: None,  // v1.49.0
         };
 
         // 验证数据

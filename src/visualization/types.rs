@@ -24,6 +24,12 @@ pub struct ChartData {
     /// v1.45.0: 饼图标签（可选，用于饼图扇区名称）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<Vec<String>>,
+    /// v1.49.0: 雷达图指标维度（可选，用于雷达图）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indicators: Option<Vec<String>>,
+    /// v1.49.0: 热力图数据（可选，格式: [[x_index, y_index, value], ...]）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub heatmap_data: Option<Vec<(usize, usize, f64)>>,
 }
 
 impl ChartData {
@@ -50,6 +56,8 @@ impl ChartData {
             }],
             options: ChartOptions::default(),
             labels: None,
+            indicators: None,  // v1.49.0
+            heatmap_data: None,  // v1.49.0
         }
     }
 
@@ -167,6 +175,10 @@ pub enum ChartType {
     Area,
     /// 气泡图 (v1.48.0 - Phase 3 P2)
     Bubble,
+    /// 雷达图 (v1.49.0 - Phase 3 P3)
+    Radar,
+    /// 热力图 (v1.49.0 - Phase 3 P3)
+    Heatmap,
 }
 
 impl ChartType {
@@ -179,6 +191,8 @@ impl ChartType {
             "scatter" => Some(Self::Scatter),
             "area" => Some(Self::Area),  // v1.47.0
             "bubble" => Some(Self::Bubble),  // v1.48.0
+            "radar" => Some(Self::Radar),  // v1.49.0
+            "heatmap" => Some(Self::Heatmap),  // v1.49.0
             _ => None,
         }
     }
@@ -393,6 +407,8 @@ mod tests {
             series: vec![Series::new("份额", vec![35.0, 25.0, 40.0])],
             options: ChartOptions::default(),
             labels: Some(vec!["产品A".to_string(), "产品B".to_string(), "产品C".to_string()]),
+            indicators: None,  // v1.49.0
+            heatmap_data: None,  // v1.49.0
         };
 
         assert!(chart.validate().is_ok());
@@ -409,6 +425,8 @@ mod tests {
             series: vec![Series::new("数据", vec![1.0, 2.0])],
             options: ChartOptions::default(),
             labels: Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]), // 长度不匹配
+            indicators: None,  // v1.49.0
+            heatmap_data: None,  // v1.49.0
         };
 
         assert!(chart.validate().is_err());
@@ -429,6 +447,8 @@ mod tests {
             )],
             options: ChartOptions::default(),
             labels: None,
+            indicators: None,  // v1.49.0
+            heatmap_data: None,  // v1.49.0
         };
 
         assert!(chart.validate().is_ok());
@@ -445,6 +465,8 @@ mod tests {
             series: vec![Series::new("数据", vec![1.0, 2.0])], // 没有 points
             options: ChartOptions::default(),
             labels: None,
+            indicators: None,  // v1.49.0
+            heatmap_data: None,  // v1.49.0
         };
 
         assert!(chart.validate().is_err());

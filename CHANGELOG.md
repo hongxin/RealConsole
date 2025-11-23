@@ -5,6 +5,124 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.49.0] - 2025-01-23
+
+### 🎯 Highlights
+
+**主题**: Phase 3 P3 - 导出 UI 重构 + 雷达图 + 热力图
+
+- ✅ **导出下拉菜单** - 统一的导出入口，整合 CSV、PNG、SVG 三种导出方式
+- ✅ **PNG 图片导出** - 高清光栅图导出，2x 分辨率，适合网页展示
+- ✅ **雷达图 (Radar Chart)** - 多维数据对比，支持能力评估、绩效分析等场景
+- ✅ **热力图 (Heatmap)** - 数据密度可视化，支持时间热力、相关性矩阵等场景
+- ✅ **图表类型达到 8 种** - 向 Phase 2 目标（10+ 图表）迈进
+
+### ✨ Added
+
+**UI 重构：导出下拉菜单** (`src/web/frontend.rs`)
+
+- **HTML 结构** (lines 115-150):
+  - 移除独立的"导出 CSV"和"导出 SVG"按钮
+  - 新增 `.toolbar-dropdown` 容器
+  - 主按钮：`#export-dropdown-btn`（带下拉箭头图标）
+  - 下拉菜单：`#export-dropdown-menu`（包含 3 个选项）
+  - 菜单项：`data-export-type` 属性标识导出类型（csv/png/svg）
+
+- **CSS 样式** (lines 8200-8296):
+  - `.dropdown-menu`: 绝对定位，blur backdrop，opacity 过渡动画
+  - `.dropdown-arrow`: 12px 箭头，active 时旋转 180°
+  - `.dropdown-item`: flex 布局，hover 效果，active 状态
+  - 深色/浅色主题适配
+
+- **JavaScript 逻辑** (lines 4711-4761):
+  - 点击主按钮：切换 `.hidden` 类，显示/隐藏菜单
+  - 点击菜单项：调用 `handleExport(exportType)`
+  - 点击外部区域：关闭菜单
+  - `handleExport()` 方法：根据 type 路由到 exportData/exportPNG/exportSVG
+
+**PNG 图片导出** (`src/web/frontend.rs`, lines 1825-1861)
+
+- **exportPNG() 方法**:
+  - 检查图表存在性（`this.charts.length === 0`）
+  - 获取最新图表实例
+  - 使用 ECharts `getDataURL()` API：
+    - `type: 'png'`
+    - `pixelRatio: 2`（2x 分辨率，确保清晰度）
+    - `backgroundColor: '#fff'`（白色背景，避免透明）
+  - 文件名格式：`{标题}_{图表类型}_{时间戳}.png`
+  - 成功/失败 Toast 通知
+
+**雷达图支持** (`src/visualization/types.rs`, `src/web/frontend.rs`)
+
+- **后端数据结构**:
+  - `ChartType::Radar` 枚举值
+  - `ChartData.indicators: Option<Vec<String>>`（雷达图指标维度）
+  - `ChartType::from_str("radar")` 解析支持
+
+- **前端渲染逻辑** (lines 3338-3357, 3419-3453):
+  - 类型判断：`const isRadar = chartData.chart_type === 'radar'`
+  - grid/xAxis/yAxis: 雷达图时为 undefined（与饼图类似）
+  - `radar` 配置：
+    - `indicator`: 从 `chartData.indicators` 构建维度
+    - `radius: '60%'`, `center: ['50%', '55%']`
+    - 分割线/分割区域样式（深色/浅色主题适配）
+  - series 映射：
+    - `type: 'radar'`
+    - `data: [{ value, name, areaStyle, lineStyle, itemStyle }]`
+    - 半透明区域填充（opacity: 0.3）
+
+**热力图支持** (`src/visualization/types.rs`, `src/web/frontend.rs`)
+
+- **后端数据结构**:
+  - `ChartType::Heatmap` 枚举值
+  - `ChartData.heatmap_data: Option<Vec<(usize, usize, f64)>>`（格式：`[[x_index, y_index, value], ...]`）
+  - `ChartType::from_str("heatmap")` 解析支持
+
+- **前端渲染逻辑** (lines 3358-3373, 3454-3488):
+  - 类型判断：`const isHeatmap = chartData.chart_type === 'heatmap'`
+  - series 映射：
+    - `type: 'heatmap'`
+    - `data: chartData.heatmap_data || []`
+    - 标签显示：`label.show: true`
+  - `visualMap` 配置：
+    - `min: 0, max: 100`（可根据数据动态调整）
+    - `calculable: true`（支持拖拽调整范围）
+    - `orient: 'horizontal'`, `left: 'center'`, `bottom: '5%'`
+    - 颜色方案：深色主题使用科学配色（蓝-黄-红），浅色主题使用蓝色渐变
+
+### 🔧 Changed
+
+**所有 ChartData 构造位置更新**:
+- `src/visualization/types.rs`: `simple_line()` 添加 `indicators: None`, `heatmap_data: None`
+- `src/visualization/parser.rs`: 命令解析添加两个新字段
+- `src/visualization/csv.rs`: CSV 解析添加两个新字段
+- `src/visualization/mod.rs`: 测试用例添加两个新字段
+
+### 📊 Statistics
+
+- **图表类型**: 8 种（折线、柱状、饼图、散点、面积、气泡、雷达、热力）
+- **导出格式**: 3 种（CSV 数据、PNG 图片、SVG 矢量图）
+- **测试通过**: 1388 个
+
+### 🎨 Design Notes
+
+**雷达图应用场景**:
+- 能力评估：技能雷达图（编程、设计、沟通等）
+- 绩效分析：多维度 KPI 对比
+- 产品对比：多属性产品对比（价格、性能、续航等）
+
+**热力图应用场景**:
+- 时间热力：用户活跃度时间分布（GitHub contribution graph）
+- 相关性矩阵：变量间相关性可视化
+- 地理热力：区域数据密度展示
+
+**UI 改进价值**:
+- 空间节省：3 个导出按钮 → 1 个下拉菜单
+- 扩展性强：未来新增导出格式（PDF、Excel）只需添加菜单项
+- 用户体验：统一的导出入口，符合现代 UI 设计规范
+
+---
+
 ## [1.48.0] - 2025-01-23
 
 ### 🎯 Highlights

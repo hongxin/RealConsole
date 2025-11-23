@@ -52,6 +52,8 @@ mod tests {
                 smooth: false,
             },
             labels: None,
+            indicators: None,  // v1.49.0
+            heatmap_data: None,  // v1.49.0
         };
 
         // 测试序列化

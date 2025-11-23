@@ -81,6 +81,8 @@ impl ChartCommandParser {
                 smooth,
             },
             labels, // v1.45.0: 饼图标签
+            indicators: None,  // v1.49.0: 雷达图指标
+            heatmap_data: None,  // v1.49.0: 热力图数据
         };
 
         // 验证数据

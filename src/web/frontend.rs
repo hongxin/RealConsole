@@ -112,14 +112,42 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 </svg>
                 <span>上传 CSV</span>
             </button>
-            <button id="export-data-btn" class="toolbar-btn" title="导出数据">
-                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                <span>导出数据</span>
-            </button>
+            <!-- v1.49.0: 导出下拉菜单 -->
+            <div class="toolbar-dropdown">
+                <button id="export-dropdown-btn" class="toolbar-btn" title="导出数据和图表">
+                    <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>导出</span>
+                    <svg class="dropdown-arrow" viewBox="0 0 12 12" fill="currentColor">
+                        <path d="M2 4l4 4 4-4"></path>
+                    </svg>
+                </button>
+                <div id="export-dropdown-menu" class="dropdown-menu hidden">
+                    <button class="dropdown-item" data-export-type="csv">
+                        <svg class="dropdown-icon" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5z"></path>
+                            <path d="M8 8.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"></path>
+                        </svg>
+                        <span>导出 CSV 数据</span>
+                    </button>
+                    <button class="dropdown-item" data-export-type="png">
+                        <svg class="dropdown-icon" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"></path>
+                            <path d="M14.002 13a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2V5A2 2 0 0 1 2 3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-1.998 2zM14 2H4a1 1 0 0 0-1 1h9.002a2 2 0 0 1 2 2v7A1 1 0 0 0 15 11V3a1 1 0 0 0-1-1z"></path>
+                        </svg>
+                        <span>导出 PNG 图片</span>
+                    </button>
+                    <button class="dropdown-item" data-export-type="svg">
+                        <svg class="dropdown-icon" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2z"></path>
+                        </svg>
+                        <span>导出 SVG 矢量图</span>
+                    </button>
+                </div>
+            </div>
             <div class="toolbar-divider"></div>
             <button id="files-panel-btn" class="toolbar-btn" title="已上传文件">
                 <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -139,13 +167,6 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <button class="toolbar-btn toolbar-btn-sm" data-chart-type="bubble" title="气泡图">🫧</button>
         </div>
         <div class="toolbar-section toolbar-right">
-            <button id="export-svg-btn" class="toolbar-btn" title="导出高质量矢量图">
-                <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                </svg>
-                <span>导出 SVG</span>
-            </button>
             <button id="chart-config-btn" class="toolbar-btn" title="图表配置">
                 <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="12" cy="12" r="3"></circle>
@@ -1801,6 +1822,44 @@ const TERMINAL_JS: &str = r#"
             }
         }
 
+        // v1.49.0: 导出 PNG 图片
+        exportPNG() {
+            // 检查是否有图表
+            if (this.charts.length === 0) {
+                this.toast.show('暂无图表可导出，请先创建图表', 'warning');
+                return;
+            }
+
+            // 获取最新的图表
+            const latestChartInfo = this.charts[this.charts.length - 1];
+            const { chart, title, chartType } = latestChartInfo;
+
+            try {
+                // 使用 ECharts getDataURL API 获取 PNG 图片（Base64）
+                const dataURL = chart.getDataURL({
+                    type: 'png',
+                    pixelRatio: 2,  // 2倍分辨率，提高清晰度
+                    backgroundColor: '#fff'  // 白色背景（PNG 默认透明）
+                });
+
+                // 生成文件名（使用图表标题和时间戳）
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                const safeTitle = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+                const filename = `${safeTitle}_${chartType}_${timestamp}.png`;
+
+                // 创建下载链接
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = filename;
+                link.click();
+
+                this.toast.show(`已导出 PNG 文件: ${filename}`, 'success');
+            } catch (error) {
+                console.error('[PNG Export Error]', error);
+                this.toast.show(`导出失败: ${error.message}`, 'error');
+            }
+        }
+
         escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -3077,6 +3136,9 @@ const TERMINAL_JS: &str = r#"
             const isArea = chartData.chart_type === 'area';
             // v1.48.0: 气泡图判断
             const isBubble = chartData.chart_type === 'bubble';
+            // v1.49.0: 雷达图和热力图判断
+            const isRadar = chartData.chart_type === 'radar';
+            const isHeatmap = chartData.chart_type === 'heatmap';
 
             return {
                 title: {
@@ -3107,14 +3169,15 @@ const TERMINAL_JS: &str = r#"
                     top: 40,
                 },
                 // v1.45.0: 饼图不需要 grid 和坐标轴
-                grid: isPie ? undefined : {
+                // v1.49.0: 雷达图也不需要 grid 和坐标轴
+                grid: (isPie || isRadar) ? undefined : {
                     left: '10%',
                     right: '10%',
                     bottom: '15%',
                     top: chartData.options.show_legend ? '20%' : '15%',
                     containLabel: true,
                 },
-                xAxis: isPie ? undefined : {
+                xAxis: (isPie || isRadar) ? undefined : {
                     type: chartData.x_axis.axis_type || 'category',
                     data: chartData.x_axis.data,
                     name: chartData.x_axis.name,
@@ -3131,7 +3194,7 @@ const TERMINAL_JS: &str = r#"
                     },
                 },
                 // v1.47.0: 双 Y 轴支持
-                yAxis: isPie ? undefined : (chartData.y_axis_secondary ? [
+                yAxis: (isPie || isRadar) ? undefined : (chartData.y_axis_secondary ? [
                     // 主 Y 轴
                     {
                         type: chartData.y_axis.axis_type || 'value',
@@ -3273,7 +3336,42 @@ const TERMINAL_JS: &str = r#"
                             },
                         },
                     };
-                }) : chartData.series.map((s, index) => {
+                }) : isRadar ? chartData.series.map((s, index) => {
+                    // v1.49.0: 雷达图数据格式：{name, value: [数值数组]}
+                    return {
+                        name: s.name,
+                        type: 'radar',
+                        data: [{
+                            value: s.data,
+                            name: s.name,
+                            areaStyle: {
+                                opacity: 0.3,
+                            },
+                            lineStyle: {
+                                color: s.color || defaultColors[index % defaultColors.length],
+                                width: 2,
+                            },
+                            itemStyle: {
+                                color: s.color || defaultColors[index % defaultColors.length],
+                            },
+                        }],
+                    };
+                }) : isHeatmap ? [{
+                    // v1.49.0: 热力图数据格式：[[x, y, value], ...]
+                    name: chartData.title,
+                    type: 'heatmap',
+                    data: chartData.heatmap_data || [],
+                    label: {
+                        show: true,
+                        color: themeColors.text,
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(0, 0, 0, 0.5)',
+                        },
+                    },
+                }] : chartData.series.map((s, index) => {
                     // v1.47.0: 混合图表 - 系列可以指定自己的图表类型
                     const seriesChartType = s.chart_type || chartData.chart_type;
                     const seriesIsArea = seriesChartType === 'area';
@@ -3317,6 +3415,77 @@ const TERMINAL_JS: &str = r#"
 
                     return seriesConfig;
                 }),
+                // v1.49.0: 雷达图配置
+                radar: isRadar ? {
+                    indicator: (chartData.indicators || []).map(name => ({
+                        name: name,
+                        color: themeColors.text,
+                    })),
+                    radius: '60%',
+                    center: ['50%', '55%'],
+                    nameGap: 8,
+                    splitNumber: 4,
+                    axisName: {
+                        color: themeColors.text,
+                        fontSize: 12,
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: isDark ? 'rgba(139, 148, 158, 0.2)' : 'rgba(124, 124, 124, 0.2)',
+                        },
+                    },
+                    splitArea: {
+                        areaStyle: {
+                            color: isDark ? [
+                                'rgba(163, 113, 247, 0.05)',
+                                'rgba(163, 113, 247, 0.1)'
+                            ] : [
+                                'rgba(139, 92, 246, 0.05)',
+                                'rgba(139, 92, 246, 0.1)'
+                            ],
+                        },
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: isDark ? 'rgba(139, 148, 158, 0.3)' : 'rgba(124, 124, 124, 0.3)',
+                        },
+                    },
+                } : undefined,
+                // v1.49.0: 热力图 visualMap 配置
+                visualMap: isHeatmap ? {
+                    min: 0,
+                    max: 100,
+                    calculable: true,
+                    orient: 'horizontal',
+                    left: 'center',
+                    bottom: '5%',
+                    inRange: {
+                        color: isDark ? [
+                            '#313695',
+                            '#4575b4',
+                            '#74add1',
+                            '#abd9e9',
+                            '#e0f3f8',
+                            '#ffffbf',
+                            '#fee090',
+                            '#fdae61',
+                            '#f46d43',
+                            '#d73027',
+                            '#a50026'
+                        ] : [
+                            '#c6dbef',
+                            '#9ecae1',
+                            '#6baed6',
+                            '#4292c6',
+                            '#2171b5',
+                            '#08519c',
+                            '#08306b'
+                        ],
+                    },
+                    textStyle: {
+                        color: themeColors.text,
+                    },
+                } : undefined,
                 toolbox: chartData.options.show_toolbox ? {
                     feature: {
                         saveAsImage: {
@@ -4687,20 +4856,55 @@ const TERMINAL_JS: &str = r#"
                 });
             });
 
-            // v1.47.0: 导出数据按钮
-            const exportBtn = document.getElementById('export-data-btn');
-            if (exportBtn) {
-                exportBtn.addEventListener('click', () => {
-                    this.exportData();
+            // v1.49.0: 导出下拉菜单
+            const exportDropdownBtn = document.getElementById('export-dropdown-btn');
+            const exportDropdownMenu = document.getElementById('export-dropdown-menu');
+            const toolbarDropdown = document.querySelector('.toolbar-dropdown');
+
+            if (exportDropdownBtn && exportDropdownMenu) {
+                // 点击按钮切换下拉菜单
+                exportDropdownBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    exportDropdownMenu.classList.toggle('hidden');
+                    toolbarDropdown.classList.toggle('active');
+                });
+
+                // 下拉菜单项点击事件
+                exportDropdownMenu.querySelectorAll('.dropdown-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const exportType = item.getAttribute('data-export-type');
+                        this.handleExport(exportType);
+                        // 关闭下拉菜单
+                        exportDropdownMenu.classList.add('hidden');
+                        toolbarDropdown.classList.remove('active');
+                    });
+                });
+
+                // 点击页面其他地方关闭下拉菜单
+                document.addEventListener('click', (e) => {
+                    if (!toolbarDropdown.contains(e.target)) {
+                        exportDropdownMenu.classList.add('hidden');
+                        toolbarDropdown.classList.remove('active');
+                    }
                 });
             }
+        }
 
-            // v1.48.0: 导出 SVG 按钮
-            const exportSvgBtn = document.getElementById('export-svg-btn');
-            if (exportSvgBtn) {
-                exportSvgBtn.addEventListener('click', () => {
+        // v1.49.0: 统一导出处理方法
+        handleExport(exportType) {
+            switch (exportType) {
+                case 'csv':
+                    this.exportData();
+                    break;
+                case 'png':
+                    terminal.exportPNG();
+                    break;
+                case 'svg':
                     terminal.exportSVG();
-                });
+                    break;
+                default:
+                    terminal.toast.show(`未知导出类型: ${exportType}`, 'error');
             }
         }
 
@@ -8174,6 +8378,103 @@ body::before {
     height: 24px;
     background: rgba(163, 113, 247, 0.2);
     margin: 0 8px;
+}
+
+/* v1.49.0: 导出下拉菜单 */
+.toolbar-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-arrow {
+    width: 12px;
+    height: 12px;
+    margin-left: 4px;
+    transition: transform 0.2s ease;
+}
+
+.toolbar-dropdown.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 200px;
+    background: rgba(13, 17, 23, 0.98);
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    padding: 8px 0;
+    z-index: 1000;
+    backdrop-filter: blur(12px);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.dropdown-menu:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: #E6EDF3;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.dropdown-item:hover {
+    background: rgba(163, 113, 247, 0.15);
+}
+
+.dropdown-item:active {
+    background: rgba(163, 113, 247, 0.25);
+}
+
+.dropdown-icon {
+    width: 16px;
+    height: 16px;
+    fill: #A371F7;
+}
+
+.dropdown-item:hover .dropdown-icon {
+    fill: #C9A9FF;
+}
+
+/* 浅色主题下拉菜单 */
+[data-theme="light"] .dropdown-menu {
+    background: rgba(255, 255, 255, 0.98);
+    border-color: #D0D7DE;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .dropdown-item {
+    color: #24292F;
+}
+
+[data-theme="light"] .dropdown-item:hover {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme="light"] .dropdown-icon {
+    fill: #6366F1;
+}
+
+[data-theme="light"] .dropdown-item:hover .dropdown-icon {
+    fill: #818CF8;
 }
 
 /* 文件面板（侧边栏） */
