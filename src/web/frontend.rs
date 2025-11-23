@@ -4572,6 +4572,14 @@ const TERMINAL_JS: &str = r#"
                     this.quickCreateChart(chartType);
                 });
             });
+
+            // v1.47.0: 导出数据按钮
+            const exportBtn = document.getElementById('export-data-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', () => {
+                    this.exportData();
+                });
+            }
         }
 
         uploadFile(file) {
@@ -4797,6 +4805,67 @@ const TERMINAL_JS: &str = r#"
                 'area': '面积图'
             };
             return names[type] || type;
+        }
+
+        // v1.47.0: 导出数据功能
+        exportData() {
+            // 检查是否有上传的文件
+            if (this.uploadedFiles.size === 0) {
+                terminal.toast.show('暂无可导出的数据，请先上传 CSV 文件', 'warning');
+                return;
+            }
+
+            // 获取最近上传的文件
+            const files = Array.from(this.uploadedFiles.values())
+                .sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+            // 如果只有一个文件，直接导出
+            if (files.length === 1) {
+                this.downloadCSV(files[0]);
+                return;
+            }
+
+            // 多个文件：显示选择列表
+            terminal.writeOutput(`\n**📥 导出数据** - 检测到 ${files.length} 个文件\n\n请在文件面板中点击要导出的文件旁的"📋 复制"按钮，然后使用该命令查看数据。\n或者，最近上传的文件将被自动导出。`);
+
+            // 默认导出最新文件
+            this.downloadCSV(files[0]);
+        }
+
+        downloadCSV(file) {
+            const { filename, preview } = file;
+
+            // 构建 CSV 内容
+            let csvContent = '';
+
+            // 添加表头
+            csvContent += preview.headers.join(',') + '\n';
+
+            // 添加数据行
+            preview.rows.forEach(row => {
+                csvContent += row.map(cell => {
+                    // 处理包含逗号或引号的单元格
+                    if (cell.includes(',') || cell.includes('"') || cell.includes('\n')) {
+                        return '"' + cell.replace(/"/g, '""') + '"';
+                    }
+                    return cell;
+                }).join(',') + '\n';
+            });
+
+            // 创建 Blob 并下载
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+
+            link.setAttribute('href', url);
+            link.setAttribute('download', `exported_${filename}`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            terminal.toast.show(`已导出 ${filename}（${preview.total_rows} 行）`, 'success');
         }
     }
 
@@ -7907,6 +7976,9 @@ body::before {
     position: sticky;
     top: 60px;
     z-index: 90;
+    max-width: 1400px;  /* v1.47.0: 与 terminal-container 等宽 */
+    width: 100%;
+    margin: 0 auto;     /* v1.47.0: 居中对齐 */
 }
 
 .toolbar-section {
