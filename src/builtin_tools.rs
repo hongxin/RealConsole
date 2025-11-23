@@ -25,6 +25,7 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry) {
     register_search_text(registry); // ✨ v1.34.0: 文本搜索工具
     register_count_files_tool(registry); // ✨ v1.35.0: 文件统计工具
     lunar_tool::register_lunar_tool(registry); // ✨ 农历工具
+    register_chart_tool(registry); // ✨ v1.51.0: 图表可视化工具（自然语言驱动）
 }
 
 /// 注册计算器工具
@@ -1043,6 +1044,67 @@ fn count_files_recursive(
     }
 
     Ok(())
+}
+
+/// v1.51.0: 注册图表可视化工具（自然语言驱动）
+///
+/// 支持通过自然语言创建各种图表：折线图、柱状图、饼图、散点图、雷达图、热力图等
+fn register_chart_tool(registry: &mut ToolRegistry) {
+    let tool = Tool::new(
+        "create_chart",
+        "创建数据可视化图表。支持多种图表类型：折线图(line)、柱状图(bar)、饼图(pie)、散点图(scatter)、面积图(area)、气泡图(bubble)、雷达图(radar)、热力图(heatmap)。用户可以用自然语言描述需求，工具会自动生成对应的图表。",
+        vec![
+            Parameter {
+                name: "chart_type".to_string(),
+                param_type: ParameterType::String,
+                description: "图表类型：line(折线图), bar(柱状图), pie(饼图), scatter(散点图), area(面积图), bubble(气泡图), radar(雷达图), heatmap(热力图)".to_string(),
+                required: true,
+                default: None,
+            },
+            Parameter {
+                name: "title".to_string(),
+                param_type: ParameterType::String,
+                description: "图表标题".to_string(),
+                required: true,
+                default: None,
+            },
+            Parameter {
+                name: "x_labels".to_string(),
+                param_type: ParameterType::Array,
+                description: "X轴标签数组（用于折线图、柱状图、面积图）。例如: [\"1月\", \"2月\", \"3月\"]".to_string(),
+                required: false,
+                default: None,
+            },
+            Parameter {
+                name: "series".to_string(),
+                param_type: ParameterType::Array,
+                description: "数据系列数组。每个系列包含 name(名称) 和 data(数据数组)。例如: [{\"name\": \"销售额\", \"data\": [120, 132, 101]}]".to_string(),
+                required: true,
+                default: None,
+            },
+            Parameter {
+                name: "labels".to_string(),
+                param_type: ParameterType::Array,
+                description: "饼图标签数组（仅用于饼图）。例如: [\"产品A\", \"产品B\", \"产品C\"]".to_string(),
+                required: false,
+                default: None,
+            },
+            Parameter {
+                name: "indicators".to_string(),
+                param_type: ParameterType::Array,
+                description: "雷达图指标数组（仅用于雷达图）。例如: [\"技术能力\", \"沟通能力\", \"项目管理\"]".to_string(),
+                required: false,
+                default: None,
+            },
+        ],
+        |args: JsonValue| {
+            // 工具执行逻辑
+            // 返回特殊标记，让 WebSocket 处理器识别并发送 Chart 消息
+            Ok(format!("__CHART_DATA__:{}", args.to_string()))
+        },
+    );
+
+    registry.register(tool);
 }
 
 #[cfg(test)]
