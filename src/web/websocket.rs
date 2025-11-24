@@ -260,6 +260,12 @@ async fn execute_system_command(
         return execute_decompose_command(&args_str, agent, session, sender).await;
     }
 
+    // ===== v1.54.0: 特殊处理 Memory 2.0 命令 =====
+    if cmd == "memory" {
+        eprintln!("🧠 [Web] Handling memory command with args: {}", args_str);
+        return execute_memory_command(&args_str, session, sender).await;
+    }
+
     // ===== 创建回合 =====
     let round = session.create_round(
         crate::web::session::RoundType::System,
@@ -1741,6 +1747,237 @@ async fn execute_decompose_command(
                     .await?;
             }
         }
+    }
+
+    Ok(())
+}
+
+/// v1.54.0: 执行 Memory 2.0 命令
+///
+/// ## 命令格式
+/// - `/memory` - 显示帮助信息
+/// - `/memory search <查询>` - 快速搜索相关上下文
+/// - `/memory extract <任务>` - 提取优化的上下文（带 token 预算）
+/// - `/memory stats` - 显示内存统计信息
+///
+/// ## 消息流程
+/// ```
+/// RoundStart(type: system) → 执行命令 → RoundComplete
+/// ```
+async fn execute_memory_command(
+    args: &str,
+    session: &Arc<Session>,
+    sender: &mut futures::stream::SplitSink<WebSocket, Message>,
+) -> anyhow::Result<()> {
+    use std::time::Instant;
+
+    eprintln!("[Memory Command] 开始执行，参数: '{}'", args);
+
+    // ===== 创建回合 =====
+    let full_command = if args.is_empty() {
+        "/memory".to_string()
+    } else {
+        format!("/memory {}", args)
+    };
+
+    let round = session.create_round(
+        crate::web::session::RoundType::System,
+        full_command.clone(),
+        "memory-2.0".to_string(),
+    ).await;
+    let round_id = round.id.clone();
+    eprintln!("[Memory Command] Session ID: {}", session.id);
+
+    // 发送 RoundStart 消息
+    let round_start_msg = ServerMessage::RoundStart {
+        round: round.clone(),
+    };
+    sender
+        .send(Message::Text(serde_json::to_string(&round_start_msg)?))
+        .await?;
+
+    // 记录开始时间
+    let start_time = Instant::now();
+
+    // ===== 检查 Memory 2.0 是否已初始化 =====
+    let orchestrator = match &session.memory_orchestrator {
+        Some(o) => {
+            eprintln!("[Memory Command] Memory 2.0 已初始化 ✓");
+            o
+        }
+        None => {
+            let error_content = "⚠ Memory 2.0 智能上下文编排器未启用\n提示: Memory 2.0 需要配置 Session 存储".to_string();
+            eprintln!("[Memory Command] 错误: {}", error_content);
+
+            // 标记回合失败
+            if let Some(failed_round) = session.fail_round(&round_id, error_content.clone()).await {
+                let round_complete_msg = ServerMessage::RoundComplete {
+                    round: failed_round,
+                };
+                sender
+                    .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+                    .await?;
+            }
+            return Ok(());
+        }
+    };
+
+    // ===== 解析命令参数 =====
+    let parts: Vec<&str> = args.trim().split_whitespace().collect();
+    eprintln!("[Memory Command] 解析参数，parts.len() = {}", parts.len());
+
+    let output_content = if parts.is_empty() {
+        // 显示帮助信息
+        eprintln!("[Memory Command] 参数为空，显示帮助信息");
+        let help_msg = "🧠 Memory 2.0 智能上下文编排器\n\n用法:\n\
+            • /memory search <查询>     - 快速搜索相关上下文\n\
+            • /memory extract <任务>    - 提取优化的上下文（带 token 预算）\n\
+            • /memory stats             - 显示内存统计信息\n\n\
+            示例:\n\
+            • /memory search 图表相关的代码\n\
+            • /memory extract 优化性能问题\n\
+            • /memory stats";
+
+        eprintln!("[Memory Command] 发送帮助消息，长度: {} 字节", help_msg.len());
+        help_msg.to_string()
+    } else {
+        let subcommand = parts[0];
+        let subargs = parts[1..].join(" ");
+
+        match subcommand {
+            "search" => {
+                eprintln!("[Memory Command] 执行搜索: {}", subargs);
+                if subargs.is_empty() {
+                    "❌ 请提供搜索查询\n用法: /memory search <查询>".to_string()
+                } else {
+                    match orchestrator.quick_search(&subargs, 10).await {
+                        Ok(chunks) => {
+                            let mut result = format!("🔍 搜索结果 (找到 {} 条):\n\n", chunks.len());
+                            for (i, chunk) in chunks.iter().enumerate().take(10) {
+                                result.push_str(&format!(
+                                    "{}. [{:?}] {}\n   时间: {}\n   相关度: {:.2}\n\n",
+                                    i + 1,
+                                    chunk.dimension,
+                                    match &chunk.content {
+                                        crate::web::memory::types::MultimodalContent::Text { content } => {
+                                            content.chars().take(100).collect::<String>()
+                                        }
+                                        crate::web::memory::types::MultimodalContent::Chart { chart, .. } => {
+                                            format!("图表: {}", chart.title)
+                                        }
+                                        crate::web::memory::types::MultimodalContent::Image { image, .. } => {
+                                            format!("图片: {}", image.alt_text)
+                                        }
+                                        crate::web::memory::types::MultimodalContent::DataSummary { filename, .. } => {
+                                            format!("数据: {}", filename)
+                                        }
+                                        crate::web::memory::types::MultimodalContent::SessionSummary { name, .. } => {
+                                            format!("会话: {}", name)
+                                        }
+                                        crate::web::memory::types::MultimodalContent::Composite { text, chart, .. } => {
+                                            if let Some(t) = text {
+                                                t.chars().take(100).collect::<String>()
+                                            } else if let Some(c) = chart {
+                                                format!("图表: {}", c.title)
+                                            } else {
+                                                "复合内容".to_string()
+                                            }
+                                        }
+                                    },
+                                    chunk.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                                    chunk.state_vector.understanding_score
+                                ));
+                            }
+                            result
+                        }
+                        Err(e) => format!("❌ 搜索失败: {}", e),
+                    }
+                }
+            }
+            "extract" => {
+                eprintln!("[Memory Command] 执行提取: {}", subargs);
+                if subargs.is_empty() {
+                    "❌ 请提供提取任务\n用法: /memory extract <任务>".to_string()
+                } else {
+                    match orchestrator.extract_relevant_context(&subargs, None, 4000).await {
+                        Ok(context) => {
+                            format!(
+                                "📊 优化上下文提取完成:\n\n\
+                                • 文本块: {} 个\n\
+                                • 图表: {} 个\n\
+                                • 图片: {} 个\n\
+                                • 数据摘要: {} 个\n\
+                                • 推荐: {} 个\n\
+                                • 总 token: {}\n\
+                                • 平均分: {:.2}\n\n\
+                                ✅ 已提取最相关的多模态上下文",
+                                context.text_chunks.len(),
+                                context.chart_references.len(),
+                                context.image_references.len(),
+                                context.data_summaries.len(),
+                                context.recommendations.len(),
+                                context.total_tokens,
+                                context.avg_score
+                            )
+                        }
+                        Err(e) => format!("❌ 提取失败: {}", e),
+                    }
+                }
+            }
+            "stats" => {
+                eprintln!("[Memory Command] 执行统计");
+                match orchestrator.get_stats().await {
+                    Ok(stats) => {
+                        use crate::web::memory::types::DataDimension;
+                        format!(
+                            "📈 Memory 2.0 统计信息:\n\n\
+                            • 总块数: {}\n\
+                            • 命令历史: {}\n\
+                            • 执行日志: {}\n\
+                            • LLM 日志: {}\n\
+                            • 对话上下文: {}\n\
+                            • 会话管理: {}\n\
+                            • 图表历史: {}\n\
+                            • 图片历史: {}\n\
+                            • 上传文件: {}",
+                            stats.total_chunks,
+                            stats.dimension_counts.get(&DataDimension::History).unwrap_or(&0),
+                            stats.dimension_counts.get(&DataDimension::ExecutionLogger).unwrap_or(&0),
+                            stats.dimension_counts.get(&DataDimension::LlmLogger).unwrap_or(&0),
+                            stats.dimension_counts.get(&DataDimension::Context).unwrap_or(&0),
+                            stats.dimension_counts.get(&DataDimension::SessionManager).unwrap_or(&0),
+                            stats.dimension_counts.get(&DataDimension::ChartHistory).unwrap_or(&0),
+                            stats.dimension_counts.get(&DataDimension::ImageHistory).unwrap_or(&0),
+                            stats.dimension_counts.get(&DataDimension::UploadedFiles).unwrap_or(&0)
+                        )
+                    }
+                    Err(e) => format!("❌ 获取统计信息失败: {}", e),
+                }
+            }
+            _ => {
+                format!("❌ 未知子命令: {}\n\n请使用 /memory 查看帮助", subcommand)
+            }
+        }
+    };
+
+    // ===== 完成回合 =====
+    let execution_time = start_time.elapsed().as_secs_f64();
+    eprintln!("[Memory Command] 执行完成，耗时: {:.2}s，输出长度: {} 字节", execution_time, output_content.len());
+
+    if let Some(completed_round) = session.complete_round(
+        &round_id,
+        output_content,
+        execution_time,
+        vec!["memory-2.0".to_string()],
+    ).await {
+        eprintln!("[Memory Command] 发送 RoundComplete 消息");
+        let round_complete_msg = ServerMessage::RoundComplete {
+            round: completed_round,
+        };
+        sender
+            .send(Message::Text(serde_json::to_string(&round_complete_msg)?))
+            .await?;
+        eprintln!("[Memory Command] RoundComplete 已发送 ✓");
     }
 
     Ok(())
