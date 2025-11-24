@@ -8,6 +8,7 @@ use crate::config::Config;
 use crate::i18n;
 use crate::llm::{DeepseekClient, LlmClient, OllamaClient};
 use crate::visualization; // v1.44.0: 可视化系统
+use crate::web::memory::SmartWebUIOrchestrator; // v1.54.0: Memory 2.0
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -488,6 +489,8 @@ pub struct Session {
     pub chart_history: Arc<RwLock<Vec<ChartHistoryEntry>>>,
     /// 图像历史记录（v1.52.0 新增）
     pub image_history: Arc<RwLock<Vec<ImageHistoryEntry>>>,
+    /// Memory 2.0 智能上下文编排器（v1.54.0 新增）
+    pub memory_orchestrator: Option<Arc<SmartWebUIOrchestrator>>,
 }
 
 impl Session {
@@ -510,6 +513,23 @@ impl Session {
         // ✨ 为每个 Web 会话创建独立的对话 ID
         let conversation_id = format!("web-{}", Uuid::new_v4());
 
+        let chart_history = Arc::new(RwLock::new(Vec::new()));
+        let image_history = Arc::new(RwLock::new(Vec::new()));
+
+        // ✨ v1.54.0: 初始化 Memory 2.0 智能上下文编排器
+        let memory_orchestrator = SmartWebUIOrchestrator::new(
+            Arc::clone(&chart_history),
+            Arc::clone(&image_history),
+        )
+        .ok()
+        .map(Arc::new);
+
+        if memory_orchestrator.is_some() {
+            eprintln!("[Session] Memory 2.0 智能上下文编排器已初始化");
+        } else {
+            eprintln!("[Session] Memory 2.0 初始化失败，将以降级模式运行");
+        }
+
         Self {
             id,
             agent: Arc::new(RwLock::new(agent)),
@@ -519,8 +539,9 @@ impl Session {
             conversation_id,
             rounds: Arc::new(RwLock::new(Vec::new())),
             uploaded_files: crate::web::uploaded_files::UploadedFiles::new(), // v1.46.0
-            chart_history: Arc::new(RwLock::new(Vec::new())), // v1.51.0
-            image_history: Arc::new(RwLock::new(Vec::new())), // v1.52.0
+            chart_history: Arc::clone(&chart_history), // v1.51.0
+            image_history: Arc::clone(&image_history), // v1.52.0
+            memory_orchestrator, // v1.54.0
         }
     }
 

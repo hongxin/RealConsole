@@ -26,5 +26,6 @@ pub mod websocket;
 pub mod frontend;
 pub mod uploaded_files; // v1.46.0: 文件上传管理
 pub mod metadata_extractor; // v1.53.0: 元数据提取器统一架构
+pub mod memory; // v1.54.0: Memory 2.0 WebUI - 智能上下文编排器
 
 pub use server::WebServer;
