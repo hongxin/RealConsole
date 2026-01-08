@@ -1,6 +1,6 @@
 # RealConsole - 深层思考：超越"一分为三"
 
-> **中文 | [English](think.en.md)**
+> **中文** (English translation planned)
 
 **创建日期**: 2025-10-22
 **版本**: 1.0

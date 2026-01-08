@@ -5,6 +5,78 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.52.0] - 2026-01-08
+
+### 🎯 Highlights
+
+**主题**: Memory 2.0 智能上下文编排 + 远程图片支持
+
+- ✅ **Memory 2.0** - 智能上下文编排系统，自动管理对话记忆
+- ✅ **远程图片查看** - 支持 Web 终端查看远程图片
+- ✅ **MetadataExtractor 重构** - 统一 trait 设计，代码更简洁
+- ✅ **文档系统规整** - 双语导航、版本同步、时间修正
+
+### ✨ Added
+
+- **Memory 2.0 系统** (`src/web/memory/`)
+  - `orchestration.rs`: 智能上下文编排器
+  - `understanding.rs`: 上下文理解模块
+  - LRU 缓存优化内存使用
+
+- **远程图片支持** (`src/web/`)
+  - 支持查看远程 URL 图片
+  - 集成到操作系统命令
+
+- **双语文档导航**
+  - `docs/README.en.md`: 英文版文档中心
+  - 中英文版本互链
+
+### 🔧 Changed
+
+- **MetadataExtractor trait** - 统一元数据提取接口
+- **版本号同步** - 所有文档更新至 v1.52.0
+- **时间修正** - 所有文档日期更新至 2026 年
+
+### 🐛 Fixed
+
+- `/memory` 命令在浏览器中的输出问题
+- 图片数据在 WebUI 中不显示的问题
+
+---
+
+## [1.51.0] - 2025-12-15
+
+### 🎯 Highlights
+
+**主题**: 自然语言驱动可视化 - 智能 Notebook 核心特性
+
+- ✅ **自然语言可视化** - 用自然语言描述即可生成图表
+- ✅ **WebSocket 深度集成** - 实时图表生成与更新
+- ✅ **图表示例库** - 35+ 实战案例参考
+- ✅ **图表历史管理** - 会话内历史记录追踪
+
+### ✨ Added
+
+- **自然语言可视化引擎**
+  - 智能解析用户描述
+  - 自动选择最佳图表类型
+  - 数据格式智能推断
+
+- **示例库系统** (`src/visualization/examples.rs`)
+  - 35+ 覆盖各类场景的示例
+  - 按类别和用途组织
+  - 一键应用示例模板
+
+- **图表历史管理**
+  - 会话内图表历史
+  - 快速回溯和重用
+
+### 🐛 Fixed
+
+- 图表数据在 `remove_debug_info` 中被意外移除的问题
+
+---
+
 ## [1.50.0] - 2025-11-23
 
 ### 🎯 Highlights

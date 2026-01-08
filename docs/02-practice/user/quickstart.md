@@ -1,5 +1,7 @@
 # RealConsole 快速开始
 
+中文 | **[English](quickstart.en.md)**
+
 欢迎使用 RealConsole！这份指南将帮助你在 **5 分钟内**完成安装、配置并开始使用。
 
 ## 目录
@@ -655,8 +657,7 @@ impl Tool for MyTool {
 
 ---
 
-**版本**: v0.5.0
-**更新日期**: 2025-10-15
-**文档状态**: ✅ Week 3 更新完成
+**版本**: v1.52.0
+**更新日期**: 2026-01-08
 
 有问题？查看 [完整文档](../README.md) 或 [提交 Issue](https://github.com/your-repo/realconsole/issues)！

@@ -1,5 +1,7 @@
 # LLM 配置指南
 
+中文 | **[English](llm-setup.en.md)**
+
 ## 快速开始
 
 RealConsole 支持多种 LLM 提供商，包括本地 Ollama 和远程 API（Deepseek、OpenAI）。
