@@ -458,9 +458,9 @@ fn parse_csv_command(
             let value_start = start + pattern.len();
             let remaining = &args[value_start..];
 
-            if remaining.starts_with('"') {
-                if let Some(end) = remaining[1..].find('"') {
-                    return Some(remaining[1..=end].to_string());
+            if let Some(stripped) = remaining.strip_prefix('"') {
+                if let Some(end) = stripped.find('"') {
+                    return Some(stripped[..end].to_string());
                 }
             } else {
                 return remaining.split_whitespace().next().map(|s| s.to_string());
@@ -471,7 +471,7 @@ fn parse_csv_command(
 
     // 获取图表类型
     let chart_type_str = extract_arg("--type").unwrap_or_else(|| "line".to_string());
-    let chart_type = ChartType::from_str(&chart_type_str)
+    let chart_type = ChartType::parse(&chart_type_str)
         .ok_or_else(|| anyhow::anyhow!("无效的图表类型: {}", chart_type_str))?;
 
     // 获取标题
@@ -489,9 +489,9 @@ fn parse_csv_command(
         let value_start = actual_start + "--y-col ".len();
         let remaining = &args[value_start..];
 
-        let col_name = if remaining.starts_with('"') {
-            if let Some(end) = remaining[1..].find('"') {
-                remaining[1..=end].to_string()
+        let col_name = if let Some(stripped) = remaining.strip_prefix('"') {
+            if let Some(end) = stripped.find('"') {
+                stripped[..end].to_string()
             } else {
                 return Err(anyhow::anyhow!("--y-col 参数引号未闭合"));
             }
@@ -568,7 +568,7 @@ async fn execute_chart_command(
     // v1.50.0: 统一命令解析入口
     let command_result = if cmd.trim_start_matches("chart").trim().starts_with("csv ") {
         // CSV 命令：!chart csv <file|@file_id> --type <type> --x-col "col" --y-col "col1" --y-col "col2"
-        parse_csv_command(cmd, session).map(ChartCommand::Create)
+        parse_csv_command(cmd, session).map(|data| ChartCommand::Create(Box::new(data)))
     } else {
         // 使用新的统一解析器（支持模板命令）
         ChartCommandParser::parse_command(cmd)
@@ -578,19 +578,19 @@ async fn execute_chart_command(
     match command_result {
         Ok(ChartCommand::Create(chart_data)) => {
             // v1.51.0: 添加到历史记录
-            session.add_chart_to_history(chart_data.clone(), Some(round_id.clone()), cmd.to_string()).await;
+            session.add_chart_to_history((*chart_data).clone(), Some(round_id.clone()), cmd.to_string()).await;
 
             // 图表创建命令：发送 Chart 消息
             let chart_msg = ServerMessage::Chart {
                 round_id: round_id.clone(),
-                chart_data,
+                chart_data: *chart_data,
             };
             sender
                 .send(Message::Text(serde_json::to_string(&chart_msg)?))
                 .await?;
 
             let execution_time = start_time.elapsed().as_secs_f64();
-            let success_msg = format!("✅ 图表生成成功");
+            let success_msg = "✅ 图表生成成功".to_string();
             if let Some(completed_round) = session.complete_round(
                 &round_id,
                 success_msg,
@@ -1823,7 +1823,7 @@ async fn execute_memory_command(
     };
 
     // ===== 解析命令参数 =====
-    let parts: Vec<&str> = args.trim().split_whitespace().collect();
+    let parts: Vec<&str> = args.split_whitespace().collect();
     eprintln!("[Memory Command] 解析参数，parts.len() = {}", parts.len());
 
     let output_content = if parts.is_empty() {
@@ -2989,28 +2989,20 @@ fn convert_tool_params_to_chart_data(params: serde_json::Value) -> anyhow::Resul
     };
 
     // 解析饼图标签（可选）
-    let labels = if let Some(labels_arr) = params["labels"].as_array() {
-        Some(
-            labels_arr
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
-        )
-    } else {
-        None
-    };
+    let labels = params["labels"].as_array().map(|labels_arr| {
+        labels_arr
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
+    });
 
     // 解析雷达图指标（可选）
-    let indicators = if let Some(indicators_arr) = params["indicators"].as_array() {
-        Some(
-            indicators_arr
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
-        )
-    } else {
-        None
-    };
+    let indicators = params["indicators"].as_array().map(|indicators_arr| {
+        indicators_arr
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
+    });
 
     // 构造 ChartData
     Ok(ChartData {

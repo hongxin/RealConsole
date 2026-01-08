@@ -15,6 +15,7 @@ pub mod parameter;
 pub mod state;
 
 // 导出核心类型
+pub use analyzer::ParameterAnalyzer;
 pub use context::ParameterSpec;
 pub use context_manager::{ContextManager, ContextSnapshot};
 pub use current::{
@@ -23,6 +24,7 @@ pub use current::{
 };
 pub use manager::{ConversationManager, Response};
 pub use parameter::{ParameterType, ParameterValue};
+pub use state::StateEvent;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

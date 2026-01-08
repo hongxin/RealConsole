@@ -196,7 +196,7 @@ async fn test_e2e_simple_tool_call() {
 
     // 执行迭代工具调用
     let result = executor
-        .execute_iterative(&llm, "请计算 10 + 5", tool_schemas)
+        .execute_iterative(&llm, vec![Message::user("请计算 10 + 5")], tool_schemas)
         .await;
 
     // 验证结果
@@ -223,7 +223,7 @@ async fn test_e2e_multi_round_tool_calls() {
 
     // 执行迭代工具调用
     let result = executor
-        .execute_iterative(&llm, "请计算 (10 + 5) * 2", tool_schemas)
+        .execute_iterative(&llm, vec![Message::user("请计算 (10 + 5) * 2")], tool_schemas)
         .await;
 
     // 验证结果
@@ -243,7 +243,7 @@ async fn test_e2e_no_tools_fallback() {
     let executor = ToolExecutor::with_defaults(registry);
 
     // 执行时不提供工具 schemas（空列表）
-    let result = executor.execute_iterative(&mock_llm, "你好", vec![]).await;
+    let result = executor.execute_iterative(&mock_llm, vec![Message::user("你好")], vec![]).await;
 
     // 应该返回普通对话
     assert!(result.is_ok());
@@ -277,7 +277,7 @@ async fn test_e2e_tool_execution_error() {
     };
 
     let result = executor
-        .execute_iterative(&llm, "调用不存在的工具", tool_schemas)
+        .execute_iterative(&llm, vec![Message::user("调用不存在的工具")], tool_schemas)
         .await;
 
     // 执行应该成功（只是工具调用失败，LLM 仍可以回应）
@@ -350,7 +350,7 @@ async fn test_e2e_max_iterations() {
     };
 
     let result = executor
-        .execute_iterative(&llm, "持续调用工具", tool_schemas)
+        .execute_iterative(&llm, vec![Message::user("持续调用工具")], tool_schemas)
         .await;
 
     // 应该返回错误：达到最大迭代次数

@@ -261,12 +261,13 @@ impl WebUIPerceptionLayer {
     ) -> MemoryStateVector {
         let age_seconds = (Utc::now() - session.updated_at).num_seconds();
 
-        let mut vector = MemoryStateVector::default();
-
+        let mut vector = MemoryStateVector {
+            text_weight: 0.8,
+            visual_weight: 0.1,
+            data_weight: 0.1,
+            ..Default::default()
+        };
         // 内容维度：会话主要是文本
-        vector.text_weight = 0.8;
-        vector.visual_weight = 0.1;
-        vector.data_weight = 0.1;
         vector.normalize_content_weights();
 
         // 时间维度：根据会话年龄
@@ -301,12 +302,13 @@ impl WebUIPerceptionLayer {
     fn vectorize_chart(&self, entry: &ChartHistoryEntry) -> MemoryStateVector {
         let age_seconds = (Utc::now() - entry.timestamp).num_seconds();
 
-        let mut vector = MemoryStateVector::default();
-
+        let mut vector = MemoryStateVector {
+            text_weight: 0.1,
+            visual_weight: 0.8,
+            data_weight: 0.1,
+            ..Default::default()
+        };
         // 内容维度：图表主要是可视化
-        vector.text_weight = 0.1;
-        vector.visual_weight = 0.8;
-        vector.data_weight = 0.1;
         vector.normalize_content_weights();
 
         // 时间维度
@@ -339,12 +341,13 @@ impl WebUIPerceptionLayer {
     fn vectorize_image(&self, entry: &ImageHistoryEntry) -> MemoryStateVector {
         let age_seconds = (Utc::now() - entry.timestamp).num_seconds();
 
-        let mut vector = MemoryStateVector::default();
-
+        let mut vector = MemoryStateVector {
+            text_weight: 0.05,
+            visual_weight: 0.9,
+            data_weight: 0.05,
+            ..Default::default()
+        };
         // 内容维度：图像主要是可视化
-        vector.text_weight = 0.05;
-        vector.visual_weight = 0.9;
-        vector.data_weight = 0.05;
         vector.normalize_content_weights();
 
         // 时间维度

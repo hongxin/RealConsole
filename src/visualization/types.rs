@@ -221,7 +221,7 @@ pub enum ChartType {
 
 impl ChartType {
     /// 从字符串解析
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "line" => Some(Self::Line),
             "bar" => Some(Self::Bar),
@@ -479,10 +479,10 @@ mod tests {
 
     #[test]
     fn test_chart_type_from_str() {
-        assert_eq!(ChartType::from_str("line"), Some(ChartType::Line));
-        assert_eq!(ChartType::from_str("LINE"), Some(ChartType::Line));
-        assert_eq!(ChartType::from_str("bar"), Some(ChartType::Bar));
-        assert_eq!(ChartType::from_str("invalid"), None);
+        assert_eq!(ChartType::parse("line"), Some(ChartType::Line));
+        assert_eq!(ChartType::parse("LINE"), Some(ChartType::Line));
+        assert_eq!(ChartType::parse("bar"), Some(ChartType::Bar));
+        assert_eq!(ChartType::parse("invalid"), None);
     }
 
     #[test]

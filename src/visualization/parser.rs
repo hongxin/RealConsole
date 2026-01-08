@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 #[derive(Debug)]
 pub enum ChartCommand {
     /// 创建图表
-    Create(ChartData),
+    Create(Box<ChartData>),
     /// 列出模板
     ListTemplates { category: Option<TemplateCategory> },
     /// 使用模板
@@ -60,7 +60,7 @@ impl ChartCommandParser {
             Self::parse_recall_command(command)
         } else {
             // 原有的图表创建命令
-            Self::parse(command).map(ChartCommand::Create)
+            Self::parse(command).map(|data| ChartCommand::Create(Box::new(data)))
         }
     }
 
@@ -136,8 +136,8 @@ impl ChartCommandParser {
         let mut difficulty = None;
 
         // 解析可选的 category 和 difficulty 参数
-        for i in 1..parts.len() {
-            let param = parts[i].to_lowercase();
+        for part in parts.iter().skip(1) {
+            let param = part.to_lowercase();
 
             // 尝试解析为分类
             match param.as_str() {
@@ -243,15 +243,15 @@ impl ChartCommandParser {
             return Err(anyhow!("缺少图表类型（line/bar/pie/scatter）"));
         }
 
-        let chart_type = ChartType::from_str(parts[0])
+        let chart_type = ChartType::parse(parts[0])
             .ok_or_else(|| anyhow!("无效的图表类型: {}，支持: line, bar, pie, scatter", parts[0]))?;
 
         // 解析参数
         let args = &parts[1..].join(" ");
         let title = Self::extract_arg(args, "--title").unwrap_or_else(|| "图表".to_string());
-        let x_labels = Self::extract_arg(args, "--x-axis")
+        let x_labels: Vec<String> = Self::extract_arg(args, "--x-axis")
             .map(|s| s.split(',').map(|l| l.trim().to_string()).collect())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
         let smooth = args.contains("--smooth");
 
         // v1.45.0: 解析饼图 labels（可选）
@@ -323,10 +323,10 @@ impl ChartCommandParser {
             let remaining = &args[value_start..];
 
             // 检查是否是引号值
-            if remaining.starts_with('"') {
+            if let Some(stripped) = remaining.strip_prefix('"') {
                 // 查找结束引号
-                if let Some(end) = remaining[1..].find('"') {
-                    return Some(remaining[1..=end].to_string());
+                if let Some(end) = stripped.find('"') {
+                    return Some(stripped[..end].to_string());
                 }
             } else {
                 // 非引号值，取到下一个空格或结束
@@ -350,32 +350,28 @@ impl ChartCommandParser {
         let mut series = Vec::new();
         let mut search_from = 0;
 
-        loop {
-            // 查找下一个 --series
-            if let Some(pos) = args[search_from..].find("--series ") {
-                let abs_pos = search_from + pos;
-                let value_start = abs_pos + "--series ".len();
+        // 查找下一个 --series
+        while let Some(pos) = args[search_from..].find("--series ") {
+            let abs_pos = search_from + pos;
+            let value_start = abs_pos + "--series ".len();
 
-                // 查找引号包裹的值
-                if args[value_start..].starts_with('"') {
-                    if let Some(end) = args[value_start + 1..].find('"') {
-                        let series_str = &args[value_start + 1..value_start + 1 + end];
-                        series.push(Self::parse_series(series_str)?);
-                        search_from = value_start + 1 + end + 1;
-                    } else {
-                        return Err(anyhow!("--series 参数缺少结束引号"));
-                    }
+            // 查找引号包裹的值
+            if let Some(stripped) = args[value_start..].strip_prefix('"') {
+                if let Some(end) = stripped.find('"') {
+                    let series_str = &stripped[..end];
+                    series.push(Self::parse_series(series_str)?);
+                    search_from = value_start + 1 + end + 1;
                 } else {
-                    // 没有引号，取到下一个空格
-                    let value = args[value_start..]
-                        .split_whitespace()
-                        .next()
-                        .unwrap_or("");
-                    series.push(Self::parse_series(value)?);
-                    search_from = value_start + value.len();
+                    return Err(anyhow!("--series 参数缺少结束引号"));
                 }
             } else {
-                break;
+                // 没有引号，取到下一个空格
+                let value = args[value_start..]
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("");
+                series.push(Self::parse_series(value)?);
+                search_from = value_start + value.len();
             }
         }
 
@@ -445,10 +441,10 @@ impl ChartCommandParser {
             let remaining = &args[value_start..];
 
             // 提取数据值（可能是引号或非引号）
-            let data_str = if remaining.starts_with('"') {
+            let data_str = if let Some(stripped) = remaining.strip_prefix('"') {
                 // 引号值
-                if let Some(end) = remaining[1..].find('"') {
-                    &remaining[1..=end]
+                if let Some(end) = stripped.find('"') {
+                    &stripped[..end]
                 } else {
                     return Err(anyhow!("--data 参数引号未闭合"));
                 }
@@ -470,12 +466,8 @@ impl ChartCommandParser {
                 let name_value_start = actual_start + name_start + name_pattern.len();
                 let name_remaining = &args[name_value_start..];
 
-                if name_remaining.starts_with('"') {
-                    if let Some(end) = name_remaining[1..].find('"') {
-                        Some(name_remaining[1..=end].to_string())
-                    } else {
-                        None
-                    }
+                if let Some(stripped) = name_remaining.strip_prefix('"') {
+                    stripped.find('"').map(|end| stripped[..end].to_string())
                 } else {
                     name_remaining
                         .split_whitespace()

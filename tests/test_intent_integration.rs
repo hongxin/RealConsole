@@ -42,8 +42,8 @@ async fn test_intent_dsl_fallback_to_llm() {
     println!("回退测试结果: {}", result);
 }
 
-#[test]
-fn test_intent_matcher_initialization() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_intent_matcher_initialization() {
     // 验证 Agent 初始化时 Intent DSL 系统被正确设置
     let config = Config::default();
     let registry = CommandRegistry::new();
@@ -56,8 +56,8 @@ fn test_intent_matcher_initialization() {
     println!("已注册意图数量: {}", agent.intent_matcher.len());
 }
 
-#[test]
-fn test_template_engine_initialization() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_template_engine_initialization() {
     // 验证 TemplateEngine 初始化正确
     let config = Config::default();
     let registry = CommandRegistry::new();

@@ -58,13 +58,13 @@ impl WebUIUnderstandingLayer {
 
         for chunk in chunks.iter_mut() {
             // 1. 基础相关性（关键词匹配）
-            let keyword_score = self.calculate_keyword_relevance(&chunk, &task_keywords);
+            let keyword_score = self.calculate_keyword_relevance(chunk, &task_keywords);
 
             // 2. 时间衰减
-            let time_decay = self.time_decay_config.calculate_decay(&chunk);
+            let time_decay = self.time_decay_config.calculate_decay(chunk);
 
             // 3. 重要性评分
-            let importance = self.infer_importance(&chunk);
+            let importance = self.infer_importance(chunk);
 
             // 4. 综合得分
             let understanding_score = (keyword_score * 0.7 + importance * 0.3) * time_decay;
@@ -384,7 +384,7 @@ impl TaskComplexityAnalyzer {
                         + (complex_score as f64 * 1.0);
 
         // 归一化（按任务长度）
-        let normalized_score = if task.len() > 0 {
+        let normalized_score = if !task.is_empty() {
             total_score / (task.split_whitespace().count() as f64)
         } else {
             0.0

@@ -1101,7 +1101,7 @@ fn register_chart_tool(registry: &mut ToolRegistry) {
         |args: JsonValue| {
             // 工具执行逻辑
             // 返回特殊标记，让 WebSocket 处理器识别并发送 Chart 消息
-            Ok(format!("__CHART_DATA__:{}", args.to_string()))
+            Ok(format!("__CHART_DATA__:{}", args))
         },
     );
 
@@ -1147,11 +1147,11 @@ fn register_view_image(registry: &mut ToolRegistry) {
 
             // 检查文件是否存在
             if !file_path.exists() {
-                return Err(format!("文件不存在: {}", path_str).into());
+                return Err(format!("文件不存在: {}", path_str));
             }
 
             if !file_path.is_file() {
-                return Err(format!("路径不是文件: {}", path_str).into());
+                return Err(format!("路径不是文件: {}", path_str));
             }
 
             // 检测图像格式
@@ -1172,8 +1172,7 @@ fn register_view_image(registry: &mut ToolRegistry) {
                     return Err(format!(
                         "不支持的图像格式: .{}。支持的格式: PNG, JPG, JPEG, GIF, WebP, SVG, BMP",
                         extension
-                    )
-                    .into());
+                    ));
                 }
             };
 
@@ -1187,8 +1186,7 @@ fn register_view_image(registry: &mut ToolRegistry) {
                 return Err(format!(
                     "文件过大: {:.2} MB（最大支持 10 MB）",
                     file_data.len() as f64 / (1024.0 * 1024.0)
-                )
-                .into());
+                ));
             }
 
             // 转换为 base64
@@ -1212,7 +1210,7 @@ fn register_view_image(registry: &mut ToolRegistry) {
             });
 
             // 返回特殊标记，让 WebSocket 处理器识别并发送 Image 消息
-            Ok(format!("__IMAGE_DATA__:{}", image_data.to_string()))
+            Ok(format!("__IMAGE_DATA__:{}", image_data))
         },
     );
 

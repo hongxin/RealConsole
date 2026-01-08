@@ -5,6 +5,38 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.53.0] - 2026-01-08
+
+### 🎯 Highlights
+
+**主题**: v2.0 准备阶段 - 代码质量稳定化
+
+- ✅ **Clippy 零警告** - 修复全部 32 个 clippy 警告
+- ✅ **API 重命名** - `from_str` → `parse` 避免与标准库混淆
+- ✅ **代码优化** - 消除冗余代码和不规范用法
+- ✅ **测试修复** - 更新过期测试用例
+
+### 🔧 Changed
+
+- **ChartCommand 优化** - 使用 `Box<ChartData>` 减少枚举大小差异
+- **方法重命名**
+  - `ChartType::from_str()` → `ChartType::parse()`
+  - `TemplateCategory::from_str()` → `TemplateCategory::parse()`
+  - `ExampleDifficulty::from_str()` → `ExampleDifficulty::parse()`
+- **代码风格改进**
+  - `unwrap_or_else(Vec::new)` → `unwrap_or_default()`
+  - `or_insert_with(Vec::new)` → `or_default()`
+  - 使用 `strip_prefix` 替代手动切片
+  - 使用 `is_empty()` 替代 `len() > 0`
+
+### 🐛 Fixed
+
+- 消除测试编译警告（Tokio runtime 要求）
+- 修复 `conversation` 模块导出缺失问题
+- 统一 `ToolExecutor::execute_iterative` API 参数
+
+---
+
 ## [1.52.0] - 2026-01-08
 
 ### 🎯 Highlights

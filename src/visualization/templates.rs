@@ -26,7 +26,7 @@ pub enum TemplateCategory {
 }
 
 impl TemplateCategory {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "business" => Some(Self::Business),
             "technical" => Some(Self::Technical),

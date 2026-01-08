@@ -271,7 +271,7 @@ impl WebUIOrchestrationLayer {
 
         for chunk in chunks {
             let content_type = chunk.content.content_type();
-            groups.entry(content_type).or_insert_with(Vec::new).push(chunk);
+            groups.entry(content_type).or_default().push(chunk);
         }
 
         groups

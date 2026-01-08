@@ -26,7 +26,7 @@ pub enum ExampleDifficulty {
 }
 
 impl ExampleDifficulty {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "beginner" | "初级" => Some(Self::Beginner),
             "intermediate" | "中级" => Some(Self::Intermediate),
@@ -68,6 +68,7 @@ pub struct ChartExample {
 }
 
 impl ChartExample {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: impl Into<String>,
         title: impl Into<String>,
