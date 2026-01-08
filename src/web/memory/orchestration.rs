@@ -19,6 +19,54 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 // ============================================================================
+// 选择策略（v1.55.0）
+// ============================================================================
+
+/// 选择策略
+///
+/// v1.55.0: 支持多种片段选择策略
+#[derive(Debug, Clone)]
+pub enum SelectionStrategy {
+    /// 快速：Top-K 最高分
+    /// 适用：简单查询、实时响应
+    TopK { k: usize },
+
+    /// 时间优先：最近的内容
+    /// 适用：日常对话、上下文连续
+    Recency { decay_factor: f64 },
+
+    /// 贪心：分数+Token优化
+    /// 适用：复杂分析、深度查询
+    Greedy { budget: usize },
+
+    /// 混合：多策略融合
+    /// 适用：不确定场景
+    #[allow(dead_code)]
+    Hybrid {
+        strategies: Vec<(Box<SelectionStrategy>, f64)>,  // (策略, 权重)
+    },
+}
+
+/// 自动选择策略
+///
+/// 根据任务复杂度自动选择合适的策略
+pub fn auto_select_strategy(complexity: super::understanding::TaskComplexity) -> SelectionStrategy {
+    use super::understanding::TaskComplexity;
+
+    match complexity {
+        TaskComplexity::Simple => {
+            SelectionStrategy::TopK { k: 10 }
+        }
+        TaskComplexity::Medium => {
+            SelectionStrategy::Recency { decay_factor: 0.3 }
+        }
+        TaskComplexity::Complex => {
+            SelectionStrategy::Greedy { budget: 8000 }
+        }
+    }
+}
+
+// ============================================================================
 // 编排层
 // ============================================================================
 
@@ -68,8 +116,9 @@ impl WebUIOrchestrationLayer {
             score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        // 2. 贪心选择：优先选择高分片段
-        let selected_chunks = self.greedy_select(chunks, token_budget);
+        // 2. v1.55.0: 使用策略选择（默认 Greedy）
+        let strategy = SelectionStrategy::Greedy { budget: token_budget };
+        let selected_chunks = self.select_by_strategy(chunks, &strategy);
 
         // 3. 按内容类型分组
         let grouped = self.group_by_content_type(selected_chunks);
@@ -128,13 +177,89 @@ impl WebUIOrchestrationLayer {
         }
 
         eprintln!(
-            "[Orchestration] Selected {} chunks, using {} / {} tokens",
+            "[Orchestration] Greedy selected {} chunks, using {} / {} tokens",
             selected.len(),
             used_tokens,
             token_budget
         );
 
         selected
+    }
+
+    /// Top-K 选择（v1.55.0）
+    ///
+    /// 选择得分最高的 K 个片段
+    fn select_top_k(&self, mut chunks: Vec<MultimodalChunk>, k: usize) -> Vec<MultimodalChunk> {
+        // 按得分排序
+        chunks.sort_by(|a, b| {
+            b.state_vector.overall_score()
+                .partial_cmp(&a.state_vector.overall_score())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // 取前 K 个
+        chunks.truncate(k);
+
+        eprintln!("[Orchestration] TopK selected {} chunks (K={})", chunks.len(), k);
+
+        chunks
+    }
+
+    /// 时间优先选择（v1.55.0）
+    ///
+    /// 优先选择最近的内容，结合时间衰减
+    fn select_recent(&self, mut chunks: Vec<MultimodalChunk>, decay_factor: f64) -> Vec<MultimodalChunk> {
+        use chrono::Utc;
+
+        // 计算时间加权得分
+        let now = Utc::now();
+        for chunk in &mut chunks {
+            let age = now - chunk.timestamp;
+            let age_hours = age.num_hours() as f64;
+
+            // 时间衰减：最近的内容权重更高
+            let time_weight = (-age_hours * decay_factor / 24.0).exp();
+
+            // 综合得分 = 原始得分 × 时间权重
+            let base_score = chunk.state_vector.overall_score();
+            chunk.state_vector.understanding_score = base_score * time_weight;
+        }
+
+        // 按新得分排序
+        chunks.sort_by(|a, b| {
+            b.state_vector.understanding_score
+                .partial_cmp(&a.state_vector.understanding_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // 选择前 15 个（合理数量）
+        chunks.truncate(15);
+
+        eprintln!("[Orchestration] Recency selected {} chunks (decay={})", chunks.len(), decay_factor);
+
+        chunks
+    }
+
+    /// 统一选择接口（v1.55.0）
+    ///
+    /// 根据策略选择片段
+    fn select_by_strategy(
+        &self,
+        chunks: Vec<MultimodalChunk>,
+        strategy: &SelectionStrategy,
+    ) -> Vec<MultimodalChunk> {
+        eprintln!("[Orchestration] Using strategy: {:?}", strategy);
+
+        match strategy {
+            SelectionStrategy::TopK { k } => self.select_top_k(chunks, *k),
+            SelectionStrategy::Recency { decay_factor } => self.select_recent(chunks, *decay_factor),
+            SelectionStrategy::Greedy { budget } => self.greedy_select(chunks, *budget),
+            SelectionStrategy::Hybrid { .. } => {
+                // Phase 1: 简化实现，暂时使用 Greedy
+                eprintln!("[Orchestration] Hybrid strategy not yet implemented, falling back to Greedy");
+                self.greedy_select(chunks, 4000)
+            }
+        }
     }
 
     /// 按内容类型分组
@@ -392,7 +517,7 @@ impl Default for DecisionEngine {
 // ============================================================================
 
 /// 优化后的富媒体上下文
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct OptimizedMultimodalContext {
     /// 文本片段
     pub text_chunks: Vec<TextChunk>,
@@ -479,7 +604,7 @@ pub enum RecommendationType {
 }
 
 /// 上下文元信息
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ContextMetadata {
     pub chunk_count: usize,
     pub dimension_distribution: HashMap<String, usize>,

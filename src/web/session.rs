@@ -467,6 +467,15 @@ pub enum ServerMessage {
     */
 }
 
+/// 上下文统计信息（v1.55.0）
+#[derive(Debug, Clone, Serialize)]
+pub struct ContextStats {
+    /// 对话回合数量
+    pub round_count: usize,
+    /// 估算的 Token 数量
+    pub estimated_tokens: usize,
+}
+
 /// Web 终端会话
 pub struct Session {
     /// 会话 ID
@@ -692,6 +701,40 @@ impl Session {
     pub async fn image_history_count(&self) -> usize {
         let history = self.image_history.read().await;
         history.len()
+    }
+
+    // ===== v1.55.0 新增：Memory 上下文管理 =====
+
+    /// 清空对话上下文（强制重置）
+    ///
+    /// 清空所有对话回合，释放内存，让 LLM 从头开始
+    pub async fn clear_context(&self) -> usize {
+        let mut rounds = self.rounds.write().await;
+        let count = rounds.len();
+        rounds.clear();
+
+        eprintln!("[Session] 清空了 {} 个对话回合", count);
+
+        count
+    }
+
+    /// 获取当前上下文统计
+    pub async fn get_context_stats(&self) -> ContextStats {
+        let rounds = self.rounds.read().await;
+        let round_count = rounds.len();
+
+        // 计算 token 数量（简化估算）
+        let estimated_tokens: usize = rounds.iter()
+            .map(|round| {
+                // 简化估算：user + ai 长度 / 4（平均每 4 字符 1 token）
+                (round.user_input.len() + round.ai_response.len()) / 4
+            })
+            .sum();
+
+        ContextStats {
+            round_count,
+            estimated_tokens,
+        }
     }
 
     /// 配置 Agent 的 LLM

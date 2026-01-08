@@ -1831,12 +1831,14 @@ async fn execute_memory_command(
         eprintln!("[Memory Command] 参数为空，显示帮助信息");
         let help_msg = "🧠 Memory 2.0 智能上下文编排器\n\n用法:\n\
             • /memory search <查询>     - 快速搜索相关上下文\n\
-            • /memory extract <任务>    - 提取优化的上下文（带 token 预算）\n\
-            • /memory stats             - 显示内存统计信息\n\n\
+            • /memory extract <任务>    - 提取优化的上下文（自适应 token 预算）\n\
+            • /memory stats             - 显示内存统计信息\n\
+            • /memory clear             - 清空对话上下文（强制重置）\n\n\
             示例:\n\
             • /memory search 图表相关的代码\n\
             • /memory extract 优化性能问题\n\
-            • /memory stats";
+            • /memory stats\n\
+            • /memory clear";
 
         eprintln!("[Memory Command] 发送帮助消息，长度: {} 字节", help_msg.len());
         help_msg.to_string()
@@ -1899,7 +1901,8 @@ async fn execute_memory_command(
                 if subargs.is_empty() {
                     "❌ 请提供提取任务\n用法: /memory extract <任务>".to_string()
                 } else {
-                    match orchestrator.extract_relevant_context(&subargs, None, 4000).await {
+                    // v1.55.0: 使用自适应 Token Budget（传入 None）
+                    match orchestrator.extract_relevant_context(&subargs, None, None).await {
                         Ok(context) => {
                             format!(
                                 "📊 优化上下文提取完成:\n\n\
@@ -1926,33 +1929,81 @@ async fn execute_memory_command(
             }
             "stats" => {
                 eprintln!("[Memory Command] 执行统计");
+
+                // v1.55.0: 获取上下文统计
+                let context_stats = session.get_context_stats().await;
+
                 match orchestrator.get_stats().await {
                     Ok(stats) => {
                         use crate::web::memory::types::DataDimension;
+
+                        // 计算各维度数量
+                        let history = *stats.dimension_counts.get(&DataDimension::History).unwrap_or(&0);
+                        let exec_log = *stats.dimension_counts.get(&DataDimension::ExecutionLogger).unwrap_or(&0);
+                        let llm_log = *stats.dimension_counts.get(&DataDimension::LlmLogger).unwrap_or(&0);
+                        let context = *stats.dimension_counts.get(&DataDimension::Context).unwrap_or(&0);
+                        let session_mgr = *stats.dimension_counts.get(&DataDimension::SessionManager).unwrap_or(&0);
+                        let charts = *stats.dimension_counts.get(&DataDimension::ChartHistory).unwrap_or(&0);
+                        let images = *stats.dimension_counts.get(&DataDimension::ImageHistory).unwrap_or(&0);
+                        let files = *stats.dimension_counts.get(&DataDimension::UploadedFiles).unwrap_or(&0);
+
+                        // 生成 ASCII 条形图
+                        fn bar(value: usize, max: usize, width: usize) -> String {
+                            if max == 0 { return " ".to_string(); }
+                            let filled = ((value as f64 / max as f64) * width as f64) as usize;
+                            "█".repeat(filled) + &"░".repeat(width.saturating_sub(filled))
+                        }
+
+                        let max_count = *[history, exec_log, llm_log, context, session_mgr, charts, images, files].iter().max().unwrap_or(&1);
+                        let bar_width = 20;
+
                         format!(
-                            "📈 Memory 2.0 统计信息:\n\n\
-                            • 总块数: {}\n\
-                            • 命令历史: {}\n\
-                            • 执行日志: {}\n\
-                            • LLM 日志: {}\n\
-                            • 对话上下文: {}\n\
-                            • 会话管理: {}\n\
-                            • 图表历史: {}\n\
-                            • 图片历史: {}\n\
-                            • 上传文件: {}",
+                            "📊 Memory 2.0 统计信息\n\n\
+                            ╭─ 对话上下文 ──────────────────────╮\n\
+                            │ • 回合数:  {:>6}                  \n\
+                            │ • Token:   {:>6} (估算)           \n\
+                            ╰───────────────────────────────────╯\n\n\
+                            ╭─ Memory 数据分布 ─────────────────╮\n\
+                            │ 总块数    {} 块                    \n\
+                            │                                    \n\
+                            │ 命令历史  {} {:>4}\n\
+                            │ 执行日志  {} {:>4}\n\
+                            │ 模型日志  {} {:>4}\n\
+                            │ 对话内容  {} {:>4}\n\
+                            │ 会话管理  {} {:>4}\n\
+                            │ 图表历史  {} {:>4}\n\
+                            │ 图片历史  {} {:>4}\n\
+                            │ 上传文件  {} {:>4}\n\
+                            ╰──────────────────────────────────╯\n\n\
+                            💡 提示: 使用 /memory clear 清空对话上下文",
+                            context_stats.round_count,
+                            context_stats.estimated_tokens,
                             stats.total_chunks,
-                            stats.dimension_counts.get(&DataDimension::History).unwrap_or(&0),
-                            stats.dimension_counts.get(&DataDimension::ExecutionLogger).unwrap_or(&0),
-                            stats.dimension_counts.get(&DataDimension::LlmLogger).unwrap_or(&0),
-                            stats.dimension_counts.get(&DataDimension::Context).unwrap_or(&0),
-                            stats.dimension_counts.get(&DataDimension::SessionManager).unwrap_or(&0),
-                            stats.dimension_counts.get(&DataDimension::ChartHistory).unwrap_or(&0),
-                            stats.dimension_counts.get(&DataDimension::ImageHistory).unwrap_or(&0),
-                            stats.dimension_counts.get(&DataDimension::UploadedFiles).unwrap_or(&0)
+                            bar(history, max_count, bar_width), history,
+                            bar(exec_log, max_count, bar_width), exec_log,
+                            bar(llm_log, max_count, bar_width), llm_log,
+                            bar(context, max_count, bar_width), context,
+                            bar(session_mgr, max_count, bar_width), session_mgr,
+                            bar(charts, max_count, bar_width), charts,
+                            bar(images, max_count, bar_width), images,
+                            bar(files, max_count, bar_width), files
                         )
                     }
                     Err(e) => format!("❌ 获取统计信息失败: {}", e),
                 }
+            }
+            "clear" => {
+                // v1.55.0: 清空对话上下文
+                eprintln!("[Memory Command] 执行清空上下文");
+                let cleared_count = session.clear_context().await;
+                format!(
+                    "🧹 对话上下文已清空\n\n\
+                    • 清除的回合数: {}\n\
+                    • 内存已释放\n\
+                    • LLM 将从头开始对话\n\n\
+                    💡 提示: 使用 /memory stats 查看当前状态",
+                    cleared_count
+                )
             }
             _ => {
                 format!("❌ 未知子命令: {}\n\n请使用 /memory 查看帮助", subcommand)

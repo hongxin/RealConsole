@@ -311,6 +311,131 @@ impl ScoringStats {
 }
 
 // ============================================================================
+// 任务复杂度分析器（v1.55.0）
+// ============================================================================
+
+/// 任务复杂度等级
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TaskComplexity {
+    /// 简单查询（如：查看、统计、列出）
+    Simple,
+    /// 中等任务（如：分析、对比、总结）
+    Medium,
+    /// 复杂分析（如：深度分析、预测、优化）
+    Complex,
+}
+
+/// 任务复杂度分析器
+///
+/// v1.55.0: 基于关键词权重评估任务复杂度
+pub struct TaskComplexityAnalyzer {
+    /// 简单任务关键词（权重：0.1-0.2）
+    simple_keywords: Vec<&'static str>,
+
+    /// 中等任务关键词（权重：0.4-0.6）
+    medium_keywords: Vec<&'static str>,
+
+    /// 复杂任务关键词（权重：0.8-1.0）
+    complex_keywords: Vec<&'static str>,
+}
+
+impl TaskComplexityAnalyzer {
+    pub fn new() -> Self {
+        Self {
+            simple_keywords: vec![
+                // 中文
+                "查看", "显示", "列出", "统计", "计数", "获取", "读取",
+                "show", "list", "view", "get", "display", "count", "fetch",
+                // 英文
+                "what", "which", "how many", "show me",
+            ],
+            medium_keywords: vec![
+                // 中文
+                "分析", "对比", "比较", "总结", "归纳", "整理", "搜索", "查找",
+                "寻找", "过滤", "筛选", "排序",
+                // 英文
+                "analyze", "compare", "summarize", "search", "find",
+                "filter", "sort", "group", "categorize",
+            ],
+            complex_keywords: vec![
+                // 中文
+                "深度分析", "预测", "优化", "建议", "推荐", "评估", "诊断",
+                "规划", "设计", "改进", "为什么", "如何解决", "最佳方案",
+                // 英文
+                "deep analysis", "predict", "optimize", "recommend",
+                "diagnose", "evaluate", "why", "how to solve", "best practice",
+                "improve", "refactor", "design",
+            ],
+        }
+    }
+
+    /// 分析任务复杂度
+    pub fn analyze(&self, task: &str) -> TaskComplexity {
+        let task_lower = task.to_lowercase();
+
+        // 计算各类关键词匹配得分
+        let simple_score = self.count_keyword_matches(&task_lower, &self.simple_keywords);
+        let medium_score = self.count_keyword_matches(&task_lower, &self.medium_keywords);
+        let complex_score = self.count_keyword_matches(&task_lower, &self.complex_keywords);
+
+        // 加权计算总分
+        let total_score = (simple_score as f64 * 0.2)
+                        + (medium_score as f64 * 0.5)
+                        + (complex_score as f64 * 1.0);
+
+        // 归一化（按任务长度）
+        let normalized_score = if task.len() > 0 {
+            total_score / (task.split_whitespace().count() as f64)
+        } else {
+            0.0
+        };
+
+        // 根据得分判断复杂度
+        if complex_score > 0 || normalized_score > 0.6 {
+            TaskComplexity::Complex
+        } else if medium_score > 0 || normalized_score > 0.3 {
+            TaskComplexity::Medium
+        } else {
+            TaskComplexity::Simple
+        }
+    }
+
+    /// 计算关键词匹配数量
+    fn count_keyword_matches(&self, text: &str, keywords: &[&str]) -> usize {
+        keywords.iter()
+            .filter(|&keyword| text.contains(keyword))
+            .count()
+    }
+}
+
+impl Default for TaskComplexityAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 自适应 Token Budget
+///
+/// v1.55.0: 根据任务复杂度动态分配 token 预算
+pub fn adaptive_token_budget(task: &str) -> usize {
+    let analyzer = TaskComplexityAnalyzer::new();
+    let complexity = analyzer.analyze(task);
+
+    let budget = match complexity {
+        TaskComplexity::Simple => 1000,   // 简单查询：1k tokens
+        TaskComplexity::Medium => 4000,   // 常规任务：4k tokens
+        TaskComplexity::Complex => 8000,  // 复杂分析：8k tokens
+    };
+
+    eprintln!(
+        "[Adaptive Budget] Task: \"{}\" → Complexity: {:?} → Budget: {} tokens",
+        task, complexity, budget
+    );
+
+    budget
+}
+
+// ============================================================================
 // 测试
 // ============================================================================
 
