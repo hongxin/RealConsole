@@ -45,6 +45,7 @@
 //! ```
 
 mod batch;
+mod builder;
 mod cached;
 mod compressed;
 mod file;
@@ -55,6 +56,7 @@ mod typed;
 mod versioned;
 
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
+pub use builder::{BuiltStorage, StorageBuilder, StorageLayerConfig};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
 pub use compressed::{
     CompressedStorage, CompressedStorageConfig, CompressionLevel, DetailedCompressionStats,

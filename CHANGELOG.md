@@ -5,6 +5,77 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 存储组合构建器
+
+- ✅ **StorageBuilder** - 流畅的存储层组合 API
+- ✅ **预设配置** - development/production/archival/fast/versioned
+- ✅ **层描述** - `describe_layers()` 查看启用的层
+- ✅ **灵活组合** - 压缩 + 缓存 + 版本控制任意组合
+- ✅ **总测试数**: 1724 (+21 新增)
+
+### ✨ Added
+
+- **StorageBuilder** (src/storage/builder.rs)
+  - `file()` / `memory()` - 选择基础存储
+  - `with_compression()` / `with_compression_default()` - 添加压缩层
+  - `with_cache_default()` / `with_tiered_cache()` - 添加缓存层
+  - `with_versioning()` / `with_versioning_default()` - 添加版本层
+  - `without_*()` - 移除特定层
+  - `build()` - 构建存储
+
+- **预设配置**
+  - `development()` - 内存存储，无优化（测试用）
+  - `production()` - 文件 + 缓存 + 压缩（生产用）
+  - `archival()` - 文件 + 最佳压缩 + 版本控制（归档用）
+  - `fast()` - 文件 + 快速压缩 + 缓存（性能优先）
+  - `versioned()` - 文件 + 缓存 + 版本控制（历史追踪）
+
+- **BuiltStorage** - 构建完成的存储
+  - `has_compression()` / `has_cache()` / `has_versioning()` - 检查层
+  - `describe_layers()` - 获取层描述列表
+  - 实现 `StorageBackend` trait
+  - 支持 `Clone`（Arc 共享）
+
+### 📊 Builder Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                   StorageBuilder                      │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  Fluent API:                                          │
+│                                                       │
+│    StorageBuilder::file("/path")                     │
+│        .with_compression(Default)                    │
+│        .with_cache_default()                         │
+│        .with_versioning(KeepLast(10))               │
+│        .build()                                      │
+│                                                       │
+│  Layer Stack (inside → outside):                     │
+│                                                       │
+│    ┌─────────────┐                                   │
+│    │  Versioned  │  ← 版本控制                       │
+│    ├─────────────┤                                   │
+│    │   Cached    │  ← 读缓存                         │
+│    ├─────────────┤                                   │
+│    │ Compressed  │  ← 压缩                           │
+│    ├─────────────┤                                   │
+│    │    File     │  ← 基础存储                       │
+│    └─────────────┘                                   │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+### 📁 New Files
+
+- `src/storage/builder.rs` - 存储构建器实现 (~520 行, 21 测试)
+
+---
+
 ## [1.65.0] - 2026-01-11
 
 ### 🎯 Highlights
