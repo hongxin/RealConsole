@@ -5,6 +5,72 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.59.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 三层 LRU 缓存
+
+- ✅ **三层缓存架构** - Hot/Warm/Cold 分层，基于"一分为三"哲学
+- ✅ **自动升降级策略** - 访问频次驱动的层级迁移
+- ✅ **命中率监控** - 详细的缓存统计信息
+- ✅ **线程安全** - RwLock 保护的并发访问
+- ✅ **总测试数**: 1589 (+19 新增)
+
+### ✨ Added
+
+- **TieredCache<K, V>** (src/storage/tiered_cache.rs)
+  - `new()` / `with_config()` / `with_defaults()` - 多种创建方式
+  - `insert()` - 插入到冷层（默认）
+  - `insert_hot()` - 直接插入热层（重要数据）
+  - `get()` - 获取数据（自动升级）
+  - `remove()` - 删除数据
+  - `clear()` - 清空所有层
+  - `contains()` / `tier_of()` - 检查键存在及层级
+  - `tier_sizes()` - 获取各层大小
+  - `stats()` - 获取缓存统计
+
+- **升降级策略**
+  - Cold → Warm: 首次访问提升
+  - Warm → Hot: 访问次数达到阈值（默认 3）
+  - Hot → Warm: 热层满时 LRU 降级
+  - Warm → Cold: 温层满时 LRU 降级
+  - Cold LRU: 淘汰
+
+- **CacheStats** - 缓存统计
+  - `hot_hits` / `warm_hits` / `cold_hits` - 各层命中
+  - `misses` - 未命中
+  - `promotions` / `demotions` - 升降级次数
+  - `evictions` - 淘汰次数
+  - `hit_rate()` / `hot_hit_rate()` - 命中率
+
+- **TieredCacheConfig** - 缓存配置
+  - `hot_capacity` - 热层容量（默认 100）
+  - `warm_capacity` - 温层容量（默认 500）
+  - `cold_capacity` - 冷层容量（默认 2000）
+  - `promotion_threshold` - 提升阈值（默认 3）
+
+### 📊 Cache Architecture
+
+```text
+┌───────────────────────────────────────────────────────────┐
+│                    TieredCache<K, V>                      │
+├───────────────────────────────────────────────────────────┤
+│  ┌─────────┐  ┌─────────┐  ┌─────────────────────────┐   │
+│  │   Hot   │  │  Warm   │  │         Cold            │   │
+│  │   100   │  │   500   │  │         2000            │   │
+│  │  最快   │  │   中等  │  │         较慢            │   │
+│  └────┬────┘  └────┬────┘  └───────────┬─────────────┘   │
+│       │            │                    │                 │
+│       └────────────┴──────────┬─────────┘                 │
+│                               │                           │
+│                         升降级引擎                         │
+│                    (access_count + LRU)                   │
+└───────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## [1.58.0] - 2026-01-11
 
 ### 🎯 Highlights

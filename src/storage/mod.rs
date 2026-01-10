@@ -46,9 +46,11 @@
 
 mod file;
 mod memory;
+pub mod tiered_cache;
 
 pub use file::FileStorage;
 pub use memory::MemoryStorage;
+pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
 
 use async_trait::async_trait;
 use std::fmt;
