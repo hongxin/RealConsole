@@ -48,12 +48,14 @@ mod batch;
 mod cached;
 mod file;
 mod memory;
+mod optimized;
 pub mod tiered_cache;
 
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
 pub use file::FileStorage;
 pub use memory::MemoryStorage;
+pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorageConfig};
 pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
 
 use async_trait::async_trait;

@@ -5,6 +5,85 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.62.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 全优化存储层
+
+- ✅ **OptimizedStorage** - 读写双优化，整合 TieredCache + BatchWriter
+- ✅ **Write-Through** - 写入时同步更新读缓存，保证一致性
+- ✅ **统一配置** - 一个配置控制读缓存和写缓冲
+- ✅ **综合统计** - read_hit_rate + write_io_savings
+- ✅ **总测试数**: 1645 (+20 新增)
+
+### ✨ Added
+
+- **OptimizedStorage<B>** (src/storage/optimized.rs)
+  - `new()` / `with_config()` - 创建全优化存储
+  - `read()` - 三层读取：写缓冲 → 读缓存 → 后端
+  - `write()` - Write-Through：更新缓存 + 缓冲写入
+  - `flush()` - 刷新写缓冲到后端
+  - `warm_cache()` - 预热读缓存
+  - `clear_all()` - 清空所有缓存和缓冲
+  - `optimization_stats()` - 获取优化统计
+
+- **OptimizedStorageConfig** - 统一配置
+  - `cache_config` - TieredCache 配置
+  - `max_write_buffer_size` - 最大写缓冲条目数（默认 100）
+  - `max_write_buffer_bytes` - 最大写缓冲字节数（默认 1MB）
+  - `enable_read_cache` - 是否启用读缓存
+  - `enable_write_buffer` - 是否启用写缓冲
+  - `flush_on_delete` - 删除时是否刷新
+
+- **DetailedOptimizationStats** - 综合统计
+  - `read_cache_hits` / `read_buffer_hits` / `read_backend_hits`
+  - `buffered_writes` / `merged_writes` / `backend_writes`
+  - `read_hit_rate()` - 读取命中率
+  - `write_io_savings()` - 写入 I/O 节省率
+  - `write_merge_rate()` - 写入合并率
+
+### 📊 Architecture
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    OptimizedStorage                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────┐    ┌─────────────────────────────┐    │
+│  │   Write Buffer  │    │       Read Cache            │    │
+│  │   (批量缓冲)     │    │   (TieredCache)            │    │
+│  │                 │    │   Hot → Warm → Cold        │    │
+│  └────────┬────────┘    └──────────────┬──────────────┘    │
+│           │                            │                    │
+│           │     Write-Through          │                    │
+│           │     (写入时同步更新缓存)     │                    │
+│           │                            │                    │
+│           └────────────┬───────────────┘                    │
+│                        │                                    │
+│                        ▼                                    │
+│              ┌─────────────────┐                            │
+│              │  Backend Store  │                            │
+│              └─────────────────┘                            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 📈 v2.0 探路期完成总结
+
+| 版本 | 主题 | 优化方向 |
+|------|------|----------|
+| v1.55.0 | LRU 缓存测试 | 基础 |
+| v1.56.0 | 多维索引 | 查询 |
+| v1.57.0 | 索引持久化 | 持久化 |
+| v1.58.0 | 存储抽象层 | 架构 |
+| v1.59.0 | 三层 LRU 缓存 | 读取 |
+| v1.60.0 | 缓存加速存储 | 读取 |
+| v1.61.0 | 批量写入器 | 写入 |
+| v1.62.0 | **全优化存储** | **读写整合** |
+
+---
+
 ## [1.61.0] - 2026-01-11
 
 ### 🎯 Highlights
