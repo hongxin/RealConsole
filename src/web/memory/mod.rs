@@ -1,6 +1,6 @@
 //! Memory 2.0 WebUI: 智能上下文编排器
 //!
-//! v1.54.0: 基于"一分为三"哲学的富媒体智能记忆系统
+//! v1.55.0: 基于"一分为三"哲学的富媒体智能记忆系统
 //!
 //! ## 设计哲学
 //!
@@ -15,7 +15,7 @@
 //!
 //! ## 三层架构
 //!
-//! ```
+//! ```text
 //! 感知层（Perception）
 //!   ↓ 采集 CLI 4维 + WebUI 3维数据
 //! 理解层（Understanding）
@@ -331,10 +331,10 @@ impl SmartWebUIOrchestrator {
 /// - 第二次：直接调用记忆（快）
 /// - 第N次：自动化反应（极快）
 pub struct QueryCache {
-    /// 搜索结果缓存：(query_hash, time_range) → Vec<MultimodalChunk>
+    /// 搜索结果缓存：`(query_hash, time_range) → Vec<MultimodalChunk>`
     search_cache: LruCache<u64, CacheEntry<Vec<MultimodalChunk>>>,
 
-    /// 上下文构建缓存：(task_hash, budget) → OptimizedMultimodalContext
+    /// 上下文构建缓存：`(task_hash, budget) → OptimizedMultimodalContext`
     context_cache: LruCache<u64, CacheEntry<OptimizedMultimodalContext>>,
 
     /// TTL: 5 minutes（缓存过期时间）
@@ -500,9 +500,165 @@ pub struct MemoryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::web::memory::types::{DataDimension, MultimodalContent};
+    use chrono::Utc;
 
-    // 集成测试需要实际的依赖
-    // 在实际环境中运行
+    // ========================================================================
+    // QueryCache 测试
+    // ========================================================================
+
+    #[test]
+    fn test_query_cache_new() {
+        let cache = QueryCache::new();
+        let (search_len, context_len) = cache.stats();
+        assert_eq!(search_len, 0);
+        assert_eq!(context_len, 0);
+    }
+
+    #[test]
+    fn test_query_cache_default() {
+        let cache = QueryCache::default();
+        let (search_len, context_len) = cache.stats();
+        assert_eq!(search_len, 0);
+        assert_eq!(context_len, 0);
+    }
+
+    #[test]
+    fn test_cache_entry_new() {
+        let entry = CacheEntry::new(42);
+        assert_eq!(entry.data, 42);
+        assert!(!entry.is_expired(std::time::Duration::from_secs(60)));
+    }
+
+    #[test]
+    fn test_cache_entry_expiration() {
+        let entry = CacheEntry::new("test");
+        // 立即检查不应过期
+        assert!(!entry.is_expired(std::time::Duration::from_secs(60)));
+        // 0秒TTL应该立即过期
+        assert!(entry.is_expired(std::time::Duration::from_secs(0)));
+    }
+
+    #[test]
+    fn test_search_cache_hit_miss() {
+        let mut cache = QueryCache::new();
+
+        // First access - miss
+        let result = cache.get_search_cached(12345);
+        assert!(result.is_none());
+
+        // Store data
+        let chunks = vec![MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "test".to_string(),
+            },
+            Utc::now(),
+        )];
+        cache.put_search_cached(12345, chunks.clone());
+
+        // Second access - hit
+        let result = cache.get_search_cached(12345);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_get_or_compute_search() {
+        let mut cache = QueryCache::new();
+        let mut compute_count = 0;
+
+        // First call - compute
+        let result1 = cache.get_or_compute_search(12345, || {
+            compute_count += 1;
+            vec![MultimodalChunk::new(
+                DataDimension::Context,
+                MultimodalContent::Text {
+                    content: "computed".to_string(),
+                },
+                Utc::now(),
+            )]
+        });
+        assert_eq!(compute_count, 1);
+        assert_eq!(result1.len(), 1);
+
+        // Second call - from cache (compute should not run)
+        let result2 = cache.get_or_compute_search(12345, || {
+            compute_count += 1;
+            vec![]
+        });
+        assert_eq!(compute_count, 1); // Still 1, not incremented
+        assert_eq!(result2.len(), 1);
+    }
+
+    #[test]
+    fn test_cache_clear() {
+        let mut cache = QueryCache::new();
+
+        // Add some data
+        cache.put_search_cached(1, vec![]);
+        cache.put_search_cached(2, vec![]);
+
+        let (search_len, _) = cache.stats();
+        assert_eq!(search_len, 2);
+
+        // Clear
+        cache.clear_all();
+
+        let (search_len, context_len) = cache.stats();
+        assert_eq!(search_len, 0);
+        assert_eq!(context_len, 0);
+    }
+
+    #[test]
+    fn test_cache_lru_eviction() {
+        // Create small cache for testing
+        let mut cache = QueryCache {
+            search_cache: lru::LruCache::new(std::num::NonZeroUsize::new(2).unwrap()),
+            context_cache: lru::LruCache::new(std::num::NonZeroUsize::new(2).unwrap()),
+            ttl: std::time::Duration::from_secs(300),
+        };
+
+        // Add 3 items to a cache with capacity 2
+        cache.put_search_cached(1, vec![]);
+        cache.put_search_cached(2, vec![]);
+        cache.put_search_cached(3, vec![]); // Should evict key 1
+
+        let (search_len, _) = cache.stats();
+        assert_eq!(search_len, 2);
+
+        // Key 1 should be evicted
+        assert!(cache.get_search_cached(1).is_none());
+        // Keys 2 and 3 should still exist
+        assert!(cache.get_search_cached(2).is_some());
+        assert!(cache.get_search_cached(3).is_some());
+    }
+
+    #[test]
+    fn test_generate_cache_key() {
+        let key1 = generate_cache_key("test");
+        let key2 = generate_cache_key("test");
+        let key3 = generate_cache_key("different");
+
+        // Same input should give same key
+        assert_eq!(key1, key2);
+        // Different input should give different key
+        assert_ne!(key1, key3);
+    }
+
+    #[test]
+    fn test_generate_cache_key_tuple() {
+        let key1 = generate_cache_key(("query", 1000));
+        let key2 = generate_cache_key(("query", 1000));
+        let key3 = generate_cache_key(("query", 2000));
+
+        assert_eq!(key1, key2);
+        assert_ne!(key1, key3);
+    }
+
+    // ========================================================================
+    // 其他测试
+    // ========================================================================
 
     #[test]
     fn test_module_compiles() {

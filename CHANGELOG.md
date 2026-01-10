@@ -5,6 +5,45 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.55.0] - 2026-01-10
+
+### 🎯 Highlights
+
+**主题**: v2.0 准备阶段 - 文档完善与缓存测试
+
+- ✅ **Rustdoc 零警告** - 修复全部 10 个文档警告
+- ✅ **LRU 缓存测试** - 新增 11 个缓存测试，验证 Memory 缓存行为
+- ✅ **基准测试验证** - 确认 criterion 基准测试正常运行
+- ✅ **总测试数**: 1524 (+10 新增)
+
+### 🔧 Changed
+
+- **文档改进**
+  - 修复代码块语法（使用 `text` 标注非 Rust 代码）
+  - 修复泛型类型注释（`List<T>` → `` `List<T>` ``）
+  - 修复 URL 超链接格式（使用尖括号包裹）
+  - 修复 HTML 标签转义（`<think>` → `` `<think>` ``）
+
+### ✨ Added
+
+- **QueryCache 测试** (web/memory/mod.rs)
+  - `test_query_cache_new` - 缓存初始化
+  - `test_cache_entry_expiration` - TTL 过期检测
+  - `test_search_cache_hit_miss` - 缓存命中/未命中
+  - `test_get_or_compute_search` - 计算缓存
+  - `test_cache_lru_eviction` - LRU 淘汰策略
+  - `test_generate_cache_key` - 缓存键生成
+
+### 📊 Benchmark Results
+
+Intent Matching 性能（criterion）：
+- `intent_exact_match`: ~14 ns
+- `intent_fuzzy_match`: ~100 ns
+- `intent_cache_stats`: ~11 ns
+- `intent_batch_matching`: ~67 ns
+
+---
+
 ## [1.54.0] - 2026-01-08
 
 ### 🎯 Highlights

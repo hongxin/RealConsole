@@ -7,8 +7,8 @@
 //! - functionDeclarations 工具调用
 //!
 //! 参考文档：
-//! - https://ai.google.dev/gemini-api/docs/text-generation
-//! - https://ai.google.dev/api/generate-content
+//! - <https://ai.google.dev/gemini-api/docs/text-generation>
+//! - <https://ai.google.dev/api/generate-content>
 
 use super::http_base::HttpClientBase;
 use super::{
@@ -34,7 +34,7 @@ impl GeminiClient {
     /// # 参数
     /// - `api_key`: Gemini API key
     /// - `model`: 模型名称（如 "gemini-pro"）
-    /// - `endpoint`: API 端点（默认 "https://generativelanguage.googleapis.com"）
+    /// - `endpoint`: API 端点（默认 `https://generativelanguage.googleapis.com`）
     ///
     /// # 返回
     /// - `Ok(GeminiClient)`: 成功创建

@@ -3,7 +3,7 @@
 //! 特色功能：
 //! - 双接口降级 (native → OpenAI compatible)
 //! - 模型列表缓存
-//! - <think> 标签过滤
+//! - `<think>` 标签过滤
 //! - 本地服务诊断
 //! - 无需认证（本地服务）
 
@@ -198,19 +198,19 @@ impl OllamaClient {
         Err(LlmError::Parse("No choices in response".to_string()))
     }
 
-    /// 过滤 <think> 标签
+    /// 过滤 `<think>` 标签
     pub fn strip_think_tags(text: &str) -> String {
         let re = Regex::new(r"<think>[\s\S]*?</think>").unwrap();
         re.replace_all(text, "").to_string()
     }
 
-    /// 带重试的聊天（双接口降级 + <think> 标签过滤）
+    /// 带重试的聊天（双接口降级 + `<think>` 标签过滤）
     ///
     /// Ollama 特有功能：
     /// 1. 优先尝试 OpenAI Compatible API（更稳定）
     /// 2. 降级到 Native API（fallback）
     /// 3. Native API 支持重试（使用 HttpClientBase）
-    /// 4. 过滤 <think> 标签
+    /// 4. 过滤 `<think>` 标签
     async fn chat_with_retry(&self, messages: &[Message]) -> Result<String, LlmError> {
         // 优先尝试 OpenAI Compatible API（更稳定）
         match self.chat_openai(messages).await {

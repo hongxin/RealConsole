@@ -29,13 +29,13 @@ pub enum PrimitiveType {
 /// 复合类型
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CompositeType {
-    /// 列表类型 List<T>
+    /// 列表类型 `List<T>`
     List(Box<Type>),
-    /// 字典类型 Dict<K, V>
+    /// 字典类型 `Dict<K, V>`
     Dict(Box<Type>, Box<Type>),
-    /// 可选类型 Optional<T>
+    /// 可选类型 `Optional<T>`
     Optional(Box<Type>),
-    /// 结果类型 Result<T, E>
+    /// 结果类型 `Result<T, E>`
     Result(Box<Type>, Box<Type>),
     /// 元组类型 (T1, T2, ...)
     Tuple(Vec<Type>),
