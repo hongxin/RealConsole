@@ -5,6 +5,50 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.56.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 多维索引原型
+
+- ✅ **多维索引系统** - 新增 MultiDimensionalIndex 支持 7 个维度的快速查询
+- ✅ **性能基准测试** - 新增 index_performance 基准，验证索引性能
+- ✅ **时间范围查询 1.24x 提升** - BTreeMap 实现高效时间范围查询
+- ✅ **O(1) 去重检查** - 内容哈希索引支持即时重复检测
+- ✅ **总测试数**: 1535 (+11 新增)
+
+### ✨ Added
+
+- **MultiDimensionalIndex** (src/tracer/index.rs)
+  - 7 维索引：时间戳、维度、条目类型、状态、重要性、标签、内容哈希
+  - `build_from()` - 从 TraceEntry 集合构建索引
+  - `insert()` / `remove()` - 单条目操作
+  - `query_by_time_range()` - 时间范围查询（BTreeMap）
+  - `query_by_dimension()` - 维度查询（HashMap O(1)）
+  - `query_by_status()` - 状态查询
+  - `query_by_tags()` - 标签查询
+  - `query_combined()` - 多条件组合查询
+  - `contains_content()` - O(1) 去重检查
+
+- **性能基准测试** (benches/index_performance.rs)
+  - `bench_index_build` - 索引构建性能
+  - `bench_dimension_query` - 维度查询（索引 vs 线性扫描）
+  - `bench_time_range_query` - 时间范围查询对比
+  - `bench_status_query` - 状态查询
+  - `bench_tag_query` - 标签查询
+  - `bench_combined_query` - 组合查询
+  - `bench_dedup_check` - 去重检查
+
+### 📊 Benchmark Results
+
+多维索引性能（criterion，10k 条目）：
+- **索引构建**: ~5.9 ms
+- **维度查询**: 8.2 µs (indexed) vs 8.5 µs (linear)
+- **时间范围查询**: 10.8 µs vs 13.4 µs - **1.24x 提升**
+- **去重检查**: 6.5 ns (O(1))
+
+---
+
 ## [1.55.0] - 2026-01-10
 
 ### 🎯 Highlights

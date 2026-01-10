@@ -42,6 +42,7 @@
 
 pub mod dashboard;
 pub mod entry;
+pub mod index;  // v1.56.0: 多维索引系统
 pub mod types;
 pub mod unified_tracer;
 
@@ -51,6 +52,7 @@ mod benchmarks;
 // 重新导出核心类型，方便使用
 pub use dashboard::{Dashboard, DashboardConfig, HealthScore};
 pub use entry::TraceEntry;
+pub use index::{MultiDimensionalIndex, IndexStats, QueryResult, StatusKey};  // v1.56.0
 pub use types::{Dimension, EntryType, Importance, QueryFilter, Status};
 pub use unified_tracer::{TraceStats, UnifiedTracer};
 

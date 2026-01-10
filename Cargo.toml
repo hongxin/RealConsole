@@ -1,6 +1,6 @@
 [package]
 name = "realconsole"
-version = "1.55.0"
+version = "1.56.0"
 edition = "2021"
 authors = ["RealConsole Contributors"]
 description = "An intelligent CLI agent with unified tracing system, combining Eastern philosophy wisdom with modern AI"
@@ -90,6 +90,10 @@ harness = false
 
 [[bench]]
 name = "memory_search"
+harness = false
+
+[[bench]]
+name = "index_performance"
 harness = false
 
 # Profile for flamegraph analysis - enable debug symbols
