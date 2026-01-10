@@ -5,6 +5,76 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.61.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 异步批量写入器
+
+- ✅ **BatchWriter** - 缓冲写入操作，批量刷新到后端
+- ✅ **写入合并** - 同一键的多次写入只保留最新值
+- ✅ **自动刷新** - 支持按条目数或字节数触发
+- ✅ **I/O 优化** - 显著减少后端写入次数
+- ✅ **总测试数**: 1625 (+19 新增)
+
+### ✨ Added
+
+- **BatchWriter<B>** (src/storage/batch.rs)
+  - `new()` / `with_config()` - 创建批量写入器
+  - `write()` - 缓冲写入
+  - `flush()` - 手动刷新到后端
+  - `read()` - 支持从缓冲区读取
+  - `clear_buffer()` - 清空缓冲区（不写入）
+  - `is_buffered()` - 检查键是否在缓冲区
+  - `buffer_size()` / `buffer_bytes()` - 缓冲区状态
+  - `detailed_stats()` - 详细统计
+
+- **BatchWriterConfig** - 批量写入配置
+  - `max_buffer_size` - 最大缓冲条目数（默认 100）
+  - `max_buffer_bytes` - 最大缓冲字节数（默认 1MB）
+  - `read_from_buffer` - 是否从缓冲区读取（默认 true）
+  - `flush_on_delete` - 删除时是否刷新（默认 true）
+
+- **DetailedBatchStats** - 批量写入统计
+  - `buffered_writes` - 缓冲的写入次数
+  - `backend_writes` - 实际后端写入次数
+  - `merged_writes` - 合并的重复写入次数
+  - `io_savings()` - I/O 节省率
+  - `merge_rate()` - 写入合并率
+
+### 📊 Batch Write Strategy
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                    BatchWriter                        │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  Write Buffer:                                        │
+│    [key1 → data1] [key2 → data2] [key3 → data3]      │
+│                                                       │
+│  Flush Triggers:                                      │
+│    1. 缓冲区满 (buffer_size >= max_buffer_size)       │
+│    2. 手动刷新 (flush())                              │
+│    3. 删除操作触发 (确保一致性)                        │
+│                                                       │
+│  Benefits:                                            │
+│    - 减少 I/O 次数 (N writes → 1 batch)              │
+│    - 合并重复键写入 (只保留最新值)                    │
+│    - 提高写入吞吐量                                   │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+### 📈 Performance Example
+
+同一键写入 10 次:
+- `buffered_writes`: 10
+- `backend_writes`: 1
+- `merged_writes`: 9
+- `io_savings()`: 90%
+
+---
+
 ## [1.60.0] - 2026-01-11
 
 ### 🎯 Highlights

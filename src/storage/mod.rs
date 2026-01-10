@@ -44,11 +44,13 @@
 //! mem_storage.write("key1", b"value1").await?;
 //! ```
 
+mod batch;
 mod cached;
 mod file;
 mod memory;
 pub mod tiered_cache;
 
+pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
 pub use file::FileStorage;
 pub use memory::MemoryStorage;
