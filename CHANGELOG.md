@@ -5,6 +5,67 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.60.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 缓存加速存储层
+
+- ✅ **CachedStorage** - 组合 FileStorage + TieredCache，持久化 + 缓存加速
+- ✅ **Write-Through 策略** - 写入同时更新后端和缓存，保证一致性
+- ✅ **缓存预热** - `warm_cache()` 支持批量预加载热点数据
+- ✅ **组合统计** - 后端统计 + 缓存统计，全面监控
+- ✅ **总测试数**: 1606 (+17 新增)
+
+### ✨ Added
+
+- **CachedStorage<B>** (src/storage/cached.rs)
+  - `new()` / `with_config()` - 创建缓存存储
+  - `read()` - 缓存优先读取
+  - `write()` - Write-Through 写入
+  - `delete()` - 同步删除缓存和后端
+  - `warm_cache()` - 缓存预热
+  - `clear_cache()` - 清空缓存（保留后端数据）
+  - `cache_hit_rate()` - 缓存命中率
+  - `cache_tier_sizes()` - 各层大小
+  - `combined_stats()` - 组合统计
+
+- **CachedStorageConfig** - 缓存配置
+  - `cache_config` - TieredCache 配置
+  - `cache_on_write` - 写入时是否缓存（默认 true）
+  - `cache_on_read_miss` - 读取未命中时是否填充（默认 true）
+
+- **CombinedStorageStats** - 组合统计
+  - `backend` - 后端统计
+  - `cache` - 缓存统计
+  - `hit_rate()` - 整体命中率
+  - `backend_read_savings()` - 后端读取节省比例
+
+### 📊 Cache Strategy
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                   CachedStorage                       │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  Read:                                                │
+│    1. 检查缓存 (TieredCache)                          │
+│    2. 缓存命中 → 返回                                 │
+│    3. 缓存未命中 → 读取后端 → 写入缓存 → 返回          │
+│                                                       │
+│  Write (Write-Through):                               │
+│    1. 写入后端 (FileStorage)                          │
+│    2. 写入缓存                                        │
+│                                                       │
+│  Delete:                                              │
+│    1. 从缓存删除                                      │
+│    2. 从后端删除                                      │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+---
+
 ## [1.59.0] - 2026-01-11
 
 ### 🎯 Highlights

@@ -44,10 +44,12 @@
 //! mem_storage.write("key1", b"value1").await?;
 //! ```
 
+mod cached;
 mod file;
 mod memory;
 pub mod tiered_cache;
 
+pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
 pub use file::FileStorage;
 pub use memory::MemoryStorage;
 pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
