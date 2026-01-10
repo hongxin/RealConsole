@@ -5,6 +5,53 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.54.0] - 2026-01-08
+
+### 🎯 Highlights
+
+**主题**: v2.0 准备阶段 - 测试覆盖率提升
+
+- ✅ **测试大幅增加** - 从 1449 增加到 1514 个测试用例
+- ✅ **Memory 模块测试** - 新增 55 个测试覆盖 orchestration/understanding/perception
+- ✅ **Visualization 测试** - 新增 41 个测试覆盖所有图表类型和验证逻辑
+- ✅ **Doctest 修复** - 修复 42 个 crate 名称引用错误
+
+### ✨ Added
+
+- **web/memory/orchestration.rs** - 新增 25 个测试
+  - SelectionStrategy 策略测试（TopK/Recency/Greedy/Hybrid）
+  - DecisionEngine 64卦决策测试
+  - TokenCounter 估算测试
+  - 数据结构序列化测试
+
+- **web/memory/understanding.rs** - 新增 30 个测试
+  - KeywordMatcher 关键词提取测试
+  - TimeDecayConfig 时间衰减测试
+  - TaskComplexityAnalyzer 复杂度分析测试
+  - ScoringStats 统计测试
+  - WebUIUnderstandingLayer 相关性评分测试
+
+- **visualization/types.rs** - 新增 30 个测试
+  - 所有 8 种图表类型验证测试
+  - AxisConfig 坐标轴配置测试
+  - Series builder 链式调用测试
+  - ImageData 图像数据测试
+  - 序列化/反序列化测试
+
+### 🔧 Changed
+
+- 修复 crate 名称从 `simpleconsole` 到 `realconsole`（42 处）
+- 导出 `FuzzyConfig` 到 `dsl::intent` 模块
+
+### 📊 Test Coverage
+
+- **总测试数**: 1514 (+65 新增)
+- **Memory 模块**: 55 个测试全部通过
+- **Visualization 模块**: 41 个测试全部通过
+- **基准覆盖率**: 67.14% lines, 73.06% functions
+
+---
+
 ## [1.53.0] - 2026-01-08
 
 ### 🎯 Highlights

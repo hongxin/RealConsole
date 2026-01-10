@@ -14,7 +14,7 @@
 //! ## 使用示例
 //!
 //! ```rust
-//! use simpleconsole::dsl::intent::builtin::BuiltinIntents;
+//! use realconsole::dsl::intent::builtin::BuiltinIntents;
 //!
 //! let builtin = BuiltinIntents::new();
 //!
@@ -42,7 +42,7 @@ use crate::dsl::intent::{
 /// # 示例
 ///
 /// ```rust
-/// use simpleconsole::dsl::intent::builtin::BuiltinIntents;
+/// use realconsole::dsl::intent::builtin::BuiltinIntents;
 ///
 /// let builtin = BuiltinIntents::new();
 ///

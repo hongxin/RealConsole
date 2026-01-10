@@ -31,7 +31,7 @@ use std::collections::HashMap;
 /// # Example
 ///
 /// ```rust
-/// use simpleconsole::dsl::intent::extractor::EntityExtractor;
+/// use realconsole::dsl::intent::extractor::EntityExtractor;
 ///
 /// let extractor = EntityExtractor::new();
 /// let entities = extractor.extract("统计 Python 代码行数", &Default::default());
@@ -76,8 +76,8 @@ impl EntityExtractor {
     /// # Example
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::extractor::EntityExtractor;
-    /// use simpleconsole::dsl::intent::EntityType;
+    /// use realconsole::dsl::intent::extractor::EntityExtractor;
+    /// use realconsole::dsl::intent::EntityType;
     /// use std::collections::HashMap;
     ///
     /// let extractor = EntityExtractor::new();
@@ -143,8 +143,8 @@ impl EntityExtractor {
     /// # Example
     ///
     /// ```
-    /// use simpleconsole::dsl::intent::extractor::EntityExtractor;
-    /// use simpleconsole::dsl::intent::EntityType;
+    /// use realconsole::dsl::intent::extractor::EntityExtractor;
+    /// use realconsole::dsl::intent::EntityType;
     ///
     /// let extractor = EntityExtractor::new();
     ///
@@ -216,8 +216,8 @@ impl EntityExtractor {
     /// # Example
     ///
     /// ```
-    /// use simpleconsole::dsl::intent::extractor::EntityExtractor;
-    /// use simpleconsole::dsl::intent::EntityType;
+    /// use realconsole::dsl::intent::extractor::EntityExtractor;
+    /// use realconsole::dsl::intent::EntityType;
     ///
     /// let extractor = EntityExtractor::new();
     ///
@@ -252,8 +252,8 @@ impl EntityExtractor {
     /// # Example
     ///
     /// ```
-    /// use simpleconsole::dsl::intent::extractor::EntityExtractor;
-    /// use simpleconsole::dsl::intent::EntityType;
+    /// use realconsole::dsl::intent::extractor::EntityExtractor;
+    /// use realconsole::dsl::intent::EntityType;
     ///
     /// let extractor = EntityExtractor::new();
     ///
@@ -351,8 +351,8 @@ impl EntityExtractor {
     /// # Example
     ///
     /// ```
-    /// use simpleconsole::dsl::intent::extractor::EntityExtractor;
-    /// use simpleconsole::dsl::intent::EntityType;
+    /// use realconsole::dsl::intent::extractor::EntityExtractor;
+    /// use realconsole::dsl::intent::EntityType;
     ///
     /// let extractor = EntityExtractor::new();
     ///

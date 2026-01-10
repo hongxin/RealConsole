@@ -477,6 +477,10 @@ impl ImageData {
 mod tests {
     use super::*;
 
+    // ========================================================================
+    // ChartType 测试
+    // ========================================================================
+
     #[test]
     fn test_chart_type_from_str() {
         assert_eq!(ChartType::parse("line"), Some(ChartType::Line));
@@ -484,6 +488,66 @@ mod tests {
         assert_eq!(ChartType::parse("bar"), Some(ChartType::Bar));
         assert_eq!(ChartType::parse("invalid"), None);
     }
+
+    #[test]
+    fn test_chart_type_parse_all() {
+        assert_eq!(ChartType::parse("line"), Some(ChartType::Line));
+        assert_eq!(ChartType::parse("bar"), Some(ChartType::Bar));
+        assert_eq!(ChartType::parse("pie"), Some(ChartType::Pie));
+        assert_eq!(ChartType::parse("scatter"), Some(ChartType::Scatter));
+        assert_eq!(ChartType::parse("area"), Some(ChartType::Area));
+        assert_eq!(ChartType::parse("bubble"), Some(ChartType::Bubble));
+        assert_eq!(ChartType::parse("radar"), Some(ChartType::Radar));
+        assert_eq!(ChartType::parse("heatmap"), Some(ChartType::Heatmap));
+    }
+
+    #[test]
+    fn test_chart_type_case_insensitive() {
+        assert_eq!(ChartType::parse("LINE"), Some(ChartType::Line));
+        assert_eq!(ChartType::parse("Bar"), Some(ChartType::Bar));
+        assert_eq!(ChartType::parse("PIE"), Some(ChartType::Pie));
+        assert_eq!(ChartType::parse("SCATTER"), Some(ChartType::Scatter));
+    }
+
+    // ========================================================================
+    // AxisConfig 测试
+    // ========================================================================
+
+    #[test]
+    fn test_axis_config_category() {
+        let axis = AxisConfig::category(vec!["A".to_string(), "B".to_string()]);
+        assert_eq!(axis.axis_type, Some("category".to_string()));
+        assert_eq!(axis.data.as_ref().unwrap().len(), 2);
+        assert!(axis.name.is_none());
+    }
+
+    #[test]
+    fn test_axis_config_value() {
+        let axis = AxisConfig::value(Some("数值".to_string()));
+        assert_eq!(axis.axis_type, Some("value".to_string()));
+        assert!(axis.data.is_none());
+        assert_eq!(axis.name, Some("数值".to_string()));
+    }
+
+    #[test]
+    fn test_axis_config_value_no_name() {
+        let axis = AxisConfig::value(None);
+        assert_eq!(axis.axis_type, Some("value".to_string()));
+        assert!(axis.data.is_none());
+        assert!(axis.name.is_none());
+    }
+
+    #[test]
+    fn test_axis_config_time() {
+        let axis = AxisConfig::time(Some("时间".to_string()));
+        assert_eq!(axis.axis_type, Some("time".to_string()));
+        assert!(axis.data.is_none());
+        assert_eq!(axis.name, Some("时间".to_string()));
+    }
+
+    // ========================================================================
+    // ChartData 测试
+    // ========================================================================
 
     #[test]
     fn test_simple_line_chart() {
@@ -515,6 +579,30 @@ mod tests {
     }
 
     #[test]
+    fn test_validation_empty_series() {
+        let chart = ChartData {
+            chart_type: ChartType::Line,
+            title: "空系列".to_string(),
+            x_axis: AxisConfig::category(vec!["A".to_string()]),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![], // 空系列
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: None,
+        };
+
+        let result = chart.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("至少需要一个数据系列"));
+    }
+
+    // ========================================================================
+    // Series 测试
+    // ========================================================================
+
+    #[test]
     fn test_series_builder() {
         let series = Series::new("测试", vec![1.0, 2.0, 3.0]).with_color("#FF0000");
 
@@ -523,7 +611,34 @@ mod tests {
         assert_eq!(series.color, Some("#FF0000".to_string()));
     }
 
-    // v1.45.0: 饼图测试
+    #[test]
+    fn test_series_with_y_axis_index() {
+        let series = Series::new("测试", vec![1.0, 2.0]).with_y_axis_index(1);
+        assert_eq!(series.y_axis_index, Some(1));
+    }
+
+    #[test]
+    fn test_series_with_chart_type() {
+        let series = Series::new("测试", vec![1.0, 2.0]).with_chart_type(ChartType::Bar);
+        assert_eq!(series.chart_type, Some(ChartType::Bar));
+    }
+
+    #[test]
+    fn test_series_builder_chained() {
+        let series = Series::new("测试", vec![1.0, 2.0, 3.0])
+            .with_color("#FF0000")
+            .with_y_axis_index(1)
+            .with_chart_type(ChartType::Line);
+
+        assert_eq!(series.color, Some("#FF0000".to_string()));
+        assert_eq!(series.y_axis_index, Some(1));
+        assert_eq!(series.chart_type, Some(ChartType::Line));
+    }
+
+    // ========================================================================
+    // 饼图测试 (v1.45.0)
+    // ========================================================================
+
     #[test]
     fn test_pie_chart_with_labels() {
         let chart = ChartData {
@@ -531,12 +646,12 @@ mod tests {
             title: "市场份额".to_string(),
             x_axis: AxisConfig::value(None),
             y_axis: AxisConfig::value(None),
-            y_axis_secondary: None,  // v1.47.0
+            y_axis_secondary: None,
             series: vec![Series::new("份额", vec![35.0, 25.0, 40.0])],
             options: ChartOptions::default(),
             labels: Some(vec!["产品A".to_string(), "产品B".to_string(), "产品C".to_string()]),
-            indicators: None,  // v1.49.0
-            heatmap_data: None,  // v1.49.0
+            indicators: None,
+            heatmap_data: None,
         };
 
         assert!(chart.validate().is_ok());
@@ -549,18 +664,21 @@ mod tests {
             title: "测试".to_string(),
             x_axis: AxisConfig::value(None),
             y_axis: AxisConfig::value(None),
-            y_axis_secondary: None,  // v1.47.0
+            y_axis_secondary: None,
             series: vec![Series::new("数据", vec![1.0, 2.0])],
             options: ChartOptions::default(),
             labels: Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]), // 长度不匹配
-            indicators: None,  // v1.49.0
-            heatmap_data: None,  // v1.49.0
+            indicators: None,
+            heatmap_data: None,
         };
 
         assert!(chart.validate().is_err());
     }
 
-    // v1.45.0: 散点图测试
+    // ========================================================================
+    // 散点图测试 (v1.45.0)
+    // ========================================================================
+
     #[test]
     fn test_scatter_chart() {
         let chart = ChartData {
@@ -568,15 +686,15 @@ mod tests {
             title: "身高体重分布".to_string(),
             x_axis: AxisConfig::value(Some("身高".to_string())),
             y_axis: AxisConfig::value(Some("体重".to_string())),
-            y_axis_secondary: None,  // v1.47.0
+            y_axis_secondary: None,
             series: vec![Series::new_scatter(
                 "人群A",
                 vec![(170.0, 65.0), (175.0, 70.0), (160.0, 55.0)],
             )],
             options: ChartOptions::default(),
             labels: None,
-            indicators: None,  // v1.49.0
-            heatmap_data: None,  // v1.49.0
+            indicators: None,
+            heatmap_data: None,
         };
 
         assert!(chart.validate().is_ok());
@@ -589,12 +707,38 @@ mod tests {
             title: "测试".to_string(),
             x_axis: AxisConfig::value(None),
             y_axis: AxisConfig::value(None),
-            y_axis_secondary: None,  // v1.47.0
+            y_axis_secondary: None,
             series: vec![Series::new("数据", vec![1.0, 2.0])], // 没有 points
             options: ChartOptions::default(),
             labels: None,
-            indicators: None,  // v1.49.0
-            heatmap_data: None,  // v1.49.0
+            indicators: None,
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    #[test]
+    fn test_scatter_chart_empty_points_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Scatter,
+            title: "测试".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series {
+                name: "空点".to_string(),
+                data: vec![],
+                color: None,
+                points: Some(vec![]), // 空的 points
+                sizes: None,
+                y_axis_index: None,
+                chart_type: None,
+            }],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: None,
         };
 
         assert!(chart.validate().is_err());
@@ -608,5 +752,340 @@ mod tests {
         assert_eq!(series.name, "测试");
         assert_eq!(series.points.as_ref().unwrap().len(), 2);
         assert_eq!(series.color, Some("#00FF00".to_string()));
+    }
+
+    // ========================================================================
+    // 气泡图测试 (v1.48.0)
+    // ========================================================================
+
+    #[test]
+    fn test_bubble_chart() {
+        let chart = ChartData {
+            chart_type: ChartType::Bubble,
+            title: "气泡图".to_string(),
+            x_axis: AxisConfig::value(Some("X轴".to_string())),
+            y_axis: AxisConfig::value(Some("Y轴".to_string())),
+            y_axis_secondary: None,
+            series: vec![Series::new_bubble(
+                "数据",
+                vec![(1.0, 2.0), (3.0, 4.0), (5.0, 6.0)],
+                vec![10.0, 20.0, 30.0],
+            )],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_ok());
+    }
+
+    #[test]
+    fn test_bubble_chart_no_points_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Bubble,
+            title: "气泡图".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new("数据", vec![1.0, 2.0])], // 没有 points
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    #[test]
+    fn test_bubble_chart_no_sizes_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Bubble,
+            title: "气泡图".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new_scatter("数据", vec![(1.0, 2.0)])], // 有 points 但没有 sizes
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    #[test]
+    fn test_bubble_chart_size_mismatch_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Bubble,
+            title: "气泡图".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new_bubble(
+                "数据",
+                vec![(1.0, 2.0), (3.0, 4.0)],
+                vec![10.0], // 长度不匹配
+            )],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    #[test]
+    fn test_bubble_series_builder() {
+        let series = Series::new_bubble(
+            "测试",
+            vec![(1.0, 2.0), (3.0, 4.0)],
+            vec![10.0, 20.0],
+        );
+
+        assert_eq!(series.name, "测试");
+        assert_eq!(series.points.as_ref().unwrap().len(), 2);
+        assert_eq!(series.sizes.as_ref().unwrap().len(), 2);
+    }
+
+    // ========================================================================
+    // 雷达图测试 (v1.49.0)
+    // ========================================================================
+
+    #[test]
+    fn test_radar_chart() {
+        let chart = ChartData {
+            chart_type: ChartType::Radar,
+            title: "能力雷达".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new("得分", vec![80.0, 90.0, 70.0, 85.0])],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: Some(vec![
+                "技术".to_string(),
+                "沟通".to_string(),
+                "管理".to_string(),
+                "创新".to_string(),
+            ]),
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_ok());
+    }
+
+    #[test]
+    fn test_radar_chart_no_indicators_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Radar,
+            title: "雷达图".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new("数据", vec![1.0, 2.0])],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None, // 没有 indicators
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    #[test]
+    fn test_radar_chart_indicator_mismatch_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Radar,
+            title: "雷达图".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new("数据", vec![1.0, 2.0])],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]), // 长度不匹配
+            heatmap_data: None,
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    // ========================================================================
+    // 热力图测试 (v1.49.0)
+    // ========================================================================
+
+    #[test]
+    fn test_heatmap_chart() {
+        let chart = ChartData {
+            chart_type: ChartType::Heatmap,
+            title: "热力图".to_string(),
+            x_axis: AxisConfig::category(vec!["A".to_string(), "B".to_string()]),
+            y_axis: AxisConfig::category(vec!["X".to_string(), "Y".to_string()]),
+            y_axis_secondary: None,
+            series: vec![Series::new("热力", vec![])],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: Some(vec![(0, 0, 1.0), (0, 1, 2.0), (1, 0, 3.0), (1, 1, 4.0)]),
+        };
+
+        assert!(chart.validate().is_ok());
+    }
+
+    #[test]
+    fn test_heatmap_chart_no_data_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Heatmap,
+            title: "热力图".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new("数据", vec![])],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: None, // 没有 heatmap_data
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    #[test]
+    fn test_heatmap_chart_empty_data_fails() {
+        let chart = ChartData {
+            chart_type: ChartType::Heatmap,
+            title: "热力图".to_string(),
+            x_axis: AxisConfig::value(None),
+            y_axis: AxisConfig::value(None),
+            y_axis_secondary: None,
+            series: vec![Series::new("数据", vec![])],
+            options: ChartOptions::default(),
+            labels: None,
+            indicators: None,
+            heatmap_data: Some(vec![]), // 空的 heatmap_data
+        };
+
+        assert!(chart.validate().is_err());
+    }
+
+    // ========================================================================
+    // ChartOptions 测试
+    // ========================================================================
+
+    #[test]
+    fn test_chart_options_default() {
+        let options = ChartOptions::default();
+        assert!(options.show_legend);
+        assert!(options.show_toolbox);
+        assert!(!options.smooth);
+    }
+
+    // ========================================================================
+    // ImageData 测试 (v1.52.0)
+    // ========================================================================
+
+    #[test]
+    fn test_image_data_from_base64() {
+        let img = ImageData::from_base64("image/png", "iVBORw0KGgo=", "测试图像");
+
+        assert_eq!(img.image_type, "base64");
+        assert_eq!(img.mime_type, "image/png");
+        assert_eq!(img.data, "iVBORw0KGgo=");
+        assert_eq!(img.alt_text, "测试图像");
+        assert!(img.filename.is_none());
+        assert!(img.size_bytes.is_none());
+    }
+
+    #[test]
+    fn test_image_data_from_url() {
+        let img = ImageData::from_url("https://example.com/image.png", "示例图像");
+
+        assert_eq!(img.image_type, "url");
+        assert_eq!(img.data, "https://example.com/image.png");
+        assert_eq!(img.alt_text, "示例图像");
+    }
+
+    #[test]
+    fn test_image_data_with_metadata() {
+        let img = ImageData::from_base64("image/jpeg", "base64data", "图像")
+            .with_filename("test.jpg")
+            .with_size(1024);
+
+        assert_eq!(img.filename, Some("test.jpg".to_string()));
+        assert_eq!(img.size_bytes, Some(1024));
+    }
+
+    #[test]
+    fn test_image_data_validate_success() {
+        let img = ImageData::from_base64("image/png", "iVBORw0KGgo=", "测试");
+        assert!(img.validate().is_ok());
+    }
+
+    #[test]
+    fn test_image_data_validate_url_success() {
+        let img = ImageData::from_url("https://example.com/img.png", "测试");
+        assert!(img.validate().is_ok());
+    }
+
+    #[test]
+    fn test_image_data_validate_empty_data_fails() {
+        let img = ImageData {
+            image_type: "base64".to_string(),
+            mime_type: "image/png".to_string(),
+            data: "".to_string(), // 空数据
+            alt_text: "测试".to_string(),
+            filename: None,
+            size_bytes: None,
+        };
+
+        let result = img.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("不能为空"));
+    }
+
+    #[test]
+    fn test_image_data_validate_invalid_type_fails() {
+        let img = ImageData {
+            image_type: "invalid".to_string(), // 无效类型
+            mime_type: "image/png".to_string(),
+            data: "data".to_string(),
+            alt_text: "测试".to_string(),
+            filename: None,
+            size_bytes: None,
+        };
+
+        let result = img.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("无效的图像类型"));
+    }
+
+    // ========================================================================
+    // 序列化测试
+    // ========================================================================
+
+    #[test]
+    fn test_chart_data_serialization() {
+        let chart = ChartData::simple_line(
+            "测试",
+            vec!["A".to_string(), "B".to_string()],
+            vec![1.0, 2.0],
+        );
+
+        let json = serde_json::to_string(&chart).unwrap();
+        assert!(json.contains("line"));
+        assert!(json.contains("测试"));
+    }
+
+    #[test]
+    fn test_image_data_serialization() {
+        let img = ImageData::from_base64("image/png", "data", "alt");
+        let json = serde_json::to_string(&img).unwrap();
+
+        assert!(json.contains("base64"));
+        assert!(json.contains("image/png"));
     }
 }

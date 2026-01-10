@@ -23,7 +23,7 @@ use std::collections::HashMap;
 /// # 示例
 ///
 /// ```rust
-/// use simpleconsole::dsl::intent::Template;
+/// use realconsole::dsl::intent::Template;
 ///
 /// let template = Template::new(
 ///     "count_files",
@@ -60,7 +60,7 @@ pub struct Template {
 /// # 示例
 ///
 /// ```rust
-/// use simpleconsole::dsl::intent::ExecutionPlan;
+/// use realconsole::dsl::intent::ExecutionPlan;
 /// use std::collections::HashMap;
 ///
 /// // ExecutionPlan 通常由 TemplateEngine 生成
@@ -95,7 +95,7 @@ pub struct ExecutionPlan {
 /// # 示例
 ///
 /// ```rust
-/// use simpleconsole::dsl::intent::{Template, TemplateEngine};
+/// use realconsole::dsl::intent::{Template, TemplateEngine};
 /// use std::collections::HashMap;
 ///
 /// let mut engine = TemplateEngine::new();
@@ -135,7 +135,7 @@ impl Template {
     /// # 示例
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::Template;
+    /// use realconsole::dsl::intent::Template;
     ///
     /// let template = Template::new(
     ///     "grep_files",
@@ -201,7 +201,7 @@ impl TemplateEngine {
     /// # 示例
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::TemplateEngine;
+    /// use realconsole::dsl::intent::TemplateEngine;
     ///
     /// let engine = TemplateEngine::new();
     /// ```
@@ -216,7 +216,7 @@ impl TemplateEngine {
     /// # 示例
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::{Template, TemplateEngine};
+    /// use realconsole::dsl::intent::{Template, TemplateEngine};
     ///
     /// let mut engine = TemplateEngine::new();
     ///
@@ -251,7 +251,7 @@ impl TemplateEngine {
     /// # 示例
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::{Template, TemplateEngine};
+    /// use realconsole::dsl::intent::{Template, TemplateEngine};
     /// use std::collections::HashMap;
     ///
     /// let mut engine = TemplateEngine::new();
@@ -305,7 +305,7 @@ impl TemplateEngine {
     /// # 示例
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::{Intent, IntentMatch, IntentDomain, Template, TemplateEngine};
+    /// use realconsole::dsl::intent::{Intent, IntentMatch, IntentDomain, Template, TemplateEngine};
     /// use std::collections::HashMap;
     ///
     /// let mut engine = TemplateEngine::new();
@@ -377,7 +377,7 @@ impl TemplateEngine {
     /// # 示例
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::TemplateEngine;
+    /// use realconsole::dsl::intent::TemplateEngine;
     /// use std::collections::HashMap;
     ///
     /// let mut bindings = HashMap::new();

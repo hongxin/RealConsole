@@ -445,6 +445,10 @@ mod tests {
     use crate::web::memory::types::{DataDimension, MultimodalContent};
     use chrono::Utc;
 
+    // ========================================================================
+    // KeywordMatcher 测试
+    // ========================================================================
+
     #[test]
     fn test_keyword_extraction() {
         let matcher = KeywordMatcher::new();
@@ -458,6 +462,51 @@ mod tests {
         // 停用词应该被过滤
         assert!(!keywords.contains(&"the".to_string()));
     }
+
+    #[test]
+    fn test_keyword_extraction_chinese() {
+        let matcher = KeywordMatcher::new();
+        let keywords = matcher.extract_keywords("分析 销售数据 趋势 预测");
+
+        assert!(keywords.contains(&"分析".to_string()));
+        assert!(keywords.contains(&"销售数据".to_string()));
+        assert!(keywords.contains(&"趋势".to_string()));
+        assert!(keywords.contains(&"预测".to_string()));
+    }
+
+    #[test]
+    fn test_keyword_extraction_short_words_filtered() {
+        let matcher = KeywordMatcher::new();
+        let keywords = matcher.extract_keywords("a b c test word");
+
+        // 短词被过滤
+        assert!(!keywords.contains(&"a".to_string()));
+        assert!(!keywords.contains(&"b".to_string()));
+        // 长词保留
+        assert!(keywords.contains(&"test".to_string()));
+        assert!(keywords.contains(&"word".to_string()));
+    }
+
+    #[test]
+    fn test_keyword_extraction_dedup() {
+        let matcher = KeywordMatcher::new();
+        let keywords = matcher.extract_keywords("test test test unique");
+
+        // 去重后只有一个 test
+        let test_count = keywords.iter().filter(|k| *k == "test").count();
+        assert_eq!(test_count, 1);
+    }
+
+    #[test]
+    fn test_keyword_matcher_default() {
+        let matcher = KeywordMatcher::default();
+        let keywords = matcher.extract_keywords("test message");
+        assert!(!keywords.is_empty());
+    }
+
+    // ========================================================================
+    // TimeDecayConfig 测试
+    // ========================================================================
 
     #[test]
     fn test_time_decay() {
@@ -488,6 +537,29 @@ mod tests {
     }
 
     #[test]
+    fn test_time_decay_min_decay() {
+        let config = TimeDecayConfig {
+            half_life_days: 1.0,
+            min_decay: 0.2,
+        };
+
+        let now = Utc::now();
+        let very_old_chunk = MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text { content: "test".to_string() },
+            now - chrono::Duration::days(365),
+        );
+
+        let decay = config.calculate_decay(&very_old_chunk);
+        // 即使是1年前的内容，也不会低于 min_decay
+        assert!(decay >= 0.2);
+    }
+
+    // ========================================================================
+    // ScoringStats 测试
+    // ========================================================================
+
+    #[test]
     fn test_scoring_stats() {
         let chunks = vec![
             {
@@ -514,5 +586,241 @@ mod tests {
         assert_eq!(stats.total_chunks, 2);
         assert!((stats.avg_relevance - 0.7).abs() < 0.01);
         assert_eq!(stats.high_relevance_count, 1);
+    }
+
+    #[test]
+    fn test_scoring_stats_empty() {
+        let stats = ScoringStats::from_chunks(&[]);
+        assert_eq!(stats.total_chunks, 0);
+        assert_eq!(stats.avg_relevance, 0.0);
+        assert_eq!(stats.max_score, 0.0);
+        assert_eq!(stats.min_score, 0.0);
+        assert_eq!(stats.high_relevance_count, 0);
+    }
+
+    #[test]
+    fn test_scoring_stats_single_chunk() {
+        let chunks = vec![{
+            let mut chunk = MultimodalChunk::new(
+                DataDimension::Context,
+                MultimodalContent::Text { content: "test".to_string() },
+                Utc::now(),
+            );
+            chunk.state_vector.understanding_score = 0.8;
+            chunk
+        }];
+
+        let stats = ScoringStats::from_chunks(&chunks);
+        assert_eq!(stats.total_chunks, 1);
+        assert!((stats.avg_relevance - 0.8).abs() < 0.01);
+        assert!((stats.max_score - 0.8).abs() < 0.01);
+        assert!((stats.min_score - 0.8).abs() < 0.01);
+        assert_eq!(stats.high_relevance_count, 1);
+    }
+
+    // ========================================================================
+    // TaskComplexityAnalyzer 测试
+    // ========================================================================
+
+    #[test]
+    fn test_task_complexity_simple() {
+        let analyzer = TaskComplexityAnalyzer::new();
+
+        // 测试无关键词匹配的情况（应该是 Simple）
+        assert_eq!(analyzer.analyze("hello world"), TaskComplexity::Simple);
+        assert_eq!(analyzer.analyze("测试"), TaskComplexity::Simple);
+
+        // 测试 simple 关键词匹配但分数低的情况
+        // "查看 文件 列表" - 有空格时, split_whitespace 分成3个词
+        assert_eq!(analyzer.analyze("查看 文件 列表"), TaskComplexity::Simple);
+    }
+
+    #[test]
+    fn test_task_complexity_medium() {
+        let analyzer = TaskComplexityAnalyzer::new();
+
+        assert_eq!(analyzer.analyze("分析销售数据"), TaskComplexity::Medium);
+        assert_eq!(analyzer.analyze("compare these two files"), TaskComplexity::Medium);
+        assert_eq!(analyzer.analyze("总结这份报告"), TaskComplexity::Medium);
+        assert_eq!(analyzer.analyze("search for errors"), TaskComplexity::Medium);
+    }
+
+    #[test]
+    fn test_task_complexity_complex() {
+        let analyzer = TaskComplexityAnalyzer::new();
+
+        assert_eq!(analyzer.analyze("深度分析系统性能"), TaskComplexity::Complex);
+        assert_eq!(analyzer.analyze("predict sales trends"), TaskComplexity::Complex);
+        assert_eq!(analyzer.analyze("优化数据库查询"), TaskComplexity::Complex);
+        assert_eq!(analyzer.analyze("为什么这个错误会发生？"), TaskComplexity::Complex);
+    }
+
+    #[test]
+    fn test_task_complexity_empty() {
+        let analyzer = TaskComplexityAnalyzer::new();
+        // 空任务应该返回 Simple
+        assert_eq!(analyzer.analyze(""), TaskComplexity::Simple);
+    }
+
+    #[test]
+    fn test_task_complexity_analyzer_default() {
+        let analyzer = TaskComplexityAnalyzer::default();
+        // 应该能正常分析
+        assert_eq!(analyzer.analyze("show files"), TaskComplexity::Simple);
+    }
+
+    // ========================================================================
+    // adaptive_token_budget 测试
+    // ========================================================================
+
+    #[test]
+    fn test_adaptive_token_budget_simple() {
+        let budget = adaptive_token_budget("查看文件");
+        assert_eq!(budget, 1000);
+    }
+
+    #[test]
+    fn test_adaptive_token_budget_medium() {
+        let budget = adaptive_token_budget("分析数据趋势");
+        assert_eq!(budget, 4000);
+    }
+
+    #[test]
+    fn test_adaptive_token_budget_complex() {
+        let budget = adaptive_token_budget("深度分析并优化系统性能");
+        assert_eq!(budget, 8000);
+    }
+
+    // ========================================================================
+    // WebUIUnderstandingLayer 测试
+    // ========================================================================
+
+    #[test]
+    fn test_understanding_layer_new() {
+        let layer = WebUIUnderstandingLayer::new();
+        // 验证初始化正确
+        assert_eq!(layer.time_decay_config.half_life_days, 7.0);
+    }
+
+    #[test]
+    fn test_understanding_layer_default() {
+        let layer = WebUIUnderstandingLayer::default();
+        assert_eq!(layer.time_decay_config.half_life_days, 7.0);
+    }
+
+    #[test]
+    fn test_infer_importance_context() {
+        let layer = WebUIUnderstandingLayer::new();
+
+        // Context 维度应该有较高的重要性权重
+        let context_chunk = MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "This is some contextual information".to_string(),
+            },
+            Utc::now(),
+        );
+
+        let importance = layer.infer_importance(&context_chunk);
+        assert!(importance > 0.5);
+    }
+
+    #[test]
+    fn test_infer_importance_long_content() {
+        let layer = WebUIUnderstandingLayer::new();
+
+        // 长内容应该有更高的重要性
+        let long_content = "a ".repeat(300);
+        let chunk = MultimodalChunk::new(
+            DataDimension::SessionManager,
+            MultimodalContent::Text { content: long_content },
+            Utc::now(),
+        );
+
+        let importance = layer.infer_importance(&chunk);
+        // 应该在合理范围内
+        assert!(importance >= 0.0 && importance <= 1.0);
+    }
+
+    #[test]
+    fn test_calculate_keyword_relevance_empty_keywords() {
+        let layer = WebUIUnderstandingLayer::new();
+        let chunk = MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text { content: "test".to_string() },
+            Utc::now(),
+        );
+
+        // 空关键词列表应返回默认相关性 0.5
+        let relevance = layer.calculate_keyword_relevance(&chunk, &[]);
+        assert!((relevance - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_calculate_keyword_relevance_full_match() {
+        let layer = WebUIUnderstandingLayer::new();
+        let chunk = MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "rust trait error debugging".to_string(),
+            },
+            Utc::now(),
+        );
+
+        let keywords = vec!["rust".to_string(), "error".to_string()];
+        let relevance = layer.calculate_keyword_relevance(&chunk, &keywords);
+        // 2/2 关键词匹配，应该是 1.0
+        assert!((relevance - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_calculate_keyword_relevance_partial_match() {
+        let layer = WebUIUnderstandingLayer::new();
+        let chunk = MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "rust trait error".to_string(),
+            },
+            Utc::now(),
+        );
+
+        let keywords = vec![
+            "rust".to_string(),
+            "python".to_string(),
+            "java".to_string(),
+            "error".to_string(),
+        ];
+        let relevance = layer.calculate_keyword_relevance(&chunk, &keywords);
+        // 2/4 关键词匹配，应该是 0.5
+        assert!((relevance - 0.5).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_score_relevance() {
+        let layer = WebUIUnderstandingLayer::new();
+
+        let chunks = vec![
+            MultimodalChunk::new(
+                DataDimension::Context,
+                MultimodalContent::Text {
+                    content: "Rust programming language traits and generics".to_string(),
+                },
+                Utc::now(),
+            ),
+            MultimodalChunk::new(
+                DataDimension::Context,
+                MultimodalContent::Text {
+                    content: "Python data analysis with pandas".to_string(),
+                },
+                Utc::now(),
+            ),
+        ];
+
+        let scored = layer.score_relevance("Rust traits", chunks).await.unwrap();
+
+        // 应该有两个结果
+        assert_eq!(scored.len(), 2);
+        // 第一个（Rust相关）应该得分更高
+        assert!(scored[0].state_vector.understanding_score >= scored[1].state_vector.understanding_score);
     }
 }

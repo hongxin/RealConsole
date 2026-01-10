@@ -25,7 +25,7 @@
 //! ## 使用示例
 //!
 //! ```rust
-//! use simpleconsole::dsl::intent::{Intent, IntentMatcher, IntentDomain};
+//! use realconsole::dsl::intent::{Intent, IntentMatcher, IntentDomain};
 //!
 //! let mut matcher = IntentMatcher::new();
 //!
@@ -59,7 +59,7 @@ pub mod workflow_templates; // ✨ Phase 8: Builtin Workflow Templates
 pub use builtin::BuiltinIntents;
 pub use extractor::EntityExtractor;
 pub use llm_bridge::LlmToPipeline;
-pub use matcher::IntentMatcher;
+pub use matcher::{FuzzyConfig, IntentMatcher};
 pub use pipeline_bridge::IntentToPipeline;
 pub use template::{ExecutionPlan, Template, TemplateEngine};
 pub use types::{EntityType, Intent, IntentDomain, IntentMatch};

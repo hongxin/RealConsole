@@ -654,6 +654,10 @@ mod tests {
     use crate::web::memory::types::{DataDimension, MultimodalContent};
     use chrono::Utc;
 
+    // ========================================================================
+    // TokenCounter 测试
+    // ========================================================================
+
     #[test]
     fn test_token_estimation() {
         let counter = TokenCounter::new();
@@ -670,6 +674,80 @@ mod tests {
         assert!(tokens > 0);
         assert!(tokens < 100); // 应该远小于100
     }
+
+    #[test]
+    fn test_token_estimation_chinese() {
+        let counter = TokenCounter::new();
+
+        let chunk = MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "这是一段中文测试内容，用于验证Token估算".to_string(),
+            },
+            Utc::now(),
+        );
+
+        let tokens = counter.estimate_tokens(&chunk);
+        assert!(tokens > 0);
+        // 中文字符每个 ~1.5 tokens
+        assert!(tokens > 20);
+    }
+
+    #[test]
+    fn test_token_counter_default() {
+        let counter = TokenCounter::default();
+        let chunk = MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "test".to_string(),
+            },
+            Utc::now(),
+        );
+        assert!(counter.estimate_tokens(&chunk) > 0);
+    }
+
+    // ========================================================================
+    // SelectionStrategy 测试
+    // ========================================================================
+
+    #[test]
+    fn test_auto_select_strategy_simple() {
+        use crate::web::memory::understanding::TaskComplexity;
+
+        let strategy = auto_select_strategy(TaskComplexity::Simple);
+        match strategy {
+            SelectionStrategy::TopK { k } => assert_eq!(k, 10),
+            _ => panic!("Expected TopK strategy for Simple complexity"),
+        }
+    }
+
+    #[test]
+    fn test_auto_select_strategy_medium() {
+        use crate::web::memory::understanding::TaskComplexity;
+
+        let strategy = auto_select_strategy(TaskComplexity::Medium);
+        match strategy {
+            SelectionStrategy::Recency { decay_factor } => {
+                assert!((decay_factor - 0.3).abs() < 0.01);
+            }
+            _ => panic!("Expected Recency strategy for Medium complexity"),
+        }
+    }
+
+    #[test]
+    fn test_auto_select_strategy_complex() {
+        use crate::web::memory::understanding::TaskComplexity;
+
+        let strategy = auto_select_strategy(TaskComplexity::Complex);
+        match strategy {
+            SelectionStrategy::Greedy { budget } => assert_eq!(budget, 8000),
+            _ => panic!("Expected Greedy strategy for Complex complexity"),
+        }
+    }
+
+    // ========================================================================
+    // WebUIOrchestrationLayer 测试
+    // ========================================================================
 
     #[test]
     fn test_greedy_select() {
@@ -704,7 +782,265 @@ mod tests {
         let selected = orchestration.greedy_select(chunks, 1000);
 
         // 应该优先选择高分片段
-        assert!(selected.len() > 0);
+        assert!(!selected.is_empty());
         assert!(selected[0].state_vector.understanding_score > 0.5);
+    }
+
+    #[test]
+    fn test_greedy_select_budget_limit() {
+        let orchestration = WebUIOrchestrationLayer::new();
+
+        // 创建大量片段
+        let chunks: Vec<MultimodalChunk> = (0..100)
+            .map(|i| {
+                let mut chunk = MultimodalChunk::new(
+                    DataDimension::Context,
+                    MultimodalContent::Text {
+                        content: format!("Chunk {} with some content to take up tokens", i),
+                    },
+                    Utc::now(),
+                );
+                chunk.state_vector.understanding_score = 0.8;
+                chunk
+            })
+            .collect();
+
+        // 小 token 预算应该限制选择数量
+        let selected = orchestration.greedy_select(chunks, 500);
+        assert!(selected.len() < 100);
+    }
+
+    #[test]
+    fn test_select_top_k() {
+        let orchestration = WebUIOrchestrationLayer::new();
+
+        let chunks: Vec<MultimodalChunk> = (0..10)
+            .map(|i| {
+                let mut chunk = MultimodalChunk::new(
+                    DataDimension::Context,
+                    MultimodalContent::Text {
+                        content: format!("Chunk {}", i),
+                    },
+                    Utc::now(),
+                );
+                chunk.state_vector.understanding_score = i as f64 / 10.0;
+                chunk
+            })
+            .collect();
+
+        let selected = orchestration.select_top_k(chunks, 3);
+        assert_eq!(selected.len(), 3);
+        // 应该选择最高分的3个
+        assert!(selected[0].state_vector.understanding_score > 0.7);
+    }
+
+    #[test]
+    fn test_select_recent() {
+        let orchestration = WebUIOrchestrationLayer::new();
+        use chrono::Duration;
+
+        // 创建不同年龄的片段
+        let now = Utc::now();
+        let chunks = vec![
+            {
+                let mut chunk = MultimodalChunk::new(
+                    DataDimension::Context,
+                    MultimodalContent::Text {
+                        content: "Old chunk".to_string(),
+                    },
+                    now - Duration::days(10),
+                );
+                chunk.state_vector.understanding_score = 0.9;
+                chunk
+            },
+            {
+                let mut chunk = MultimodalChunk::new(
+                    DataDimension::Context,
+                    MultimodalContent::Text {
+                        content: "New chunk".to_string(),
+                    },
+                    now - Duration::hours(1),
+                );
+                chunk.state_vector.understanding_score = 0.5;
+                chunk
+            },
+        ];
+
+        let selected = orchestration.select_recent(chunks, 0.3);
+        assert!(!selected.is_empty());
+        // 新片段应该排在前面（时间权重）
+    }
+
+    #[test]
+    fn test_select_by_strategy_greedy() {
+        let orchestration = WebUIOrchestrationLayer::new();
+
+        let chunks = vec![MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "Test".to_string(),
+            },
+            Utc::now(),
+        )];
+
+        let strategy = SelectionStrategy::Greedy { budget: 1000 };
+        let selected = orchestration.select_by_strategy(chunks, &strategy);
+        assert!(!selected.is_empty());
+    }
+
+    #[test]
+    fn test_select_by_strategy_hybrid_fallback() {
+        let orchestration = WebUIOrchestrationLayer::new();
+
+        let chunks = vec![{
+            let mut chunk = MultimodalChunk::new(
+                DataDimension::Context,
+                MultimodalContent::Text {
+                    content: "Test".to_string(),
+                },
+                Utc::now(),
+            );
+            chunk.state_vector.understanding_score = 0.8;
+            chunk
+        }];
+
+        // Hybrid 策略应该回退到 Greedy
+        let strategy = SelectionStrategy::Hybrid {
+            strategies: vec![(Box::new(SelectionStrategy::TopK { k: 5 }), 0.5)],
+        };
+        let selected = orchestration.select_by_strategy(chunks, &strategy);
+        assert!(!selected.is_empty());
+    }
+
+    #[test]
+    fn test_group_by_content_type() {
+        let orchestration = WebUIOrchestrationLayer::new();
+
+        let chunks = vec![
+            MultimodalChunk::new(
+                DataDimension::Context,
+                MultimodalContent::Text {
+                    content: "Text content".to_string(),
+                },
+                Utc::now(),
+            ),
+            MultimodalChunk::new(
+                DataDimension::ChartHistory,
+                MultimodalContent::DataSummary {
+                    filename: "data.csv".to_string(),
+                    rows: 100,
+                    columns: 5,
+                    headers: vec!["col1".to_string(), "col2".to_string()],
+                    summary: "Test data".to_string(),
+                },
+                Utc::now(),
+            ),
+        ];
+
+        let grouped = orchestration.group_by_content_type(chunks);
+        assert!(grouped.contains_key(&ContentType::TextOnly));
+        assert!(grouped.contains_key(&ContentType::DataOnly));
+    }
+
+    #[test]
+    fn test_orchestration_default() {
+        let orchestration = WebUIOrchestrationLayer::default();
+        assert!(orchestration.token_counter.estimate_tokens(&MultimodalChunk::new(
+            DataDimension::Context,
+            MultimodalContent::Text {
+                content: "test".to_string(),
+            },
+            Utc::now(),
+        )) > 0);
+    }
+
+    // ========================================================================
+    // DecisionEngine 测试
+    // ========================================================================
+
+    #[test]
+    fn test_decision_engine_new() {
+        let engine = DecisionEngine::new();
+        assert!(engine.rule_weights.is_empty());
+    }
+
+    #[test]
+    fn test_decision_engine_default() {
+        let engine = DecisionEngine::default();
+        assert!(engine.rule_weights.is_empty());
+    }
+
+    #[test]
+    fn test_decision_engine_decide_text_current() {
+        let engine = DecisionEngine::new();
+        let action = engine.decide(ContentType::TextOnly, TimeContext::CurrentDialog);
+
+        match action {
+            MemoryAction::HighPriority { token_budget, .. } => {
+                assert_eq!(token_budget, 2000);
+            }
+            _ => panic!("Expected HighPriority action"),
+        }
+    }
+
+    #[test]
+    fn test_decision_engine_decide_visual_session() {
+        let engine = DecisionEngine::new();
+        let action = engine.decide(ContentType::VisualOnly, TimeContext::CurrentSession);
+
+        match action {
+            MemoryAction::MediumPriority { token_budget, .. } => {
+                assert_eq!(token_budget, 500);
+            }
+            _ => panic!("Expected MediumPriority action"),
+        }
+    }
+
+    #[test]
+    fn test_decision_engine_decide_mixed_recent() {
+        let engine = DecisionEngine::new();
+        let action = engine.decide(ContentType::TextAndVisual, TimeContext::RecentSession);
+
+        match action {
+            MemoryAction::RecommendReuse { template_id, .. } => {
+                assert!(template_id.is_none());
+            }
+            _ => panic!("Expected RecommendReuse action"),
+        }
+    }
+
+    #[test]
+    fn test_decision_engine_decide_fallback() {
+        let engine = DecisionEngine::new();
+        let action = engine.decide(ContentType::DataOnly, TimeContext::LongTermSession);
+
+        match action {
+            MemoryAction::FallbackToLLM => {}
+            _ => panic!("Expected FallbackToLLM action"),
+        }
+    }
+
+    // ========================================================================
+    // 数据结构测试
+    // ========================================================================
+
+    #[test]
+    fn test_recommendation_type_debug() {
+        let rec_type = RecommendationType::ChartTemplateReuse;
+        let debug_str = format!("{:?}", rec_type);
+        assert!(debug_str.contains("ChartTemplateReuse"));
+    }
+
+    #[test]
+    fn test_context_metadata_serialize() {
+        let metadata = ContextMetadata {
+            chunk_count: 5,
+            dimension_distribution: HashMap::new(),
+            avg_relevance: 0.75,
+        };
+
+        let json = serde_json::to_string(&metadata).unwrap();
+        assert!(json.contains("chunk_count"));
+        assert!(json.contains("5"));
     }
 }

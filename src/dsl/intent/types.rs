@@ -12,7 +12,7 @@ use std::collections::HashMap;
 /// # 示例
 ///
 /// ```rust
-/// use simpleconsole::dsl::intent::{Intent, IntentDomain};
+/// use realconsole::dsl::intent::{Intent, IntentDomain};
 /// use std::collections::HashMap;
 ///
 /// let intent = Intent {
@@ -97,7 +97,7 @@ pub enum EntityType {
 /// # 示例
 ///
 /// ```rust
-/// use simpleconsole::dsl::intent::{IntentMatch, Intent, IntentDomain};
+/// use realconsole::dsl::intent::{IntentMatch, Intent, IntentDomain};
 /// use std::collections::HashMap;
 ///
 /// let intent = Intent {
@@ -139,7 +139,7 @@ impl Intent {
     /// # 示例
     ///
     /// ```rust
-    /// use simpleconsole::dsl::intent::{Intent, IntentDomain};
+    /// use realconsole::dsl::intent::{Intent, IntentDomain};
     ///
     /// let intent = Intent::new(
     ///     "count_lines",
