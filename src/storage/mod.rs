@@ -52,6 +52,7 @@ mod memory;
 mod optimized;
 pub mod tiered_cache;
 mod typed;
+mod versioned;
 
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
@@ -65,6 +66,9 @@ pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, T
 pub use typed::{
     bincode_storage, json_storage, DetailedTypedStats, SerializationFormat, TypedCollection,
     TypedStorage, TypedStorageConfig,
+};
+pub use versioned::{
+    DetailedVersioningStats, RetentionPolicy, VersionInfo, VersionedStorage, VersionedStorageConfig,
 };
 
 use async_trait::async_trait;

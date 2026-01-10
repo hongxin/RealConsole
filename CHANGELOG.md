@@ -5,6 +5,76 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.65.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 版本化存储层
+
+- ✅ **VersionedStorage** - 自动版本历史跟踪
+- ✅ **版本保留策略** - KeepAll/KeepLast(n)/KeepDays(d)
+- ✅ **版本操作** - 回滚、比较、删除特定版本
+- ✅ **元数据管理** - 版本信息、创建时间、数据大小
+- ✅ **总测试数**: 1703 (+20 新增)
+
+### ✨ Added
+
+- **VersionedStorage<B>** (src/storage/versioned.rs)
+  - `new()` / `with_retention()` / `with_config()` - 创建版本存储
+  - `read_version()` - 读取特定版本
+  - `list_versions()` - 列出所有版本
+  - `current_version()` - 获取当前版本号
+  - `rollback()` - 回滚到特定版本
+  - `diff_versions()` - 比较两个版本
+  - `delete_version()` - 删除特定版本
+  - `cleanup()` / `cleanup_all()` - 手动清理旧版本
+
+- **RetentionPolicy** - 版本保留策略
+  - `KeepAll` - 保留所有版本
+  - `KeepLast(n)` - 保留最近 n 个版本
+  - `KeepDays(d)` - 保留 d 天内的版本
+
+- **VersionInfo** - 版本元数据
+  - `version` - 版本号
+  - `created_at` - 创建时间
+  - `size` - 数据大小
+  - `description` - 可选描述
+
+- **DetailedVersioningStats** - 版本统计
+  - `versions_created` / `versions_read` / `versions_deleted`
+  - `avg_versions_per_key()` - 平均每键版本数
+
+### 📊 Versioning Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                  VersionedStorage                     │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  Write:                                               │
+│    Data ─────► Create Version ─────► Backend         │
+│                    │                                  │
+│                    └──► Apply Retention Policy        │
+│                                                       │
+│  Storage Layout:                                      │
+│    _versions/key:v1  (version 1 data)                │
+│    _versions/key:v2  (version 2 data)                │
+│    _versions/key.meta (metadata JSON)                │
+│                                                       │
+│  Retention Policies:                                  │
+│    - KeepAll: 保留所有版本                            │
+│    - KeepLast(n): 保留最近 n 个版本                   │
+│    - KeepDays(d): 保留 d 天内的版本                   │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+### 📁 New Files
+
+- `src/storage/versioned.rs` - 版本化存储实现 (~540 行, 20 测试)
+
+---
+
 ## [1.64.0] - 2026-01-11
 
 ### 🎯 Highlights
