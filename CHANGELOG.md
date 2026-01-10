@@ -5,6 +5,79 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.63.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 类型安全存储层
+
+- ✅ **TypedStorage** - 类型安全的序列化存储，自动处理 serde
+- ✅ **双格式支持** - JSON（可读）+ Bincode（紧凑）
+- ✅ **TypedCollection** - 集合存储，简化同类型数据管理
+- ✅ **批量操作** - `set_many()` / `get_many()` 批量读写
+- ✅ **总测试数**: 1665 (+20 新增)
+
+### ✨ Added
+
+- **TypedStorage<B>** (src/storage/typed.rs)
+  - `new()` / `with_bincode()` / `with_config()` - 创建类型存储
+  - `set<T>()` - 类型安全写入（自动序列化）
+  - `get<T>()` - 类型安全读取（自动反序列化）
+  - `get_opt<T>()` - 可选读取（不存在返回 None）
+  - `set_many()` / `get_many()` - 批量操作
+  - `typed_stats()` - 序列化统计
+
+- **SerializationFormat** - 序列化格式
+  - `Json` - JSON 格式（默认，可读）
+  - `Bincode` - Bincode 格式（紧凑，高性能）
+
+- **TypedCollection<B, T>** - 类型化集合
+  - `insert()` / `get()` / `remove()` - 基本操作
+  - `list_ids()` - 列出所有 ID
+  - `get_all()` - 获取所有项目
+  - `count()` - 获取数量
+  - `contains()` - 检查存在
+
+- **便捷函数**
+  - `json_storage()` - 创建 JSON 存储
+  - `bincode_storage()` - 创建 Bincode 存储
+
+### 📊 Type-Safe Storage
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                   TypedStorage                        │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  Rust Type ─────► Serializer ─────► Bytes            │
+│                                                       │
+│  Supported Formats:                                   │
+│    - JSON   (可读, 调试友好)                          │
+│    - Bincode (紧凑, 性能优先)                         │
+│                                                       │
+│  Bytes ─────────► StorageBackend                     │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+### 📝 Usage Example
+
+```rust
+#[derive(Serialize, Deserialize)]
+struct User { name: String, age: u32 }
+
+let storage = TypedStorage::new(MemoryStorage::new());
+
+// 类型安全存储
+let user = User { name: "Alice".into(), age: 30 };
+storage.set("user:1", &user).await?;
+
+// 类型安全读取
+let loaded: User = storage.get("user:1").await?;
+```
+
+---
+
 ## [1.62.0] - 2026-01-11
 
 ### 🎯 Highlights

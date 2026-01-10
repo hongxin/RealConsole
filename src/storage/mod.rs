@@ -50,6 +50,7 @@ mod file;
 mod memory;
 mod optimized;
 pub mod tiered_cache;
+mod typed;
 
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
@@ -57,6 +58,10 @@ pub use file::FileStorage;
 pub use memory::MemoryStorage;
 pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorageConfig};
 pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
+pub use typed::{
+    bincode_storage, json_storage, DetailedTypedStats, SerializationFormat, TypedCollection,
+    TypedStorage, TypedStorageConfig,
+};
 
 use async_trait::async_trait;
 use std::fmt;
