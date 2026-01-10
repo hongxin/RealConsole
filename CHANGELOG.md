@@ -5,6 +5,78 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.67.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 存储性能基准测试
+
+- ✅ **完整基准测试套件** - 验证 3-5x I/O 性能提升目标
+- ✅ **10 个基准测试组** - 覆盖读写、缓存、压缩、批量操作
+- ✅ **吞吐量测量** - Throughput::Bytes/Elements 精确测量
+- ✅ **混合工作负载** - 80/20 读写比模拟真实场景
+- ✅ **存储层探路期完成** - 9 个版本系统性验证
+
+### ✨ Added
+
+- **基准测试组** (benches/storage_performance.rs)
+  - `single_write` - 单次写入比较 (Memory/File/Cached/Compressed)
+  - `single_read` - 单次读取比较（含缓存命中）
+  - `cache_effectiveness` - 缓存命中 vs 未命中
+  - `compression_levels` - 压缩级别比较 (None/Fast/Default/Best)
+  - `compression_read` - 解压读取性能
+  - `builder_presets` - StorageBuilder 预设性能
+  - `batch_write` - 批量写入 (10/100/500 条)
+  - `batch_read` - 批量读取（缓存预热）
+  - `data_sizes` - 不同数据大小 (64B/1KB/10KB/100KB)
+  - `mixed_workload` - 混合读写工作负载 (80% 读 + 20% 写)
+
+### 📊 Benchmark Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│              Storage Performance Benchmarks           │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  基础性能:                                            │
+│    Memory ◄─── FileStorage ◄─── CachedStorage        │
+│                      │               │               │
+│                      └─── CompressedStorage          │
+│                                                       │
+│  测试维度:                                            │
+│    - 单次 vs 批量操作                                 │
+│    - 缓存命中 vs 未命中                               │
+│    - 压缩级别对比                                     │
+│    - 数据大小影响                                     │
+│    - 混合工作负载                                     │
+│                                                       │
+│  运行: cargo bench --bench storage_performance       │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+### 📁 Modified Files
+
+- `benches/storage_performance.rs` - 完整重写 (~700 行, 10 基准组)
+
+### 🎉 v2.0 探路期总结
+
+存储层 9 个版本的系统性探索完成：
+
+| 版本 | 组件 | 功能 |
+|------|------|------|
+| v1.59.0 | TieredCache | 三级 LRU 缓存 |
+| v1.60.0 | CachedStorage | 读缓存优化 |
+| v1.61.0 | BatchWriter | 写缓冲优化 |
+| v1.62.0 | OptimizedStorage | 读写组合优化 |
+| v1.63.0 | TypedStorage | 类型安全序列化 |
+| v1.64.0 | CompressedStorage | gzip 压缩 |
+| v1.65.0 | VersionedStorage | 版本历史 |
+| v1.66.0 | StorageBuilder | 层组合构建器 |
+| v1.67.0 | **Benchmarks** | **性能基准测试** |
+
+---
+
 ## [1.66.0] - 2026-01-11
 
 ### 🎯 Highlights
