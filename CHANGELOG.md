@@ -5,6 +5,78 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.64.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 压缩存储层
+
+- ✅ **CompressedStorage** - 基于 gzip 的透明压缩存储
+- ✅ **多压缩级别** - Fast/Default/Best/Custom 四种级别
+- ✅ **智能压缩策略** - 小数据跳过，压缩后更大则跳过
+- ✅ **数据标记** - CMP1/RAW1 标记区分压缩/原始数据
+- ✅ **总测试数**: 1683 (+18 新增)
+
+### ✨ Added
+
+- **CompressedStorage<B>** (src/storage/compressed.rs)
+  - `new()` / `with_fast()` / `with_best()` / `with_config()` - 创建压缩存储
+  - `compress()` / `decompress()` - 内部压缩/解压
+  - `compression_stats()` - 压缩统计
+  - 透明压缩：写入自动压缩，读取自动解压
+
+- **CompressionLevel** - 压缩级别
+  - `None` - 不压缩
+  - `Fast` - 快速压缩 (level 1)
+  - `Default` - 默认压缩 (level 6)
+  - `Best` - 最佳压缩 (level 9)
+  - `Custom(u32)` - 自定义级别
+
+- **DetailedCompressionStats** - 详细统计
+  - `compression_ratio()` - 压缩率（压缩后/原始）
+  - `space_savings()` - 节省空间比例
+  - `avg_original_size()` - 平均原始大小
+  - `avg_compressed_size()` - 平均压缩大小
+
+- **智能压缩策略**
+  - `min_size_threshold` - 小于阈值不压缩（默认 64 字节）
+  - `skip_if_larger` - 压缩后更大则跳过
+
+### 📊 Compression Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                  CompressedStorage                    │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  Write:                                               │
+│    Raw Data ─────► Compress ─────► Backend           │
+│                                                       │
+│  Read:                                                │
+│    Backend ─────► Decompress ─────► Raw Data         │
+│                                                       │
+│  Data Markers:                                        │
+│    - CMP1: Compressed data                           │
+│    - RAW1: Uncompressed data                         │
+│                                                       │
+│  Compression Levels:                                  │
+│    - Fast (1): 快速，压缩率较低                       │
+│    - Default (6): 平衡                               │
+│    - Best (9): 最佳压缩率                            │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+### 📁 New Files
+
+- `src/storage/compressed.rs` - 压缩存储实现 (~690 行, 18 测试)
+
+### 📦 Dependencies
+
+- 新增 `flate2 = "1.0"` - gzip/deflate 压缩库
+
+---
+
 ## [1.63.0] - 2026-01-11
 
 ### 🎯 Highlights

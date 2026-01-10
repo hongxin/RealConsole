@@ -46,6 +46,7 @@
 
 mod batch;
 mod cached;
+mod compressed;
 mod file;
 mod memory;
 mod optimized;
@@ -54,6 +55,9 @@ mod typed;
 
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
+pub use compressed::{
+    CompressedStorage, CompressedStorageConfig, CompressionLevel, DetailedCompressionStats,
+};
 pub use file::FileStorage;
 pub use memory::MemoryStorage;
 pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorageConfig};
