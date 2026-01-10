@@ -47,6 +47,7 @@ pub mod repl; // REPL 循环（包含 Tab 补全集成）
 pub mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 pub mod shell_executor;
 pub mod spinner;
+pub mod storage; // ✨ v1.58.0: 存储抽象层（FileStorage, MemoryStorage）
 pub mod stats; // ✨ Phase 9: 统计与可视化系统
 pub mod suggestion; // ✨ Phase 4.1: 主动建议系统（三源融合）
 pub mod system_monitor; // ✨ Phase 6: 系统监控工具

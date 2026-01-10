@@ -5,6 +5,61 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.58.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 存储抽象层
+
+- ✅ **存储抽象层** - StorageBackend trait 定义统一存储接口
+- ✅ **FileStorage** - 文件系统存储后端，原子写入
+- ✅ **MemoryStorage** - 内存存储后端，高性能测试/缓存
+- ✅ **性能基准测试** - 对比 File vs Memory 存储性能
+- ✅ **总测试数**: 1570 (+25 新增)
+
+### ✨ Added
+
+- **StorageBackend trait** (src/storage/mod.rs)
+  - `read()` - 读取数据
+  - `write()` - 写入数据（原子）
+  - `delete()` - 删除数据
+  - `list()` - 列出指定前缀的键
+  - `exists()` - 检查键是否存在
+  - `stats()` - 获取统计信息
+
+- **FileStorage** (src/storage/file.rs)
+  - 基于文件系统的持久化存储
+  - 原子写入（临时文件 + 重命名）
+  - 自动创建目录结构
+  - 可配置文件扩展名
+
+- **MemoryStorage** (src/storage/memory.rs)
+  - 基于内存的高性能存储
+  - 线程安全（RwLock）
+  - 命中率统计
+  - 适用于测试和缓存
+
+- **性能基准测试** (benches/storage_performance.rs)
+  - 单次读写性能
+  - 批量写入性能
+  - 批量读取性能
+  - 存在性检查
+  - 键列表操作
+
+### 📊 Benchmark Results
+
+存储性能对比（batch_write 256 bytes）：
+
+| 操作 | MemoryStorage | FileStorage | 差距 |
+|-----|---------------|-------------|------|
+| 写入 10 项 | 1.1 µs | 52 ms | ~47000x |
+| 写入 100 项 | 10.8 µs | 546 ms | ~50000x |
+| 写入 1000 项 | 124 µs | 5.85 s | ~47000x |
+
+MemoryStorage 适用于高性能缓存场景；FileStorage 适用于持久化存储。
+
+---
+
 ## [1.57.0] - 2026-01-11
 
 ### 🎯 Highlights
