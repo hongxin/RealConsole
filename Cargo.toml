@@ -1,6 +1,6 @@
 [package]
 name = "realconsole"
-version = "1.56.0"
+version = "1.57.0"
 edition = "2021"
 authors = ["RealConsole Contributors"]
 description = "An intelligent CLI agent with unified tracing system, combining Eastern philosophy wisdom with modern AI"
@@ -56,6 +56,7 @@ uuid = { version = "1.10", features = ["v4", "serde"] }  # UUID generation for c
 chinese-lunisolar-calendar = "0.1"  # Chinese lunisolar calendar: 公历/农历转换、节气、干支、生肖（1901-2100）
 csv = "1.3"  # ✨ v1.45.0: CSV file parsing for data visualization
 base64 = "0.22"  # ✨ v1.52.0: Base64 encoding for image display
+bincode = "1.3"  # ✨ v1.57.0: Binary serialization for index persistence
 shellexpand = "3.1"  # ✨ v1.52.0: Shell-style path expansion (~ and environment variables)
 
 # Web server (for browser-based terminal interface)

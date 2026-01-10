@@ -5,6 +5,56 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.57.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 探路期 - 索引持久化
+
+- ✅ **索引持久化** - IndexPersistence 支持保存/加载索引数据
+- ✅ **增量更新 WAL** - Write-Ahead Log 支持增量条目追加
+- ✅ **启动时索引重建** - 从 JSON 加载条目并快速重建索引（~6ms/10k）
+- ✅ **压缩与清理** - 自动 WAL 压缩，支持数据清理
+- ✅ **总测试数**: 1545 (+10 新增)
+
+### ✨ Added
+
+- **IndexPersistence** (src/tracer/index.rs)
+  - `save()` - 完整索引保存（JSON 格式，可读性好）
+  - `load()` - 索引加载并重建
+  - `append_entries()` - WAL 增量追加
+  - `append_remove()` - WAL 删除追加
+  - `get_index_info()` - 获取索引元信息
+  - `needs_compaction()` - 检查是否需要压缩
+  - `compact()` - 合并 WAL 到主文件
+  - `clear()` - 删除所有持久化数据
+
+- **持久化测试** (10 个新测试)
+  - `test_persistence_save_load` - 保存/加载
+  - `test_persistence_empty_index` - 空索引处理
+  - `test_persistence_append_entries` - 增量追加
+  - `test_persistence_incremental_updates` - 增量更新
+  - `test_persistence_index_info` - 元信息获取
+  - `test_persistence_compaction` - 压缩操作
+  - `test_persistence_clear` - 数据清理
+  - `test_persistence_remove_via_wal` - WAL 删除
+  - `test_json_serialization` - JSON 序列化
+  - `test_wal_entry_serialization` - WAL 条目序列化
+
+### 📝 Design Notes
+
+**设计决策**：使用 JSON 而非 bincode
+- JSON 可读性好，便于调试
+- 只持久化条目列表，加载时重建索引
+- 索引重建很快（10k 条目 ~6ms），简化持久化复杂度
+- WAL 使用 JSON Lines 格式，支持增量追加
+
+### 🔧 Dependencies
+
+- 新增 `bincode = "1.3"` (备用，当前使用 JSON)
+
+---
+
 ## [1.56.0] - 2026-01-11
 
 ### 🎯 Highlights

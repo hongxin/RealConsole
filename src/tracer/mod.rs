@@ -52,7 +52,7 @@ mod benchmarks;
 // 重新导出核心类型，方便使用
 pub use dashboard::{Dashboard, DashboardConfig, HealthScore};
 pub use entry::TraceEntry;
-pub use index::{MultiDimensionalIndex, IndexStats, QueryResult, StatusKey};  // v1.56.0
+pub use index::{MultiDimensionalIndex, IndexStats, QueryResult, StatusKey, IndexPersistence, IndexInfo, PersistenceError};  // v1.56.0, v1.57.0
 pub use types::{Dimension, EntryType, Importance, QueryFilter, Status};
 pub use unified_tracer::{TraceStats, UnifiedTracer};
 
