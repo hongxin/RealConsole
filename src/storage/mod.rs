@@ -63,6 +63,7 @@ mod retry;
 pub mod tiered_cache;
 mod transaction;
 mod typed;
+mod validated;
 mod versioned;
 mod watchable;
 
@@ -122,6 +123,12 @@ pub use transaction::{
 pub use typed::{
     bincode_storage, json_storage, DetailedTypedStats, SerializationFormat, TypedCollection,
     TypedStorage, TypedStorageConfig,
+};
+pub use validated::{
+    DetailedValidationStats, JsonValidator, KeyForbiddenCharsValidator, KeyLengthValidator,
+    KeyPatternValidator, KeyValidator, Utf8Validator, ValidatedStorage, ValidatedStorageBuilder,
+    ValidationConfig, ValidationError, ValidationStats, ValidationStatsSnapshot, ValueSizeValidator,
+    ValueValidator,
 };
 pub use versioned::{
     DetailedVersioningStats, RetentionPolicy, VersionInfo, VersionedStorage, VersionedStorageConfig,
