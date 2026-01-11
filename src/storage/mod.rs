@@ -58,6 +58,7 @@ mod namespaced;
 mod optimized;
 mod quota;
 mod rate_limited;
+mod read_only;
 mod replicated;
 mod retry;
 pub mod tiered_cache;
@@ -105,6 +106,10 @@ pub use quota::{
 pub use rate_limited::{
     DetailedRateLimitStats, RateLimitConfig, RateLimitError, RateLimitPolicy, RateLimitStats,
     RateLimitStatsSnapshot, RateLimitedStorage, RateLimitedStorageBuilder,
+};
+pub use read_only::{
+    DetailedReadOnlyStats, ReadOnlyConfig, ReadOnlyError, ReadOnlyMode, ReadOnlyStats,
+    ReadOnlyStatsSnapshot, ReadOnlyStorage, ReadOnlyStorageBuilder,
 };
 pub use replicated::{
     BackendStatus, BackendStatusInfo, ConsistencyLevel, DetailedReplicationStats, ReadStrategy,
