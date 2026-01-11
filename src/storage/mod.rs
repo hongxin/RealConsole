@@ -61,6 +61,7 @@ pub mod tiered_cache;
 mod transaction;
 mod typed;
 mod versioned;
+mod watchable;
 
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use builder::{BuiltStorage, StorageBuilder, StorageLayerConfig};
@@ -108,6 +109,11 @@ pub use typed::{
 };
 pub use versioned::{
     DetailedVersioningStats, RetentionPolicy, VersionInfo, VersionedStorage, VersionedStorageConfig,
+};
+pub use watchable::{
+    DetailedWatchStats, EventType, StorageEvent, SubscriptionId, SubscriptionsByPattern,
+    WatchPattern, WatchStatsSnapshot, WatchableStorage, WatchableStorageBuilder,
+    WatchableStorageConfig,
 };
 
 use async_trait::async_trait;
