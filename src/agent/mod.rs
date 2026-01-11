@@ -70,6 +70,9 @@ use crate::voice::{BroadcastConfig, VoiceBroadcaster};
 // ✨ v1.5.1: 追踪上下文系统
 use crate::trace_context::{ExecutionSpan, SpanType, TraceContext, TraceStore};
 
+// ✨ v1.89.0: 延迟初始化与启动计时
+use crate::utils::lazy_init::StartupTimer;
+
 // ✨ Phase 4.1: 主动建议系统
 use crate::suggestion::{
     Suggestion, SuggestionCache, SuggestionConfig, SuggestionContext, SuggestionEngine,
@@ -209,8 +212,12 @@ impl Agent {
     }
 
     pub fn new(config: Config, registry: CommandRegistry) -> Self {
+        // ✨ v1.89.0: 启动计时
+        let mut startup_timer = StartupTimer::start("Agent");
+
         // ✨ Phase 10.1: 初始化智能命令路由器
         let command_router = CommandRouter::new(config.prefix.clone());
+        startup_timer.checkpoint("CommandRouter");
 
         // ✨ Phase 8 (Workflow): 初始化 Workflow Intent 系统
         let (workflow_intents, workflow_executor) =
@@ -221,6 +228,8 @@ impl Agent {
             } else {
                 (Vec::new(), None)
             };
+
+        startup_timer.checkpoint("WorkflowIntents");
 
         // 初始化记忆系统
         let memory_capacity = config
@@ -255,6 +264,7 @@ impl Agent {
         } else {
             memory
         };
+        startup_timer.checkpoint("Memory");
 
         // 初始化执行日志系统
         let exec_logger = ExecutionLogger::new(1000);
@@ -287,6 +297,7 @@ impl Agent {
             config.features.max_tool_iterations,
             config.features.max_tools_per_round,
         );
+        startup_timer.checkpoint("Tools");
 
         // 初始化 Intent DSL 系统（使用内置意图库）
         let builtin = BuiltinIntents::new();
@@ -295,6 +306,7 @@ impl Agent {
 
         // ✨ Phase 6.3: 初始化 Pipeline DSL 转换器
         let pipeline_converter = IntentToPipeline::new();
+        startup_timer.checkpoint("IntentDSL");
 
         // ✨ Phase 7: LLM Bridge 初始化为 None，在配置 LLM 后再设置
         // 这个在 main.rs 中调用 configure_llm() 后会被设置
@@ -314,19 +326,22 @@ impl Agent {
         // 如果配置了持久化路径，设置存储路径
         if let Some(ref config_dir) = dirs::config_dir() {
             let storage_path = config_dir.join("realconsole").join("feedback.json");
-            let learner_with_storage = FeedbackLearner::new().with_storage(storage_path);
+            let feedback_learner = Arc::new(FeedbackLearner::new().with_storage(storage_path.clone()));
 
+            // ✨ v1.89.0: 改为后台加载，避免阻塞启动
             // 在测试环境中跳过磁盘加载以避免阻塞问题
             #[cfg(not(test))]
             {
-                // 尝试从磁盘加载历史反馈
-                let _ = tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(async { learner_with_storage.load_from_disk().await })
+                let learner_clone = Arc::clone(&feedback_learner);
+                // 后台加载反馈历史，不阻塞启动
+                tokio::spawn(async move {
+                    if let Err(e) = learner_clone.load_from_disk().await {
+                        eprintln!("Warning: Failed to load feedback history: {}", e);
+                    }
                 });
             }
 
-            let feedback_learner = Arc::new(learner_with_storage);
+            startup_timer.checkpoint("FeedbackLearner");
 
             let shell_executor_with_fixer =
                 Arc::new(ShellExecutorWithFixer::new().with_feedback_learner(feedback_learner));
@@ -370,12 +385,17 @@ impl Agent {
             ));
 
             let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
+            startup_timer.checkpoint("Services");
 
             // ✨ 初始化 LLM 日志系统
             let llm_logger = Self::create_llm_logger(&config);
 
             // ✨ 初始化语音播报系统
             let voice_broadcaster = Self::create_voice_broadcaster(&config);
+
+            // ✨ v1.89.0: 完成启动计时
+            let _startup_report = startup_timer.finish();
+            // 可以在 verbose 模式下打印: eprintln!("{}", _startup_report.summary());
 
             return Self {
                 // 核心配置
@@ -423,6 +443,7 @@ impl Agent {
         }
 
         // Fallback: 无持久化
+        startup_timer.checkpoint("FeedbackLearner");
         let shell_executor_with_fixer =
             Arc::new(ShellExecutorWithFixer::new().with_feedback_learner(feedback_learner));
         let last_failed_command = Arc::new(RwLock::new(None));
@@ -464,12 +485,16 @@ impl Agent {
         ));
 
         let shell_service = Arc::new(ShellService::new(Arc::clone(&shell_executor_with_fixer)));
+        startup_timer.checkpoint("Services");
 
         // ✨ 初始化 LLM 日志系统
         let llm_logger = Self::create_llm_logger(&config);
 
         // ✨ 初始化语音播报系统
         let voice_broadcaster = Self::create_voice_broadcaster(&config);
+
+        // ✨ v1.89.0: 完成启动计时
+        let _startup_report = startup_timer.finish();
 
         Self {
             // 核心配置
