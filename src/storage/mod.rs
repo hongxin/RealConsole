@@ -52,6 +52,7 @@ mod circuit_breaker;
 mod compressed;
 mod encrypted;
 mod file;
+mod lazy;
 mod memory;
 mod metrics;
 mod namespaced;
@@ -90,6 +91,10 @@ pub use encrypted::{
     XorCipher,
 };
 pub use file::FileStorage;
+pub use lazy::{
+    DetailedLazyStats, InitializationError, LazyStats, LazyStatsSnapshot, LazyStorage,
+    LazyStorageBuilder,
+};
 pub use memory::MemoryStorage;
 pub use metrics::{
     ErrorSnapshot, ErrorTracker, LatencySnapshot, LatencyTracker, MetricsSnapshot,
