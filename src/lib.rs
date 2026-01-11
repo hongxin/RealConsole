@@ -50,6 +50,7 @@ pub mod repl; // REPL 循环（包含 Tab 补全集成）
 pub mod resource; // ✨ v1.92.0: 资源管理（内存监控、自动清理）
 pub mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 pub mod shell_executor;
+pub mod signal; // ✨ v1.93.0: 信号处理（SIGINT/SIGTERM、优雅关闭）
 pub mod spinner;
 pub mod storage; // ✨ v1.58.0: 存储抽象层（FileStorage, MemoryStorage）
 pub mod stats; // ✨ Phase 9: 统计与可视化系统
