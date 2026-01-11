@@ -50,6 +50,7 @@ mod cached;
 mod compressed;
 mod file;
 mod memory;
+mod metrics;
 mod optimized;
 pub mod tiered_cache;
 mod typed;
@@ -63,6 +64,10 @@ pub use compressed::{
 };
 pub use file::FileStorage;
 pub use memory::MemoryStorage;
+pub use metrics::{
+    ErrorSnapshot, ErrorTracker, LatencySnapshot, LatencyTracker, MetricsSnapshot,
+    MetricsStorage, StorageMetricsCollector, ThroughputSnapshot, ThroughputTracker,
+};
 pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorageConfig};
 pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
 pub use typed::{

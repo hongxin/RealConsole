@@ -5,6 +5,94 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 收尾 - 存储可观测性层
+
+- ✅ **MetricsStorage** - 全面的存储指标收集
+- ✅ **延迟追踪** - p50/p95/p99 百分位延迟
+- ✅ **吞吐量统计** - ops/sec, bytes/sec 实时统计
+- ✅ **错误监控** - 按操作类型分类的错误统计
+- ✅ **总测试数**: 1745 (+21 新增)
+
+### ✨ Added
+
+- **LatencyTracker** - 延迟追踪器
+  - `record()` - 记录操作延迟
+  - `avg()` / `min()` / `max()` - 基础统计
+  - `p50()` / `p95()` / `p99()` - 百分位延迟
+  - `snapshot()` - 获取延迟快照
+
+- **ThroughputTracker** - 吞吐量追踪器
+  - `record()` - 记录操作和字节数
+  - `ops_per_sec()` - 操作数/秒
+  - `bytes_per_sec()` - 字节数/秒
+  - `format_bytes_per_sec()` - 人类可读格式
+
+- **ErrorTracker** - 错误追踪器
+  - `record_read_error()` / `record_write_error()` / `record_delete_error()`
+  - `total_errors()` - 总错误数
+  - `snapshot()` - 错误统计快照
+
+- **MetricsStorage<B>** - 带指标的存储包装器
+  - `new()` - 包装任意 StorageBackend
+  - `detailed_metrics()` - 获取完整指标快照
+  - `metrics_report()` - 生成文本报告
+
+- **StorageMetricsCollector** - 统一指标收集器
+  - 读取/写入/删除延迟追踪
+  - 读取/写入吞吐量追踪
+  - 错误统计
+
+### 📊 Metrics Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                   MetricsStorage                      │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  延迟指标 (LatencyTracker):                           │
+│    - 循环缓冲区存储样本 (1000 samples)               │
+│    - 实时计算 p50/p95/p99                            │
+│    - 直方图桶统计                                     │
+│                                                       │
+│  吞吐量指标 (ThroughputTracker):                      │
+│    - 操作计数                                         │
+│    - 字节计数                                         │
+│    - 自动计算速率                                     │
+│                                                       │
+│  错误指标 (ErrorTracker):                             │
+│    - 读取/写入/删除/其他错误                         │
+│    - 原子计数器                                       │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+```
+
+### 📁 New Files
+
+- `src/storage/metrics.rs` - 存储可观测性实现 (~650 行, 21 测试)
+
+### 🎉 v2.0 存储层探路期完成
+
+存储层 10 个版本的系统性探索完成：
+
+| 版本 | 组件 | 功能 |
+|------|------|------|
+| v1.59.0 | TieredCache | 三级 LRU 缓存 |
+| v1.60.0 | CachedStorage | 读缓存优化 |
+| v1.61.0 | BatchWriter | 写缓冲优化 |
+| v1.62.0 | OptimizedStorage | 读写组合优化 |
+| v1.63.0 | TypedStorage | 类型安全序列化 |
+| v1.64.0 | CompressedStorage | gzip 压缩 |
+| v1.65.0 | VersionedStorage | 版本历史 |
+| v1.66.0 | StorageBuilder | 层组合构建器 |
+| v1.67.0 | Benchmarks | 性能基准测试 |
+| v1.68.0 | **MetricsStorage** | **可观测性** |
+
+---
+
 ## [1.67.0] - 2026-01-11
 
 ### 🎯 Highlights
