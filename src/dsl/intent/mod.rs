@@ -47,6 +47,7 @@ pub mod builtin;
 pub mod extractor;
 pub mod llm_bridge; // Phase 7: LLM → Pipeline Bridge
 pub mod matcher;
+pub mod optimizer; // ✨ v1.87.0: Intent 匹配优化器（Trie + Bloom Filter）
 pub mod pipeline_bridge; // Phase 6.3: Intent → Pipeline Bridge
 pub mod template;
 pub mod types;
@@ -60,6 +61,7 @@ pub use builtin::BuiltinIntents;
 pub use extractor::EntityExtractor;
 pub use llm_bridge::LlmToPipeline;
 pub use matcher::{FuzzyConfig, IntentMatcher};
+pub use optimizer::{BloomFilter, KeywordTrie, OptimizedIntentIndex, ShortCircuitConfig}; // ✨ v1.87.0
 pub use pipeline_bridge::IntentToPipeline;
 pub use template::{ExecutionPlan, Template, TemplateEngine};
 pub use types::{EntityType, Intent, IntentDomain, IntentMatch};

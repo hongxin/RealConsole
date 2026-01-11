@@ -1,8 +1,15 @@
 //! Intent 匹配引擎
 //!
 //! 负责将用户的自然语言输入匹配到预定义的意图。
+//!
+//! # v1.87.0 优化
+//!
+//! - **Trie 关键词索引**: O(m) 前缀匹配
+//! - **Bloom 过滤器**: 快速排除不相关意图
+//! - **短路匹配**: 高置信度时提前返回
 
 use crate::dsl::intent::extractor::EntityExtractor;
+use crate::dsl::intent::optimizer::{OptimizedIntentIndex, ShortCircuitConfig};
 use crate::dsl::intent::types::{Intent, IntentMatch};
 use lru::LruCache;
 use regex::Regex;
@@ -126,6 +133,12 @@ pub fn string_similarity(s1: &str, s2: &str) -> f64 {
 /// IntentMatcher 负责识别用户输入中的意图，通过关键词匹配和正则模式匹配
 /// 来计算置信度分数，并提取结构化实体信息。
 ///
+/// # v1.87.0 优化
+///
+/// - 使用 Trie 索引加速关键词匹配
+/// - 使用 Bloom 过滤器快速排除不相关输入
+/// - 支持短路匹配（高置信度时提前返回）
+///
 /// # 示例
 ///
 /// ```rust
@@ -170,6 +183,12 @@ pub struct IntentMatcher {
 
     /// 模糊匹配配置 (Fuzzy Matching)
     fuzzy_config: FuzzyConfig,
+
+    /// ✨ v1.87.0: 优化索引（Trie + Bloom Filter）
+    optimized_index: OptimizedIntentIndex,
+
+    /// ✨ v1.87.0: 短路匹配配置
+    short_circuit_config: ShortCircuitConfig,
 }
 
 /// 模糊匹配配置
@@ -287,7 +306,28 @@ impl IntentMatcher {
             cache_hits: Arc::new(RwLock::new(0)),
             cache_misses: Arc::new(RwLock::new(0)),
             fuzzy_config,
+            optimized_index: OptimizedIntentIndex::new(),
+            short_circuit_config: ShortCircuitConfig::default(),
         }
+    }
+
+    /// ✨ v1.87.0: 启用短路匹配
+    ///
+    /// 当找到高置信度匹配时提前返回，提升性能。
+    ///
+    /// # 参数
+    ///
+    /// * `threshold` - 高置信度阈值（0.0 - 1.0）
+    /// * `max_results` - 最大返回结果数
+    pub fn enable_short_circuit(&mut self, threshold: f64, max_results: usize) {
+        self.short_circuit_config = ShortCircuitConfig::enabled(threshold, max_results);
+        self.clear_cache();
+    }
+
+    /// ✨ v1.87.0: 禁用短路匹配
+    pub fn disable_short_circuit(&mut self) {
+        self.short_circuit_config = ShortCircuitConfig::disabled();
+        self.clear_cache();
     }
 
     /// 启用模糊匹配
@@ -342,6 +382,11 @@ impl IntentMatcher {
                 }
             }
         }
+
+        // ✨ v1.87.0: 添加关键词到优化索引
+        let intent_index = self.intents.len();
+        self.optimized_index
+            .add_intent(intent_index, &intent.keywords);
 
         self.intents.push(intent);
 
@@ -400,12 +445,32 @@ impl IntentMatcher {
             *misses += 1;
         }
 
+        // ✨ v1.87.0: 使用优化索引进行快速预筛选
+        // 如果 Bloom 过滤器确定输入不包含任何已知关键词，可以跳过详细匹配
+        // 但我们仍然需要检查正则模式，所以只用于获取候选集
+        let candidate_indices = self.optimized_index.get_candidate_intents(input);
+
         let mut matches = Vec::new();
 
         // 将输入转换为小写以进行不区分大小写的匹配
         let input_lower = input.to_lowercase();
 
-        for intent in &self.intents {
+        // ✨ v1.87.0: 优化匹配逻辑
+        // 如果有候选集，优先匹配候选；否则回退到全量匹配
+        let intents_to_check: Vec<(usize, &Intent)> = if !candidate_indices.is_empty() {
+            // 优先检查候选意图，按索引排序以保持稳定顺序
+            let mut sorted_indices: Vec<usize> = candidate_indices.into_iter().collect();
+            sorted_indices.sort_unstable();
+            sorted_indices
+                .into_iter()
+                .filter_map(|idx| self.intents.get(idx).map(|intent| (idx, intent)))
+                .collect()
+        } else {
+            // 回退到全量匹配（可能有正则模式匹配但无关键词匹配的情况）
+            self.intents.iter().enumerate().collect()
+        };
+
+        for (_idx, intent) in intents_to_check {
             let mut score: f64 = 0.0;
             let mut matched_keywords = Vec::new();
 
@@ -483,6 +548,14 @@ impl IntentMatcher {
                     extracted_entities,
                 };
                 matches.push(intent_match);
+
+                // ✨ v1.87.0: 短路匹配 - 如果找到高置信度匹配，提前返回
+                if self.short_circuit_config.enabled
+                    && confidence >= self.short_circuit_config.high_confidence_threshold
+                    && matches.len() >= self.short_circuit_config.max_results
+                {
+                    break;
+                }
             }
         }
 
@@ -492,6 +565,11 @@ impl IntentMatcher {
                 .partial_cmp(&a.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+
+        // ✨ v1.87.0: 限制返回结果数
+        if self.short_circuit_config.enabled {
+            matches.truncate(self.short_circuit_config.max_results);
+        }
 
         // 将结果存入缓存
         if let Ok(mut cache) = self.query_cache.write() {
@@ -594,6 +672,7 @@ impl IntentMatcher {
     pub fn clear(&mut self) {
         self.intents.clear();
         self.regex_cache.clear();
+        self.optimized_index.clear(); // ✨ v1.87.0
         self.clear_cache();
     }
 
@@ -778,6 +857,10 @@ impl Clone for IntentMatcher {
         // Clone fuzzy_config（已实现 Clone）
         let fuzzy_config = self.fuzzy_config.clone();
 
+        // ✨ v1.87.0: Clone optimized_index 和 short_circuit_config
+        let optimized_index = self.optimized_index.clone();
+        let short_circuit_config = self.short_circuit_config.clone();
+
         // 创建新的 IntentMatcher
         // regex_cache 会被清空（重新编译）
         // query_cache、cache_hits、cache_misses 会重置
@@ -785,6 +868,8 @@ impl Clone for IntentMatcher {
         matcher.intents = intents;
         matcher.extractor = extractor;
         matcher.fuzzy_config = fuzzy_config;
+        matcher.optimized_index = optimized_index;
+        matcher.short_circuit_config = short_circuit_config;
 
         matcher
     }
@@ -1592,5 +1677,164 @@ mod tests {
         let matches = matcher.match_intent("统记");
         assert!(!matches.is_empty(), "Should fuzzy match after enabling");
         assert!(matches[0].matched_keywords.iter().any(|k| k.contains('~')));
+    }
+
+    // ==================== v1.87.0 优化测试 ====================
+
+    #[test]
+    fn test_optimized_index_integration() {
+        let mut matcher = IntentMatcher::new();
+
+        // 注册多个意图
+        for i in 0..10 {
+            let intent = Intent::new(
+                &format!("intent_{}", i),
+                IntentDomain::FileOps,
+                vec![format!("keyword{}", i)],
+                Vec::new(),
+                0.3,
+            );
+            matcher.register(intent);
+        }
+
+        // 优化索引应该包含所有关键词
+        // 直接测试匹配功能
+        let matches = matcher.match_intent("keyword5");
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].intent.name, "intent_5");
+    }
+
+    #[test]
+    fn test_short_circuit_matching() {
+        let mut matcher = IntentMatcher::new();
+
+        // 注册多个高置信度意图
+        for i in 0..10 {
+            let intent = Intent::new(
+                &format!("intent_{}", i),
+                IntentDomain::FileOps,
+                vec!["test".to_string()],
+                vec![r"test".to_string()],
+                0.3,
+            );
+            matcher.register(intent);
+        }
+
+        // 启用短路匹配
+        matcher.enable_short_circuit(0.9, 3);
+
+        // 匹配应该只返回最多 3 个结果
+        let matches = matcher.match_intent("test something");
+        assert!(matches.len() <= 3);
+    }
+
+    #[test]
+    fn test_short_circuit_disabled_returns_all() {
+        let mut matcher = IntentMatcher::new();
+
+        // 注册多个意图
+        for i in 0..5 {
+            let intent = Intent::new(
+                &format!("intent_{}", i),
+                IntentDomain::FileOps,
+                vec!["test".to_string()],
+                Vec::new(),
+                0.3,
+            );
+            matcher.register(intent);
+        }
+
+        // 默认短路是禁用的
+        matcher.disable_short_circuit();
+
+        // 应该返回所有匹配
+        let matches = matcher.match_intent("test something");
+        assert_eq!(matches.len(), 5);
+    }
+
+    #[test]
+    fn test_optimized_matching_performance() {
+        let mut matcher = IntentMatcher::new();
+
+        // 注册 50 个意图
+        for i in 0..50 {
+            let intent = Intent::new(
+                &format!("intent_{}", i),
+                IntentDomain::FileOps,
+                vec![format!("keyword{}", i), format!("tag{}", i)],
+                vec![format!(r"pattern{}.*", i)],
+                0.3,
+            );
+            matcher.register(intent);
+        }
+
+        // 测试匹配性能
+        let start = std::time::Instant::now();
+        for _ in 0..100 {
+            let _ = matcher.match_intent("keyword25 is great");
+        }
+        let elapsed = start.elapsed();
+
+        // 100 次匹配应该在合理时间内完成（允许一些波动）
+        // 由于缓存，后 99 次应该很快
+        assert!(
+            elapsed.as_millis() < 100,
+            "Matching too slow: {:?}",
+            elapsed
+        );
+    }
+
+    #[test]
+    fn test_optimized_index_with_chinese_keywords() {
+        let mut matcher = IntentMatcher::new();
+
+        matcher.register(Intent::new(
+            "count_lines",
+            IntentDomain::FileOps,
+            vec!["统计".to_string(), "行数".to_string()],
+            vec![r"统计.*行数".to_string()],
+            0.5,
+        ));
+
+        matcher.register(Intent::new(
+            "list_files",
+            IntentDomain::FileOps,
+            vec!["列出".to_string(), "文件".to_string()],
+            Vec::new(),
+            0.3,
+        ));
+
+        // 测试中文关键词匹配
+        let matches = matcher.match_intent("统计代码行数");
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].intent.name, "count_lines");
+
+        let matches = matcher.match_intent("列出文件");
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].intent.name, "list_files");
+    }
+
+    #[test]
+    fn test_clear_also_clears_optimized_index() {
+        let mut matcher = IntentMatcher::new();
+
+        matcher.register(Intent::new(
+            "test",
+            IntentDomain::FileOps,
+            vec!["keyword".to_string()],
+            Vec::new(),
+            0.3,
+        ));
+
+        // 验证匹配有效
+        let matches = matcher.match_intent("keyword test");
+        assert!(!matches.is_empty());
+
+        // 清空
+        matcher.clear();
+
+        // 清空后应该没有匹配
+        let matches = matcher.match_intent("keyword test");
+        assert!(matches.is_empty());
     }
 }
