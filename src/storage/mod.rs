@@ -56,6 +56,7 @@ mod memory;
 mod metrics;
 mod namespaced;
 mod optimized;
+mod quota;
 mod replicated;
 mod retry;
 pub mod tiered_cache;
@@ -94,6 +95,10 @@ pub use namespaced::{
     DetailedNamespaceStats, NamespaceManager, NamespacedStorage, NamespacedStorageConfig,
 };
 pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorageConfig};
+pub use quota::{
+    DetailedQuotaStats, QuotaConfig, QuotaError, QuotaPolicy, QuotaStats, QuotaStatsSnapshot,
+    QuotaStorage, QuotaStorageBuilder, QuotaUsage,
+};
 pub use replicated::{
     BackendStatus, BackendStatusInfo, ConsistencyLevel, DetailedReplicationStats, ReadStrategy,
     ReplicatedStorage, ReplicatedStorageBuilder, ReplicatedStorageConfig, ReplicationStats,
