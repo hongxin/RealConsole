@@ -11,13 +11,19 @@
 //! - Deepseek (远程 API)
 //! - Gemini (Google AI)
 //! - OpenAI (兼容 API)
+//!
+//! # v1.88.0 新增
+//!
+//! - **响应缓存**: CachedLlmClient 包装器，减少重复 API 调用
 
+pub mod cache; // ✨ v1.88.0: LLM 响应缓存
 mod deepseek;
 mod gemini;
 pub mod http_base;
 pub mod logger;
 mod ollama;
 
+pub use cache::{CachedLlmClient, CacheWarmer, LlmCacheConfig, LlmCacheStats}; // ✨ v1.88.0
 pub use deepseek::DeepseekClient;
 pub use gemini::GeminiClient;
 pub use logger::{

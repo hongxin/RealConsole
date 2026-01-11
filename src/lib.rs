@@ -83,7 +83,10 @@ pub use error_fixer::{
 pub use likan::{
     CycleReport, FurnaceConfig, KanExtractor, LiEnhancer, LiKanFurnace, Pattern,
 };
-pub use llm::{ChatResponse, FunctionCall, LlmClient, LlmError, Message, ToolCall};
+pub use llm::{
+    CachedLlmClient, CacheWarmer, ChatResponse, FunctionCall, LlmCacheConfig, LlmCacheStats,
+    LlmClient, LlmError, Message, ToolCall,
+};
 pub use progress::{
     MultiProgressManager, ProgressConfig, ProgressIndicator, ProgressTask, ProgressType,
     with_progress, with_progress_iter,
