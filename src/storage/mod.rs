@@ -62,6 +62,7 @@ mod replicated;
 mod retry;
 pub mod tiered_cache;
 mod transaction;
+mod ttl;
 mod typed;
 mod validated;
 mod versioned;
@@ -119,6 +120,9 @@ pub use transaction::{
     DetailedTransactionStats, Savepoint, Transaction, TransactionOp, TransactionResult,
     TransactionState, TransactionStats, TransactionStatsSnapshot, TransactionStorage,
     TransactionStorageConfig, TransactionWithSavepoints,
+};
+pub use ttl::{
+    DetailedTTLStats, TTLConfig, TTLStats, TTLStatsSnapshot, TTLStorage, TTLStorageBuilder,
 };
 pub use typed::{
     bincode_storage, json_storage, DetailedTypedStats, SerializationFormat, TypedCollection,
