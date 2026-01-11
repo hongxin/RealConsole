@@ -55,6 +55,7 @@ mod metrics;
 mod namespaced;
 mod optimized;
 mod replicated;
+mod retry;
 pub mod tiered_cache;
 mod transaction;
 mod typed;
@@ -85,6 +86,10 @@ pub use replicated::{
     BackendStatus, BackendStatusInfo, ConsistencyLevel, DetailedReplicationStats, ReadStrategy,
     ReplicatedStorage, ReplicatedStorageBuilder, ReplicatedStorageConfig, ReplicationStats,
     ReplicationStatsSnapshot,
+};
+pub use retry::{
+    BackoffStrategy, DetailedRetryStats, RetryCondition, RetryStats, RetryStatsSnapshot,
+    RetryStorage, RetryStorageBuilder, RetryStorageConfig,
 };
 pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
 pub use transaction::{

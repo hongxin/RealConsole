@@ -5,6 +5,82 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.73.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 收尾 - 自动重试层
+
+- ✅ **RetryStorage** - 自动重试存储包装器
+- ✅ **BackoffStrategy** - 多种退避策略（固定/线性/指数）
+- ✅ **RetryCondition** - 可配置重试条件
+- ✅ **抖动支持** - 避免雷群效应
+- ✅ **Builder 模式** - 流畅的重试配置
+- ✅ **总测试数**: 1852 (+24 新增)
+
+### ✨ Added
+
+- **BackoffStrategy** - 退避策略
+  - `Fixed` - 固定延迟
+  - `Linear` - 线性增长延迟
+  - `Exponential` - 指数增长延迟（默认）
+  - `None` - 无延迟立即重试
+
+- **RetryCondition** - 重试条件
+  - `All` - 所有错误都重试（NotFound 除外）
+  - `IoOnly` - 只重试 IO 错误
+  - `TimeoutOnly` - 只重试超时错误
+  - `Never` - 永不重试
+
+- **RetryStorage<B>** - 重试存储包装器
+  - `new()` - 创建默认配置的重试存储
+  - `with_config()` - 使用自定义配置
+  - `builder()` - 使用构建器模式
+  - `detailed_stats()` - 详细重试统计
+
+- **RetryStorageBuilder<B>** - 构建器
+  - `max_retries()` - 设置最大重试次数
+  - `fixed_backoff()` - 固定延迟退避
+  - `linear_backoff()` - 线性退避
+  - `exponential_backoff()` - 指数退避
+  - `with_jitter()` - 启用/禁用抖动
+  - `condition()` - 设置重试条件
+
+### 📊 Retry Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                    RetryStorage                        │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  重试流程:                                             │
+│    操作 → 失败 → 检查条件 → 计算延迟 → 等待 → 重试    │
+│                                                       │
+│  退避策略:                                             │
+│    Fixed:       100ms → 100ms → 100ms                 │
+│    Linear:      100ms → 150ms → 200ms → ...          │
+│    Exponential: 100ms → 200ms → 400ms → 800ms        │
+│                                                       │
+│  抖动:                                                 │
+│    - 添加 0-25% 随机延迟                               │
+│    - 避免多客户端同时重试                              │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+
+使用示例:
+  let retry = RetryStorage::builder(storage)
+      .max_retries(3)
+      .exponential_backoff(100, 5000)
+      .with_jitter(true)
+      .condition(RetryCondition::IoOnly)
+      .build();
+
+  // 失败时自动重试
+  retry.write("key1", b"value1").await?;
+```
+
+---
+
 ## [1.72.0] - 2026-01-11
 
 ### 🎯 Highlights
