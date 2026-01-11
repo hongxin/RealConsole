@@ -68,6 +68,17 @@ impl ConfigGenerator {
                     model
                 )
             }
+            LlmProviderChoice::OpenAI { model, .. } => {
+                format!(
+                    r#"llm:
+  primary:
+    provider: openai
+    model: {}
+    endpoint: https://api.openai.com/v1
+    api_key: ${{OPENAI_API_KEY}}"#,
+                    model
+                )
+            }
             LlmProviderChoice::Ollama { endpoint, model } => {
                 format!(
                     r#"llm:
@@ -170,6 +181,15 @@ intent:
                     lines.push(format!("GEMINI_ENDPOINT={}", endpoint));
                 }
             }
+            LlmProviderChoice::OpenAI {
+                api_key, endpoint, ..
+            } => {
+                lines.push("# OpenAI API 配置".to_string());
+                lines.push(format!("OPENAI_API_KEY={}", api_key));
+                if endpoint != "https://api.openai.com/v1" {
+                    lines.push(format!("OPENAI_ENDPOINT={}", endpoint));
+                }
+            }
             LlmProviderChoice::Ollama { endpoint, .. } => {
                 lines.push("# Ollama 配置".to_string());
                 if endpoint != "http://localhost:11434" {
@@ -242,6 +262,73 @@ mod tests {
         assert!(yaml.contains("tool_calling_enabled: true"));
         assert!(yaml.contains("# memory: (未启用)"));
         assert!(yaml.contains("# workflow_enabled: false")); // Workflow 默认禁用
+    }
+
+    #[test]
+    fn test_generate_yaml_openai() {
+        let config = WizardConfig {
+            llm_provider: LlmProviderChoice::OpenAI {
+                api_key: "sk-openai-test".to_string(),
+                model: "gpt-4o".to_string(),
+                endpoint: "https://api.openai.com/v1".to_string(),
+            },
+            shell_enabled: true,
+            tool_calling_enabled: true,
+            memory_enabled: true,
+            workflow_enabled: false,
+        };
+
+        let yaml = ConfigGenerator::generate_yaml(&config).unwrap();
+
+        // 验证关键内容
+        assert!(yaml.contains("provider: openai"));
+        assert!(yaml.contains("model: gpt-4o"));
+        assert!(yaml.contains("${OPENAI_API_KEY}")); // API key 应使用环境变量
+        assert!(!yaml.contains("sk-openai-test")); // 不应包含实际 API key
+        assert!(yaml.contains("memory:"));
+        assert!(yaml.contains("capacity: 100"));
+    }
+
+    #[test]
+    fn test_generate_env_openai() {
+        let config = WizardConfig {
+            llm_provider: LlmProviderChoice::OpenAI {
+                api_key: "sk-openai-test-key".to_string(),
+                model: "gpt-4o".to_string(),
+                endpoint: "https://api.openai.com/v1".to_string(),
+            },
+            shell_enabled: true,
+            tool_calling_enabled: true,
+            memory_enabled: false,
+            workflow_enabled: false,
+        };
+
+        let env = ConfigGenerator::generate_env(&config).unwrap();
+
+        assert!(env.contains("OPENAI_API_KEY=sk-openai-test-key"));
+        assert!(env.contains("# OpenAI API 配置"));
+        // 使用默认 endpoint，不应该写入 .env
+        assert!(!env.contains("OPENAI_ENDPOINT"));
+    }
+
+    #[test]
+    fn test_generate_env_openai_custom_endpoint() {
+        let config = WizardConfig {
+            llm_provider: LlmProviderChoice::OpenAI {
+                api_key: "sk-openai-test-key".to_string(),
+                model: "gpt-4o".to_string(),
+                endpoint: "https://custom.openai.azure.com/v1".to_string(),
+            },
+            shell_enabled: true,
+            tool_calling_enabled: true,
+            memory_enabled: false,
+            workflow_enabled: false,
+        };
+
+        let env = ConfigGenerator::generate_env(&config).unwrap();
+
+        // 非默认 endpoint 应该写入 .env
+        assert!(env.contains("OPENAI_ENDPOINT=https://custom.openai.azure.com/v1"));
     }
 
     #[test]

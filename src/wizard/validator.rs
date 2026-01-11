@@ -57,6 +57,38 @@ impl ApiValidator {
         }
     }
 
+    /// 验证 OpenAI API Key
+    ///
+    /// 发送最小测试请求，检查 API Key 是否有效。
+    ///
+    /// # Returns
+    /// - `Ok(true)`: API Key 有效
+    /// - `Ok(false)`: API Key 无效（401 Unauthorized）
+    /// - `Err(_)`: 网络错误或其他问题
+    pub async fn validate_openai_key(&self, api_key: &str, endpoint: &str) -> Result<bool> {
+        let response = self
+            .client
+            .post(format!("{}/chat/completions", endpoint))
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&json!({
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": "test"}],
+                "max_tokens": 1
+            }))
+            .send()
+            .await
+            .map_err(|e| anyhow!("网络请求失败: {}", e))?;
+
+        let status = response.status();
+
+        match status {
+            StatusCode::OK | StatusCode::BAD_REQUEST => Ok(true),
+            StatusCode::UNAUTHORIZED => Ok(false),
+            _ => Err(anyhow!("服务返回异常状态码: {}", status.as_u16())),
+        }
+    }
+
     /// 检测 Ollama 服务并获取可用模型列表
     ///
     /// # Returns

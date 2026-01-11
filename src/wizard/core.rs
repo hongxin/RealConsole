@@ -1,6 +1,7 @@
 //! 配置向导核心逻辑
 
 use anyhow::{Context, Result};
+use colored::Colorize;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use std::path::Path;
 
@@ -29,10 +30,23 @@ pub enum LlmProviderChoice {
         model: String,
         endpoint: String,
     },
+    OpenAI {
+        api_key: String,
+        model: String,
+        endpoint: String,
+    },
     Ollama {
         endpoint: String,
         model: String,
     },
+}
+
+/// Provider 检测状态
+#[derive(Debug, Clone)]
+pub struct ProviderStatus {
+    pub name: &'static str,
+    pub available: bool,
+    pub message: String,
 }
 
 /// 向导配置（用户选择结果）
@@ -92,7 +106,7 @@ impl ConfigWizard {
     /// 打印欢迎界面
     fn print_welcome(&self) {
         println!("\n╔══════════════════════════════════════════════════════════════╗");
-        println!("║         欢迎使用 RealConsole 配置向导 v0.7.0              ║");
+        println!("║         欢迎使用 RealConsole 配置向导 v1.83.0             ║");
         println!("╚══════════════════════════════════════════════════════════════╝\n");
 
         match self.mode {
@@ -124,9 +138,25 @@ impl ConfigWizard {
     async fn prompt_llm_provider(&self) -> Result<LlmProviderChoice> {
         println!("\n━━━ LLM Provider 配置 ━━━\n");
 
+        // 检测可用的 Provider
+        println!("正在检测可用的 LLM 服务...\n");
+        let statuses = self.detect_providers().await;
+
+        for status in &statuses {
+            let icon = if status.available { "✓" } else { "✗" };
+            let color = if status.available { "green" } else { "dim" };
+            if color == "green" {
+                println!("  {} {} - {}", icon.green(), status.name, status.message);
+            } else {
+                println!("  {} {} - {}", icon.dimmed(), status.name.dimmed(), status.message.dimmed());
+            }
+        }
+        println!();
+
         let choices = vec![
             "Deepseek (远程 API，功能强大，推荐)",
             "Gemini (Google AI，多模态支持)",
+            "OpenAI (GPT-4o，最强大)",
             "Ollama (本地模型，隐私优先)",
         ];
 
@@ -139,9 +169,60 @@ impl ConfigWizard {
         match selection {
             0 => self.prompt_deepseek_config().await,
             1 => self.prompt_gemini_config().await,
-            2 => self.prompt_ollama_config().await,
+            2 => self.prompt_openai_config().await,
+            3 => self.prompt_ollama_config().await,
             _ => unreachable!(),
         }
+    }
+
+    /// 检测可用的 Provider
+    async fn detect_providers(&self) -> Vec<ProviderStatus> {
+        use tokio::time::timeout;
+        use std::time::Duration;
+
+        let mut statuses = Vec::new();
+
+        // 检测 Ollama (本地服务)
+        let ollama_status = match timeout(
+            Duration::from_secs(2),
+            self.validator.check_ollama_service("http://localhost:11434")
+        ).await {
+            Ok(Ok(models)) => ProviderStatus {
+                name: "Ollama",
+                available: true,
+                message: format!("检测到 {} 个本地模型", models.len()),
+            },
+            Ok(Err(_)) => ProviderStatus {
+                name: "Ollama",
+                available: false,
+                message: "服务未运行".to_string(),
+            },
+            Err(_) => ProviderStatus {
+                name: "Ollama",
+                available: false,
+                message: "连接超时".to_string(),
+            },
+        };
+        statuses.push(ollama_status);
+
+        // 云服务状态 (需要 API Key 才能验证)
+        statuses.push(ProviderStatus {
+            name: "Deepseek",
+            available: true,
+            message: "需要 API Key".to_string(),
+        });
+        statuses.push(ProviderStatus {
+            name: "Gemini",
+            available: true,
+            message: "需要 API Key".to_string(),
+        });
+        statuses.push(ProviderStatus {
+            name: "OpenAI",
+            available: true,
+            message: "需要 API Key".to_string(),
+        });
+
+        statuses
     }
 
     /// 提示 Deepseek 配置
@@ -221,6 +302,81 @@ impl ConfigWizard {
             api_key,
             model,
             endpoint: "https://generativelanguage.googleapis.com".to_string(),
+        })
+    }
+
+    /// 提示 OpenAI 配置
+    async fn prompt_openai_config(&self) -> Result<LlmProviderChoice> {
+        println!("\n💡 提示: 从 https://platform.openai.com/api-keys 获取 API Key\n");
+
+        let api_key: String = Password::with_theme(&self.theme)
+            .with_prompt("请输入 OpenAI API Key")
+            .interact()?;
+
+        if api_key.trim().is_empty() {
+            anyhow::bail!("API Key 不能为空");
+        }
+
+        // 验证 OpenAI API Key
+        use indicatif::{ProgressBar, ProgressStyle};
+
+        let spinner = ProgressBar::new_spinner();
+        spinner.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap(),
+        );
+        spinner.set_message("正在验证 API Key...");
+        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+
+        let validation_result = self
+            .validator
+            .validate_openai_key(&api_key, "https://api.openai.com/v1")
+            .await;
+
+        spinner.finish_and_clear();
+
+        match validation_result {
+            Ok(true) => println!("✓ API Key 验证成功！\n"),
+            Ok(false) => {
+                println!("⚠️  API Key 可能无效，但将继续配置\n");
+            }
+            Err(e) => {
+                println!("⚠️  验证失败: {}，但将继续配置\n", e);
+            }
+        }
+
+        // 选择模型
+        let models = vec![
+            "gpt-4o (推荐，平衡性能与成本)",
+            "gpt-4o-mini (快速，低成本)",
+            "gpt-4-turbo (高质量)",
+            "o1-preview (推理增强)",
+        ];
+
+        let model_idx = if self.mode == WizardMode::Complete {
+            Select::with_theme(&self.theme)
+                .with_prompt("选择 OpenAI 模型")
+                .items(&models)
+                .default(0)
+                .interact()?
+        } else {
+            0 // 快速模式使用默认
+        };
+
+        let model = match model_idx {
+            0 => "gpt-4o",
+            1 => "gpt-4o-mini",
+            2 => "gpt-4-turbo",
+            3 => "o1-preview",
+            _ => "gpt-4o",
+        }
+        .to_string();
+
+        Ok(LlmProviderChoice::OpenAI {
+            api_key,
+            model,
+            endpoint: "https://api.openai.com/v1".to_string(),
         })
     }
 
@@ -424,8 +580,49 @@ impl ConfigWizard {
         }
     }
 
+    /// 显示配置摘要并确认
+    pub fn show_summary_and_confirm(&self, config: &WizardConfig) -> Result<bool> {
+        println!("\n━━━ 配置摘要 ━━━\n");
+
+        // LLM Provider
+        let (provider_name, model_name) = match &config.llm_provider {
+            LlmProviderChoice::Deepseek { model, .. } => ("Deepseek", model.as_str()),
+            LlmProviderChoice::Gemini { model, .. } => ("Gemini", model.as_str()),
+            LlmProviderChoice::OpenAI { model, .. } => ("OpenAI", model.as_str()),
+            LlmProviderChoice::Ollama { model, .. } => ("Ollama", model.as_str()),
+        };
+
+        println!("  {} LLM Provider: {} ({})", "▸".cyan(), provider_name.green(), model_name);
+        println!("  {} Shell 执行: {}", "▸".cyan(),
+            if config.shell_enabled { "启用".green() } else { "禁用".dimmed() });
+        println!("  {} Tool Calling: {}", "▸".cyan(),
+            if config.tool_calling_enabled { "启用".green() } else { "禁用".dimmed() });
+        println!("  {} 记忆系统: {}", "▸".cyan(),
+            if config.memory_enabled { "启用".green() } else { "禁用".dimmed() });
+        println!("  {} Workflow: {}", "▸".cyan(),
+            if config.workflow_enabled { "启用".yellow() } else { "禁用".dimmed() });
+        println!();
+
+        // 将要生成的文件
+        println!("  将生成以下文件:");
+        println!("    {} realconsole.yaml", "📄".dimmed());
+        println!("    {} .env (包含 API Key)", "🔐".dimmed());
+        println!();
+
+        Confirm::with_theme(&self.theme)
+            .with_prompt("确认保存配置？")
+            .default(true)
+            .interact()
+            .context("用户取消")
+    }
+
     /// 生成配置文件并显示下一步提示
     pub fn generate_and_save(&self, config: &WizardConfig) -> Result<()> {
+        // 显示摘要并确认
+        if !self.show_summary_and_confirm(config)? {
+            anyhow::bail!("用户取消保存");
+        }
+
         println!("\n━━━ 生成配置文件 ━━━\n");
 
         // 生成并保存配置
