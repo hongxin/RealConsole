@@ -5,6 +5,82 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.71.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 收尾 - 加密存储层
+
+- ✅ **EncryptedStorage** - 透明加密存储包装器
+- ✅ **Cipher trait** - 可插拔加密算法接口
+- ✅ **多种加密器** - XorCipher, Base64Cipher, NullCipher
+- ✅ **MultiKeyCipher** - 密钥轮换支持
+- ✅ **键名加密** - 可选的键名加密保护
+- ✅ **总测试数**: 1806 (+22 新增)
+
+### ✨ Added
+
+- **Cipher trait** - 加密器接口
+  - `encrypt()` - 加密数据
+  - `decrypt()` - 解密数据
+  - `name()` - 获取加密器名称
+  - `key_id()` - 获取密钥 ID
+
+- **XorCipher** - XOR 加密器（演示用）
+  - `new()` - 创建加密器
+  - `with_key_id()` - 指定密钥 ID
+  - 包含魔数验证和长度校验
+
+- **Base64Cipher** - Base64 编码器（混淆用）
+- **NullCipher** - 空加密器（透传，测试用）
+
+- **MultiKeyCipher<C>** - 多密钥加密器
+  - `new()` - 创建多密钥加密器
+  - `with_historical()` - 添加历史密钥
+  - `rotate()` - 密钥轮换
+  - 支持使用旧密钥解密历史数据
+
+- **EncryptedStorage<B, C>** - 加密存储包装器
+  - `new()` / `with_config()` - 创建加密存储
+  - `from_arc()` / `from_arc_with_config()` - 从 Arc 创建
+  - `cipher_name()` / `key_id()` - 获取加密器信息
+  - `detailed_stats()` - 详细加密统计
+
+### 📊 Encryption Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                  EncryptedStorage                      │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  加密流程:                                             │
+│    write() → encrypt(data) → backend.write()         │
+│    read()  → backend.read() → decrypt(data)          │
+│                                                       │
+│  密钥管理:                                             │
+│    - 单密钥: XorCipher, Base64Cipher                  │
+│    - 多密钥: MultiKeyCipher（支持密钥轮换）            │
+│                                                       │
+│  可选功能:                                             │
+│    - encrypt_keys: 加密键名                           │
+│    - fail_on_decrypt_error: 解密失败处理策略          │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+
+使用示例:
+  let storage = MemoryStorage::new();
+  let cipher = XorCipher::new(b"secret-key-32-bytes!");
+  let encrypted = EncryptedStorage::new(storage, cipher);
+
+  // 数据自动加密存储
+  encrypted.write("key1", b"sensitive data").await?;
+
+  // 读取时自动解密
+  let data = encrypted.read("key1").await?;
+```
+
+---
+
 ## [1.70.0] - 2026-01-11
 
 ### 🎯 Highlights

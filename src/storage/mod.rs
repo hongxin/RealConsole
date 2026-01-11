@@ -48,6 +48,7 @@ mod batch;
 mod builder;
 mod cached;
 mod compressed;
+mod encrypted;
 mod file;
 mod memory;
 mod metrics;
@@ -63,6 +64,11 @@ pub use builder::{BuiltStorage, StorageBuilder, StorageLayerConfig};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
 pub use compressed::{
     CompressedStorage, CompressedStorageConfig, CompressionLevel, DetailedCompressionStats,
+};
+pub use encrypted::{
+    Base64Cipher, Cipher, CipherError, DetailedEncryptionStats, EncryptedStorage,
+    EncryptedStorageConfig, EncryptionStats, EncryptionStatsSnapshot, MultiKeyCipher, NullCipher,
+    XorCipher,
 };
 pub use file::FileStorage;
 pub use memory::MemoryStorage;
