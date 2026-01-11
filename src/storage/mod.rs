@@ -44,6 +44,7 @@
 //! mem_storage.write("key1", b"value1").await?;
 //! ```
 
+mod audit;
 mod batch;
 mod builder;
 mod cached;
@@ -63,6 +64,11 @@ mod typed;
 mod versioned;
 mod watchable;
 
+pub use audit::{
+    AuditBackend, AuditEntry, AuditLevel, AuditOperation, AuditQuery, AuditResult,
+    AuditStats, AuditStatsSnapshot, AuditStorage, AuditStorageBuilder, AuditStorageConfig,
+    CallbackAuditBackend, DetailedAuditStats, MemoryAuditBackend,
+};
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use builder::{BuiltStorage, StorageBuilder, StorageLayerConfig};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
