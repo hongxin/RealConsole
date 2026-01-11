@@ -4,8 +4,9 @@
 //! - 系统命令补全（/ 前缀）
 //! - 文件路径补全
 //! - 历史命令补全
+//! - Git 上下文感知补全 (v1.85.0)
 
-use super::types::{Candidate, CompletionSource};
+use super::types::{Candidate, CompletionSource, GitContext};
 use crate::command::CommandRegistry;
 use crate::history::{HistoryManager, SortStrategy};
 use std::path::{Path, PathBuf};
@@ -18,13 +19,16 @@ use tokio::sync::RwLock;
 ///
 /// - **高确定性**：基于已知结构，准确率 > 95%
 /// - **高性能**：响应时间 < 10ms
-/// - **三种模式**：命令、路径、历史
+/// - **四种模式**：命令、路径、历史、Git 上下文 (v1.85.0)
 pub struct StaticCompleter {
     /// 命令注册表
     command_registry: Arc<CommandRegistry>,
 
     /// 历史管理器
     history: Arc<RwLock<HistoryManager>>,
+
+    /// Git 上下文（缓存，避免重复检测）
+    git_context: Option<GitContext>,
 }
 
 impl StaticCompleter {
@@ -36,24 +40,155 @@ impl StaticCompleter {
         Self {
             command_registry,
             history,
+            git_context: None,
         }
+    }
+
+    /// 创建带 Git 上下文检测的静态补全器 (v1.85.0)
+    pub fn with_git_context(
+        command_registry: Arc<CommandRegistry>,
+        history: Arc<RwLock<HistoryManager>>,
+    ) -> Self {
+        Self {
+            command_registry,
+            history,
+            git_context: Some(GitContext::detect()),
+        }
+    }
+
+    /// 刷新 Git 上下文（当目录变化时调用）
+    pub fn refresh_git_context(&mut self) {
+        self.git_context = Some(GitContext::detect());
     }
 
     /// 统一补全入口
     ///
-    /// # 补全规则
+    /// # 补全规则 (v1.85.0 更新)
     ///
     /// 1. 输入以 `/` 开头 → 系统命令补全
     /// 2. 输入包含 `/` → 文件路径补全
-    /// 3. 其他 → 历史命令补全
+    /// 3. 输入以 `git` 开头 → Git 上下文感知补全
+    /// 4. 其他 → 历史命令补全（带 Git 建议）
     pub fn complete(&self, input: &str) -> Vec<Candidate> {
         if input.starts_with('/') {
             self.complete_command(input)
         } else if input.contains('/') {
             self.complete_path(input)
+        } else if input.starts_with("git") {
+            // v1.85.0: Git 上下文感知补全
+            self.complete_git_command(input)
         } else {
-            self.complete_history(input)
+            // 历史补全 + Git 建议
+            let mut candidates = self.complete_history(input);
+
+            // 如果输入为空或很短，且在 Git 仓库中，添加 Git 建议
+            if input.len() <= 2 {
+                candidates.extend(self.complete_git_suggestions(input));
+            }
+
+            candidates
         }
+    }
+
+    /// Git 上下文感知命令补全 (v1.85.0)
+    ///
+    /// 根据当前 Git 仓库状态智能推荐命令
+    fn complete_git_command(&self, input: &str) -> Vec<Candidate> {
+        let git_context = self.git_context.as_ref()
+            .map(|c| c.clone())
+            .unwrap_or_else(GitContext::detect);
+
+        let mut candidates = Vec::new();
+
+        // 获取基于状态的智能建议
+        let suggestions = git_context.suggest_commands();
+
+        for (cmd, desc) in suggestions {
+            if cmd.starts_with(input) {
+                candidates.push(Candidate::with_score(
+                    cmd.to_string(),
+                    format!("{} [Git]", desc),
+                    0.95, // 高分，因为是上下文感知的
+                    CompletionSource::Static,
+                ));
+            }
+        }
+
+        // 添加通用 Git 命令（如果匹配）
+        let common_git_commands = [
+            ("git status", "查看仓库状态"),
+            ("git add", "添加文件到暂存区"),
+            ("git commit", "提交更改"),
+            ("git push", "推送到远程"),
+            ("git pull", "拉取远程更新"),
+            ("git fetch", "获取远程更新"),
+            ("git branch", "管理分支"),
+            ("git checkout", "切换分支/恢复文件"),
+            ("git merge", "合并分支"),
+            ("git rebase", "变基操作"),
+            ("git log", "查看提交历史"),
+            ("git diff", "查看差异"),
+            ("git stash", "暂存当前更改"),
+            ("git reset", "重置更改"),
+            ("git remote", "管理远程仓库"),
+            ("git clone", "克隆仓库"),
+        ];
+
+        for (cmd, desc) in common_git_commands {
+            if cmd.starts_with(input) && !candidates.iter().any(|c| c.text == cmd) {
+                candidates.push(Candidate::with_score(
+                    cmd.to_string(),
+                    desc.to_string(),
+                    0.85,
+                    CompletionSource::Static,
+                ));
+            }
+        }
+
+        // 也从历史中获取匹配的 git 命令
+        let history_candidates = self.complete_history(input);
+        for hc in history_candidates {
+            if hc.text.starts_with("git") && !candidates.iter().any(|c| c.text == hc.text) {
+                candidates.push(hc);
+            }
+        }
+
+        // 按分数排序
+        candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+        // 限制数量
+        candidates.truncate(10);
+
+        candidates
+    }
+
+    /// Git 建议补全（用于空输入或短输入）
+    fn complete_git_suggestions(&self, input: &str) -> Vec<Candidate> {
+        let git_context = self.git_context.as_ref()
+            .map(|c| c.clone())
+            .unwrap_or_else(GitContext::detect);
+
+        if !git_context.is_git_repo {
+            return Vec::new();
+        }
+
+        let mut candidates = Vec::new();
+
+        // 只在 Git 仓库中且有未处理的更改时才显示建议
+        let suggestions = git_context.suggest_commands();
+
+        for (cmd, desc) in suggestions.iter().take(3) {
+            if input.is_empty() || cmd.starts_with(input) {
+                candidates.push(Candidate::with_score(
+                    cmd.to_string(),
+                    format!("💡 {}", desc),
+                    0.7, // 建议性分数
+                    CompletionSource::Static,
+                ));
+            }
+        }
+
+        candidates
     }
 
     /// 补全系统命令（/ 前缀）

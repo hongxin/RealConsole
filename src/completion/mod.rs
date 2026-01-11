@@ -42,6 +42,7 @@ pub use semantic_completer::SemanticCompleter;
 pub use static_completer::StaticCompleter;
 pub use types::{
     Candidate, CompletionConfig, CompletionContext, CompletionSource, CompletionType,
+    GitContext, // v1.85.0: Git 上下文感知补全
 };
 
 use crate::command::CommandRegistry;

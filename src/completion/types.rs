@@ -67,6 +67,138 @@ pub enum CompletionSource {
     Intelligent,
 }
 
+/// Git 仓库上下文 (v1.85.0)
+#[derive(Debug, Clone, Default)]
+pub struct GitContext {
+    /// 是否在 Git 仓库中
+    pub is_git_repo: bool,
+
+    /// 当前分支名
+    pub branch: Option<String>,
+
+    /// 是否有未暂存的更改
+    pub has_changes: bool,
+
+    /// 是否有未跟踪的文件
+    pub has_untracked: bool,
+
+    /// 是否有暂存的更改
+    pub has_staged: bool,
+}
+
+impl GitContext {
+    /// 检测当前目录的 Git 状态
+    pub fn detect() -> Self {
+        // 检查是否在 git 仓库中
+        let is_git_repo = std::process::Command::new("git")
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        if !is_git_repo {
+            return Self::default();
+        }
+
+        // 获取当前分支
+        let branch = std::process::Command::new("git")
+            .args(["branch", "--show-current"])
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    String::from_utf8(o.stdout).ok().map(|s| s.trim().to_string())
+                } else {
+                    None
+                }
+            })
+            .filter(|s| !s.is_empty());
+
+        // 获取 git status --porcelain
+        let status_output = std::process::Command::new("git")
+            .args(["status", "--porcelain"])
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    String::from_utf8(o.stdout).ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        let mut has_changes = false;
+        let mut has_untracked = false;
+        let mut has_staged = false;
+
+        for line in status_output.lines() {
+            if line.starts_with("??") {
+                has_untracked = true;
+            } else if line.starts_with(' ') {
+                has_changes = true; // 工作区有修改
+            } else if !line.is_empty() {
+                // 第一个字符不是空格且不是 ?? 说明有暂存的更改
+                let first_char = line.chars().next().unwrap_or(' ');
+                if first_char != ' ' && first_char != '?' {
+                    has_staged = true;
+                }
+                // 第二个字符不是空格说明工作区有修改
+                if line.len() > 1 {
+                    let second_char = line.chars().nth(1).unwrap_or(' ');
+                    if second_char != ' ' {
+                        has_changes = true;
+                    }
+                }
+            }
+        }
+
+        Self {
+            is_git_repo,
+            branch,
+            has_changes,
+            has_untracked,
+            has_staged,
+        }
+    }
+
+    /// 根据 Git 状态推荐相关命令
+    pub fn suggest_commands(&self) -> Vec<(&'static str, &'static str)> {
+        if !self.is_git_repo {
+            return vec![("git init", "初始化 Git 仓库")];
+        }
+
+        let mut suggestions = vec![
+            ("git status", "查看仓库状态"),
+            ("git log --oneline -10", "查看最近提交"),
+        ];
+
+        if self.has_untracked {
+            suggestions.push(("git add .", "添加所有文件到暂存区"));
+            suggestions.push(("git add -p", "交互式添加更改"));
+        }
+
+        if self.has_changes {
+            suggestions.push(("git diff", "查看未暂存的更改"));
+            suggestions.push(("git checkout -- .", "撤销工作区更改"));
+        }
+
+        if self.has_staged {
+            suggestions.push(("git commit -m \"\"", "提交暂存的更改"));
+            suggestions.push(("git diff --cached", "查看已暂存的更改"));
+            suggestions.push(("git reset HEAD", "取消暂存"));
+        }
+
+        if !self.has_changes && !self.has_untracked && !self.has_staged {
+            suggestions.push(("git pull", "拉取远程更新"));
+            suggestions.push(("git push", "推送到远程"));
+            suggestions.push(("git fetch", "获取远程更新"));
+        }
+
+        suggestions
+    }
+}
+
 /// 补全上下文（用于多维评分）
 #[derive(Debug, Clone)]
 pub struct CompletionContext {
@@ -81,6 +213,9 @@ pub struct CompletionContext {
 
     /// 命令使用频率统计
     pub usage_stats: HashMap<String, usize>,
+
+    /// Git 仓库上下文 (v1.85.0)
+    pub git_context: GitContext,
 }
 
 impl Default for CompletionContext {
@@ -90,11 +225,23 @@ impl Default for CompletionContext {
             recent_commands: Vec::new(),
             conversation_summary: String::new(),
             usage_stats: HashMap::new(),
+            git_context: GitContext::default(),
         }
     }
 }
 
 impl CompletionContext {
+    /// 创建带 Git 上下文检测的补全上下文 (v1.85.0)
+    pub fn with_git_detection() -> Self {
+        Self {
+            current_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            recent_commands: Vec::new(),
+            conversation_summary: String::new(),
+            usage_stats: HashMap::new(),
+            git_context: GitContext::detect(),
+        }
+    }
+
     /// 获取命令使用频率（归一化到 0.0-1.0）
     #[allow(dead_code)] // Phase 2 多维评分时使用
     pub fn get_usage_frequency(&self, command: &str) -> f64 {
@@ -260,5 +407,107 @@ mod tests {
 
         let score = context.relevance_score("git");
         assert!(score > 0.0);
+    }
+
+    // ===== v1.85.0: Git 上下文测试 =====
+
+    #[test]
+    fn test_git_context_default() {
+        let context = GitContext::default();
+        assert!(!context.is_git_repo);
+        assert!(context.branch.is_none());
+        assert!(!context.has_changes);
+        assert!(!context.has_untracked);
+        assert!(!context.has_staged);
+    }
+
+    #[test]
+    fn test_git_context_detect() {
+        // 在当前目录（RealConsole）中应该检测到 Git 仓库
+        let context = GitContext::detect();
+        // 这是一个 git 仓库
+        assert!(context.is_git_repo);
+        // 应该有分支信息
+        assert!(context.branch.is_some());
+    }
+
+    #[test]
+    fn test_git_context_suggest_commands_in_repo() {
+        let context = GitContext {
+            is_git_repo: true,
+            branch: Some("main".to_string()),
+            has_changes: true,
+            has_untracked: true,
+            has_staged: false,
+        };
+
+        let suggestions = context.suggest_commands();
+
+        // 应该有基本命令
+        assert!(suggestions.iter().any(|(cmd, _)| *cmd == "git status"));
+
+        // 有未跟踪文件时应该建议 git add
+        assert!(suggestions.iter().any(|(cmd, _)| cmd.starts_with("git add")));
+
+        // 有未暂存更改时应该建议 git diff
+        assert!(suggestions.iter().any(|(cmd, _)| *cmd == "git diff"));
+    }
+
+    #[test]
+    fn test_git_context_suggest_commands_staged() {
+        let context = GitContext {
+            is_git_repo: true,
+            branch: Some("feature".to_string()),
+            has_changes: false,
+            has_untracked: false,
+            has_staged: true,
+        };
+
+        let suggestions = context.suggest_commands();
+
+        // 有暂存的更改时应该建议 commit
+        assert!(suggestions.iter().any(|(cmd, _)| cmd.starts_with("git commit")));
+    }
+
+    #[test]
+    fn test_git_context_suggest_commands_clean() {
+        let context = GitContext {
+            is_git_repo: true,
+            branch: Some("main".to_string()),
+            has_changes: false,
+            has_untracked: false,
+            has_staged: false,
+        };
+
+        let suggestions = context.suggest_commands();
+
+        // 工作区干净时应该建议 pull/push
+        assert!(suggestions.iter().any(|(cmd, _)| *cmd == "git pull"));
+        assert!(suggestions.iter().any(|(cmd, _)| *cmd == "git push"));
+    }
+
+    #[test]
+    fn test_git_context_suggest_commands_not_repo() {
+        let context = GitContext {
+            is_git_repo: false,
+            branch: None,
+            has_changes: false,
+            has_untracked: false,
+            has_staged: false,
+        };
+
+        let suggestions = context.suggest_commands();
+
+        // 不在 Git 仓库时应该建议 git init
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].0, "git init");
+    }
+
+    #[test]
+    fn test_completion_context_with_git_detection() {
+        let context = CompletionContext::with_git_detection();
+
+        // 应该检测到 Git 仓库（因为我们在 RealConsole 目录中）
+        assert!(context.git_context.is_git_repo);
     }
 }
