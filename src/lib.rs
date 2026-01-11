@@ -28,6 +28,7 @@ pub mod display;
 pub mod display_helper; // 显示辅助工具（emoji/纯文本切换）
 pub mod dsl;
 pub mod error;
+pub mod error_formatter; // ✨ v1.84.0: 增强错误消息格式化
 pub mod error_fixer; // ✨ Phase 9.1 Week 2: 错误自动修复
 pub mod execution_logger;
 pub mod git_assistant; // ✨ Phase 6: Git 智能助手
@@ -73,6 +74,7 @@ pub use completion::{
 pub use config::Config;
 pub use display::{Display, DisplayMode};
 pub use error::{ErrorCode, FixSuggestion, RealError};
+pub use error_formatter::ErrorFormatter;
 pub use error_fixer::{
     ErrorAnalysis, ErrorAnalyzer, ErrorCategory, ErrorSeverity, FeedbackLearner, FeedbackRecord,
     FeedbackType, FixOutcome, FixStrategy, LearningSummary,
