@@ -5,6 +5,76 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.69.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 收尾 - 命名空间存储隔离
+
+- ✅ **NamespacedStorage** - 命名空间隔离存储包装器
+- ✅ **NamespaceManager** - 多命名空间管理器
+- ✅ **键前缀隔离** - 自动键前缀和命名空间隔离
+- ✅ **批量操作** - read_many/write_many/delete_many
+- ✅ **子命名空间** - 支持嵌套命名空间层级
+- ✅ **总测试数**: 1765 (+20 新增)
+
+### ✨ Added
+
+- **NamespacedStorage<B>** - 命名空间存储包装器
+  - `new()` - 创建带命名空间的存储
+  - `with_separator()` - 自定义分隔符
+  - `prefix()` - 获取命名空间前缀
+  - `clear()` - 清空命名空间所有键
+  - `count()` - 统计命名空间内键数量
+  - `copy_to()` - 复制键到另一个命名空间
+  - `move_to()` - 移动键到另一个命名空间
+
+- **批量操作** - 高效的批量读写
+  - `read_many()` - 批量读取多个键
+  - `write_many()` - 批量写入多个键值对
+  - `delete_many()` - 批量删除多个键
+
+- **子命名空间** - 嵌套命名空间支持
+  - `sub_namespace()` - 创建子命名空间
+  - 支持任意深度嵌套: `users::admin::settings`
+
+- **NamespaceManager<B>** - 命名空间管理器
+  - `namespace()` - 获取指定命名空间的存储
+  - `list_namespaces()` - 列出所有命名空间
+  - `delete_namespace()` - 删除整个命名空间
+
+### 📊 Namespace Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                  NamespacedStorage                     │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  键前缀转换:                                           │
+│    存储: prefixed_key("key") → "namespace:key"        │
+│    读取: 自动添加前缀                                  │
+│    列表: 可选剥离前缀                                  │
+│                                                       │
+│  隔离保证:                                             │
+│    - 每个命名空间完全独立                              │
+│    - 不同命名空间可存储相同键名                        │
+│    - clear() 只影响当前命名空间                       │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+
+使用示例:
+  let storage = MemoryStorage::new();
+  let users = NamespacedStorage::new(storage.clone(), "users");
+  let config = NamespacedStorage::new(storage.clone(), "config");
+
+  users.write("alice", data).await?;   // 实际存储为 "users:alice"
+  config.write("theme", data).await?;  // 实际存储为 "config:theme"
+
+  let sub = users.sub_namespace("admin");  // "users:admin:"
+```
+
+---
+
 ## [1.68.0] - 2026-01-11
 
 ### 🎯 Highlights
