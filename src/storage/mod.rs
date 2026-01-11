@@ -57,6 +57,7 @@ mod metrics;
 mod namespaced;
 mod optimized;
 mod quota;
+mod rate_limited;
 mod replicated;
 mod retry;
 pub mod tiered_cache;
@@ -98,6 +99,10 @@ pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorag
 pub use quota::{
     DetailedQuotaStats, QuotaConfig, QuotaError, QuotaPolicy, QuotaStats, QuotaStatsSnapshot,
     QuotaStorage, QuotaStorageBuilder, QuotaUsage,
+};
+pub use rate_limited::{
+    DetailedRateLimitStats, RateLimitConfig, RateLimitError, RateLimitPolicy, RateLimitStats,
+    RateLimitStatsSnapshot, RateLimitedStorage, RateLimitedStorageBuilder,
 };
 pub use replicated::{
     BackendStatus, BackendStatusInfo, ConsistencyLevel, DetailedReplicationStats, ReadStrategy,
