@@ -54,6 +54,7 @@ mod memory;
 mod metrics;
 mod namespaced;
 mod optimized;
+mod replicated;
 pub mod tiered_cache;
 mod transaction;
 mod typed;
@@ -80,6 +81,11 @@ pub use namespaced::{
     DetailedNamespaceStats, NamespaceManager, NamespacedStorage, NamespacedStorageConfig,
 };
 pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorageConfig};
+pub use replicated::{
+    BackendStatus, BackendStatusInfo, ConsistencyLevel, DetailedReplicationStats, ReadStrategy,
+    ReplicatedStorage, ReplicatedStorageBuilder, ReplicatedStorageConfig, ReplicationStats,
+    ReplicationStatsSnapshot,
+};
 pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
 pub use transaction::{
     DetailedTransactionStats, Savepoint, Transaction, TransactionOp, TransactionResult,

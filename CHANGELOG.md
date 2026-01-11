@@ -5,6 +5,82 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 收尾 - 复制存储层
+
+- ✅ **ReplicatedStorage** - 多后端数据复制
+- ✅ **ConsistencyLevel** - 可配置一致性级别（One/Two/Quorum/All）
+- ✅ **ReadStrategy** - 读取策略（PrimaryOnly/PrimaryWithFallback/Any）
+- ✅ **故障转移** - 自动检测并切换到健康后端
+- ✅ **Builder 模式** - 流畅的复制存储配置
+- ✅ **总测试数**: 1828 (+20 新增)
+
+### ✨ Added
+
+- **ConsistencyLevel** - 写入一致性级别
+  - `One` - 只写入主后端
+  - `Two` - 写入主后端和至少一个副本
+  - `Quorum` - 写入大多数后端
+  - `All` - 写入所有后端
+
+- **ReadStrategy** - 读取策略
+  - `PrimaryOnly` - 只从主后端读取
+  - `PrimaryWithFallback` - 优先主后端，失败则从副本读取
+  - `Any` - 轮询读取（负载均衡）
+
+- **ReplicatedStorage<B>** - 复制存储包装器
+  - `new()` - 创建单主后端存储
+  - `add_replica()` - 添加副本后端
+  - `backend_count()` - 获取后端数量
+  - `healthy_backend_count()` - 获取健康后端数量
+  - `detailed_stats()` - 详细复制统计
+
+- **ReplicatedStorageBuilder<B>** - 构建器
+  - `with_replica()` - 添加副本
+  - `with_consistency()` - 设置一致性级别
+  - `with_read_strategy()` - 设置读取策略
+  - `build()` - 构建复制存储
+
+### 📊 Replication Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                  ReplicatedStorage                     │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  写入复制:                                             │
+│    write() → 复制到所有后端 → 验证一致性级别           │
+│                                                       │
+│  读取策略:                                             │
+│    PrimaryOnly: Primary                               │
+│    Fallback: Primary → Replica1 → Replica2 → ...     │
+│    Any: 轮询 (负载均衡)                               │
+│                                                       │
+│  故障检测:                                             │
+│    - 连续失败计数                                      │
+│    - 自动标记不可用后端                               │
+│    - 健康后端优先                                      │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+
+使用示例:
+  let storage = ReplicatedStorageBuilder::new(primary)
+      .with_replica(replica1)
+      .with_replica(replica2)
+      .with_consistency(ConsistencyLevel::Quorum)
+      .with_read_strategy(ReadStrategy::PrimaryWithFallback)
+      .build()
+      .await;
+
+  // 写入自动复制到所有后端
+  storage.write("key1", b"value1").await?;
+```
+
+---
+
 ## [1.71.0] - 2026-01-11
 
 ### 🎯 Highlights
