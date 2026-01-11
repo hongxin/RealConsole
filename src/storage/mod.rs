@@ -47,6 +47,7 @@
 mod batch;
 mod builder;
 mod cached;
+mod circuit_breaker;
 mod compressed;
 mod encrypted;
 mod file;
@@ -64,6 +65,10 @@ mod versioned;
 pub use batch::{BatchWriter, BatchWriterConfig, DetailedBatchStats};
 pub use builder::{BuiltStorage, StorageBuilder, StorageLayerConfig};
 pub use cached::{CachedStorage, CachedStorageConfig, CombinedStorageStats};
+pub use circuit_breaker::{
+    CircuitBreakerBuilder, CircuitBreakerConfig, CircuitBreakerStats, CircuitBreakerStatsSnapshot,
+    CircuitBreakerStorage, CircuitState, DetailedCircuitBreakerStats,
+};
 pub use compressed::{
     CompressedStorage, CompressedStorageConfig, CompressionLevel, DetailedCompressionStats,
 };

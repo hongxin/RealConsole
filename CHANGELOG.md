@@ -5,6 +5,76 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.74.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 收尾 - 熔断器模式
+
+- ✅ **CircuitBreakerStorage** - 熔断器存储包装器
+- ✅ **三态模型** - Closed/Open/HalfOpen 状态机
+- ✅ **失败阈值** - 可配置失败触发阈值
+- ✅ **自动恢复** - 超时后自动尝试恢复
+- ✅ **Builder 模式** - 流畅的熔断器配置
+- ✅ **总测试数**: 1870 (+18 新增)
+
+### ✨ Added
+
+- **CircuitState** - 熔断器状态
+  - `Closed` - 正常运行，允许请求
+  - `Open` - 熔断状态，拒绝请求
+  - `HalfOpen` - 半开状态，测试恢复
+
+- **CircuitBreakerStorage<B>** - 熔断器存储包装器
+  - `new()` - 创建默认配置的熔断器
+  - `with_config()` - 使用自定义配置
+  - `builder()` - 使用构建器模式
+  - `state()` - 获取当前状态
+  - `force_open()` / `force_close()` - 手动控制状态
+  - `detailed_stats()` - 详细统计信息
+
+- **CircuitBreakerBuilder<B>** - 构建器
+  - `failure_threshold()` - 设置失败阈值（触发打开）
+  - `success_threshold()` - 设置成功阈值（半开→关闭）
+  - `open_timeout_secs()` - 设置打开超时时间
+  - `half_open_max_requests()` - 设置半开状态最大并发
+
+### 📊 Circuit Breaker Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                CircuitBreakerStorage                   │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  状态转换:                                             │
+│                                                       │
+│    ┌─────────┐  失败>=阈值   ┌─────────┐              │
+│    │ Closed  │ ───────────→ │  Open   │              │
+│    │ (正常)  │              │ (熔断)  │              │
+│    └─────────┘              └─────────┘              │
+│         ↑                        │                    │
+│         │                        │ 超时后             │
+│         │                        ↓                    │
+│         │   成功>=阈值     ┌───────────┐             │
+│         └───────────────── │ Half-Open │             │
+│               失败→Open    │  (测试)   │             │
+│                           └───────────┘              │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+
+使用示例:
+  let cb = CircuitBreakerStorage::builder(storage)
+      .failure_threshold(5)
+      .success_threshold(3)
+      .open_timeout_secs(30)
+      .build();
+
+  // 正常使用，熔断器自动管理状态
+  cb.write("key1", b"value1").await?;
+```
+
+---
+
 ## [1.73.0] - 2026-01-11
 
 ### 🎯 Highlights
