@@ -5,6 +5,83 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.70.0] - 2026-01-11
+
+### 🎯 Highlights
+
+**主题**: v2.0 收尾 - 事务存储支持
+
+- ✅ **TransactionStorage** - 事务语义存储包装器
+- ✅ **Transaction** - 事务句柄，支持 read/write/delete
+- ✅ **Commit/Rollback** - 提交和回滚支持
+- ✅ **Savepoint** - 保存点支持，部分回滚
+- ✅ **隔离性** - 事务间修改隔离
+- ✅ **总测试数**: 1784 (+19 新增)
+
+### ✨ Added
+
+- **TransactionStorage<B>** - 事务存储包装器
+  - `begin()` - 开始新事务
+  - `stats_snapshot()` - 获取统计快照
+  - `detailed_stats()` - 详细统计信息
+  - `cleanup_timed_out()` - 清理超时事务
+
+- **Transaction<B>** - 事务句柄
+  - `read()` / `write()` / `delete()` - 事务内操作
+  - `exists()` - 检查键是否存在
+  - `commit()` - 提交事务
+  - `rollback()` - 回滚事务
+  - `operation_count()` - 获取操作数
+
+- **TransactionWithSavepoints<B>** - 带保存点的事务
+  - `savepoint()` - 创建保存点
+  - `rollback_to_savepoint()` - 回滚到保存点
+  - `release_savepoint()` - 释放保存点
+  - `savepoint_names()` - 获取保存点列表
+
+- **事务统计**
+  - `TransactionStats` - 事务统计收集器
+  - `TransactionStatsSnapshot` - 统计快照
+  - `commit_rate()` - 提交率
+  - `auto_rollback_rate()` - 自动回滚率
+
+### 📊 Transaction Architecture
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                  TransactionStorage                    │
+├───────────────────────────────────────────────────────┤
+│                                                       │
+│  事务生命周期:                                         │
+│    begin() → Transaction → commit()/rollback()       │
+│                                                       │
+│  隔离机制:                                             │
+│    - 本地缓存: 事务内修改暂存                          │
+│    - WAL 日志: 写前日志支持回滚                        │
+│    - 提交时批量写入后端                               │
+│                                                       │
+│  自动回滚:                                             │
+│    - Drop 时未提交自动回滚                            │
+│    - 防止资源泄露                                      │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+
+使用示例:
+  let tx_storage = TransactionStorage::new(storage);
+
+  let mut tx = tx_storage.begin().await?;
+  tx.write("key1", b"value1").await?;
+  tx.write("key2", b"value2").await?;
+
+  // 提交所有修改
+  tx.commit().await?;
+
+  // 或者回滚
+  // tx.rollback().await?;
+```
+
+---
+
 ## [1.69.0] - 2026-01-11
 
 ### 🎯 Highlights

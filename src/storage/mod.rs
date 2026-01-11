@@ -54,6 +54,7 @@ mod metrics;
 mod namespaced;
 mod optimized;
 pub mod tiered_cache;
+mod transaction;
 mod typed;
 mod versioned;
 
@@ -74,6 +75,11 @@ pub use namespaced::{
 };
 pub use optimized::{DetailedOptimizationStats, OptimizedStorage, OptimizedStorageConfig};
 pub use tiered_cache::{CacheStats, CacheTier, DetailedCacheStats, TieredCache, TieredCacheConfig};
+pub use transaction::{
+    DetailedTransactionStats, Savepoint, Transaction, TransactionOp, TransactionResult,
+    TransactionState, TransactionStats, TransactionStatsSnapshot, TransactionStorage,
+    TransactionStorageConfig, TransactionWithSavepoints,
+};
 pub use typed::{
     bincode_storage, json_storage, DetailedTypedStats, SerializationFormat, TypedCollection,
     TypedStorage, TypedStorageConfig,
