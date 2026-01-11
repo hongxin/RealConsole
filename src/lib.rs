@@ -43,6 +43,7 @@ pub mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支�
 pub mod markdown_renderer; // ✨ v1.25.0: Markdown 渲染器 - LLM 输出美化
 pub mod memory;
 pub mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
+pub mod progress; // ✨ v1.86.0: 统一进度指示器（进度条、计时、多任务）
 pub mod project_context; // ✨ Phase 6: 项目上下文感知
 pub mod repl; // REPL 循环（包含 Tab 补全集成）
 pub mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
@@ -83,6 +84,10 @@ pub use likan::{
     CycleReport, FurnaceConfig, KanExtractor, LiEnhancer, LiKanFurnace, Pattern,
 };
 pub use llm::{ChatResponse, FunctionCall, LlmClient, LlmError, Message, ToolCall};
+pub use progress::{
+    MultiProgressManager, ProgressConfig, ProgressIndicator, ProgressTask, ProgressType,
+    with_progress, with_progress_iter,
+};
 pub use shell_executor::{ExecutionResult, ShellExecutorWithFixer};
 pub use suggestion::{
     ContextSuggester, FileType, HistorySuggester, LlmSuggester, Suggestion, SuggestionCategory,
