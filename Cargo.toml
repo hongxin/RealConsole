@@ -1,6 +1,6 @@
 [package]
 name = "realconsole"
-version = "1.90.0"
+version = "1.91.0"
 edition = "2021"
 authors = ["RealConsole Contributors"]
 description = "An intelligent CLI agent with unified tracing system, combining Eastern philosophy wisdom with modern AI"
