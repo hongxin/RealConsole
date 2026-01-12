@@ -32,5 +32,6 @@ pub mod mobile; // v1.95.0: 移动端增强（触控、手势、虚拟键盘）
 pub mod keyboard; // v1.96.0: 键盘快捷键系统（帮助覆盖层、命令面板）
 pub mod theme; // v1.97.0: 主题系统（亮/暗/跟随系统、自定义主题）
 pub mod virtual_scroll; // v1.98.0: 虚拟滚动（大输出性能优化、DOM回收）
+pub mod ws_optimize; // v1.99.0: WebSocket 优化（消息批处理、心跳、重连）
 
 pub use server::WebServer;
