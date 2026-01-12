@@ -484,7 +484,7 @@ impl<C: LlmClient + 'static> CacheWarmer<C> {
 
         for query in queries {
             let messages = vec![Message::user(*query)];
-            if let Ok(_) = self.client.chat(messages).await {
+            if self.client.chat(messages).await.is_ok() {
                 warmed += 1;
             }
         }

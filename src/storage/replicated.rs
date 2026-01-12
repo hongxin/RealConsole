@@ -41,6 +41,7 @@ use tokio::sync::RwLock;
 
 /// 写入一致性级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ConsistencyLevel {
     /// 只写入主后端
     One,
@@ -49,6 +50,7 @@ pub enum ConsistencyLevel {
     /// 写入大多数后端（包括主后端）
     Quorum,
     /// 写入所有后端
+    #[default]
     All,
 }
 
@@ -64,11 +66,6 @@ impl ConsistencyLevel {
     }
 }
 
-impl Default for ConsistencyLevel {
-    fn default() -> Self {
-        ConsistencyLevel::All
-    }
-}
 
 // ============================================================================
 // 读取策略
@@ -76,20 +73,17 @@ impl Default for ConsistencyLevel {
 
 /// 读取策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ReadStrategy {
     /// 只从主后端读取
     PrimaryOnly,
     /// 优先主后端，失败则从副本读取
+    #[default]
     PrimaryWithFallback,
     /// 从任意可用后端读取（负载均衡）
     Any,
 }
 
-impl Default for ReadStrategy {
-    fn default() -> Self {
-        ReadStrategy::PrimaryWithFallback
-    }
-}
 
 // ============================================================================
 // 后端状态

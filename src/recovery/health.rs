@@ -34,7 +34,7 @@ use tokio::sync::RwLock;
 // ============================================================================
 
 /// 健康状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum HealthStatus {
     /// 健康
     Healthy,
@@ -43,6 +43,7 @@ pub enum HealthStatus {
     /// 不健康
     Unhealthy,
     /// 未知（未执行检查）
+    #[default]
     Unknown,
 }
 
@@ -63,11 +64,6 @@ impl HealthStatus {
     }
 }
 
-impl Default for HealthStatus {
-    fn default() -> Self {
-        HealthStatus::Unknown
-    }
-}
 
 // ============================================================================
 // 健康检查结果

@@ -168,27 +168,27 @@ impl MultiDimensionalIndex {
         // 更新时间索引
         self.by_timestamp
             .entry(entry.timestamp)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
 
         // 更新维度索引
         self.by_dimension
-            .entry(entry.dimension.clone())
-            .or_insert_with(HashSet::new)
+            .entry(entry.dimension)
+            .or_default()
             .insert(id);
-        *self.stats.dimension_counts.entry(entry.dimension.clone()).or_insert(0) += 1;
+        *self.stats.dimension_counts.entry(entry.dimension).or_insert(0) += 1;
 
         // 更新类型索引
         self.by_entry_type
             .entry(entry.entry_type.clone())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
 
         // 更新状态索引
         let status_key = StatusKey::from(&entry.status);
         self.by_status
             .entry(status_key)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
         *self.stats.status_counts.entry(status_key).or_insert(0) += 1;
 
@@ -197,7 +197,7 @@ impl MultiDimensionalIndex {
             let level = importance_to_level(importance);
             self.by_importance
                 .entry(level)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(id);
         }
 
@@ -205,7 +205,7 @@ impl MultiDimensionalIndex {
         for tag in &entry.tags {
             self.by_tag
                 .entry(tag.clone())
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(id);
         }
 
@@ -213,7 +213,7 @@ impl MultiDimensionalIndex {
         let hash = entry.content_hash();
         self.by_content_hash
             .entry(hash)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
 
         // 存储条目

@@ -50,10 +50,12 @@ impl Default for WsOptimizeConfig {
 
 /// Message priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum MessagePriority {
     /// Low priority (can be batched/delayed)
     Low = 0,
     /// Normal priority
+    #[default]
     Normal = 1,
     /// High priority (bypass batching)
     High = 2,
@@ -61,11 +63,6 @@ pub enum MessagePriority {
     Critical = 3,
 }
 
-impl Default for MessagePriority {
-    fn default() -> Self {
-        MessagePriority::Normal
-    }
-}
 
 /// Message wrapper with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -286,11 +283,7 @@ impl HeartbeatState {
     pub fn latency_ms(&self) -> u64 {
         let ping = self.last_ping.load(Ordering::SeqCst);
         let pong = self.last_pong.load(Ordering::SeqCst);
-        if pong >= ping {
-            pong - ping
-        } else {
-            0
-        }
+        pong.saturating_sub(ping)
     }
 }
 

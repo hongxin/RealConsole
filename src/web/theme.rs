@@ -12,20 +12,17 @@ use std::collections::HashMap;
 /// Theme mode options
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum ThemeMode {
     /// Light theme
     Light,
     /// Dark theme
     Dark,
     /// Follow system preference
+    #[default]
     System,
 }
 
-impl Default for ThemeMode {
-    fn default() -> Self {
-        ThemeMode::System
-    }
-}
 
 impl ThemeMode {
     /// Get display name for UI

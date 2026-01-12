@@ -186,8 +186,7 @@ impl KeywordTrie {
             let chars: Vec<char> = word.chars().collect();
             for start in 0..chars.len() {
                 let mut node_idx = 0;
-                for i in start..chars.len() {
-                    let ch = chars[i];
+                for &ch in chars.iter().skip(start) {
                     if let Some(&next_idx) = self.nodes[node_idx].children.get(&ch) {
                         node_idx = next_idx;
                         if self.nodes[node_idx].is_end {
@@ -251,7 +250,7 @@ impl BloomFilter {
         // 计算最优哈希函数数量: k = (m/n) * ln(2)
         let hash_count =
             ((size as f64 / expected_items as f64) * 2.0_f64.ln()).ceil() as usize;
-        let hash_count = hash_count.max(1).min(10); // 限制在 1-10 之间
+        let hash_count = hash_count.clamp(1, 10); // 限制在 1-10 之间
 
         Self {
             bits: vec![false; size],

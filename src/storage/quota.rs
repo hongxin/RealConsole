@@ -469,13 +469,8 @@ impl<B: StorageBackend> QuotaStorage<B> {
     async fn update_tracking(&self, key: &str, new_size: usize) {
         let old_size = self.key_sizes.set(key, new_size).await;
 
-        if old_size.is_none() {
-            // 新键
-            self.key_count.fetch_add(1, Ordering::SeqCst);
-            self.total_bytes.fetch_add(new_size as u64, Ordering::SeqCst);
-        } else {
+        if let Some(old) = old_size {
             // 更新现有键
-            let old = old_size.unwrap();
             if new_size > old {
                 self.total_bytes
                     .fetch_add((new_size - old) as u64, Ordering::SeqCst);
@@ -483,6 +478,10 @@ impl<B: StorageBackend> QuotaStorage<B> {
                 self.total_bytes
                     .fetch_sub((old - new_size) as u64, Ordering::SeqCst);
             }
+        } else {
+            // 新键
+            self.key_count.fetch_add(1, Ordering::SeqCst);
+            self.total_bytes.fetch_add(new_size as u64, Ordering::SeqCst);
         }
     }
 

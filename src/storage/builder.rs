@@ -73,6 +73,7 @@ use std::sync::Arc;
 
 /// 存储层配置
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct StorageLayerConfig {
     /// 压缩配置
     pub compression: Option<CompressedStorageConfig>,
@@ -82,15 +83,6 @@ pub struct StorageLayerConfig {
     pub versioning: Option<VersionedStorageConfig>,
 }
 
-impl Default for StorageLayerConfig {
-    fn default() -> Self {
-        Self {
-            compression: None,
-            cache: None,
-            versioning: None,
-        }
-    }
-}
 
 /// 存储构建器
 ///

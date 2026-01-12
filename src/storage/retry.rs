@@ -109,8 +109,10 @@ impl Default for BackoffStrategy {
 
 /// 重试条件
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum RetryCondition {
     /// 所有错误都重试
+    #[default]
     All,
     /// 只重试 IO 错误
     IoOnly,
@@ -138,11 +140,6 @@ impl RetryCondition {
     }
 }
 
-impl Default for RetryCondition {
-    fn default() -> Self {
-        RetryCondition::All
-    }
-}
 
 // ============================================================================
 // 重试统计

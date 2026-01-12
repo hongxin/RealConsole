@@ -94,8 +94,7 @@ impl StaticCompleter {
     ///
     /// 根据当前 Git 仓库状态智能推荐命令
     fn complete_git_command(&self, input: &str) -> Vec<Candidate> {
-        let git_context = self.git_context.as_ref()
-            .map(|c| c.clone())
+        let git_context = self.git_context.clone()
             .unwrap_or_else(GitContext::detect);
 
         let mut candidates = Vec::new();
@@ -164,8 +163,7 @@ impl StaticCompleter {
 
     /// Git 建议补全（用于空输入或短输入）
     fn complete_git_suggestions(&self, input: &str) -> Vec<Candidate> {
-        let git_context = self.git_context.as_ref()
-            .map(|c| c.clone())
+        let git_context = self.git_context.clone()
             .unwrap_or_else(GitContext::detect);
 
         if !git_context.is_git_repo {

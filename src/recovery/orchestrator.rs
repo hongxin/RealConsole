@@ -39,20 +39,15 @@ use tokio::sync::RwLock;
 // ============================================================================
 
 /// 熔断器状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum CircuitState {
     /// 关闭（正常）
+    #[default]
     Closed,
     /// 打开（熔断中）
     Open,
     /// 半开（测试恢复）
     HalfOpen,
-}
-
-impl Default for CircuitState {
-    fn default() -> Self {
-        CircuitState::Closed
-    }
 }
 
 // ============================================================================

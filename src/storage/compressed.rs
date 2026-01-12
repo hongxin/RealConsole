@@ -61,12 +61,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// 压缩级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum CompressionLevel {
     /// 不压缩
     None,
     /// 快速压缩 (level 1)
     Fast,
     /// 默认压缩 (level 6)
+    #[default]
     Default,
     /// 最佳压缩 (level 9)
     Best,
@@ -76,22 +78,17 @@ pub enum CompressionLevel {
 
 impl CompressionLevel {
     /// 转换为 flate2 的 Compression
-    fn to_flate2(&self) -> Option<Compression> {
+    fn to_flate2(self) -> Option<Compression> {
         match self {
             CompressionLevel::None => None,
             CompressionLevel::Fast => Some(Compression::fast()),
             CompressionLevel::Default => Some(Compression::default()),
             CompressionLevel::Best => Some(Compression::best()),
-            CompressionLevel::Custom(level) => Some(Compression::new(*level)),
+            CompressionLevel::Custom(level) => Some(Compression::new(level)),
         }
     }
 }
 
-impl Default for CompressionLevel {
-    fn default() -> Self {
-        CompressionLevel::Default
-    }
-}
 
 /// 压缩存储配置
 #[derive(Debug, Clone)]
