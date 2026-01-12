@@ -230,9 +230,9 @@ impl ChartCommandParser {
     /// 解析 chart 命令
     ///
     /// 示例命令：
-    /// ```
+    /// ```ignore
     /// !chart line --title "月度趋势" --x-axis "1月,2月,3月" --series "销售额:120,132,101"
-    /// ```
+    /// ```ignore
     pub fn parse(command: &str) -> Result<ChartData> {
         // 移除 "chart" 前缀
         let command = command.trim_start_matches("chart").trim();

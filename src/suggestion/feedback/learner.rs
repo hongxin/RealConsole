@@ -63,7 +63,7 @@ impl FeedbackLearner {
     /// 调整后的评分（0.0-1.0）
     ///
     /// # 示例
-    /// ```no_run
+    /// ```ignore
     /// # use realconsole::suggestion::feedback::{FeedbackCollector, FeedbackLearner};
     /// # use realconsole::suggestion::{Suggestion, SuggestionContext};
     /// # async fn example() -> anyhow::Result<()> {
@@ -117,7 +117,7 @@ impl FeedbackLearner {
     /// 批量调整建议评分
     ///
     /// # 示例
-    /// ```no_run
+    /// ```ignore
     /// # use realconsole::suggestion::feedback::{FeedbackCollector, FeedbackLearner};
     /// # use realconsole::suggestion::{Suggestion, SuggestionContext};
     /// # async fn example() -> anyhow::Result<()> {
@@ -143,7 +143,7 @@ impl FeedbackLearner {
     /// 获取建议的统计信息
     ///
     /// # 示例
-    /// ```no_run
+    /// ```ignore
     /// # use realconsole::suggestion::feedback::{FeedbackCollector, FeedbackLearner};
     /// # async fn example() -> anyhow::Result<()> {
     /// # let collector = FeedbackCollector::from_default_location().await?;

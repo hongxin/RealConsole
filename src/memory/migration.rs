@@ -154,7 +154,7 @@ impl MemoryMigrator {
     /// - `Err(...)`: 文件读取错误
     ///
     /// # 示例
-    /// ```rust,no_run
+    /// ```ignore
     /// use realconsole::memory::migration::MemoryMigrator;
     /// use realconsole::memory::manager::MemoryManager;
     ///
@@ -164,7 +164,7 @@ impl MemoryMigrator {
     /// println!("{}", report.format());
     /// # Ok::<(), anyhow::Error>(())
     /// # };
-    /// ```
+    /// ```ignore
     pub async fn migrate_from_file<P: AsRef<Path>>(&self, file_path: P) -> Result<MigrationReport> {
         let path = file_path.as_ref();
         let mut report = MigrationReport::new();

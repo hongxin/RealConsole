@@ -215,9 +215,9 @@ async fn handle_input(
 /// 执行系统命令（v1.28.1: 统一回合系统）
 ///
 /// ## 消息流程
-/// ```
+/// ```ignore
 /// RoundStart(type: system) → 执行命令 → RoundComplete
-/// ```
+/// ```ignore
 ///
 /// ## 与 LLM 的差异
 /// - ❌ 没有 `Thinking` 消息
@@ -325,9 +325,9 @@ async fn execute_system_command(
 /// 执行 Shell 命令（v1.28.1: 统一回合系统）
 ///
 /// ## 消息流程
-/// ```
+/// ```ignore
 /// RoundStart(type: shell) → 执行命令 → RoundComplete
-/// ```
+/// ```ignore
 ///
 /// ## 与 LLM 的差异
 /// - ❌ 没有 `Thinking` 消息
@@ -536,9 +536,9 @@ fn parse_csv_command(
 /// 处理 `!chart` 命令，解析参数并生成图表
 ///
 /// ## 消息流程
-/// ```
+/// ```ignore
 /// RoundStart(type: shell) → Chart(chart_data) → RoundComplete
-/// ```
+/// ```ignore
 async fn execute_chart_command(
     cmd: &str,
     session: &Arc<Session>,
@@ -951,9 +951,9 @@ async fn execute_chart_command(
 /// 执行 LLM 对话（v1.28.1: 统一回合系统 + 工具调用）
 ///
 /// ## 消息流程
-/// ```
+/// ```ignore
 /// RoundStart(type: llm) → Thinking → Stream(流式) → RoundComplete
-/// ```
+/// ```ignore
 ///
 /// ## 与 Shell/System 的差异
 /// - ✅ 有 `Thinking` 消息（显示飞轮 + 模型名称）
@@ -1426,9 +1426,9 @@ fn extract_tools_from_response(llm_response: &crate::services::LlmResponse) -> V
 /// 处理 `/decompose` 命令的 WebSocket 版本
 ///
 /// ## 消息流程（v1.29.1 修复：加入回合系统）
-/// ```
+/// ```ignore
 /// RoundStart → Thinking → IntentUnderstanding → StepProgress × N → Output → RoundComplete
-/// ```
+/// ```ignore
 ///
 /// ## 与其他命令的一致性
 /// - ✅ 有 `RoundStart` 和 `RoundComplete`（回合模式必需）
@@ -1761,9 +1761,9 @@ async fn execute_decompose_command(
 /// - `/memory stats` - 显示内存统计信息
 ///
 /// ## 消息流程
-/// ```
+/// ```ignore
 /// RoundStart(type: system) → 执行命令 → RoundComplete
-/// ```
+/// ```ignore
 async fn execute_memory_command(
     args: &str,
     session: &Arc<Session>,

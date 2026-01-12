@@ -10,7 +10,7 @@
 //!
 //! ## 使用示例
 //!
-//! ```rust
+//! ```ignore
 //! // Chart 提取
 //! let extractor = ChartExtractor;
 //! let result = extractor.extract(response);

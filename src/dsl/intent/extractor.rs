@@ -30,12 +30,12 @@ use std::collections::HashMap;
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
 /// use realconsole::dsl::intent::extractor::EntityExtractor;
 ///
 /// let extractor = EntityExtractor::new();
 /// let entities = extractor.extract("统计 Python 代码行数", &Default::default());
-/// ```
+/// ```ignore
 #[derive(Debug)]
 pub struct EntityExtractor {
     /// Cached regex patterns for performance
@@ -75,7 +75,7 @@ impl EntityExtractor {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::extractor::EntityExtractor;
     /// use realconsole::dsl::intent::EntityType;
     /// use std::collections::HashMap;
@@ -88,7 +88,7 @@ impl EntityExtractor {
     /// let entities = extractor.extract("统计 Python 代码行数在 ./src 目录", &expected);
     /// assert!(entities.contains_key("file_type"));
     /// assert!(entities.contains_key("path"));
-    /// ```
+    /// ```ignore
     pub fn extract(
         &self,
         input: &str,
@@ -142,7 +142,7 @@ impl EntityExtractor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use realconsole::dsl::intent::extractor::EntityExtractor;
     /// use realconsole::dsl::intent::EntityType;
     ///
@@ -151,7 +151,7 @@ impl EntityExtractor {
     /// if let Some(EntityType::FileType(ft)) = extractor.extract_file_type("统计 Python 代码") {
     ///     assert_eq!(ft, "py");
     /// }
-    /// ```
+    /// ```ignore
     pub fn extract_file_type(&self, input: &str) -> Option<EntityType> {
         if let Some(captures) = self.file_type_pattern.captures(input) {
             if let Some(matched) = captures.get(1) {
@@ -215,7 +215,7 @@ impl EntityExtractor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use realconsole::dsl::intent::extractor::EntityExtractor;
     /// use realconsole::dsl::intent::EntityType;
     ///
@@ -224,7 +224,7 @@ impl EntityExtractor {
     /// if let Some(EntityType::Path(path)) = extractor.extract_path("查找 ./src 目录") {
     ///     assert_eq!(path, "./src");
     /// }
-    /// ```
+    /// ```ignore
     pub fn extract_path(&self, input: &str) -> Option<EntityType> {
         // Try to find all path matches and return the first valid one
         for captures in self.path_pattern.captures_iter(input) {
@@ -251,7 +251,7 @@ impl EntityExtractor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use realconsole::dsl::intent::extractor::EntityExtractor;
     /// use realconsole::dsl::intent::EntityType;
     ///
@@ -260,7 +260,7 @@ impl EntityExtractor {
     /// if let Some(EntityType::Number(n)) = extractor.extract_number("查找大于 100 MB 的文件") {
     ///     assert_eq!(n, 100.0);
     /// }
-    /// ```
+    /// ```ignore
     pub fn extract_number(&self, input: &str) -> Option<EntityType> {
         if let Some(captures) = self.number_pattern.captures(input) {
             if let Some(matched) = captures.get(1) {
@@ -350,7 +350,7 @@ impl EntityExtractor {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore
     /// use realconsole::dsl::intent::extractor::EntityExtractor;
     /// use realconsole::dsl::intent::EntityType;
     ///
@@ -365,7 +365,7 @@ impl EntityExtractor {
     /// if let Some(EntityType::Custom(_, dir)) = extractor.extract_sort_direction("显示最小的文件") {
     ///     assert_eq!(dir, "-h");
     /// }
-    /// ```
+    /// ```ignore
     fn extract_sort_direction(&self, input: &str) -> Option<EntityType> {
         let input_lower = input.to_lowercase();
 

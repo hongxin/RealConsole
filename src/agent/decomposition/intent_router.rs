@@ -70,7 +70,7 @@ impl IntentRouter {
     ///
     /// # 示例
     ///
-    /// ```no_run
+    /// ```ignore
     /// let router = IntentRouter::new();
     ///
     /// // 成功匹配

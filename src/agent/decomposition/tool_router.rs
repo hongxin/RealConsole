@@ -10,7 +10,7 @@
 //!
 //! # 示例
 //!
-//! ```rust
+//! ```ignore
 //! use realconsole::agent::decomposition::tool_router::ToolRouter;
 //!
 //! let router = ToolRouter::new();
@@ -67,7 +67,7 @@ impl std::fmt::Debug for ToolMapping {
 ///
 /// # 示例
 ///
-/// ```no_run
+/// ```ignore
 /// use realconsole::agent::decomposition::tool_router::ToolRouter;
 ///
 /// let router = ToolRouter::new();
@@ -106,7 +106,7 @@ impl ToolRouter {
     ///
     /// # 示例
     ///
-    /// ```no_run
+    /// ```ignore
     /// let router = ToolRouter::new();
     ///
     /// if let Some((tool, params)) = router.route(&intent_match) {

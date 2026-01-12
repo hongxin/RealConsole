@@ -12,7 +12,7 @@
 //! ```text
 //! Static (确定性) → Semantic (灵活性) → Intelligent (预测性)
 //!   <10ms             10-50ms              50-300ms
-//! ```
+//! ```ignore
 //!
 //! # 使用示例
 //!
@@ -28,7 +28,7 @@
 //!
 //! // 补全输入
 //! let candidates = completer.complete("/he", 3, &ctx)?;
-//! ```
+//! ```ignore
 
 mod cache;
 mod intelligent_completer;
@@ -63,7 +63,7 @@ use tokio::sync::RwLock as TokioRwLock;
 ///   ├─ StaticCompleter (Phase 1) ✅
 ///   ├─ SemanticCompleter (Phase 2) ✅
 ///   └─ IntelligentCompleter (Phase 3) ✅
-/// ```
+/// ```ignore
 pub struct MultiDimensionalCompleter {
     /// Phase 1: 静态补全器
     static_completer: StaticCompleter,

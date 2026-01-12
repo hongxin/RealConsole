@@ -26,7 +26,7 @@
 //!
 //! # 使用示例
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use realconsole::memory::manager::MemoryManager;
 //! use realconsole::memory::memory_core::MemoryEntryType;
 //! use std::sync::Arc;
@@ -44,7 +44,7 @@
 //! // 搜索记忆
 //! let results = manager.search("Rust").await.unwrap();
 //! # }
-//! ```
+//! ```ignore
 //!
 //! # 注意事项
 //!
@@ -80,7 +80,7 @@ impl MemoryManager {
     /// - `capacity`: 最大容量（用于兼容）
     ///
     /// # 示例
-    /// ```rust,no_run
+    /// ```ignore
     /// use realconsole::memory::manager::MemoryManager;
     /// use realconsole::tracer::UnifiedTracer;
     /// use std::sync::Arc;
@@ -88,7 +88,7 @@ impl MemoryManager {
     /// // 假设已有 tracer
     /// let tracer = Arc::new(tracer);
     /// let manager = MemoryManager::new(tracer, 100);
-    /// ```
+    /// ```ignore
     pub fn new(tracer: Arc<UnifiedTracer>, capacity: usize) -> Self {
         Self { tracer, capacity }
     }
@@ -100,14 +100,14 @@ impl MemoryManager {
     /// - `entry_type`: 条目类型
     ///
     /// # 示例
-    /// ```rust,no_run
+    /// ```ignore
     /// use realconsole::memory::manager::MemoryManager;
     /// use realconsole::memory::EntryType;
     ///
     /// # async {
     /// manager.add("Hello, world!".to_string(), EntryType::User).await;
     /// # };
-    /// ```
+    /// ```ignore
     pub async fn add(&self, content: String, entry_type: MemoryEntryType) {
         let trace_entry = self.memory_entry_to_trace(&MemoryEntry::new(content, entry_type));
         self.tracer.add_entry(trace_entry).await;

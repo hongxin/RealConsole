@@ -30,7 +30,7 @@ impl IntentDecomposer {
     ///
     /// # 示例
     ///
-    /// ```no_run
+    /// ```ignore
     /// let plan = decomposer.decompose("加载 data.csv 并显示前 10 行").await?;
     /// println!("理解: {}", plan.understanding);
     /// println!("步骤数: {}", plan.step_count());

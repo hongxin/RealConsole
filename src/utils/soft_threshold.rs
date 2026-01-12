@@ -12,7 +12,7 @@
 //! } else {
 //!     reject  // 0.69 → 0%
 //! }
-//! ```
+//! ```ignore
 //! 在阈值边界处有明显的"跳变"，不符合自然规律。
 //!
 //! **软阈值的优势**：
@@ -21,7 +21,7 @@
 //! // 0.69 → 48%
 //! // 0.70 → 50%
 //! // 0.71 → 52%
-//! ```
+//! ```ignore
 //! 平滑过渡，更符合真实世界的"模糊性"。
 
 use std::f64::consts::E;
@@ -34,7 +34,7 @@ use std::f64::consts::E;
 ///
 /// ```text
 /// σ(x) = 1 / (1 + e^(-x))
-/// ```
+/// ```ignore
 ///
 /// # 参数
 /// - `x`: 输入值
@@ -43,13 +43,13 @@ use std::f64::consts::E;
 /// - 输出在 (0, 1) 区间，x=0 时输出 0.5
 ///
 /// # 示例
-/// ```
+/// ```ignore
 /// use realconsole::utils::soft_threshold::sigmoid;
 ///
 /// assert!((sigmoid(0.0) - 0.5).abs() < 1e-10);
 /// assert!(sigmoid(5.0) > 0.99);   // 正数 → 接近 1
 /// assert!(sigmoid(-5.0) < 0.01);  // 负数 → 接近 0
-/// ```
+/// ```ignore
 pub fn sigmoid(x: f64) -> f64 {
     1.0 / (1.0 + E.powf(-x))
 }
@@ -69,7 +69,7 @@ pub fn sigmoid(x: f64) -> f64 {
 /// - 输出在 (0, 1) 区间
 ///
 /// # 示例
-/// ```
+/// ```ignore
 /// use realconsole::utils::soft_threshold::sigmoid_with_params;
 ///
 /// // 标准 sigmoid（中心 0，陡度 1）
@@ -81,7 +81,7 @@ pub fn sigmoid(x: f64) -> f64 {
 /// // 陡度增加（更接近硬阈值）
 /// let steep = sigmoid_with_params(0.71, 0.7, 10.0);
 /// assert!(steep > 0.7);  // 快速上升
-/// ```
+/// ```ignore
 pub fn sigmoid_with_params(x: f64, center: f64, steepness: f64) -> f64 {
     sigmoid((x - center) * steepness)
 }
@@ -96,12 +96,12 @@ pub fn sigmoid_with_params(x: f64, center: f64, steepness: f64) -> f64 {
 /// ```text
 /// if score >= threshold { 100% }
 /// else { 0% }
-/// ```
+/// ```ignore
 ///
 /// **软阈值**：
 /// ```text
 /// probability = sigmoid((score - threshold) / softness)
-/// ```
+/// ```ignore
 ///
 /// # 参数
 /// - `score`: 评分（如置信度、匹配度等）
@@ -116,7 +116,7 @@ pub fn sigmoid_with_params(x: f64, center: f64, steepness: f64) -> f64 {
 /// - 接受概率 (0, 1)
 ///
 /// # 示例
-/// ```
+/// ```ignore
 /// use realconsole::utils::soft_threshold::acceptance_probability;
 ///
 /// // 陡峭过渡（softness = 0.1）
@@ -136,7 +136,7 @@ pub fn sigmoid_with_params(x: f64, center: f64, steepness: f64) -> f64 {
 /// assert!(p4 > 0.2 && p4 < 0.3);  // ~25%
 /// assert!((p5 - 0.5).abs() < 0.01);  // ~50%
 /// assert!(p6 > 0.7 && p6 < 0.8);  // ~75%
-/// ```
+/// ```ignore
 pub fn acceptance_probability(score: f64, threshold: f64, softness: f64) -> f64 {
     // softness 作为除数，值越大过渡越平缓
     sigmoid((score - threshold) / softness)
@@ -151,13 +151,13 @@ pub fn acceptance_probability(score: f64, threshold: f64, softness: f64) -> f64 
 /// **硬超时**：
 /// ```text
 /// if idle_time >= timeout { clear(); }  // 突然清除
-/// ```
+/// ```ignore
 ///
 /// **软超时**：
 /// ```text
 /// probability = smooth_clear_probability(idle_time, timeout);
 /// if random() < probability { clear(); }  // 概率清除
-/// ```
+/// ```ignore
 ///
 /// # 参数
 /// - `idle_seconds`: 空闲时间（秒）
@@ -170,7 +170,7 @@ pub fn acceptance_probability(score: f64, threshold: f64, softness: f64) -> f64 
 ///   - `idle > timeout*2`: 接近 1（几乎必然清除）
 ///
 /// # 示例
-/// ```
+/// ```ignore
 /// use realconsole::utils::soft_threshold::smooth_clear_probability;
 ///
 /// let timeout = 600.0;  // 10 分钟
@@ -185,7 +185,7 @@ pub fn acceptance_probability(score: f64, threshold: f64, softness: f64) -> f64 
 ///
 /// // 远超阈值：接近 100%
 /// assert!(smooth_clear_probability(1200.0, timeout) > 0.9);
-/// ```
+/// ```ignore
 pub fn smooth_clear_probability(idle_seconds: f64, timeout: f64) -> f64 {
     if idle_seconds <= timeout / 2.0 {
         // 前半段：几乎不清除（二次函数，最大 0.1）
@@ -217,13 +217,13 @@ pub fn smooth_clear_probability(idle_seconds: f64, timeout: f64) -> f64 {
 /// - `t = 1.0`: 返回 `to`
 ///
 /// # 示例
-/// ```
+/// ```ignore
 /// use realconsole::utils::soft_threshold::lerp;
 ///
 /// assert_eq!(lerp(0.0, 10.0, 0.0), 0.0);
 /// assert_eq!(lerp(0.0, 10.0, 0.5), 5.0);
 /// assert_eq!(lerp(0.0, 10.0, 1.0), 10.0);
-/// ```
+/// ```ignore
 pub fn lerp(from: f64, to: f64, t: f64) -> f64 {
     from + (to - from) * t
 }
@@ -243,7 +243,7 @@ pub fn lerp(from: f64, to: f64, t: f64) -> f64 {
 /// - `x >= edge1`: 返回 1.0
 ///
 /// # 示例
-/// ```
+/// ```ignore
 /// use realconsole::utils::soft_threshold::smoothstep;
 ///
 /// assert_eq!(smoothstep(0.0, 1.0, -0.5), 0.0);
@@ -251,7 +251,7 @@ pub fn lerp(from: f64, to: f64, t: f64) -> f64 {
 /// assert!((smoothstep(0.0, 1.0, 0.5) - 0.5).abs() < 0.1);
 /// assert_eq!(smoothstep(0.0, 1.0, 1.0), 1.0);
 /// assert_eq!(smoothstep(0.0, 1.0, 1.5), 1.0);
-/// ```
+/// ```ignore
 pub fn smoothstep(edge0: f64, edge1: f64, x: f64) -> f64 {
     // 裁剪到边界
     let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);

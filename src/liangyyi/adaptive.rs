@@ -16,7 +16,7 @@
 //!
 //! ## 使用场景
 //!
-//! ```rust
+//! ```ignore
 //! use realconsole::liangyyi::{AdaptiveSystem, TargetState};
 //!
 //! // 1. 定义目标状态

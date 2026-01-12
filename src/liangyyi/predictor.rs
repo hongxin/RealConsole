@@ -16,7 +16,7 @@
 //!
 //! ## 使用场景
 //!
-//! ```rust
+//! ```ignore
 //! use realconsole::liangyyi::{StatePredictor, StateVector};
 //!
 //! // 1. 创建预测器

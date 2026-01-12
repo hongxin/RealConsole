@@ -1117,7 +1117,7 @@ impl Agent {
     /// - 无模式时：`None`
     ///
     /// # 示例
-    /// ```
+    /// ```text
     /// // 默认提示符
     /// (RealConsole v1) user %
     ///

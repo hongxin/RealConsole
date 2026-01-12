@@ -111,10 +111,10 @@ impl LlmSuggester {
     /// 解析 LLM 响应
     ///
     /// 期望格式：
-    /// ```
+    /// ```ignore
     /// command | description
     /// another command | description
-    /// ```
+    /// ```ignore
     fn parse_llm_response(&self, response: &str) -> Vec<Suggestion> {
         response
             .lines()

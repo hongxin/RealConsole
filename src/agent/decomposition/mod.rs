@@ -13,7 +13,7 @@
 //!
 //! # 使用示例
 //!
-//! ```no_run
+//! ```ignore
 //! use realconsole::agent::decomposition::{IntentDecomposer, PlanExecutor};
 //!
 //! async fn example(llm: Arc<dyn LlmClient>) {

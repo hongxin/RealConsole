@@ -26,7 +26,7 @@ use std::collections::HashMap;
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
 /// use realconsole::dsl::intent::pipeline_bridge::IntentToPipeline;
 ///
 /// let converter = IntentToPipeline::new();

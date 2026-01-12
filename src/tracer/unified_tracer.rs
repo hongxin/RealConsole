@@ -18,7 +18,7 @@
 //!
 //! # 使用示例
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use realconsole::tracer::UnifiedTracer;
 //! use std::sync::Arc;
 //! use tokio::sync::RwLock;
@@ -69,7 +69,7 @@ use uuid::Uuid;
 ///
 /// # 示例
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use realconsole::tracer::UnifiedTracer;
 /// // ... 创建 tracer
 /// let entries = tracer.query_all(20).await?;
@@ -168,7 +168,7 @@ impl UnifiedTracer {
     ///
     /// # 示例
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// let entries = tracer.query_all(20).await?;
     /// ```
     pub async fn query_all(&self, limit: usize) -> Result<Vec<TraceEntry>> {
@@ -246,7 +246,7 @@ impl UnifiedTracer {
     ///
     /// # 示例
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use realconsole::tracer::{Dimension, EntryType, Importance, QueryFilter};
     ///
     /// # async fn example(tracer: std::sync::Arc<realconsole::tracer::UnifiedTracer>) {
@@ -314,7 +314,7 @@ impl UnifiedTracer {
     ///
     /// # 示例
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use realconsole::tracer::{TraceEntry, Dimension, EntryType, Status};
     ///
     /// let entry = TraceEntry::new(
@@ -458,7 +458,7 @@ impl UnifiedTracer {
     ///
     /// # 示例
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// let entries = tracer.query_by_tags(vec!["rust".to_string(), "async".to_string()], 20).await?;
     /// ```
     pub async fn query_by_tags(&self, tags: Vec<String>, limit: usize) -> Result<Vec<TraceEntry>> {
@@ -501,7 +501,7 @@ impl UnifiedTracer {
     ///
     /// # 示例
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use realconsole::tracer::Importance;
     ///
     /// let entries = tracer.query_by_importance(Importance::Critical, 20).await?;

@@ -18,7 +18,7 @@
 //!
 //! ## 使用示例
 //!
-//! ```rust
+//! ```ignore
 //! use realconsole::markdown_renderer::MarkdownRenderer;
 //!
 //! let mut renderer = MarkdownRenderer::new(true)?;

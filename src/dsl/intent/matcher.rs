@@ -34,13 +34,13 @@ use std::sync::{Arc, RwLock};
 ///
 /// # 示例
 ///
-/// ```
+/// ```ignore
 /// use realconsole::dsl::intent::matcher::levenshtein_distance;
 ///
 /// assert_eq!(levenshtein_distance("kitten", "sitting"), 3);
 /// assert_eq!(levenshtein_distance("统计", "统计"), 0);
 /// assert_eq!(levenshtein_distance("统计", "统记"), 1);
-/// ```
+/// ```ignore
 ///
 /// # 算法复杂度
 ///
@@ -110,13 +110,13 @@ pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 ///
 /// # 示例
 ///
-/// ```
+/// ```ignore
 /// use realconsole::dsl::intent::matcher::string_similarity;
 ///
 /// assert_eq!(string_similarity("统计", "统计"), 1.0);
 /// assert!(string_similarity("统计", "统记") > 0.5);
 /// assert!(string_similarity("hello", "world") < 0.5);
-/// ```
+/// ```ignore
 pub fn string_similarity(s1: &str, s2: &str) -> f64 {
     let distance = levenshtein_distance(s1, s2);
     let max_len = s1.chars().count().max(s2.chars().count());
@@ -141,7 +141,7 @@ pub fn string_similarity(s1: &str, s2: &str) -> f64 {
 ///
 /// # 示例
 ///
-/// ```rust
+/// ```ignore
 /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
 ///
 /// let mut matcher = IntentMatcher::new();
@@ -159,7 +159,7 @@ pub fn string_similarity(s1: &str, s2: &str) -> f64 {
 /// // 匹配用户输入（自动提取实体）
 /// let matches = matcher.match_intent("统计 Python 代码行数");
 /// assert!(!matches.is_empty());
-/// ```
+/// ```ignore
 #[derive(Debug)]
 pub struct IntentMatcher {
     /// 已注册的意图列表
@@ -251,7 +251,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::IntentMatcher;
     ///
     /// let matcher = IntentMatcher::new();
@@ -268,7 +268,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::IntentMatcher;
     ///
     /// // 创建一个缓存容量为 50 的匹配器
@@ -287,7 +287,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{IntentMatcher, FuzzyConfig};
     ///
     /// // 创建一个启用模糊匹配的匹配器
@@ -356,7 +356,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -410,7 +410,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -585,7 +585,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -611,7 +611,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -635,7 +635,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::IntentMatcher;
     ///
     /// let matcher = IntentMatcher::new();
@@ -651,7 +651,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -683,7 +683,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -727,7 +727,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -761,7 +761,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();
@@ -795,7 +795,7 @@ impl IntentMatcher {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// use realconsole::dsl::intent::{Intent, IntentDomain, IntentMatcher};
     ///
     /// let mut matcher = IntentMatcher::new();

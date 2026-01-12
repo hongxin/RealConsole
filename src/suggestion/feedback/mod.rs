@@ -12,14 +12,14 @@
 //! 接受（Accepted）   →  积极信号，提升评分
 //! 跳过（Skipped）    →  中性信号，保持评分
 //! 拒绝（Rejected）   →  消极信号，降低评分（未来）
-//! ```
+//! ```ignore
 //!
 //! ### 三层学习
 //! ```text
 //! 即时学习（Instant）     →  单次反馈立即调整
 //! 短期学习（Short-term）  →  最近 N 次反馈的模式
 //! 长期学习（Long-term）   →  历史数据的趋势分析
-//! ```
+//! ```ignore
 //!
 //! ## 使用示例
 //!
@@ -44,7 +44,7 @@
 //! let adjusted_score = learner.adjust_score(&suggestions[0], &context).await;
 //! # Ok(())
 //! # }
-//! ```
+//! ```ignore
 
 mod collector;
 mod learner;

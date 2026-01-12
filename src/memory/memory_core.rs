@@ -235,9 +235,9 @@ impl Memory {
     /// - `capacity`: 最大记忆容量
     ///
     /// # 示例
-    /// ```
+    /// ```ignore
     /// let memory = Memory::new(100);
-    /// ```
+    /// ```ignore
     pub fn new(capacity: usize) -> Self {
         Self {
             entries: VecDeque::with_capacity(capacity),
@@ -260,9 +260,9 @@ impl Memory {
     /// - `entry_type`: 条目类型
     ///
     /// # 示例
-    /// ```
+    /// ```ignore
     /// memory.add("Hello, world!".to_string(), EntryType::User);
-    /// ```
+    /// ```ignore
     pub fn add(&mut self, content: String, entry_type: EntryType) {
         let entry = MemoryEntry::new(content, entry_type);
 

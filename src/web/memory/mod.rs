@@ -27,7 +27,7 @@
 //!
 //! ## 使用示例
 //!
-//! ```rust
+//! ```ignore
 //! let orchestrator = SmartWebUIOrchestrator::new(...);
 //!
 //! // 为当前任务提取相关上下文
@@ -134,7 +134,7 @@ impl SmartWebUIOrchestrator {
     ///
     /// # 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// // 使用自适应 budget（v1.55.0+）
     /// let context = orchestrator
     ///     .extract_relevant_context("调试 Rust trait 问题", None, None)

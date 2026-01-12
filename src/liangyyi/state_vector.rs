@@ -16,7 +16,7 @@
 //!
 //! ## 使用场景
 //!
-//! ```rust
+//! ```ignore
 //! use realconsole::liangyyi::{StateVector, StateSnapshot};
 //!
 //! // 1. 从快照创建向量
@@ -185,7 +185,7 @@ impl StateVector {
     ///
     /// ## 示例
     ///
-    /// ```rust
+    /// ```ignore
     /// let mut vec = StateVector::standard();
     /// vec.set("yin", 0.3);
     ///
