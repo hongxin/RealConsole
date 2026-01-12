@@ -29,5 +29,6 @@ pub mod uploaded_files; // v1.46.0: 文件上传管理
 pub mod metadata_extractor; // v1.53.0: 元数据提取器统一架构
 pub mod memory; // v1.54.0: Memory 2.0 WebUI - 智能上下文编排器
 pub mod mobile; // v1.95.0: 移动端增强（触控、手势、虚拟键盘）
+pub mod keyboard; // v1.96.0: 键盘快捷键系统（帮助覆盖层、命令面板）
 
 pub use server::WebServer;
