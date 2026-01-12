@@ -22,6 +22,7 @@
 pub mod server;
 pub mod session;
 pub mod session_manager; // v1.40.0: 会话持久化管理
+pub mod session_persistence; // v1.94.0: 会话持久化与恢复（自动保存、Token、重连）
 pub mod websocket;
 pub mod frontend;
 pub mod uploaded_files; // v1.46.0: 文件上传管理
