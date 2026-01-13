@@ -35,5 +35,6 @@ pub mod virtual_scroll; // v1.98.0: 虚拟滚动（大输出性能优化、DOM�
 pub mod ws_optimize; // v1.99.0: WebSocket 优化（消息批处理、心跳、重连）
 pub mod asset_optimize; // v1.100.0: 资源优化（缓存策略、压缩、懒加载、代码分割）
 pub mod tabs; // v1.101.0: 多标签支持（标签管理、状态切换、会话隔离）
+pub mod file_transfer; // v1.102.0: 文件传输增强（拖放上传、批量传输、进度显示、断点续传）
 
 pub use server::WebServer;
