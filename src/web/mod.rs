@@ -37,5 +37,6 @@ pub mod asset_optimize; // v1.100.0: 资源优化（缓存策略、压缩、懒�
 pub mod tabs; // v1.101.0: 多标签支持（标签管理、状态切换、会话隔离）
 pub mod file_transfer; // v1.102.0: 文件传输增强（拖放上传、批量传输、进度显示、断点续传）
 pub mod collaboration; // v1.103.0: 协作功能（会话共享、权限控制、实时同步基础）
+pub mod session_storage; // v1.108.0: Web Session 存储迁移（Storage Layer 2.0 集成）
 
 pub use server::WebServer;
