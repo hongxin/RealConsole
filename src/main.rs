@@ -39,6 +39,7 @@ mod services; // ✨ Phase 2: 服务层架构（v1.3.0）
 mod shell_executor;
 mod spinner;
 mod stats; // ✨ Phase 9: 统计与可视化
+mod storage; // ✨ v1.58.0: 存储抽象层（FileStorage, MemoryStorage）
 mod suggestion; // ✨ Phase 4.1: 主动建议系统（三源融合）
 mod system_monitor; // ✨ Phase 6: 系统监控工具
 mod task; // ✨ Phase 10: 任务分解与规划系统

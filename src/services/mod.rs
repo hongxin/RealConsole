@@ -28,6 +28,8 @@ pub mod state_manager;
 pub mod intent_service;
 pub mod llm_service;
 pub mod shell_service;
+pub mod registry; // v1.104.0: 服务注册中心
+pub mod storage_service; // v1.104.0: 存储服务
 // mod tool_service;
 // mod command_service;
 
@@ -35,6 +37,11 @@ pub use state_manager::StateManager;
 pub use intent_service::{IntentError, IntentRequest, IntentResponse, IntentService};
 pub use llm_service::{LlmError, LlmMode, LlmRequest, LlmResponse, LlmService};
 pub use shell_service::{ShellError, ShellRequest, ShellResponse, ShellService};
+pub use registry::{
+    HealthStatus, RegistryEvent, RegistryStats, ServiceDescriptor, ServiceError,
+    ServiceId, ServiceLifecycle, ServiceRegistry, ServiceState,
+};
+pub use storage_service::{OperationCounts, StorageService, StorageServiceConfig, StorageServiceStats};
 
 /// Service trait - 所有服务的基础抽象
 ///
