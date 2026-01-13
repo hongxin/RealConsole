@@ -36,6 +36,7 @@ pub mod decomposer;
 pub mod error;
 pub mod executor;
 pub mod planner;
+pub mod storage; // v1.109.0: Storage Layer 集成
 pub mod types;
 
 // 重新导出核心类型
@@ -54,3 +55,9 @@ pub use types::{
     TaskResult as TaskExecutionResult, TaskType,
 };
 pub use types::{ExecutionContext, ExecutionMode, ExecutionPlan, ExecutionResult, TaskStatus};
+
+// v1.109.0: 导出 Storage Layer 集成
+pub use storage::{
+    PlanStatus, StoredPlan, StoredResult, TaskAsStorage, TaskIndex, TaskIndexEntry,
+    TaskStorageAdapter, TaskStorageConfig, TaskStorageStats,
+};
