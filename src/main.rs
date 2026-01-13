@@ -33,6 +33,7 @@ mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支生�
 mod markdown_renderer; // ✨ v1.25.0: Markdown 渲染器 - LLM 输出美化
 mod memory;
 mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
+mod plugin; // ✨ v1.105.0: 插件系统基础架构（加载、注册、生命周期）
 mod project_context; // ✨ Phase 6: 项目上下文感知
 mod repl; // REPL 循环（包含 Tab 补全集成）
 mod services; // ✨ Phase 2: 服务层架构（v1.3.0）

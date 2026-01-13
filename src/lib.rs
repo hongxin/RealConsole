@@ -43,6 +43,7 @@ pub mod lunar_tool; // ✨ 农历工具：公历/农历转换、节气、干支�
 pub mod markdown_renderer; // ✨ v1.25.0: Markdown 渲染器 - LLM 输出美化
 pub mod memory;
 pub mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
+pub mod plugin; // ✨ v1.105.0: 插件系统基础架构（加载、注册、生命周期）
 pub mod progress; // ✨ v1.86.0: 统一进度指示器（进度条、计时、多任务）
 pub mod project_context; // ✨ Phase 6: 项目上下文感知
 pub mod recovery; // ✨ v1.91.0: 优雅错误恢复（健康检查、熔断、恢复编排）
