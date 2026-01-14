@@ -5,6 +5,100 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-alpha.1] - 2026-01-14
+
+### 🎯 Highlights
+
+**主题**: Notebook 基础架构 - RealConsole 2.0 系列开篇
+
+- ✅ **Notebook 系统** - 交互式计算环境，融合自然语言、命令与代码
+- ✅ **Cell 类型** - Natural/Command/Code/Markdown 四种单元类型
+- ✅ **丰富输出** - Text/Code/Chart/Image/Table/Error/Stream 七种输出
+- ✅ **.rcnb 格式** - Git 友好的 JSON Lines 持久化格式
+- ✅ **异步存储** - Memory/File 双存储实现，支持索引与搜索
+- ✅ **总测试数**: 2604 (+71 新增)
+
+### ✨ Added
+
+- **CellType** - Cell 单元类型
+  - `Natural` - 自然语言输入 → LLM 处理
+  - `Command` - 系统命令 (/help, /memory)
+  - `Code` - 代码块 (Shell, 未来支持 Python)
+  - `Markdown` - Markdown 文档
+
+- **CellState** - Cell 执行状态
+  - `Idle` - 未执行
+  - `Pending` - 排队中
+  - `Running` - 执行中
+  - `Success` - 执行成功
+  - `Failed` - 执行失败
+  - `Cancelled` - 已取消
+
+- **CellOutput** - Cell 输出类型
+  - `Text` - 纯文本输出
+  - `Code` - 代码块（带语言标识）
+  - `Chart` - 图表数据（ECharts 格式）
+  - `Image` - 图片（Base64 编码）
+  - `Table` - 表格数据
+  - `Error` - 错误信息（带 traceback）
+  - `Stream` - 流式输出（stdout/stderr）
+
+- **NotebookStorage** - 存储抽象层
+  - `MemoryNotebookStorage` - 内存存储（测试用）
+  - `FileNotebookStorage` - 文件存储（基于 Storage Layer）
+  - `NotebookIndex` - 索引支持搜索与过滤
+
+- **CellExecutor** - Cell 执行引擎
+  - 支持 Natural/Command/Code/Markdown 执行
+  - 可配置超时、Shell 前缀
+  - 执行统计与监控
+
+- **RcnbFormat** - .rcnb 文件格式
+  - JSON Lines 格式（每行一个 JSON）
+  - 支持流式读取
+  - Git 友好的差异对比
+  - 支持追加写入
+
+### 📊 Notebook Architecture
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                        Notebook                              │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ Cell 1 (Natural): "分析这段代码的性能"                   ││
+│  │ → Output: [Text: "这段代码有以下性能问题..."]            ││
+│  └─────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ Cell 2 (Code): "!cargo bench"                            ││
+│  │ → Output: [Code: "test bench_sort ... 1,234 ns/iter"]    ││
+│  └─────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ Cell 3 (Command): "/memory save performance-analysis"    ││
+│  │ → Output: [Text: "已保存到记忆系统"]                      ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+
+.rcnb 文件格式:
+  Line 1: {"version":"2.0.0-alpha.1","id":"...","name":"..."}
+  Line 2: {"id":"...","cell_type":"natural","source":"..."}
+  Line 3: {"id":"...","cell_type":"code","source":"!cargo bench"}
+  ...
+```
+
+### 🔄 Version Jump
+
+从 v1.112.0 跳跃到 v2.0.0-alpha.1，标志着 RealConsole 2.0 系列的开始。
+v1.101.0 - v1.112.0 完成了所有 v2.0 准备工作：
+
+- v1.101.0-v1.103.0: Multi-tab, File Transfer, Collaboration
+- v1.104.0-v1.109.0: Service/Plugin/Event/Storage 迁移
+- v1.110.0: 统一指标收集系统
+- v1.111.0: 分布式追踪支持
+- v1.112.0: 完整健康检查系统
+
+---
+
 ## [1.74.0] - 2026-01-11
 
 ### 🎯 Highlights
