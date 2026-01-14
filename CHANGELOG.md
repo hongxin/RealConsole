@@ -5,6 +5,70 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-alpha.3] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: Cell 依赖与并行执行
+
+- ✅ **依赖图 (DAG)** - 有向无环图跟踪 Cell 依赖关系
+- ✅ **依赖类型** - Explicit/Variable/Sequential/Output 四种依赖
+- ✅ **并行调度** - 独立 Cell 可并行执行
+- ✅ **变量分析** - 自动检测 Shell 变量依赖
+- ✅ **环检测** - 防止循环依赖
+- ✅ **总测试数**: 2632 (+21 新增)
+
+### ✨ Added
+
+- **DependencyGraph** - 依赖图核心结构
+  - `add_cell()` / `remove_cell()` - Cell 管理
+  - `add_dependency()` - 添加依赖关系
+  - `add_variable_dependency()` - 变量依赖
+  - `get_roots()` / `get_leaves()` - 图遍历
+  - `topological_sort()` - 拓扑排序
+  - `has_cycle()` - 环检测
+  - `has_path()` - 路径查询
+
+- **DependencyType** - 依赖类型
+  - `Explicit` - 用户显式定义
+  - `Variable` - 变量引用
+  - `Sequential` - 顺序依赖
+  - `Output` - 输出依赖
+
+- **ExecutionScheduler** - 执行调度器
+  - `schedule()` - 生成执行计划
+  - `get_ready_cells()` - 获取可执行 Cell
+  - `with_max_batch_size()` - 限制批次大小
+
+- **DependencyAnalyzer** - 依赖分析器
+  - `analyze_cell()` - 分析 Cell 源码
+  - `build_graph()` - 构建依赖图
+  - Shell 变量检测 (`$VAR`, `${VAR}`, `export VAR=`)
+
+### 📊 Dependency Architecture
+
+```text
+依赖图示例 (菱形结构):
+
+    Cell 1 (Root)
+      ↙    ↘
+  Cell 2   Cell 3    ← 可并行执行
+      ↘    ↙
+    Cell 4 (Join)
+
+执行批次:
+  Batch 0: [Cell 1]          ← 无依赖
+  Batch 1: [Cell 2, Cell 3]  ← 并行执行
+  Batch 2: [Cell 4]          ← 等待 2 和 3
+
+变量依赖分析:
+  Cell 1: FOO=bar            ← 定义 FOO
+  Cell 2: echo $FOO          ← 使用 FOO → 依赖 Cell 1
+  Cell 3: BAR=$FOO           ← 使用 FOO，定义 BAR → 依赖 Cell 1
+```
+
+---
+
 ## [2.0.0-alpha.2] - 2026-01-14
 
 ### 🎯 Highlights
