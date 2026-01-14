@@ -45,6 +45,7 @@ pub mod memory;
 pub mod path_resolver; // ✨ UX 改进：统一的配置文件路径搜索
 pub mod plugin; // ✨ v1.105.0: 插件系统基础架构（加载、注册、生命周期）
 pub mod event; // ✨ v1.106.0: 统一事件系统（发布-订阅、事件总线）
+pub mod metrics; // ✨ v1.110.0: 统一指标收集系统（Counter、Gauge、Histogram）
 pub mod progress; // ✨ v1.86.0: 统一进度指示器（进度条、计时、多任务）
 pub mod project_context; // ✨ Phase 6: 项目上下文感知
 pub mod recovery; // ✨ v1.91.0: 优雅错误恢复（健康检查、熔断、恢复编排）
