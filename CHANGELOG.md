@@ -5,6 +5,52 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-beta.1] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: 特性冻结与稳定性优化
+
+- ✅ **特性冻结** - Notebook 系统功能完整
+- ✅ **测试修复** - 环境无关测试改进
+- ✅ **Clippy 清零** - 所有代码警告修复
+- ✅ **代码质量** - 类型别名、条件简化
+- ✅ **总测试数**: 2671 (2628 单元测试 + 43 文档测试)
+
+### 🔧 Fixed
+
+- **环境无关测试**
+  - `test_git_context_detect` - 不再假设特定 Git 环境
+  - `test_completion_context_with_git_detection` - 处理非 Git 仓库情况
+  - `test_handle_git_analyze_*` - 兼容不同 Git 状态
+
+- **Clippy 警告修复**
+  - 使用 `#[derive(Default)]` + `#[default]` 替代手动实现
+  - `sort_by_key` 替代 `sort_by` 提升可读性
+  - `div_ceil()` 替代手动除法向上取整
+  - 嵌套 `if` 语句合并简化
+  - 为复杂回调类型添加类型别名
+  - `map_while(Result::ok)` 替代 `flatten()` 处理迭代器
+  - 允许特定 `await_holding_lock` 场景
+
+### 📦 Modules
+
+**稳定模块 (Feature Complete)**:
+- `notebook::types` - Cell/Notebook/CellOutput 核心类型
+- `notebook::storage` - NotebookStorage 存储抽象
+- `notebook::execution` - CellExecutor 执行引擎
+- `notebook::persistence` - .rcnb 格式读写
+- `notebook::dependency` - 依赖图与并行调度
+- `notebook::collaboration` - OT 协作编辑
+
+**改进模块**:
+- `event` - Default derive 优化
+- `plugin` - HookResult Default derive
+- `storage` - 回调类型别名 (InitCallback, ErrorCallback, etc.)
+- `tracer` - 文档测试修复
+
+---
+
 ## [2.0.0-alpha.4] - 2026-01-15
 
 ### 🎯 Highlights
