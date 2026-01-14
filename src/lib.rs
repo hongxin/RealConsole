@@ -48,6 +48,7 @@ pub mod event; // ✨ v1.106.0: 统一事件系统（发布-订阅、事件总�
 pub mod metrics; // ✨ v1.110.0: 统一指标收集系统（Counter、Gauge、Histogram）
 pub mod progress; // ✨ v1.86.0: 统一进度指示器（进度条、计时、多任务）
 pub mod project_context; // ✨ Phase 6: 项目上下文感知
+pub mod health; // ✨ v1.112.0: 完整健康检查系统（探针、HTTP端点、服务检查）
 pub mod recovery; // ✨ v1.91.0: 优雅错误恢复（健康检查、熔断、恢复编排）
 pub mod repl; // REPL 循环（包含 Tab 补全集成）
 pub mod resource; // ✨ v1.92.0: 资源管理（内存监控、自动清理）
