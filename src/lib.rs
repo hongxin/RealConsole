@@ -71,6 +71,7 @@ pub mod voice; // ✨ 语音播报系统
 pub mod visualization; // ✨ v1.44.0: 可视化系统（数据图表、Notebook）
 pub mod web; // ✨ v1.23.0: Web 终端（浏览器访问）
 pub mod wizard;
+pub mod notebook; // ✨ v2.0.0-alpha.1: Notebook 基础架构（Cell、存储、执行、.rcnb格式）
 
 // Re-export commonly used types
 pub use agent::Agent;
