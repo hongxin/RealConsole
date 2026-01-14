@@ -5,6 +5,69 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-alpha.2] - 2026-01-14
+
+### 🎯 Highlights
+
+**主题**: Notebook WebSocket 集成 - 实时协议支持
+
+- ✅ **WebSocket 协议** - 完整的 Notebook 实时通信协议
+- ✅ **Notebook 操作** - Create/Open/Save/Close/Delete/List/Rename
+- ✅ **Cell 操作** - Add/Update/Delete/Move/Execute/Cancel
+- ✅ **导入导出** - 支持 .rcnb, JSON, Markdown 格式
+- ✅ **实时执行** - 流式输出与状态同步
+- ✅ **总测试数**: 2611 (+7 新增)
+
+### ✨ Added
+
+- **NotebookClientMessage** - 客户端消息类型
+  - `CreateNotebook` - 创建新 Notebook
+  - `OpenNotebook` / `CloseNotebook` - 打开/关闭 Notebook
+  - `SaveNotebook` / `DeleteNotebook` - 保存/删除 Notebook
+  - `ListNotebooks` / `RenameNotebook` - 列表/重命名
+  - `AddCell` / `UpdateCell` / `DeleteCell` / `MoveCell` - Cell 编辑
+  - `ExecuteCell` / `ExecuteAll` / `CancelExecution` - Cell 执行
+  - `ExportNotebook` / `ImportNotebook` - 导入导出
+
+- **NotebookServerMessage** - 服务端消息类型
+  - `NotebookCreated` / `NotebookOpened` / `NotebookSaved` - Notebook 响应
+  - `CellAdded` / `CellUpdated` / `CellDeleted` / `CellMoved` - Cell 响应
+  - `CellExecutionStarted` / `CellOutput` / `CellExecutionCompleted` - 执行流
+  - `NotebookExported` / `NotebookImported` - 导入导出响应
+
+- **NotebookSession** - 会话状态管理
+  - 打开的 Notebook 跟踪
+  - CellExecutor 集成
+  - 存储后端抽象
+
+- **数据传输对象 (DTO)**
+  - `NotebookSummary` - Notebook 列表摘要
+  - `NotebookData` - 完整 Notebook 数据
+  - `CellData` - Cell 传输格式
+  - `CellOutputData` - 输出传输格式
+
+### 📊 WebSocket Protocol
+
+```text
+Client → Server:
+┌────────────────────────────────────────────────────────┐
+│ {"type":"create_notebook","name":"My Analysis"}        │
+│ {"type":"add_cell","notebook_id":"...","cell_type":... │
+│ {"type":"execute_cell","notebook_id":"...","cell_id":..│
+│ {"type":"export_notebook","notebook_id":"...","format":│
+└────────────────────────────────────────────────────────┘
+
+Server → Client:
+┌────────────────────────────────────────────────────────┐
+│ {"type":"notebook_created","notebook":{...}}           │
+│ {"type":"cell_added","notebook_id":"...","cell":{...}} │
+│ {"type":"cell_output","notebook_id":"...","output":{...│
+│ {"type":"cell_execution_completed","state":"success"...│
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## [2.0.0-alpha.1] - 2026-01-14
 
 ### 🎯 Highlights
