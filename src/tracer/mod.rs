@@ -41,6 +41,7 @@
 //! - `docs/04-reports/four-dimensions-philosophy.md` - 哲学理论基础
 
 pub mod dashboard;
+pub mod distributed;  // v1.111.0: 分布式追踪支持
 pub mod entry;
 pub mod index;  // v1.56.0: 多维索引系统
 pub mod types;
@@ -51,6 +52,14 @@ mod benchmarks;
 
 // 重新导出核心类型，方便使用
 pub use dashboard::{Dashboard, DashboardConfig, HealthScore};
+// v1.111.0: 分布式追踪支持
+pub use distributed::{
+    AlwaysOffSampler, AlwaysOnSampler, Carrier, DistributedContext, DistributedTracingStats,
+    ExportFormat, ExportLog, ExportSpan, HeaderCarrier, ParentBasedSampler, ProbabilitySampler,
+    Propagator, RateLimitingSampler, SamplingDecision, SamplingParameters, Sampler, SpanExporter,
+    SpanId, SpanKind, TraceError, TraceFlags, TraceId, TraceParent, TraceState,
+    BAGGAGE_HEADER, TRACEPARENT_HEADER, TRACESTATE_HEADER,
+};
 pub use entry::TraceEntry;
 pub use index::{MultiDimensionalIndex, IndexStats, QueryResult, StatusKey, IndexPersistence, IndexInfo, PersistenceError};  // v1.56.0, v1.57.0
 pub use types::{Dimension, EntryType, Importance, QueryFilter, Status};
