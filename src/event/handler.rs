@@ -28,9 +28,10 @@ pub enum HandlerError {
 }
 
 /// 处理结果
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum HandlerResult {
     /// 成功处理
+    #[default]
     Handled,
     /// 成功处理并停止传播
     StopPropagation,
@@ -79,12 +80,6 @@ impl HandlerResult {
         } else {
             None
         }
-    }
-}
-
-impl Default for HandlerResult {
-    fn default() -> Self {
-        HandlerResult::Handled
     }
 }
 

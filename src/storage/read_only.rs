@@ -37,6 +37,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+// Type alias for callback types to satisfy clippy::type_complexity
+type DenyCallback = Arc<dyn Fn(&str, &str) + Send + Sync>;
+
 // ============================================================================
 // 只读错误
 // ============================================================================
@@ -177,7 +180,7 @@ pub struct ReadOnlyStorage<B: StorageBackend> {
     /// 统计信息
     stats: Arc<ReadOnlyStats>,
     /// 拒绝回调
-    deny_callback: Option<Arc<dyn Fn(&str, &str) + Send + Sync>>,
+    deny_callback: Option<DenyCallback>,
 }
 
 impl<B: StorageBackend> ReadOnlyStorage<B> {
@@ -363,7 +366,7 @@ pub struct ReadOnlyStorageBuilder<B: StorageBackend> {
     config: ReadOnlyConfig,
     key_whitelist: HashSet<String>,
     prefix_whitelist: Vec<String>,
-    deny_callback: Option<Arc<dyn Fn(&str, &str) + Send + Sync>>,
+    deny_callback: Option<DenyCallback>,
 }
 
 impl<B: StorageBackend> ReadOnlyStorageBuilder<B> {

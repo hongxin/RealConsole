@@ -456,10 +456,10 @@ impl CollaborationSession {
         let timeout = chrono::Duration::seconds(self.config.offline_timeout_secs as i64);
 
         for participant in self.participants.values_mut() {
-            if participant.status == ParticipantStatus::Online {
-                if now.signed_duration_since(participant.last_active_at) > timeout {
-                    participant.status = ParticipantStatus::Away;
-                }
+            if participant.status == ParticipantStatus::Online
+                && now.signed_duration_since(participant.last_active_at) > timeout
+            {
+                participant.status = ParticipantStatus::Away;
             }
         }
     }

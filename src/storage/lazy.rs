@@ -38,6 +38,10 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{OnceCell, RwLock};
 
+// Type aliases for callback types to satisfy clippy::type_complexity
+type InitCallback = Arc<dyn Fn() + Send + Sync>;
+type ErrorCallback = Arc<dyn Fn(&str) + Send + Sync>;
+
 // ============================================================================
 // 初始化错误
 // ============================================================================
@@ -136,9 +140,9 @@ pub struct LazyStorage<B: StorageBackend> {
     /// 统计信息
     stats: Arc<LazyStats>,
     /// 初始化成功回调
-    on_init: Option<Arc<dyn Fn() + Send + Sync>>,
+    on_init: Option<InitCallback>,
     /// 初始化失败回调
-    on_error: Option<Arc<dyn Fn(&str) + Send + Sync>>,
+    on_error: Option<ErrorCallback>,
 }
 
 impl<B: StorageBackend + 'static> LazyStorage<B> {
@@ -374,8 +378,8 @@ impl<B: StorageBackend + 'static> StorageBackend for LazyStorage<B> {
 /// LazyStorage 构建器
 pub struct LazyStorageBuilder<B: StorageBackend> {
     factory: Factory<B>,
-    on_init: Option<Arc<dyn Fn() + Send + Sync>>,
-    on_error: Option<Arc<dyn Fn(&str) + Send + Sync>>,
+    on_init: Option<InitCallback>,
+    on_error: Option<ErrorCallback>,
 }
 
 impl<B: StorageBackend + 'static> LazyStorageBuilder<B> {

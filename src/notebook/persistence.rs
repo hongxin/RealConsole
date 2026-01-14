@@ -321,11 +321,9 @@ impl RcnbFormat {
 
         // Count cells
         let mut cell_count = 0;
-        for line_result in lines {
-            if let Ok(line) = line_result {
-                if !line.is_empty() {
-                    cell_count += 1;
-                }
+        for line in lines.map_while(Result::ok) {
+            if !line.is_empty() {
+                cell_count += 1;
             }
         }
 

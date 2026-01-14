@@ -240,7 +240,7 @@ impl EventBus {
             let mut subs = self.subscriptions.write().unwrap();
             subs.push(subscription);
             // 按优先级排序（高优先级在前）
-            subs.sort_by(|a, b| b.priority().cmp(&a.priority()));
+            subs.sort_by_key(|s| std::cmp::Reverse(s.priority()));
             subs.len()
         };
 
@@ -274,7 +274,7 @@ impl EventBus {
         let count = {
             let mut subs = self.subscriptions.write().unwrap();
             subs.push(subscription);
-            subs.sort_by(|a, b| b.priority().cmp(&a.priority()));
+            subs.sort_by_key(|s| std::cmp::Reverse(s.priority()));
             subs.len()
         };
 
@@ -359,6 +359,10 @@ impl EventBus {
     }
 
     /// 异步分发
+    ///
+    /// Note: We hold the read lock across await points here, which is acceptable
+    /// because the async handlers don't modify the subscription list.
+    #[allow(clippy::await_holding_lock)]
     async fn dispatch_async(&self, event: &Event) -> Vec<HandlerResult> {
         // 先处理同步处理器
         let sync_results = self.dispatch_sync(event);

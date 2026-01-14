@@ -455,10 +455,11 @@ impl<S: StorageBackend> TaskStorageAdapter<S> {
 
         let mut removed = 0;
         for entry in index.plans.iter() {
-            if entry.created_at < expiry && entry.status != PlanStatus::Running {
-                if self.delete_plan(&entry.plan_id).await.is_ok() {
-                    removed += 1;
-                }
+            if entry.created_at < expiry
+                && entry.status != PlanStatus::Running
+                && self.delete_plan(&entry.plan_id).await.is_ok()
+            {
+                removed += 1;
             }
         }
 

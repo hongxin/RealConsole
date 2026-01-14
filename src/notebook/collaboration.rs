@@ -406,7 +406,7 @@ impl OperationTransform {
 // ============================================================================
 
 /// Cursor position in the notebook
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct CursorPosition {
     /// Cell ID where cursor is located
     pub cell_id: Option<Uuid>,
@@ -438,17 +438,6 @@ impl CursorPosition {
     /// Check if cursor has selection
     pub fn has_selection(&self) -> bool {
         self.selection_end.is_some()
-    }
-}
-
-impl Default for CursorPosition {
-    fn default() -> Self {
-        Self {
-            cell_id: None,
-            line: 0,
-            column: 0,
-            selection_end: None,
-        }
     }
 }
 

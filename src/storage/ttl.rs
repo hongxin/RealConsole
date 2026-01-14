@@ -39,6 +39,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
+// Type alias for callback types to satisfy clippy::type_complexity
+type ExpirationCallback = Arc<dyn Fn(&str) + Send + Sync>;
+
 // ============================================================================
 // 过期信息
 // ============================================================================
@@ -168,7 +171,7 @@ pub struct TTLStorage<B: StorageBackend> {
     /// 统计信息
     stats: Arc<TTLStats>,
     /// 过期回调
-    expiration_callback: Option<Arc<dyn Fn(&str) + Send + Sync>>,
+    expiration_callback: Option<ExpirationCallback>,
 }
 
 impl<B: StorageBackend> TTLStorage<B> {
@@ -459,7 +462,7 @@ impl<B: StorageBackend> StorageBackend for TTLStorage<B> {
 pub struct TTLStorageBuilder<B: StorageBackend> {
     backend: Arc<B>,
     config: TTLConfig,
-    expiration_callback: Option<Arc<dyn Fn(&str) + Send + Sync>>,
+    expiration_callback: Option<ExpirationCallback>,
 }
 
 impl<B: StorageBackend> TTLStorageBuilder<B> {

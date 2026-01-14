@@ -19,7 +19,7 @@
 //!
 //! ```rust
 //! use realconsole::tracer::distributed::{
-//!     DistributedContext, TraceParent, Propagator, HeaderCarrier,
+//!     DistributedContext, TraceParent, Propagator, HeaderCarrier, Carrier,
 //!     Sampler, SamplingDecision, AlwaysOnSampler,
 //! };
 //!
@@ -768,14 +768,13 @@ impl RateLimitingSampler {
             .as_secs();
 
         let last = self.last_reset.load(Ordering::Relaxed);
-        if now > last {
-            if self
+        if now > last
+            && self
                 .last_reset
                 .compare_exchange(last, now, Ordering::SeqCst, Ordering::Relaxed)
                 .is_ok()
-            {
-                self.counter.store(0, Ordering::Relaxed);
-            }
+        {
+            self.counter.store(0, Ordering::Relaxed);
         }
     }
 }

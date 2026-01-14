@@ -170,10 +170,11 @@ impl EventMetadata {
 }
 
 /// 事件数据
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EventData {
     /// 空数据
+    #[default]
     None,
     /// 字符串
     String(String),
@@ -187,12 +188,6 @@ pub enum EventData {
     Json(serde_json::Value),
     /// 字节数组
     Bytes(Vec<u8>),
-}
-
-impl Default for EventData {
-    fn default() -> Self {
-        EventData::None
-    }
 }
 
 impl EventData {
@@ -307,9 +302,10 @@ impl Event {
 }
 
 /// 事件过滤器
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum EventFilter {
     /// 匹配所有
+    #[default]
     All,
     /// 主题匹配（支持通配符）
     Topic(String),
@@ -383,12 +379,6 @@ impl EventFilter {
                 }
             }
         }
-    }
-}
-
-impl Default for EventFilter {
-    fn default() -> Self {
-        EventFilter::All
     }
 }
 

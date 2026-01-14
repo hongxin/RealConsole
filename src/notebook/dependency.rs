@@ -677,10 +677,12 @@ impl DependencyAnalyzer {
                     before
                 };
                 // Check if it's an assignment (not comparison)
-                if !var_part.contains(' ') && !var_part.contains('<') && !var_part.contains('>') {
-                    if is_valid_variable_name(var_part) {
-                        definitions.insert(var_part.to_string());
-                    }
+                if !var_part.contains(' ')
+                    && !var_part.contains('<')
+                    && !var_part.contains('>')
+                    && is_valid_variable_name(var_part)
+                {
+                    definitions.insert(var_part.to_string());
                 }
             }
 

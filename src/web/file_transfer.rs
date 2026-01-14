@@ -143,7 +143,7 @@ pub struct TransferProgress {
 impl TransferProgress {
     /// 创建新的进度
     pub fn new(total_bytes: usize, chunk_size: usize) -> Self {
-        let total_chunks = (total_bytes + chunk_size - 1) / chunk_size;
+        let total_chunks = total_bytes.div_ceil(chunk_size);
         Self {
             bytes_transferred: 0,
             total_bytes,
@@ -251,7 +251,7 @@ impl Transfer {
     /// 创建新的上传任务
     pub fn new_upload(filename: String, file_size: usize, mime_type: String, chunk_size: usize) -> Self {
         let now = Utc::now();
-        let total_chunks = (file_size + chunk_size - 1) / chunk_size;
+        let total_chunks = file_size.div_ceil(chunk_size);
 
         // 创建块列表
         let mut chunks = Vec::with_capacity(total_chunks);

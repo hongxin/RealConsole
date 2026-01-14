@@ -414,9 +414,10 @@ pub enum HookPoint {
 }
 
 /// 钩子处理结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum HookResult {
     /// 继续执行
+    #[default]
     Continue,
     /// 跳过后续钩子
     Skip,
@@ -424,12 +425,6 @@ pub enum HookResult {
     Abort(String),
     /// 修改数据
     Modify(serde_json::Value),
-}
-
-impl Default for HookResult {
-    fn default() -> Self {
-        HookResult::Continue
-    }
 }
 
 /// 插件管理器配置

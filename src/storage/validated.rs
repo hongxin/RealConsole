@@ -35,6 +35,9 @@ use regex::Regex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+// Type alias for callback types to satisfy clippy::type_complexity
+type WarnCallback = Arc<dyn Fn(&str, &ValidationError) + Send + Sync>;
+
 // ============================================================================
 // 验证错误
 // ============================================================================
@@ -451,7 +454,7 @@ pub struct ValidatedStorage<B: StorageBackend> {
     /// 统计信息
     stats: Arc<ValidationStats>,
     /// 警告回调
-    warn_callback: Option<Arc<dyn Fn(&str, &ValidationError) + Send + Sync>>,
+    warn_callback: Option<WarnCallback>,
 }
 
 impl<B: StorageBackend> ValidatedStorage<B> {
@@ -623,7 +626,7 @@ pub struct ValidatedStorageBuilder<B: StorageBackend> {
     key_validators: Vec<Box<dyn KeyValidator>>,
     value_validators: Vec<Box<dyn ValueValidator>>,
     config: ValidationConfig,
-    warn_callback: Option<Arc<dyn Fn(&str, &ValidationError) + Send + Sync>>,
+    warn_callback: Option<WarnCallback>,
 }
 
 impl<B: StorageBackend> ValidatedStorageBuilder<B> {
