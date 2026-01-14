@@ -5,6 +5,55 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-beta.2] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: Notebook 性能基准测试
+
+- ✅ **基准测试框架** - 使用 Criterion 建立性能基线
+- ✅ **依赖图性能** - O(n) 复杂度验证
+- ✅ **OT 变换性能** - ~100ns 单次转换
+- ✅ **调度器性能** - 钻石依赖高效处理
+
+### ✨ Added
+
+- **benches/notebook_performance.rs** (~300 行)
+  - `bench_dependency_graph` - 依赖图操作
+    - `add_cells` - 10/50/100/500 cells
+    - `topological_sort` - 拓扑排序 (~11µs/100 cells)
+    - `has_cycle` - 环检测
+  - `bench_execution_scheduler` - 执行调度
+    - `schedule_diamond` - 钻石依赖模式
+  - `bench_dependency_analyzer` - 依赖分析
+    - `analyze_cell` - 变量分析
+    - `build_graph` - 图构建 (10/50/100 cells)
+  - `bench_ot_transform` - OT 转换
+    - `insert_insert` - ~100ns
+    - `insert_delete` - ~100ns
+    - `transform_list` - 批量转换
+  - `bench_text_operations` - 文本操作
+    - `text_insert` / `text_delete`
+  - `bench_collaboration_session` - 协作会话
+    - `add_collaborators` - 添加协作者
+    - `apply_operations` - 应用操作
+  - `bench_notebook_operations` - Notebook 操作
+    - `add_cells` - 添加 Cell
+    - `get_cell_by_id` - ID 查询
+    - `cells_by_type` - 类型过滤
+
+### 📊 Performance Baselines
+
+| 操作 | 规模 | 时间 |
+|------|------|------|
+| add_cells | 100 | ~15µs |
+| topological_sort | 100 | ~11µs |
+| has_cycle | 100 | ~5µs |
+| OT transform | single | ~100ns |
+| transform_list | 20 ops | ~2µs |
+
+---
+
 ## [2.0.0-beta.1] - 2026-01-15
 
 ### 🎯 Highlights
