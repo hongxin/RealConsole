@@ -1,4 +1,4 @@
-//! v2.0.0-alpha.1: Notebook System
+//! v2.0.0-alpha.3: Notebook System
 //!
 //! The Notebook module provides an interactive computational environment
 //! that combines natural language, commands, and code in a single document.
@@ -66,11 +66,13 @@
 //! - [`storage`]: Storage abstraction for notebooks
 //! - [`execution`]: Cell execution engine
 //! - [`persistence`]: .rcnb file format handling
+//! - [`dependency`]: Cell dependency and parallel execution (v2.0.0-alpha.3)
 
 pub mod types;
 pub mod storage;
 pub mod execution;
 pub mod persistence;
+pub mod dependency; // v2.0.0-alpha.3: Cell dependency and parallel execution
 
 // Re-export core types
 pub use types::{
@@ -91,8 +93,14 @@ pub use persistence::{
     RcnbFormat, RcnbError, RCNB_EXTENSION, RCNB_VERSION,
 };
 
+pub use dependency::{
+    DependencyGraph, DependencyType, DependencyEdge, DependencyError,
+    ExecutionScheduler, ExecutionSchedule, ExecutionBatch,
+    DependencyAnalyzer,
+};
+
 /// Notebook format version
-pub const NOTEBOOK_VERSION: &str = "2.0.0-alpha.1";
+pub const NOTEBOOK_VERSION: &str = "2.0.0-alpha.3";
 
 /// Default notebook file extension
 pub const NOTEBOOK_EXTENSION: &str = "rcnb";
