@@ -5,6 +5,107 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-alpha.4] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: 协作编辑支持 (Operational Transformation)
+
+- ✅ **操作转换 (OT)** - 并发冲突自动解决
+- ✅ **Cell 操作** - Insert/Delete/Update/Move/UpdateMetadata
+- ✅ **文本操作** - 字符级编辑 (Insert/Delete/Retain)
+- ✅ **光标同步** - 实时光标位置共享
+- ✅ **参与者管理** - 协作者状态与颜色
+- ✅ **会话管理** - 多 Notebook 协作会话
+- ✅ **总测试数**: 2650 (+18 新增)
+
+### ✨ Added
+
+- **CellOperation** - 单元格级操作
+  - `Insert { index, cell }` - 插入新 Cell
+  - `Delete { cell_id, index }` - 删除 Cell
+  - `Update { cell_id, old_source, new_source, position }` - 更新源码
+  - `Move { cell_id, from_index, to_index }` - 移动 Cell
+  - `UpdateMetadata { cell_id, key, value }` - 更新元数据
+  - `Noop` - 空操作 (OT 结果)
+
+- **TextOperation** - 字符级文本操作
+  - `Insert { position, text }` - 插入文本
+  - `Delete { position, length }` - 删除文本
+  - `Retain { count }` - 保留字符
+
+- **OperationTransform** - 操作转换引擎
+  - `transform(op_a, op_b) -> (op_a', op_b')` - 双向转换
+  - `transform_list(ops, against) -> ops'` - 批量转换
+  - Server-wins 语义 (B 优先)
+  - 支持所有操作类型组合
+
+- **CursorPosition** - 光标位置
+  - `cell_id` - 所在 Cell
+  - `line` / `column` - 行列位置
+  - `selection_end` - 选区结束
+
+- **Collaborator** - 协作者
+  - 唯一 ID 与名称
+  - 颜色标识
+  - 在线状态
+  - 光标位置
+
+- **CollaborationSession** - 协作会话
+  - `add_collaborator()` / `remove_collaborator()`
+  - `apply_local()` - 应用本地操作
+  - `apply_remote()` - 应用远程操作
+  - `acknowledge()` - 确认操作
+  - `pending_count()` - 待确认操作数
+
+- **CollaborationManager** - 会话管理器
+  - `create_session()` / `get_session()`
+  - `remove_session()` / `list_sessions()`
+  - 多 Notebook 支持
+
+- **CollabMessage** - 同步协议消息
+  - `Operation` / `Acknowledge`
+  - `Cursor` / `Presence`
+  - `Join` / `Leave` / `Sync`
+
+- **CollaborationError** - 错误类型
+  - `SessionNotFound` / `CollaboratorNotFound`
+  - `CellNotFound` / `InvalidOperation`
+  - `PermissionDenied` / `VersionConflict`
+  - `SessionFull`
+
+### 📊 OT Architecture
+
+```text
+操作转换流程:
+
+  Client A ─────┐                      ┌───── Client B
+       │        │                      │        │
+       ▼        │                      │        ▼
+  [Local Op] ───┼──────► Server ◄─────┼─── [Local Op]
+       │        │          │           │        │
+       │        │     [Transform]      │        │
+       │        │          │           │        │
+       ▼        └───── [Broadcast] ────┘        ▼
+  [Apply] ◄────────────────┴──────────────► [Apply]
+
+冲突解决示例 (同位置插入):
+
+  Op A: Insert(0, "Hello")   Op B: Insert(0, "World")
+                   │                    │
+                   └────────┬───────────┘
+                            │
+                     Transform(A, B)
+                            │
+                   ┌────────┴───────────┐
+                   │                    │
+         A': Insert(1, "Hello")  B': Insert(0, "World")
+                   │                    │
+              B wins tie        A shifts to index 1
+```
+
+---
+
 ## [2.0.0-alpha.3] - 2026-01-15
 
 ### 🎯 Highlights
