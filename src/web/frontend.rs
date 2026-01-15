@@ -4763,12 +4763,8 @@ const TERMINAL_JS: &str = r#"
         // v1.46.0: 初始化 FileUploadManager
         terminal.fileUploadManager = new FileUploadManager(ws);
 
-        // v2.1.0: 初始化 NotebookManager
-        if (typeof NotebookManager !== 'undefined') {
-            const notebookManager = new NotebookManager();
-            notebookManager.connect(ws);
-            window.notebookManager = notebookManager;
-        }
+        // v2.1.0: 保存 ws 引用供 NotebookManager 使用（延迟初始化）
+        window.ws = ws;
 
         // 应用初始语言设置
         updatePageText();
@@ -5002,7 +4998,7 @@ const TERMINAL_JS: &str = r#"
             case 'cell_execution_started':
             case 'cell_output':
             case 'cell_execution_completed':
-            case 'notebook_error':
+            case 'error':
                 // 路由到 NotebookManager
                 if (window.notebookManager) {
                     window.notebookManager.handleMessage(msg);
@@ -6287,7 +6283,6 @@ const TERMINAL_JS: &str = r#"
     /**
      * Notebook 模式管理
      */
-    let notebookManager = null;
     let isNotebookMode = false;
 
     function toggleNotebookMode() {
@@ -6307,12 +6302,12 @@ const TERMINAL_JS: &str = r#"
             btn.title = '切换到终端模式';
             btn.classList.add('active');
 
-            // 初始化 NotebookManager
-            if (!notebookManager) {
-                notebookManager = new NotebookManager();
+            // 初始化 NotebookManager（只创建一次）
+            if (!window.notebookManager) {
+                window.notebookManager = new NotebookManager();
                 // 使用已存在的 WebSocket 连接
                 if (window.ws && window.ws.readyState === WebSocket.OPEN) {
-                    notebookManager.connect(window.ws);
+                    window.notebookManager.connect(window.ws);
                 }
             }
         } else {
@@ -6342,8 +6337,8 @@ const TERMINAL_JS: &str = r#"
 
     // 处理 Notebook WebSocket 消息
     function handleNotebookMessage(data) {
-        if (notebookManager) {
-            notebookManager.handleMessage(data);
+        if (window.notebookManager) {
+            window.notebookManager.handleMessage(data);
         }
     }
 
@@ -6355,17 +6350,10 @@ const TERMINAL_JS: &str = r#"
         }
     });
 
-    // 导出给外部使用
+    // 初始化全局变量
     window.notebookManager = null;
     window.isNotebookMessage = isNotebookMessage;
     window.handleNotebookMessage = handleNotebookMessage;
-    window.initNotebookManager = () => {
-        if (!notebookManager) {
-            notebookManager = new NotebookManager();
-        }
-        window.notebookManager = notebookManager;
-        return notebookManager;
-    };
 
 })();
 "#;

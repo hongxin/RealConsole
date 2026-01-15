@@ -13,6 +13,7 @@ use crate::dsl::intent::IntentMatch;
 use crate::i18n;
 use crate::services::{LlmRequest, Service};
 use crate::visualization::types::{AxisConfig, ChartData, ChartOptions, ChartType, Series};
+use crate::web::notebook_ws::NotebookClientMessage; // v2.1.0
 use crate::web::session::{ClientMessage, EnabledStep, ServerMessage, Session};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
@@ -154,6 +155,64 @@ async fn handle_message(
         // ===== v1.46.0: 文件上传 =====
         ClientMessage::UploadFile { filename, content } => {
             handle_upload_file(session, filename, content, sender).await?;
+        }
+
+        // ===== v2.1.0: Notebook 消息 =====
+        ClientMessage::ListNotebooks => {
+            let msg = NotebookClientMessage::ListNotebooks;
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::CreateNotebook { name } => {
+            let msg = NotebookClientMessage::CreateNotebook { name };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::OpenNotebook { notebook_id } => {
+            let msg = NotebookClientMessage::OpenNotebook { notebook_id };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::SaveNotebook { notebook_id } => {
+            let msg = NotebookClientMessage::SaveNotebook { notebook_id };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::DeleteNotebook { notebook_id } => {
+            let msg = NotebookClientMessage::DeleteNotebook { notebook_id };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::RenameNotebook { notebook_id, new_name } => {
+            let msg = NotebookClientMessage::RenameNotebook { notebook_id, new_name };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::AddCell { notebook_id, cell_type, source, index } => {
+            let msg = NotebookClientMessage::AddCell { notebook_id, cell_type, source, index };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::UpdateCell { notebook_id, cell_id, source } => {
+            let msg = NotebookClientMessage::UpdateCell { notebook_id, cell_id, source };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::DeleteCell { notebook_id, cell_id } => {
+            let msg = NotebookClientMessage::DeleteCell { notebook_id, cell_id };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::MoveCell { notebook_id, cell_id, new_index } => {
+            let msg = NotebookClientMessage::MoveCell { notebook_id, cell_id, new_index };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::ExecuteCell { notebook_id, cell_id } => {
+            let msg = NotebookClientMessage::ExecuteCell { notebook_id, cell_id };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::ExecuteAll { notebook_id } => {
+            let msg = NotebookClientMessage::ExecuteAll { notebook_id };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::ClearOutputs { notebook_id, cell_id } => {
+            let msg = NotebookClientMessage::ClearOutputs { notebook_id, cell_id };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
+        ClientMessage::ExportNotebook { notebook_id, format } => {
+            let msg = NotebookClientMessage::ExportNotebook { notebook_id, format };
+            session.notebook_session.handle_message(msg, sender).await?;
         }
     }
     Ok(())

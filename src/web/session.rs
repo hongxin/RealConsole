@@ -9,6 +9,7 @@ use crate::i18n;
 use crate::llm::{DeepseekClient, LlmClient, OllamaClient};
 use crate::visualization; // v1.44.0: 可视化系统
 use crate::web::memory::SmartWebUIOrchestrator; // v1.54.0: Memory 2.0
+use crate::web::notebook_ws::NotebookSession; // v2.1.0: Notebook WebSocket
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -169,6 +170,76 @@ pub enum ClientMessage {
         filename: String,
         /// 文件内容（CSV 格式的文本）
         content: String,
+    },
+
+    // ===== v2.1.0 新增：Notebook 消息 =====
+    /// 列出所有笔记本
+    #[serde(rename = "list_notebooks")]
+    ListNotebooks,
+    /// 创建新笔记本
+    #[serde(rename = "create_notebook")]
+    CreateNotebook { name: String },
+    /// 打开笔记本
+    #[serde(rename = "open_notebook")]
+    OpenNotebook { notebook_id: String },
+    /// 保存笔记本
+    #[serde(rename = "save_notebook")]
+    SaveNotebook { notebook_id: String },
+    /// 删除笔记本
+    #[serde(rename = "delete_notebook")]
+    DeleteNotebook { notebook_id: String },
+    /// 重命名笔记本
+    #[serde(rename = "rename_notebook")]
+    RenameNotebook { notebook_id: String, new_name: String },
+    /// 添加 Cell
+    #[serde(rename = "add_cell")]
+    AddCell {
+        notebook_id: String,
+        cell_type: String,
+        source: String,
+        #[serde(default)]
+        index: Option<usize>,
+    },
+    /// 更新 Cell
+    #[serde(rename = "update_cell")]
+    UpdateCell {
+        notebook_id: String,
+        cell_id: String,
+        source: String,
+    },
+    /// 删除 Cell
+    #[serde(rename = "delete_cell")]
+    DeleteCell {
+        notebook_id: String,
+        cell_id: String,
+    },
+    /// 移动 Cell
+    #[serde(rename = "move_cell")]
+    MoveCell {
+        notebook_id: String,
+        cell_id: String,
+        new_index: usize,
+    },
+    /// 执行 Cell
+    #[serde(rename = "execute_cell")]
+    ExecuteCell {
+        notebook_id: String,
+        cell_id: String,
+    },
+    /// 执行所有 Cell
+    #[serde(rename = "execute_all")]
+    ExecuteAll { notebook_id: String },
+    /// 清除 Cell 输出
+    #[serde(rename = "clear_outputs")]
+    ClearOutputs {
+        notebook_id: String,
+        cell_id: String,
+    },
+    /// 导出笔记本
+    #[serde(rename = "export_notebook")]
+    ExportNotebook {
+        notebook_id: String,
+        format: String, // "rcnb", "json", "markdown"
     },
 }
 
@@ -500,6 +571,8 @@ pub struct Session {
     pub image_history: Arc<RwLock<Vec<ImageHistoryEntry>>>,
     /// Memory 2.0 智能上下文编排器（v1.54.0 新增）
     pub memory_orchestrator: Option<Arc<SmartWebUIOrchestrator>>,
+    /// Notebook 会话（v2.1.0 新增）
+    pub notebook_session: Arc<NotebookSession>,
 }
 
 impl Session {
@@ -539,6 +612,12 @@ impl Session {
             eprintln!("[Session] Memory 2.0 初始化失败，将以降级模式运行");
         }
 
+        // v2.1.0: 初始化 Notebook 会话
+        let notebook_base_dir = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".realconsole");
+        let notebook_session = Arc::new(NotebookSession::with_file_storage(notebook_base_dir));
+
         Self {
             id,
             agent: Arc::new(RwLock::new(agent)),
@@ -551,6 +630,7 @@ impl Session {
             chart_history: Arc::clone(&chart_history), // v1.51.0
             image_history: Arc::clone(&image_history), // v1.52.0
             memory_orchestrator, // v1.54.0
+            notebook_session, // v2.1.0
         }
     }
 

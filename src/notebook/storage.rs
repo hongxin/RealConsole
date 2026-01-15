@@ -376,6 +376,9 @@ impl FileNotebookStorage {
 #[async_trait]
 impl NotebookStorage for FileNotebookStorage {
     async fn save(&self, notebook: &Notebook) -> StorageResult<()> {
+        // Ensure base directory exists
+        tokio::fs::create_dir_all(&self.base_path).await?;
+
         let path = self.notebook_path(notebook.id);
 
         // Serialize notebook
