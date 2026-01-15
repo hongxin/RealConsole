@@ -5562,6 +5562,9 @@ const TERMINAL_JS: &str = r#"
                 case 'notebook_renamed':
                     this.handleNotebookRenamed(data);
                     break;
+                case 'notebook_exported':
+                    this.handleNotebookExported(data);
+                    break;
                 case 'cell_added':
                     this.handleCellAdded(data);
                     break;
@@ -5687,6 +5690,17 @@ const TERMINAL_JS: &str = r#"
             });
         }
 
+        // ========== 导出功能 (v2.1.0-alpha.2) ==========
+
+        exportNotebook(format = 'markdown') {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'export_notebook',
+                notebook_id: this.currentNotebook.id,
+                format: format  // 'rcnb', 'json', 'markdown'
+            });
+        }
+
         // ========== 消息处理器 ==========
 
         handleNotebookList(notebooks) {
@@ -5749,6 +5763,79 @@ const TERMINAL_JS: &str = r#"
             }
             if (this.currentNotebook && this.currentNotebook.id === data.notebook_id) {
                 document.getElementById('notebook-title-input').value = data.new_name;
+            }
+        }
+
+        // v2.1.0-alpha.2: 显示导出菜单
+        showExportMenu(button) {
+            // 移除已存在的菜单
+            const existingMenu = document.querySelector('.export-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+                return;
+            }
+
+            const menu = document.createElement('div');
+            menu.className = 'export-menu';
+            menu.innerHTML = `
+                <div class="export-menu-item" data-format="markdown">📝 Markdown (.md)</div>
+                <div class="export-menu-item" data-format="json">📄 JSON (.json)</div>
+                <div class="export-menu-item" data-format="rcnb">💾 RCNB (.rcnb)</div>
+            `;
+
+            // 定位菜单
+            const rect = button.getBoundingClientRect();
+            menu.style.position = 'absolute';
+            menu.style.top = (rect.bottom + 4) + 'px';
+            menu.style.left = rect.left + 'px';
+
+            // 绑定点击事件
+            menu.querySelectorAll('.export-menu-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const format = item.dataset.format;
+                    this.exportNotebook(format);
+                    menu.remove();
+                });
+            });
+
+            // 点击外部关闭
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target) && e.target !== button) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenu), 0);
+
+            document.body.appendChild(menu);
+        }
+
+        // v2.1.0-alpha.2: 导出处理
+        handleNotebookExported(data) {
+            const { filename, content, format } = data;
+
+            // 创建下载链接
+            const blob = new Blob([content], { type: this.getExportMimeType(format) });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            if (window.toastManager) {
+                window.toastManager.show(`已导出: ${filename}`, 'success');
+            }
+        }
+
+        getExportMimeType(format) {
+            switch (format) {
+                case 'markdown': return 'text/markdown';
+                case 'json': return 'application/json';
+                case 'rcnb': return 'application/json';
+                default: return 'text/plain';
             }
         }
 
@@ -5869,6 +5956,15 @@ const TERMINAL_JS: &str = r#"
                 this.executeAll();
             });
 
+            // v2.1.0-alpha.2: 导出按钮（带格式选择）
+            const exportBtn = document.getElementById('notebook-export-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showExportMenu(exportBtn);
+                });
+            }
+
             // Cell 工具栏 - 添加 Cell
             this.cellToolbar?.querySelectorAll('[data-action]').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -5933,6 +6029,10 @@ const TERMINAL_JS: &str = r#"
             this.cellElements = new Map();  // cellId -> DOM element
             this.cellList = document.getElementById('cell-list');
 
+            // 拖拽状态
+            this.draggedCellId = null;
+            this.dropIndicator = null;
+
             this.typeIcons = {
                 natural: '💬',
                 command: '⚙️',
@@ -5946,6 +6046,93 @@ const TERMINAL_JS: &str = r#"
                 code: '输入代码 (Shell 命令用 ! 前缀)...',
                 markdown: '输入 Markdown 文本...'
             };
+
+            // 初始化拖拽排序
+            this.initDragDrop();
+        }
+
+        // ========== 拖拽排序 (v2.1.0-alpha.2) ==========
+
+        initDragDrop() {
+            // 创建拖拽指示器
+            this.dropIndicator = document.createElement('div');
+            this.dropIndicator.className = 'cell-drop-indicator';
+            this.dropIndicator.style.display = 'none';
+
+            // 绑定容器事件
+            this.cellList.addEventListener('dragover', (e) => this.handleDragOver(e));
+            this.cellList.addEventListener('drop', (e) => this.handleDrop(e));
+            this.cellList.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+        }
+
+        handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            const afterElement = this.getDragAfterElement(e.clientY);
+
+            // 显示放置指示器
+            if (!this.dropIndicator.parentNode) {
+                this.cellList.appendChild(this.dropIndicator);
+            }
+            this.dropIndicator.style.display = 'block';
+
+            if (afterElement) {
+                this.cellList.insertBefore(this.dropIndicator, afterElement);
+            } else {
+                this.cellList.appendChild(this.dropIndicator);
+            }
+        }
+
+        handleDrop(e) {
+            e.preventDefault();
+            this.dropIndicator.style.display = 'none';
+
+            const cellId = e.dataTransfer.getData('text/plain');
+            if (!cellId || !this.draggedCellId) return;
+
+            const afterElement = this.getDragAfterElement(e.clientY);
+            let newIndex;
+
+            if (afterElement) {
+                newIndex = parseInt(afterElement.dataset.index, 10);
+            } else {
+                // 放到最后
+                newIndex = this.cellElements.size;
+            }
+
+            // 调整索引：如果从上往下拖，需要减1
+            const draggedElement = this.cellElements.get(cellId);
+            const currentIndex = parseInt(draggedElement?.dataset.index || '0', 10);
+            if (currentIndex < newIndex) {
+                newIndex = Math.max(0, newIndex - 1);
+            }
+
+            // 调用后端移动
+            this.manager.moveCell(cellId, newIndex);
+            this.draggedCellId = null;
+        }
+
+        handleDragLeave(e) {
+            // 只有离开 cellList 时才隐藏指示器
+            if (!this.cellList.contains(e.relatedTarget)) {
+                this.dropIndicator.style.display = 'none';
+            }
+        }
+
+        getDragAfterElement(y) {
+            const draggableElements = [...this.cellList.querySelectorAll('.notebook-cell:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
         // ========== Cell 渲染 ==========
@@ -6251,16 +6438,22 @@ const TERMINAL_JS: &str = r#"
                 });
             }
 
-            // 拖拽事件
+            // 拖拽事件 (v2.1.0-alpha.2: 完整拖拽排序)
             const dragHandle = cellElement.querySelector('.cell-drag-handle');
             if (dragHandle) {
                 dragHandle.addEventListener('dragstart', (e) => {
                     e.dataTransfer.setData('text/plain', cellId);
+                    e.dataTransfer.effectAllowed = 'move';
                     cellElement.classList.add('dragging');
+                    this.draggedCellId = cellId;
                 });
 
                 dragHandle.addEventListener('dragend', () => {
                     cellElement.classList.remove('dragging');
+                    this.draggedCellId = null;
+                    if (this.dropIndicator) {
+                        this.dropIndicator.style.display = 'none';
+                    }
                 });
             }
         }
@@ -10437,17 +10630,48 @@ body::before {
 }
 
 .cell-drop-indicator {
-    position: absolute;
-    height: 3px;
+    height: 4px;
     background: var(--accent-primary);
     border-radius: 2px;
-    pointer-events: none;
-    z-index: 100;
-    box-shadow: 0 0 8px var(--accent-primary);
+    margin: 4px 0;
+    box-shadow: 0 0 10px var(--accent-primary);
+    animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes dropIndicatorPulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
 }
 
 .cell-drop-indicator.hidden {
     display: none;
+}
+
+/* v2.1.0-alpha.2: 导出菜单 */
+.export-menu {
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    padding: 4px 0;
+    min-width: 160px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+}
+
+.export-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.export-menu-item:hover {
+    background: var(--accent-primary-alpha-10);
+}
+
+.export-menu-item:active {
+    background: var(--accent-primary-alpha-30);
 }
 
 /* 空状态 */

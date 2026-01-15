@@ -5,6 +5,41 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-alpha.2] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: Cell 拖拽排序 + 导出功能
+
+- ✨ **拖拽排序** - 拖拽 Cell 手柄重新排序
+- ✨ **导出功能** - 支持 Markdown/JSON/RCNB 格式导出
+- 🔧 **Bug 修复** - 后端集成、存储目录创建
+
+### ✨ New Features
+
+#### 拖拽排序 Cell
+
+- 🎯 拖拽手柄 (⠿) 支持 HTML5 Drag & Drop
+- 📍 实时放置指示器（紫色发光条）
+- ✅ 前后端联动更新索引
+
+#### 导出功能
+
+- 📤 导出按钮下拉菜单
+- 📝 **Markdown** - 可读性导出
+- 📄 **JSON** - 完整数据导出
+- 💾 **RCNB** - 原生格式导出
+- 💾 自动下载文件
+
+### 🔧 Bug Fixes
+
+- 修复 NotebookManager 重复创建问题
+- 添加后端 Notebook 消息类型 (15 种)
+- 修复 FileNotebookStorage 目录自动创建
+- 修复错误消息类型 (notebook_error → error)
+
+---
+
 ## [2.1.0-alpha.1] - 2026-01-15
 
 ### 🎯 Highlights
