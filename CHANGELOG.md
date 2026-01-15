@@ -5,6 +5,66 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-01-15
+
+### 🎉 Major Release: Notebook System
+
+**RealConsole 2.0** 引入全新的 **Notebook 系统**，将自然语言、命令和代码融合在单一交互式文档中。
+
+### ✨ 核心特性
+
+#### Notebook 系统 (`src/notebook/`)
+- **Cell 类型** - Natural (自然语言) / Command (命令) / Code (代码) / Markdown
+- **丰富输出** - Text / Code / Chart / Image / Table / Error
+- **存储抽象** - FileNotebookStorage / MemoryNotebookStorage
+- **执行引擎** - CellExecutor 支持 LLM 和 Shell 执行
+- **持久化** - .rcnb 格式 (Git 友好的 JSON Lines)
+
+#### 依赖图与并行执行
+- **DependencyGraph** - 单元格依赖关系图
+- **DependencyAnalyzer** - 自动分析变量依赖
+- **ExecutionScheduler** - 智能并行调度
+- **拓扑排序** - O(n) 复杂度
+
+#### 协作编辑 (OT)
+- **CellOperation** - Insert / Delete / Update / Move
+- **TextOperation** - 字符级编辑 (Insert / Delete / Retain)
+- **OperationTransform** - 并发冲突自动解决
+- **CollaborationSession** - 多用户实时协作
+
+### 📊 性能基线
+
+| 操作 | 规模 | 时间 |
+|------|------|------|
+| add_cells | 100 | ~15µs |
+| topological_sort | 100 | ~11µs |
+| OT transform | single | ~100ns |
+
+### 📦 模块结构
+
+```
+src/notebook/
+├── types.rs        # Cell, Notebook, CellOutput
+├── storage.rs      # NotebookStorage trait
+├── execution.rs    # CellExecutor
+├── persistence.rs  # .rcnb 格式
+├── dependency.rs   # 依赖图与调度
+└── collaboration.rs # OT 协作编辑
+```
+
+### 🔢 统计
+
+- **单元测试**: 2628
+- **文档测试**: 43
+- **基准测试**: 7 组 (notebook_performance)
+- **Clippy 警告**: 0
+
+### 🚀 从 1.x 升级
+
+v2.0.0 完全向后兼容 v1.x API。Notebook 是新增模块，不影响现有功能。
+
+---
+
 ## [2.0.0-rc.1] - 2026-01-15
 
 ### 🎯 Highlights
