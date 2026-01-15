@@ -75,6 +75,7 @@ pub mod execution;
 pub mod persistence;
 pub mod dependency; // v2.0.0-alpha.3: Cell dependency and parallel execution
 pub mod collaboration; // v2.0.0-alpha.4: Collaborative editing with OT
+pub mod ipynb; // v2.2.0-beta.1: Jupyter Notebook import/export
 
 // Re-export core types
 pub use types::{
@@ -106,6 +107,8 @@ pub use collaboration::{
     CursorPosition, Collaborator, CollaborationSession,
     CollaborationManager, CollabMessage, CollaborationError,
 };
+
+pub use ipynb::IpynbConverter;
 
 /// Notebook format version
 pub const NOTEBOOK_VERSION: &str = "2.0.0";

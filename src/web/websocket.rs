@@ -214,6 +214,21 @@ async fn handle_message(
             let msg = NotebookClientMessage::ExportNotebook { notebook_id, format };
             session.notebook_session.handle_message(msg, sender).await?;
         }
+        // v2.2.0-beta.1: Import notebook (including .ipynb)
+        ClientMessage::ImportNotebook { format, content, filename } => {
+            // Extract name from filename (remove extension)
+            let name = filename
+                .rsplit('.')
+                .skip(1)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join(".");
+            let name = if name.is_empty() { filename.clone() } else { name };
+            let msg = NotebookClientMessage::ImportNotebook { name, content, format };
+            session.notebook_session.handle_message(msg, sender).await?;
+        }
     }
     Ok(())
 }

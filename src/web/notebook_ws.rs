@@ -8,7 +8,7 @@
 
 use crate::notebook::{
     Cell, CellExecutor, CellOutput, CellState, CellType, ExecutionConfig,
-    ExecutionResult, FileNotebookStorage, MemoryNotebookStorage, Notebook,
+    ExecutionResult, FileNotebookStorage, IpynbConverter, MemoryNotebookStorage, Notebook,
     NotebookStorage, NotebookStorageError, RcnbFormat,
 };
 use axum::extract::ws::{Message, WebSocket};
@@ -1133,6 +1133,16 @@ impl NotebookSession {
                     Err(e) => return NotebookServerMessage::Error {
                         code: "IMPORT_ERROR".to_string(),
                         message: format!("Failed to parse JSON: {}", e),
+                    },
+                }
+            }
+            // v2.2.0-beta.1: Jupyter Notebook import
+            "ipynb" => {
+                match IpynbConverter::from_ipynb_str(&content, &name) {
+                    Ok(nb) => nb,
+                    Err(e) => return NotebookServerMessage::Error {
+                        code: "IMPORT_ERROR".to_string(),
+                        message: format!("Failed to parse .ipynb: {}", e),
                     },
                 }
             }

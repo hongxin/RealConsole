@@ -241,6 +241,18 @@ pub enum ClientMessage {
         notebook_id: String,
         format: String, // "rcnb", "json", "markdown"
     },
+
+    // ===== v2.2.0-beta.1 新增：Notebook 导入功能 =====
+    /// 导入笔记本（支持 .ipynb, .rcnb, .json）
+    #[serde(rename = "import_notebook")]
+    ImportNotebook {
+        /// 文件格式: "ipynb", "rcnb", "json"
+        format: String,
+        /// 文件内容（JSON 字符串）
+        content: String,
+        /// 原始文件名（用于提取笔记本名称）
+        filename: String,
+    },
 }
 
 /// v1.29.3: 启用的步骤信息

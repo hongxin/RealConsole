@@ -5,6 +5,60 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-beta.1] - 2026-01-16
+
+### 🎯 Highlights
+
+**主题**: Jupyter Notebook 导入支持（"北冥神功"）
+
+- ✨ **导入按钮** - 侧边栏新增导入按钮（📥）
+- ✨ **.ipynb 支持** - 支持导入 Jupyter Notebook 文件
+- ✨ **多格式导入** - 支持 .ipynb, .rcnb, .json 三种格式
+- 🔄 **格式转换** - 自动将 Jupyter Cell 类型映射到 RealConsole
+
+### ✨ New Features
+
+#### Jupyter Notebook 导入
+
+**格式映射** (.ipynb → RealConsole):
+| .ipynb cell_type | RealConsole CellType |
+|------------------|----------------------|
+| `code`           | Code                 |
+| `markdown`       | Markdown             |
+| `raw`            | Natural              |
+
+**功能特点**:
+- 保留原始 Cell 输出内容
+- 支持执行计数（execution_count）
+- 支持元数据（tags 等）
+- 双向转换（导入/导出）
+
+### 🔧 Technical
+
+**新增文件**:
+- `src/notebook/ipynb.rs` - Jupyter Notebook 转换器
+
+**新增结构**:
+- `JupyterNotebook` - Jupyter Notebook 根结构
+- `JupyterCell` - Jupyter Cell 结构
+- `JupyterOutput` - Jupyter 输出类型
+- `IpynbConverter` - 转换器实现
+
+**消息类型**:
+- `ClientMessage::ImportNotebook` - 导入请求
+- `NotebookServerMessage::NotebookImported` - 导入响应
+
+### 📊 代码统计
+
+| 组件 | 新增行数 |
+|------|----------|
+| ipynb.rs 转换器 | ~500 |
+| 消息处理 | ~50 |
+| 前端 UI | ~60 |
+| **总计** | **~610** |
+
+---
+
 ## [2.2.0-alpha.2] - 2026-01-15
 
 ### 🎯 Highlights

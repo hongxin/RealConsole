@@ -192,7 +192,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         <aside id="notebook-sidebar" class="notebook-sidebar">
             <div class="notebook-sidebar-header">
                 <h3>📒 Notebooks</h3>
-                <button id="new-notebook-btn" class="notebook-action-btn" title="新建笔记本">+</button>
+                <div class="notebook-header-actions">
+                    <button id="import-notebook-btn" class="notebook-action-btn" title="导入笔记本 (.ipynb, .rcnb, .json)">📥</button>
+                    <button id="new-notebook-btn" class="notebook-action-btn" title="新建笔记本">+</button>
+                </div>
+                <input type="file" id="import-file-input" accept=".ipynb,.rcnb,.json" style="display: none;">
             </div>
             <div class="notebook-search">
                 <input type="text" id="notebook-search-input" placeholder="🔍 搜索笔记本...">
@@ -5603,6 +5607,9 @@ const TERMINAL_JS: &str = r#"
                 case 'notebook_exported':
                     this.handleNotebookExported(data);
                     break;
+                case 'notebook_imported':
+                    this.handleNotebookImported(data);
+                    break;
                 case 'cell_added':
                     this.handleCellAdded(data);
                     break;
@@ -5737,6 +5744,42 @@ const TERMINAL_JS: &str = r#"
                 notebook_id: this.currentNotebook.id,
                 format: format  // 'rcnb', 'json', 'markdown'
             });
+        }
+
+        // v2.2.0-beta.1: 导入笔记本
+        importNotebook(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                const filename = file.name;
+                // Determine format from extension
+                const ext = filename.split('.').pop().toLowerCase();
+                let format;
+                switch (ext) {
+                    case 'ipynb':
+                        format = 'ipynb';
+                        break;
+                    case 'rcnb':
+                        format = 'rcnb';
+                        break;
+                    case 'json':
+                        format = 'json';
+                        break;
+                    default:
+                        alert('不支持的文件格式: ' + ext);
+                        return;
+                }
+                this.send({
+                    type: 'import_notebook',
+                    format: format,
+                    content: content,
+                    filename: filename
+                });
+            };
+            reader.onerror = () => {
+                alert('读取文件失败');
+            };
+            reader.readAsText(file);
         }
 
         // ========== 消息处理器 ==========
@@ -5877,6 +5920,17 @@ const TERMINAL_JS: &str = r#"
             }
         }
 
+        // v2.2.0-beta.1: 处理导入完成
+        handleNotebookImported(data) {
+            const notebook = data.notebook;
+            this.notebooks.set(notebook.id, notebook);
+            this.renderNotebookList();
+            this.openNotebook(notebook.id);
+            if (window.toastManager) {
+                window.toastManager.show(`已导入: ${notebook.name} (${notebook.cell_count} cells)`, 'success');
+            }
+        }
+
         handleCellAdded(data) {
             data.cell.index = data.index;
             this.cells.set(data.cell.id, data.cell);
@@ -5992,6 +6046,22 @@ const TERMINAL_JS: &str = r#"
                     this.createNotebook(name);
                 }
             });
+
+            // v2.2.0-beta.1: 导入笔记本按钮
+            const importBtn = document.getElementById('import-notebook-btn');
+            const importFileInput = document.getElementById('import-file-input');
+            if (importBtn && importFileInput) {
+                importBtn.addEventListener('click', () => {
+                    importFileInput.click();
+                });
+                importFileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.importNotebook(file);
+                        importFileInput.value = ''; // Reset for next selection
+                    }
+                });
+            }
 
             // 保存按钮
             document.getElementById('notebook-save-btn')?.addEventListener('click', () => {
@@ -10277,6 +10347,11 @@ body::before {
     margin: 0;
     color: var(--text-title);
     font-size: 1em;
+}
+
+.notebook-header-actions {
+    display: flex;
+    gap: 4px;
 }
 
 .notebook-action-btn {
