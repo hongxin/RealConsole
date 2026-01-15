@@ -216,6 +216,22 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                     <button id="notebook-export-btn" class="notebook-btn" title="导出">📤 导出</button>
                 </div>
             </div>
+            <!-- v2.2.0-alpha.2: 快捷输入栏 -->
+            <div id="quick-input-bar" class="quick-input-bar hidden">
+                <div class="cell-type-selector">
+                    <button class="type-btn active" data-type="natural" title="自然语言 (默认)">💬</button>
+                    <button class="type-btn" data-type="command" title="命令 (/ 前缀)">⚙️</button>
+                    <button class="type-btn" data-type="code" title="代码 (! 前缀)">💻</button>
+                    <button class="type-btn" data-type="markdown" title="Markdown (# 前缀)">📝</button>
+                </div>
+                <div class="quick-input-area">
+                    <textarea id="quick-input" placeholder="输入内容，按 Enter 执行，Shift+Enter 仅添加..." rows="1"></textarea>
+                </div>
+                <div class="quick-action-buttons">
+                    <button id="quick-execute-btn" class="quick-btn" title="创建并执行 (Enter)">▶️</button>
+                    <button id="quick-add-btn" class="quick-btn" title="仅添加 (Shift+Enter)">➕</button>
+                </div>
+            </div>
             <!-- Cell 工具栏 -->
             <div id="cell-toolbar" class="cell-toolbar hidden">
                 <button class="cell-toolbar-btn" data-action="add-natural" title="添加自然语言 Cell">
@@ -5538,6 +5554,11 @@ const TERMINAL_JS: &str = r#"
             this.cellToolbar = document.getElementById('cell-toolbar');
             this.emptyState = document.getElementById('notebook-empty-state');
 
+            // v2.2.0-alpha.2: 快捷输入栏元素
+            this.quickInputBar = document.getElementById('quick-input-bar');
+            this.quickInput = document.getElementById('quick-input');
+            this.selectedCellType = 'natural';  // 默认类型
+
             this.init();
         }
 
@@ -5860,6 +5881,12 @@ const TERMINAL_JS: &str = r#"
             data.cell.index = data.index;
             this.cells.set(data.cell.id, data.cell);
             this.cellEditor.addCell(data.cell, data.index);
+
+            // v2.2.0-alpha.2: 如果有待执行的 Cell，立即执行
+            if (this._pendingExecute) {
+                this._pendingExecute = false;
+                this.executeCell(data.cell.id);
+            }
         }
 
         handleCellUpdated(data) {
@@ -5941,13 +5968,16 @@ const TERMINAL_JS: &str = r#"
 
         showNotebookUI() {
             this.notebookHeader.classList.remove('hidden');
-            this.cellToolbar.classList.remove('hidden');
+            // v2.2.0-alpha.2: 使用快捷输入栏替代 cell-toolbar
+            // this.cellToolbar.classList.remove('hidden');
+            this.quickInputBar?.classList.remove('hidden');
             this.emptyState.style.display = 'none';
         }
 
         hideNotebookUI() {
             this.notebookHeader.classList.add('hidden');
-            this.cellToolbar.classList.add('hidden');
+            // this.cellToolbar.classList.add('hidden');
+            this.quickInputBar?.classList.add('hidden');
             this.emptyState.style.display = '';
             this.cellList.innerHTML = '';
         }
@@ -6028,6 +6058,125 @@ const TERMINAL_JS: &str = r#"
                     titleInput.blur();
                 }
             });
+
+            // v2.2.0-alpha.2: 快捷输入栏事件
+            this.bindQuickInputEvents();
+        }
+
+        // v2.2.0-alpha.2: 快捷输入栏事件绑定
+        bindQuickInputEvents() {
+            if (!this.quickInputBar || !this.quickInput) return;
+
+            // 类型选择器按钮
+            this.quickInputBar.querySelectorAll('.type-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // 移除其他按钮的 active 状态
+                    this.quickInputBar.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+                    // 添加当前按钮的 active 状态
+                    btn.classList.add('active');
+                    // 更新选中的类型
+                    this.selectedCellType = btn.dataset.type;
+                    // 聚焦输入框
+                    this.quickInput.focus();
+                });
+            });
+
+            // 输入框键盘事件
+            this.quickInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    // Enter: 创建并执行
+                    e.preventDefault();
+                    this.handleQuickInput(true);
+                } else if (e.key === 'Enter' && e.shiftKey) {
+                    // Shift+Enter: 仅添加
+                    e.preventDefault();
+                    this.handleQuickInput(false);
+                } else if (e.key === 'Tab' && !e.shiftKey) {
+                    // Tab: 切换到下一个类型
+                    e.preventDefault();
+                    this.cycleQuickInputType(1);
+                } else if (e.key === 'Tab' && e.shiftKey) {
+                    // Shift+Tab: 切换到上一个类型
+                    e.preventDefault();
+                    this.cycleQuickInputType(-1);
+                }
+            });
+
+            // 智能类型检测（输入时）
+            this.quickInput.addEventListener('input', () => {
+                this.autoDetectCellType();
+            });
+
+            // 执行按钮
+            document.getElementById('quick-execute-btn')?.addEventListener('click', () => {
+                this.handleQuickInput(true);
+            });
+
+            // 仅添加按钮
+            document.getElementById('quick-add-btn')?.addEventListener('click', () => {
+                this.handleQuickInput(false);
+            });
+
+            // 自动调整 textarea 高度
+            this.quickInput.addEventListener('input', () => {
+                this.quickInput.style.height = 'auto';
+                this.quickInput.style.height = Math.min(this.quickInput.scrollHeight, 120) + 'px';
+            });
+        }
+
+        // 处理快捷输入
+        handleQuickInput(execute = true) {
+            const content = this.quickInput.value.trim();
+            if (!content || !this.currentNotebook) return;
+
+            // 添加 Cell
+            this.addCell(this.selectedCellType, content);
+
+            // 清空输入
+            this.quickInput.value = '';
+            this.quickInput.style.height = 'auto';
+
+            // 如果需要执行，在 Cell 创建后执行（通过消息回调处理）
+            if (execute) {
+                this._pendingExecute = true;
+            }
+        }
+
+        // 循环切换类型
+        cycleQuickInputType(direction) {
+            const types = ['natural', 'command', 'code', 'markdown'];
+            const currentIndex = types.indexOf(this.selectedCellType);
+            const newIndex = (currentIndex + direction + types.length) % types.length;
+            this.selectedCellType = types[newIndex];
+
+            // 更新 UI
+            this.quickInputBar.querySelectorAll('.type-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === this.selectedCellType);
+            });
+        }
+
+        // 智能类型检测
+        autoDetectCellType() {
+            const content = this.quickInput.value.trim();
+            if (!content) return;
+
+            let detectedType = null;
+
+            if (content.startsWith('/')) {
+                detectedType = 'command';
+            } else if (content.startsWith('!') || content.startsWith('```')) {
+                detectedType = 'code';
+            } else if (content.startsWith('#') || content.startsWith('---') || content.startsWith('**')) {
+                detectedType = 'markdown';
+            }
+
+            // 只在检测到明确前缀时自动切换
+            if (detectedType && detectedType !== this.selectedCellType) {
+                this.selectedCellType = detectedType;
+                this.quickInputBar.querySelectorAll('.type-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.type === detectedType);
+                });
+            }
         }
 
         escapeHtml(text) {
@@ -10117,9 +10266,11 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 0 16px;
+    height: 48px;
     border-bottom: 1px solid var(--border-secondary);
     background: var(--surface-tertiary);
+    box-sizing: border-box;
 }
 
 .notebook-sidebar-header h3 {
@@ -10149,18 +10300,24 @@ body::before {
 }
 
 .notebook-search {
-    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    height: 44px;
     border-bottom: 1px solid var(--border-secondary);
+    box-sizing: border-box;
 }
 
 .notebook-search input {
     width: 100%;
-    padding: 8px 12px;
+    height: 28px;
+    padding: 0 10px;
     background: var(--terminal-input-bg);
     border: 1px solid var(--border-secondary);
     border-radius: 6px;
     color: var(--text-primary);
-    font-size: 0.9em;
+    font-size: 0.85em;
+    box-sizing: border-box;
 }
 
 .notebook-search input:focus {
@@ -10228,9 +10385,11 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 0 16px;
+    height: 48px;
     border-bottom: 1px solid var(--border-secondary);
     background: var(--surface-tertiary);
+    box-sizing: border-box;
 }
 
 .notebook-header.hidden {
@@ -10295,6 +10454,119 @@ body::before {
 .notebook-btn:hover {
     background: rgba(163, 113, 247, 0.2);
     border-color: var(--accent-primary);
+}
+
+/* v2.2.0-alpha.2: 快捷输入栏 */
+.quick-input-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    height: 44px;
+    background: var(--surface-primary);
+    border-bottom: 1px solid var(--border-secondary);
+    box-sizing: border-box;
+}
+
+.quick-input-bar.hidden {
+    display: none;
+}
+
+.cell-type-selector {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.type-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-secondary);
+    border-radius: 6px;
+    background: var(--surface-tertiary);
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.type-btn:hover {
+    background: rgba(163, 113, 247, 0.15);
+    border-color: var(--accent-primary);
+}
+
+.type-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.quick-input-area {
+    flex: 1;
+    min-width: 0;
+}
+
+.quick-input-area textarea {
+    width: 100%;
+    height: 28px;
+    min-height: 28px;
+    max-height: 120px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-secondary);
+    border-radius: 6px;
+    background: var(--surface-tertiary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.85em;
+    line-height: 1.4;
+    resize: none;
+    overflow-y: hidden;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-input-area textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(163, 113, 247, 0.15);
+}
+
+.quick-input-area textarea::placeholder {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+.quick-action-buttons {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.quick-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-secondary);
+    border-radius: 6px;
+    background: var(--surface-tertiary);
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.quick-btn:hover {
+    background: rgba(163, 113, 247, 0.15);
+    border-color: var(--accent-primary);
+}
+
+#quick-execute-btn:hover {
+    background: rgba(52, 211, 153, 0.2);
+    border-color: var(--color-success);
 }
 
 /* Cell 工具栏 */

@@ -5,6 +5,55 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-alpha.2] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: 快捷输入栏
+
+- ✨ **快捷输入栏** - Jupyter 风格的快捷输入体验
+- ✨ **类型选择器** - 四种 Cell 类型一键切换
+- ✨ **智能检测** - 根据前缀自动切换类型（`/` → Command, `!` → Code）
+- ✨ **快捷键** - Enter 执行, Shift+Enter 仅添加, Tab 切换类型
+
+### ✨ New Features
+
+#### 快捷输入栏
+
+**UI 组件**:
+- 💬⚙️💻📝 类型选择器按钮
+- 可自动调整高度的输入框
+- ▶️ 执行按钮 / ➕ 仅添加按钮
+
+**交互逻辑**:
+- `Enter` - 创建 Cell 并立即执行
+- `Shift+Enter` - 仅创建 Cell（不执行）
+- `Tab` / `Shift+Tab` - 循环切换 Cell 类型
+
+**智能类型检测**:
+- `/` 开头 → 自动切换到 Command
+- `!` 或 ``` 开头 → 自动切换到 Code
+- `#` 或 `---` 开头 → 自动切换到 Markdown
+
+### 🔧 Technical
+
+- `bindQuickInputEvents()` - 快捷输入栏事件绑定
+- `handleQuickInput()` - 处理快捷输入
+- `autoDetectCellType()` - 智能类型检测
+- `cycleQuickInputType()` - 循环切换类型
+- `_pendingExecute` - 创建后自动执行标记
+
+### 📊 代码统计
+
+| 组件 | 新增行数 |
+|------|----------|
+| HTML 结构 | ~15 |
+| JavaScript | ~120 |
+| CSS 样式 | ~110 |
+| **总计** | **~245** |
+
+---
+
 ## [2.2.0-alpha.1] - 2026-01-15
 
 ### 🎯 Highlights
