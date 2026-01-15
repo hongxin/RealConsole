@@ -10493,76 +10493,144 @@ body::before {
     display: none;
 }
 
-/* 输出类型样式 */
+/* 输出类型样式 (v2.1.0-beta.1 增强) */
 .cell-output-text {
-    padding: 8px 12px;
+    padding: 10px 14px;
     font-family: inherit;
     white-space: pre-wrap;
     color: var(--terminal-output);
+    line-height: 1.6;
+    animation: fadeInOutput 0.3s ease-out;
+}
+
+@keyframes fadeInOutput {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .cell-output-code {
     margin: 0;
-    padding: 12px;
-    background: rgba(10, 14, 39, 0.8);
-    border-radius: 4px;
+    padding: 14px;
+    background: linear-gradient(135deg, rgba(10, 14, 39, 0.9) 0%, rgba(26, 11, 46, 0.8) 100%);
+    border-radius: 6px;
+    border: 1px solid var(--border-secondary);
     overflow-x: auto;
+    animation: fadeInOutput 0.3s ease-out;
 }
 
 .cell-output-code code {
-    color: #51CF66;
-    font-family: "Consolas", monospace;
+    color: #7ee787;
+    font-family: "JetBrains Mono", "Consolas", "Monaco", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.cell-output-code:hover {
+    border-color: var(--border-primary);
 }
 
 .cell-output-chart {
     width: 100%;
     min-height: 300px;
+    border-radius: 6px;
+    background: rgba(10, 14, 39, 0.5);
+    animation: fadeInOutput 0.3s ease-out;
+}
+
+.cell-output-image {
+    animation: fadeInOutput 0.3s ease-out;
 }
 
 .cell-output-image img {
     max-width: 100%;
-    border-radius: 4px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.cell-output-image img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
 .cell-output-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.9em;
+    border-radius: 6px;
+    overflow: hidden;
+    animation: fadeInOutput 0.3s ease-out;
 }
 
 .cell-output-table th,
 .cell-output-table td {
-    padding: 8px 12px;
-    border: 1px solid var(--border-secondary);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-secondary);
     text-align: left;
 }
 
 .cell-output-table th {
-    background: rgba(163, 113, 247, 0.1);
+    background: linear-gradient(135deg, rgba(163, 113, 247, 0.15) 0%, rgba(163, 113, 247, 0.08) 100%);
     color: var(--text-primary);
     font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+.cell-output-table tbody tr {
+    transition: background 0.2s;
+}
+
+.cell-output-table tbody tr:hover {
+    background: rgba(163, 113, 247, 0.05);
+}
+
+.cell-output-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 .cell-output-error {
-    padding: 12px;
-    background: rgba(255, 123, 114, 0.1);
-    border-left: 3px solid var(--color-error);
-    border-radius: 4px;
+    padding: 14px;
+    background: linear-gradient(135deg, rgba(255, 123, 114, 0.12) 0%, rgba(255, 123, 114, 0.05) 100%);
+    border-left: 4px solid var(--color-error);
+    border-radius: 6px;
+    animation: fadeInOutput 0.3s ease-out, errorShake 0.5s ease-out;
+}
+
+@keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50% { transform: translateX(-4px); }
+    20%, 40% { transform: translateX(4px); }
 }
 
 .cell-output-error .error-message {
     color: var(--color-error);
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 14px;
 }
 
 .cell-output-error .error-traceback {
-    margin-top: 8px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.3);
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.4);
     border-radius: 4px;
-    font-size: 0.85em;
+    font-size: 12px;
+    font-family: "JetBrains Mono", "Consolas", monospace;
     color: var(--text-secondary);
     overflow-x: auto;
+    line-height: 1.4;
+}
+
+/* 流式输出样式 */
+.cell-output-stream {
+    padding: 8px 14px;
+    font-family: "JetBrains Mono", "Consolas", monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    color: var(--text-secondary);
+    border-left: 2px solid var(--border-secondary);
+    margin-left: 4px;
 }
 
 /* Cell 状态指示器 */
@@ -10609,18 +10677,58 @@ body::before {
     background: var(--text-secondary);
 }
 
-/* Cell 执行状态类 */
+/* Cell 执行状态类 (v2.1.0-beta.1 增强) */
 .notebook-cell.cell-state-running {
     border-color: var(--accent-primary);
-    box-shadow: 0 0 10px rgba(163, 113, 247, 0.3);
+    box-shadow: 0 0 15px rgba(163, 113, 247, 0.4);
+    animation: cellRunningPulse 1.5s ease-in-out infinite;
+}
+
+.notebook-cell.cell-state-running .cell-gutter {
+    background: linear-gradient(135deg, rgba(163, 113, 247, 0.15) 0%, transparent 100%);
+}
+
+.notebook-cell.cell-state-running .status-indicator {
+    animation: statusPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes cellRunningPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(163, 113, 247, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(163, 113, 247, 0.5); }
+}
+
+@keyframes statusPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.8; }
 }
 
 .notebook-cell.cell-state-success {
     border-left: 3px solid var(--color-success);
+    animation: cellSuccessFlash 0.5s ease-out;
+}
+
+.notebook-cell.cell-state-success .cell-gutter {
+    background: linear-gradient(135deg, rgba(57, 255, 20, 0.08) 0%, transparent 100%);
+}
+
+@keyframes cellSuccessFlash {
+    0% { background: rgba(57, 255, 20, 0.15); }
+    100% { background: transparent; }
 }
 
 .notebook-cell.cell-state-failed {
     border-left: 3px solid var(--color-error);
+    animation: cellFailedShake 0.4s ease-out;
+}
+
+.notebook-cell.cell-state-failed .cell-gutter {
+    background: linear-gradient(135deg, rgba(255, 123, 114, 0.1) 0%, transparent 100%);
+}
+
+@keyframes cellFailedShake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-3px); }
+    40%, 80% { transform: translateX(3px); }
 }
 
 /* 拖拽样式 */
@@ -10724,7 +10832,13 @@ body::before {
     background: #F7F9FA;
 }
 
-/* Notebook 响应式 */
+/* Notebook 响应式 (v2.1.0-beta.1 增强) */
+@media (max-width: 1024px) {
+    .notebook-sidebar {
+        width: 240px;
+    }
+}
+
 @media (max-width: 768px) {
     .notebook-container {
         flex-direction: column;
@@ -10735,16 +10849,105 @@ body::before {
         width: 100%;
         max-width: 100%;
         border-radius: 8px 8px 0 0;
-        max-height: 200px;
+        max-height: 180px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .notebook-sidebar-header {
+        padding: 10px 14px;
     }
 
     .notebook-main {
-        border-left: 1px solid var(--border-primary);
+        border-left: none;
         border-radius: 0 0 8px 8px;
+    }
+
+    .notebook-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .notebook-header .notebook-title-wrapper {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .notebook-header .notebook-actions {
+        flex: 1 1 100%;
+        justify-content: flex-start;
     }
 
     .cell-toolbar {
         flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px;
+    }
+
+    .cell-toolbar button {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    .notebook-cell {
+        padding: 10px;
+    }
+
+    .cell-gutter {
+        width: 36px;
+        padding: 6px;
+    }
+
+    .cell-main {
+        padding: 8px;
+    }
+
+    .cell-source {
+        font-size: 13px;
+        min-height: 50px;
+    }
+
+    .cell-toolbar-mini {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .cell-toolbar-mini button {
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+
+    /* 导出菜单移动端适配 */
+    .export-menu {
+        position: fixed;
+        left: 50% !important;
+        transform: translateX(-50%);
+        bottom: 20px !important;
+        top: auto !important;
+        width: 90%;
+        max-width: 300px;
+    }
+}
+
+@media (max-width: 480px) {
+    .notebook-container {
+        padding: 4px;
+    }
+
+    .notebook-cell {
+        border-radius: 6px;
+    }
+
+    .cell-gutter {
+        width: 30px;
+    }
+
+    .cell-execution-count {
+        font-size: 10px;
+    }
+
+    .cell-output-area {
+        padding: 8px;
     }
 }
 "#;

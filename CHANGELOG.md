@@ -5,6 +5,47 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-beta.1] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: 样式完善 + 响应式布局
+
+- ✨ **执行动画** - Cell 执行状态精美动画效果
+- ✨ **输出美化** - 输出区域渐变背景和淡入动画
+- ✨ **响应式布局** - 适配平板和移动设备
+
+### ✨ New Features
+
+#### Cell 执行状态动画
+
+- 🔄 **Running** - 紫色脉冲发光动画 (cellRunningPulse)
+- ✅ **Success** - 绿色边框闪烁 (cellSuccessFlash)
+- ❌ **Failed** - 红色边框震动 (cellFailedShake)
+- ⏳ **Pending** - 执行计数器脉冲效果
+
+#### 输出区域样式优化
+
+- 🎨 输出渐入动画 (fadeInOutput 0.3s)
+- 📦 输出容器渐变背景
+- 💻 代码输出增强高亮
+- 📊 表格样式优化（圆角、悬停效果）
+- ❌ 错误输出改进（红色左边框、图标指示）
+
+#### 响应式布局
+
+- 📱 **1024px** - 侧边栏缩小到 240px
+- 📱 **768px** - 侧边栏折叠到 200px，Cell 工具栏简化
+- 📱 **480px** - 移动端优化，垂直布局，隐藏侧边栏
+
+### 🔧 Technical
+
+- CSS keyframes 动画: cellRunningPulse, cellSuccessFlash, cellFailedShake, fadeInOutput
+- 媒体查询断点: 1024px, 768px, 480px
+- 性能优化: 动画使用 transform 和 opacity
+
+---
+
 ## [2.1.0-alpha.2] - 2026-01-15
 
 ### 🎯 Highlights
