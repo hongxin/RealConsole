@@ -64,6 +64,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <p data-i18n="web.header.tagline">融合东方哲学智慧的智能 CLI Agent</p>
         </div>
         <div id="header-right-controls">
+            <button id="notebook-mode-toggle" class="notebook-mode-btn" title="切换到笔记本模式">📓 笔记本</button>
             <button id="session-menu-btn" class="session-btn" title="会话管理">💾 会话</button>
             <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合</button>
             <button id="clear-screen-btn" class="clear-btn" title="清空当前对话">🗑️ 清空</button>
@@ -186,6 +187,60 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         </div>
         <div id="files-list" class="files-list"></div>
         <div class="files-panel-empty hidden">暂无文件，点击"上传 CSV"添加</div>
+    </div>
+    <!-- v2.1.0: Notebook 模式容器 (Jupyter 风格) -->
+    <div id="notebook-container" class="notebook-container hidden">
+        <!-- 侧边栏: Notebook 管理 -->
+        <aside id="notebook-sidebar" class="notebook-sidebar">
+            <div class="notebook-sidebar-header">
+                <h3>📒 Notebooks</h3>
+                <button id="new-notebook-btn" class="notebook-action-btn" title="新建笔记本">+</button>
+            </div>
+            <div class="notebook-search">
+                <input type="text" id="notebook-search-input" placeholder="🔍 搜索笔记本...">
+            </div>
+            <div id="notebook-list" class="notebook-list">
+                <div class="notebook-list-empty">暂无笔记本，点击 + 创建</div>
+            </div>
+        </aside>
+        <!-- 主区域: Cell 编辑器 -->
+        <main id="notebook-main" class="notebook-main">
+            <!-- Notebook 头部 -->
+            <div id="notebook-header" class="notebook-header hidden">
+                <div class="notebook-title-area">
+                    <input type="text" id="notebook-title-input" class="notebook-title-input"
+                           placeholder="未命名笔记本" readonly>
+                    <button id="notebook-title-edit" class="title-edit-btn" title="编辑标题">✏️</button>
+                </div>
+                <div class="notebook-actions">
+                    <button id="notebook-save-btn" class="notebook-btn" title="保存">💾 保存</button>
+                    <button id="notebook-run-all-btn" class="notebook-btn" title="运行全部">▶️ 运行全部</button>
+                    <button id="notebook-export-btn" class="notebook-btn" title="导出">📤 导出</button>
+                </div>
+            </div>
+            <!-- Cell 工具栏 -->
+            <div id="cell-toolbar" class="cell-toolbar hidden">
+                <button class="cell-toolbar-btn" data-action="add-natural" title="添加自然语言 Cell">
+                    💬 自然语言
+                </button>
+                <button class="cell-toolbar-btn" data-action="add-command" title="添加命令 Cell">
+                    ⚙️ 命令
+                </button>
+                <button class="cell-toolbar-btn" data-action="add-code" title="添加代码 Cell">
+                    💻 代码
+                </button>
+                <button class="cell-toolbar-btn" data-action="add-markdown" title="添加 Markdown Cell">
+                    📝 Markdown
+                </button>
+            </div>
+            <!-- Cell 列表容器 -->
+            <div id="cell-list" class="cell-list"></div>
+            <!-- 空状态 -->
+            <div id="notebook-empty-state" class="notebook-empty-state">
+                <div class="empty-icon">📓</div>
+                <p>请从左侧选择或创建一个笔记本</p>
+            </div>
+        </main>
     </div>
     <div id="terminal-container">
         <!-- 混合终端：单一容器，统一滚动 -->
@@ -4708,6 +4763,13 @@ const TERMINAL_JS: &str = r#"
         // v1.46.0: 初始化 FileUploadManager
         terminal.fileUploadManager = new FileUploadManager(ws);
 
+        // v2.1.0: 初始化 NotebookManager
+        if (typeof NotebookManager !== 'undefined') {
+            const notebookManager = new NotebookManager();
+            notebookManager.connect(ws);
+            window.notebookManager = notebookManager;
+        }
+
         // 应用初始语言设置
         updatePageText();
     };
@@ -4922,6 +4984,28 @@ const TERMINAL_JS: &str = r#"
                 // 文件上传成功
                 if (terminal.fileUploadManager) {
                     terminal.fileUploadManager.handleFileUploaded(msg);
+                }
+                break;
+
+            // ===== v2.1.0: Notebook 消息 =====
+            case 'notebook_list':
+            case 'notebook_created':
+            case 'notebook_opened':
+            case 'notebook_saved':
+            case 'notebook_deleted':
+            case 'notebook_renamed':
+            case 'notebook_exported':
+            case 'cell_added':
+            case 'cell_updated':
+            case 'cell_deleted':
+            case 'cell_moved':
+            case 'cell_execution_started':
+            case 'cell_output':
+            case 'cell_execution_completed':
+            case 'notebook_error':
+                // 路由到 NotebookManager
+                if (window.notebookManager) {
+                    window.notebookManager.handleMessage(msg);
                 }
                 break;
         }
@@ -5420,6 +5504,868 @@ const TERMINAL_JS: &str = r#"
         // 初始化 i18n
         updatePageText();
     });
+
+    // ========== v2.1.0: Notebook UI ==========
+
+    /**
+     * NotebookManager - 管理 Notebook WebSocket 通信
+     */
+    class NotebookManager {
+        constructor() {
+            this.ws = null;
+            this.notebooks = new Map();      // id -> NotebookSummary
+            this.currentNotebook = null;     // NotebookData
+            this.cells = new Map();          // cellId -> CellData
+            this.cellEditor = null;
+
+            // UI 元素
+            this.notebookList = document.getElementById('notebook-list');
+            this.cellList = document.getElementById('cell-list');
+            this.notebookHeader = document.getElementById('notebook-header');
+            this.cellToolbar = document.getElementById('cell-toolbar');
+            this.emptyState = document.getElementById('notebook-empty-state');
+
+            this.init();
+        }
+
+        init() {
+            this.bindEvents();
+            this.cellEditor = new CellEditor(this);
+        }
+
+        // ========== WebSocket 通信 ==========
+
+        connect(ws) {
+            this.ws = ws;
+            this.listNotebooks();
+        }
+
+        send(message) {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify(message));
+            }
+        }
+
+        handleMessage(data) {
+            switch (data.type) {
+                case 'notebook_list':
+                    this.handleNotebookList(data.notebooks);
+                    break;
+                case 'notebook_created':
+                    this.handleNotebookCreated(data.notebook);
+                    break;
+                case 'notebook_opened':
+                    this.handleNotebookOpened(data.notebook);
+                    break;
+                case 'notebook_saved':
+                    this.handleNotebookSaved(data);
+                    break;
+                case 'notebook_deleted':
+                    this.handleNotebookDeleted(data);
+                    break;
+                case 'notebook_renamed':
+                    this.handleNotebookRenamed(data);
+                    break;
+                case 'cell_added':
+                    this.handleCellAdded(data);
+                    break;
+                case 'cell_updated':
+                    this.handleCellUpdated(data);
+                    break;
+                case 'cell_deleted':
+                    this.handleCellDeleted(data);
+                    break;
+                case 'cell_moved':
+                    this.handleCellMoved(data);
+                    break;
+                case 'cell_execution_started':
+                    this.handleCellExecutionStarted(data);
+                    break;
+                case 'cell_output':
+                    this.handleCellOutput(data);
+                    break;
+                case 'cell_execution_completed':
+                    this.handleCellExecutionCompleted(data);
+                    break;
+                case 'cell_outputs_cleared':
+                    this.handleCellOutputsCleared(data);
+                    break;
+                case 'error':
+                    this.handleError(data);
+                    break;
+            }
+        }
+
+        // ========== Notebook CRUD ==========
+
+        listNotebooks() {
+            this.send({ type: 'list_notebooks' });
+        }
+
+        createNotebook(name) {
+            this.send({ type: 'create_notebook', name: name || '未命名笔记本' });
+        }
+
+        openNotebook(notebookId) {
+            this.send({ type: 'open_notebook', notebook_id: notebookId });
+        }
+
+        saveNotebook() {
+            if (!this.currentNotebook) return;
+            this.send({ type: 'save_notebook', notebook_id: this.currentNotebook.id });
+        }
+
+        deleteNotebook(notebookId) {
+            this.send({ type: 'delete_notebook', notebook_id: notebookId });
+        }
+
+        renameNotebook(notebookId, newName) {
+            this.send({ type: 'rename_notebook', notebook_id: notebookId, new_name: newName });
+        }
+
+        // ========== Cell 操作 ==========
+
+        addCell(cellType, source = '', index = null) {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'add_cell',
+                notebook_id: this.currentNotebook.id,
+                cell_type: cellType,
+                source: source,
+                index: index
+            });
+        }
+
+        updateCell(cellId, source) {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'update_cell',
+                notebook_id: this.currentNotebook.id,
+                cell_id: cellId,
+                source: source
+            });
+        }
+
+        deleteCell(cellId) {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'delete_cell',
+                notebook_id: this.currentNotebook.id,
+                cell_id: cellId
+            });
+        }
+
+        moveCell(cellId, newIndex) {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'move_cell',
+                notebook_id: this.currentNotebook.id,
+                cell_id: cellId,
+                new_index: newIndex
+            });
+        }
+
+        executeCell(cellId) {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'execute_cell',
+                notebook_id: this.currentNotebook.id,
+                cell_id: cellId
+            });
+        }
+
+        executeAll() {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'execute_all',
+                notebook_id: this.currentNotebook.id
+            });
+        }
+
+        clearOutputs(cellId) {
+            if (!this.currentNotebook) return;
+            this.send({
+                type: 'clear_outputs',
+                notebook_id: this.currentNotebook.id,
+                cell_id: cellId
+            });
+        }
+
+        // ========== 消息处理器 ==========
+
+        handleNotebookList(notebooks) {
+            this.notebooks.clear();
+            notebooks.forEach(nb => this.notebooks.set(nb.id, nb));
+            this.renderNotebookList();
+        }
+
+        handleNotebookCreated(notebook) {
+            this.notebooks.set(notebook.id, notebook);
+            this.renderNotebookList();
+            this.openNotebook(notebook.id);
+            if (window.toastManager) {
+                window.toastManager.show('笔记本已创建', 'success');
+            }
+        }
+
+        handleNotebookOpened(notebook) {
+            this.currentNotebook = notebook;
+            this.cells.clear();
+            notebook.cells.forEach((cell, index) => {
+                cell.index = index;
+                this.cells.set(cell.id, cell);
+            });
+
+            // 更新 UI
+            this.showNotebookUI();
+            document.getElementById('notebook-title-input').value = notebook.name;
+            this.cellEditor.renderAllCells(notebook.cells);
+
+            // 高亮选中的笔记本
+            this.notebookList.querySelectorAll('.notebook-list-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.notebookId === notebook.id);
+            });
+        }
+
+        handleNotebookSaved(data) {
+            if (window.toastManager) {
+                window.toastManager.show('笔记本已保存', 'success');
+            }
+        }
+
+        handleNotebookDeleted(data) {
+            this.notebooks.delete(data.notebook_id);
+            this.renderNotebookList();
+            if (this.currentNotebook && this.currentNotebook.id === data.notebook_id) {
+                this.currentNotebook = null;
+                this.hideNotebookUI();
+            }
+            if (window.toastManager) {
+                window.toastManager.show('笔记本已删除', 'info');
+            }
+        }
+
+        handleNotebookRenamed(data) {
+            const notebook = this.notebooks.get(data.notebook_id);
+            if (notebook) {
+                notebook.name = data.new_name;
+                this.renderNotebookList();
+            }
+            if (this.currentNotebook && this.currentNotebook.id === data.notebook_id) {
+                document.getElementById('notebook-title-input').value = data.new_name;
+            }
+        }
+
+        handleCellAdded(data) {
+            data.cell.index = data.index;
+            this.cells.set(data.cell.id, data.cell);
+            this.cellEditor.addCell(data.cell, data.index);
+        }
+
+        handleCellUpdated(data) {
+            const cell = this.cells.get(data.cell_id);
+            if (cell) {
+                cell.source = data.source;
+            }
+        }
+
+        handleCellDeleted(data) {
+            this.cells.delete(data.cell_id);
+            this.cellEditor.removeCell(data.cell_id);
+        }
+
+        handleCellMoved(data) {
+            this.cellEditor.moveCell(data.cell_id, data.new_index);
+        }
+
+        handleCellExecutionStarted(data) {
+            this.cellEditor.updateCellState(data.cell_id, 'running');
+        }
+
+        handleCellOutput(data) {
+            this.cellEditor.appendOutput(data.cell_id, data.output);
+        }
+
+        handleCellExecutionCompleted(data) {
+            const cell = this.cells.get(data.cell_id);
+            if (cell) {
+                cell.state = data.state;
+                cell.duration_ms = data.duration_ms;
+                cell.execution_count = data.execution_count;
+            }
+            this.cellEditor.updateCellState(data.cell_id, data.state);
+            this.cellEditor.updateCellMeta(data.cell_id, data.duration_ms, data.execution_count);
+        }
+
+        handleCellOutputsCleared(data) {
+            this.cellEditor.clearCellOutput(data.cell_id);
+        }
+
+        handleError(data) {
+            console.error('Notebook error:', data.message);
+            if (window.toastManager) {
+                window.toastManager.show(data.message, 'error');
+            }
+        }
+
+        // ========== UI 渲染 ==========
+
+        renderNotebookList() {
+            const emptyEl = this.notebookList.querySelector('.notebook-list-empty');
+
+            if (this.notebooks.size === 0) {
+                this.notebookList.innerHTML = '<div class="notebook-list-empty">暂无笔记本，点击 + 创建</div>';
+                return;
+            }
+
+            let html = '';
+            for (const [id, nb] of this.notebooks) {
+                const isActive = this.currentNotebook && this.currentNotebook.id === id;
+                html += `
+                    <div class="notebook-list-item ${isActive ? 'active' : ''}"
+                         data-notebook-id="${id}">
+                        <div class="notebook-list-item-title">📓 ${this.escapeHtml(nb.name)}</div>
+                        <div class="notebook-list-item-meta">${nb.cell_count || 0} cells</div>
+                    </div>
+                `;
+            }
+            this.notebookList.innerHTML = html;
+
+            // 绑定点击事件
+            this.notebookList.querySelectorAll('.notebook-list-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.openNotebook(item.dataset.notebookId);
+                });
+            });
+        }
+
+        showNotebookUI() {
+            this.notebookHeader.classList.remove('hidden');
+            this.cellToolbar.classList.remove('hidden');
+            this.emptyState.style.display = 'none';
+        }
+
+        hideNotebookUI() {
+            this.notebookHeader.classList.add('hidden');
+            this.cellToolbar.classList.add('hidden');
+            this.emptyState.style.display = '';
+            this.cellList.innerHTML = '';
+        }
+
+        // ========== 事件绑定 ==========
+
+        bindEvents() {
+            // 新建笔记本
+            document.getElementById('new-notebook-btn')?.addEventListener('click', () => {
+                const name = prompt('笔记本名称:', '未命名笔记本');
+                if (name !== null) {
+                    this.createNotebook(name);
+                }
+            });
+
+            // 保存按钮
+            document.getElementById('notebook-save-btn')?.addEventListener('click', () => {
+                this.saveNotebook();
+            });
+
+            // 运行全部按钮
+            document.getElementById('notebook-run-all-btn')?.addEventListener('click', () => {
+                this.executeAll();
+            });
+
+            // Cell 工具栏 - 添加 Cell
+            this.cellToolbar?.querySelectorAll('[data-action]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const action = btn.dataset.action;
+                    const typeMap = {
+                        'add-natural': 'natural',
+                        'add-command': 'command',
+                        'add-code': 'code',
+                        'add-markdown': 'markdown'
+                    };
+                    const cellType = typeMap[action];
+                    if (cellType) {
+                        this.addCell(cellType);
+                    }
+                });
+            });
+
+            // 标题编辑
+            const titleInput = document.getElementById('notebook-title-input');
+            const titleEditBtn = document.getElementById('notebook-title-edit');
+
+            titleEditBtn?.addEventListener('click', () => {
+                if (titleInput.readOnly) {
+                    titleInput.readOnly = false;
+                    titleInput.focus();
+                    titleInput.select();
+                } else {
+                    titleInput.readOnly = true;
+                    if (this.currentNotebook) {
+                        this.renameNotebook(this.currentNotebook.id, titleInput.value);
+                    }
+                }
+            });
+
+            titleInput?.addEventListener('blur', () => {
+                if (!titleInput.readOnly && this.currentNotebook) {
+                    titleInput.readOnly = true;
+                    this.renameNotebook(this.currentNotebook.id, titleInput.value);
+                }
+            });
+
+            titleInput?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    titleInput.blur();
+                }
+            });
+        }
+
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+
+    /**
+     * CellEditor - 管理 Cell 渲染和交互
+     */
+    class CellEditor {
+        constructor(notebookManager) {
+            this.manager = notebookManager;
+            this.cellElements = new Map();  // cellId -> DOM element
+            this.cellList = document.getElementById('cell-list');
+
+            this.typeIcons = {
+                natural: '💬',
+                command: '⚙️',
+                code: '💻',
+                markdown: '📝'
+            };
+
+            this.typePlaceholders = {
+                natural: '输入自然语言问题...',
+                command: '输入系统命令 (如 /help)...',
+                code: '输入代码 (Shell 命令用 ! 前缀)...',
+                markdown: '输入 Markdown 文本...'
+            };
+        }
+
+        // ========== Cell 渲染 ==========
+
+        renderAllCells(cells) {
+            this.cellList.innerHTML = '';
+            this.cellElements.clear();
+            cells.forEach((cell, index) => {
+                const cellEl = this.renderCell(cell, index);
+                this.cellList.appendChild(cellEl);
+            });
+        }
+
+        renderCell(cellData, index) {
+            const cell = document.createElement('div');
+            cell.className = `notebook-cell cell-state-${cellData.state || 'idle'}`;
+            cell.dataset.cellId = cellData.id;
+            cell.dataset.cellType = cellData.cell_type;
+            cell.dataset.index = index;
+
+            cell.innerHTML = this.getCellHTML(cellData);
+
+            this.bindCellEvents(cell, cellData);
+            this.cellElements.set(cellData.id, cell);
+
+            return cell;
+        }
+
+        getCellHTML(cellData) {
+            const typeIcon = this.typeIcons[cellData.cell_type] || '📄';
+            const placeholder = this.typePlaceholders[cellData.cell_type] || '';
+            const executionCount = cellData.execution_count || ' ';
+            const duration = cellData.duration_ms ? `${cellData.duration_ms}ms` : '';
+            const hasOutputs = cellData.outputs && cellData.outputs.length > 0;
+
+            return `
+                <div class="cell-gutter">
+                    <div class="cell-drag-handle" draggable="true" title="拖拽排序">⠿</div>
+                    <div class="cell-execution-count">[${executionCount}]</div>
+                    <div class="cell-type-indicator" title="${cellData.cell_type}">${typeIcon}</div>
+                </div>
+                <div class="cell-main">
+                    <div class="cell-toolbar-mini">
+                        <button class="cell-btn run-btn" title="运行 (Shift+Enter)">▶️</button>
+                        <button class="cell-btn move-up-btn" title="上移">⬆️</button>
+                        <button class="cell-btn move-down-btn" title="下移">⬇️</button>
+                        <button class="cell-btn clear-btn" title="清除输出">🧹</button>
+                        <button class="cell-btn delete-btn" title="删除">🗑️</button>
+                    </div>
+                    <div class="cell-input-area">
+                        <textarea class="cell-source"
+                                  placeholder="${placeholder}"
+                                  rows="${Math.max(3, (cellData.source || '').split('\\n').length)}"
+                        >${this.escapeHtml(cellData.source || '')}</textarea>
+                    </div>
+                    <div class="cell-output-area ${hasOutputs ? '' : 'hidden'}">
+                        ${this.renderOutputs(cellData.outputs || [])}
+                    </div>
+                </div>
+                <div class="cell-status">
+                    <span class="status-indicator ${cellData.state || 'idle'}"></span>
+                    <span class="execution-time">${duration}</span>
+                </div>
+            `;
+        }
+
+        // ========== 输出渲染 ==========
+
+        renderOutputs(outputs) {
+            return outputs.map(output => this.renderOutput(output)).join('');
+        }
+
+        renderOutput(output) {
+            switch (output.type) {
+                case 'text':
+                    return `<div class="cell-output-text">${this.escapeHtml(output.content)}</div>`;
+
+                case 'code':
+                    return `<pre class="cell-output-code"><code class="language-${output.language || 'text'}">${this.escapeHtml(output.content)}</code></pre>`;
+
+                case 'chart':
+                    const chartId = 'chart-' + Math.random().toString(36).substr(2, 9);
+                    setTimeout(() => this.initializeChart(chartId, output.data), 100);
+                    return `<div id="${chartId}" class="cell-output-chart"></div>`;
+
+                case 'image':
+                    return `<div class="cell-output-image">
+                        <img src="data:${output.mime_type};base64,${output.data}" alt="${output.alt || 'Output Image'}">
+                    </div>`;
+
+                case 'table':
+                    return this.renderTable(output.headers, output.rows);
+
+                case 'error':
+                    return `<div class="cell-output-error">
+                        <div class="error-message">❌ ${this.escapeHtml(output.message)}</div>
+                        ${output.traceback ? `<pre class="error-traceback">${this.escapeHtml(output.traceback)}</pre>` : ''}
+                    </div>`;
+
+                case 'stream':
+                    return `<div class="cell-output-stream stream-${output.name}">${this.escapeHtml(output.content)}</div>`;
+
+                default:
+                    return `<div class="cell-output-text">${JSON.stringify(output)}</div>`;
+            }
+        }
+
+        renderTable(headers, rows) {
+            let html = '<table class="cell-output-table"><thead><tr>';
+            (headers || []).forEach(h => { html += `<th>${this.escapeHtml(h)}</th>`; });
+            html += '</tr></thead><tbody>';
+            (rows || []).forEach(row => {
+                html += '<tr>';
+                row.forEach(cell => { html += `<td>${this.escapeHtml(cell)}</td>`; });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        initializeChart(containerId, chartData) {
+            const container = document.getElementById(containerId);
+            if (container && typeof echarts !== 'undefined') {
+                const chart = echarts.init(container);
+                chart.setOption(chartData);
+            }
+        }
+
+        // ========== Cell 操作 ==========
+
+        addCell(cellData, index) {
+            const cellEl = this.renderCell(cellData, index);
+
+            if (index !== undefined && index < this.cellList.children.length) {
+                this.cellList.insertBefore(cellEl, this.cellList.children[index]);
+            } else {
+                this.cellList.appendChild(cellEl);
+            }
+
+            // 更新所有 cell 的 index
+            this.updateCellIndices();
+
+            // 聚焦到新 cell
+            const textarea = cellEl.querySelector('.cell-source');
+            if (textarea) {
+                textarea.focus();
+            }
+        }
+
+        removeCell(cellId) {
+            const cellEl = this.cellElements.get(cellId);
+            if (cellEl) {
+                cellEl.remove();
+                this.cellElements.delete(cellId);
+                this.updateCellIndices();
+            }
+        }
+
+        moveCell(cellId, newIndex) {
+            const cellEl = this.cellElements.get(cellId);
+            if (!cellEl) return;
+
+            const referenceEl = this.cellList.children[newIndex];
+            if (referenceEl) {
+                this.cellList.insertBefore(cellEl, referenceEl);
+            } else {
+                this.cellList.appendChild(cellEl);
+            }
+
+            this.updateCellIndices();
+        }
+
+        updateCellIndices() {
+            Array.from(this.cellList.children).forEach((cellEl, index) => {
+                cellEl.dataset.index = index;
+            });
+        }
+
+        // ========== 状态更新 ==========
+
+        updateCellState(cellId, state) {
+            const cell = this.cellElements.get(cellId);
+            if (!cell) return;
+
+            // 移除旧状态类
+            cell.classList.remove('cell-state-idle', 'cell-state-pending',
+                                 'cell-state-running', 'cell-state-success',
+                                 'cell-state-failed', 'cell-state-cancelled');
+
+            // 添加新状态类
+            cell.classList.add(`cell-state-${state}`);
+
+            // 更新状态指示器
+            const indicator = cell.querySelector('.status-indicator');
+            if (indicator) {
+                indicator.className = `status-indicator ${state}`;
+            }
+        }
+
+        updateCellMeta(cellId, durationMs, executionCount) {
+            const cell = this.cellElements.get(cellId);
+            if (!cell) return;
+
+            const countEl = cell.querySelector('.cell-execution-count');
+            if (countEl) {
+                countEl.textContent = `[${executionCount || ' '}]`;
+            }
+
+            const timeEl = cell.querySelector('.execution-time');
+            if (timeEl) {
+                timeEl.textContent = durationMs ? `${durationMs}ms` : '';
+            }
+        }
+
+        appendOutput(cellId, output) {
+            const cell = this.cellElements.get(cellId);
+            if (!cell) return;
+
+            const outputArea = cell.querySelector('.cell-output-area');
+            if (outputArea) {
+                outputArea.classList.remove('hidden');
+                outputArea.innerHTML += this.renderOutput(output);
+            }
+        }
+
+        clearCellOutput(cellId) {
+            const cell = this.cellElements.get(cellId);
+            if (!cell) return;
+
+            const outputArea = cell.querySelector('.cell-output-area');
+            if (outputArea) {
+                outputArea.innerHTML = '';
+                outputArea.classList.add('hidden');
+            }
+        }
+
+        // ========== 事件绑定 ==========
+
+        bindCellEvents(cellElement, cellData) {
+            const cellId = cellData.id;
+
+            // 运行按钮
+            cellElement.querySelector('.run-btn')?.addEventListener('click', () => {
+                this.saveCellSource(cellElement, cellId);
+                this.manager.executeCell(cellId);
+            });
+
+            // 删除按钮
+            cellElement.querySelector('.delete-btn')?.addEventListener('click', () => {
+                if (confirm('确定删除此 Cell？')) {
+                    this.manager.deleteCell(cellId);
+                }
+            });
+
+            // 上移按钮
+            cellElement.querySelector('.move-up-btn')?.addEventListener('click', () => {
+                const currentIndex = parseInt(cellElement.dataset.index);
+                if (currentIndex > 0) {
+                    this.manager.moveCell(cellId, currentIndex - 1);
+                }
+            });
+
+            // 下移按钮
+            cellElement.querySelector('.move-down-btn')?.addEventListener('click', () => {
+                const currentIndex = parseInt(cellElement.dataset.index);
+                this.manager.moveCell(cellId, currentIndex + 1);
+            });
+
+            // 清除输出按钮
+            cellElement.querySelector('.clear-btn')?.addEventListener('click', () => {
+                this.manager.clearOutputs(cellId);
+            });
+
+            // 源码编辑
+            const textarea = cellElement.querySelector('.cell-source');
+            if (textarea) {
+                let originalValue = textarea.value;
+
+                // 失焦保存
+                textarea.addEventListener('blur', () => {
+                    if (textarea.value !== originalValue) {
+                        this.manager.updateCell(cellId, textarea.value);
+                        originalValue = textarea.value;
+                    }
+                });
+
+                // Shift+Enter 运行
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.shiftKey && e.key === 'Enter') {
+                        e.preventDefault();
+                        if (textarea.value !== originalValue) {
+                            this.manager.updateCell(cellId, textarea.value);
+                            originalValue = textarea.value;
+                        }
+                        this.manager.executeCell(cellId);
+                    }
+                });
+
+                // 自动调整高度
+                textarea.addEventListener('input', () => {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+                });
+            }
+
+            // 拖拽事件
+            const dragHandle = cellElement.querySelector('.cell-drag-handle');
+            if (dragHandle) {
+                dragHandle.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', cellId);
+                    cellElement.classList.add('dragging');
+                });
+
+                dragHandle.addEventListener('dragend', () => {
+                    cellElement.classList.remove('dragging');
+                });
+            }
+        }
+
+        saveCellSource(cellElement, cellId) {
+            const textarea = cellElement.querySelector('.cell-source');
+            if (textarea) {
+                this.manager.updateCell(cellId, textarea.value);
+            }
+        }
+
+        escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+
+    /**
+     * Notebook 模式管理
+     */
+    let notebookManager = null;
+    let isNotebookMode = false;
+
+    function toggleNotebookMode() {
+        const terminalContainer = document.getElementById('terminal-container');
+        const notebookContainer = document.getElementById('notebook-container');
+        const toolbar = document.getElementById('toolbar');
+        const btn = document.getElementById('notebook-mode-toggle');
+
+        isNotebookMode = !isNotebookMode;
+
+        if (isNotebookMode) {
+            // 切换到 Notebook 模式
+            terminalContainer.classList.add('hidden');
+            toolbar.classList.add('hidden');
+            notebookContainer.classList.remove('hidden');
+            btn.innerHTML = '📺 终端';
+            btn.title = '切换到终端模式';
+            btn.classList.add('active');
+
+            // 初始化 NotebookManager
+            if (!notebookManager) {
+                notebookManager = new NotebookManager();
+                // 使用已存在的 WebSocket 连接
+                if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+                    notebookManager.connect(window.ws);
+                }
+            }
+        } else {
+            // 切换到终端模式
+            notebookContainer.classList.add('hidden');
+            terminalContainer.classList.remove('hidden');
+            toolbar.classList.remove('hidden');
+            btn.innerHTML = '📓 笔记本';
+            btn.title = '切换到笔记本模式';
+            btn.classList.remove('active');
+        }
+    }
+
+    // 检查是否是 Notebook 消息
+    function isNotebookMessage(type) {
+        const notebookTypes = [
+            'notebook_list', 'notebook_created', 'notebook_opened',
+            'notebook_saved', 'notebook_closed', 'notebook_deleted',
+            'notebook_renamed', 'cell_added', 'cell_updated',
+            'cell_deleted', 'cell_moved', 'cell_execution_started',
+            'cell_output', 'cell_execution_completed',
+            'cell_outputs_cleared', 'notebook_exported',
+            'notebook_imported', 'error'
+        ];
+        return notebookTypes.includes(type);
+    }
+
+    // 处理 Notebook WebSocket 消息
+    function handleNotebookMessage(data) {
+        if (notebookManager) {
+            notebookManager.handleMessage(data);
+        }
+    }
+
+    // 绑定模式切换按钮
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggleBtn = document.getElementById('notebook-mode-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', toggleNotebookMode);
+        }
+    });
+
+    // 导出给外部使用
+    window.notebookManager = null;
+    window.isNotebookMessage = isNotebookMessage;
+    window.handleNotebookMessage = handleNotebookMessage;
+    window.initNotebookManager = () => {
+        if (!notebookManager) {
+            notebookManager = new NotebookManager();
+        }
+        window.notebookManager = notebookManager;
+        return notebookManager;
+    };
 
 })();
 "#;
@@ -8931,6 +9877,662 @@ body::before {
         top: 60px;
         max-height: calc(100vh - 120px);
         border-radius: 0;
+    }
+}
+
+/* ============================================
+   v2.1.0: Notebook UI (Jupyter 风格)
+   ============================================ */
+
+/* Notebook 模式切换按钮 */
+.notebook-mode-btn {
+    background: linear-gradient(135deg, rgba(163, 113, 247, 0.2), rgba(163, 113, 247, 0.1));
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    color: var(--accent-primary);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s ease;
+}
+
+.notebook-mode-btn:hover {
+    background: linear-gradient(135deg, rgba(163, 113, 247, 0.3), rgba(163, 113, 247, 0.2));
+    border-color: var(--accent-primary);
+    box-shadow: 0 2px 8px rgba(163, 113, 247, 0.2);
+}
+
+.notebook-mode-btn.active {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+/* Notebook 容器布局 */
+.notebook-container {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+    gap: 0;
+    padding: 16px;
+}
+
+.notebook-container.hidden {
+    display: none;
+}
+
+/* 侧边栏 */
+.notebook-sidebar {
+    width: 280px;
+    min-width: 220px;
+    max-width: 350px;
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px 0 0 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.notebook-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-secondary);
+    background: var(--surface-tertiary);
+}
+
+.notebook-sidebar-header h3 {
+    margin: 0;
+    color: var(--text-title);
+    font-size: 1em;
+}
+
+.notebook-action-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--accent-primary);
+    border-radius: 6px;
+    background: rgba(163, 113, 247, 0.1);
+    color: var(--accent-primary);
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notebook-action-btn:hover {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+.notebook-search {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.notebook-search input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--terminal-input-bg);
+    border: 1px solid var(--border-secondary);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+.notebook-search input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.notebook-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.notebook-list-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 24px 12px;
+    font-size: 0.9em;
+}
+
+.notebook-list-item {
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.notebook-list-item:hover {
+    background: rgba(163, 113, 247, 0.1);
+    border-color: rgba(163, 113, 247, 0.2);
+}
+
+.notebook-list-item.active {
+    background: rgba(163, 113, 247, 0.2);
+    border-color: var(--accent-primary);
+}
+
+.notebook-list-item-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.notebook-list-item-meta {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+}
+
+/* 主区域 */
+.notebook-main {
+    flex: 1;
+    min-width: 0;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-primary);
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.notebook-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-secondary);
+    background: var(--surface-tertiary);
+}
+
+.notebook-header.hidden {
+    display: none;
+}
+
+.notebook-title-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notebook-title-input {
+    background: transparent;
+    border: none;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-title);
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.notebook-title-input:not([readonly]) {
+    background: var(--terminal-input-bg);
+    border: 1px solid var(--accent-primary);
+}
+
+.notebook-title-input:focus {
+    outline: none;
+}
+
+.title-edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9em;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.title-edit-btn:hover {
+    opacity: 1;
+}
+
+.notebook-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.notebook-btn {
+    padding: 6px 12px;
+    background: rgba(163, 113, 247, 0.1);
+    border: 1px solid rgba(163, 113, 247, 0.3);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s ease;
+}
+
+.notebook-btn:hover {
+    background: rgba(163, 113, 247, 0.2);
+    border-color: var(--accent-primary);
+}
+
+/* Cell 工具栏 */
+.cell-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-secondary);
+    background: var(--surface-primary);
+}
+
+.cell-toolbar.hidden {
+    display: none;
+}
+
+.cell-toolbar-btn {
+    padding: 8px 16px;
+    background: var(--surface-tertiary);
+    border: 1px solid var(--border-secondary);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+}
+
+.cell-toolbar-btn:hover {
+    background: rgba(163, 113, 247, 0.1);
+    border-color: var(--accent-primary);
+}
+
+/* Cell 列表 */
+.cell-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    position: relative;
+}
+
+/* 单个 Cell */
+.notebook-cell {
+    display: flex;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-secondary);
+    border-radius: 6px;
+    background: var(--surface-primary);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.notebook-cell:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-card);
+}
+
+.notebook-cell:focus-within {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(163, 113, 247, 0.2);
+}
+
+/* Cell 左侧槽 */
+.cell-gutter {
+    width: 50px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    border-right: 1px solid var(--border-secondary);
+    background: var(--surface-tertiary);
+    border-radius: 5px 0 0 5px;
+}
+
+.cell-drag-handle {
+    cursor: grab;
+    color: var(--text-secondary);
+    font-size: 1.1em;
+    padding: 4px;
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+}
+
+.cell-drag-handle:hover {
+    opacity: 1;
+    color: var(--accent-primary);
+}
+
+.cell-drag-handle:active {
+    cursor: grabbing;
+}
+
+.cell-execution-count {
+    font-family: monospace;
+    font-size: 0.75em;
+    color: var(--text-secondary);
+    margin: 4px 0;
+}
+
+.cell-type-indicator {
+    font-size: 1em;
+}
+
+/* Cell 主内容 */
+.cell-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Cell 迷你工具栏 */
+.cell-toolbar-mini {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-secondary);
+    background: var(--surface-tertiary);
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.notebook-cell:hover .cell-toolbar-mini {
+    opacity: 1;
+}
+
+.cell-btn {
+    background: none;
+    border: 1px solid transparent;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s ease;
+}
+
+.cell-btn:hover {
+    background: rgba(163, 113, 247, 0.1);
+    border-color: rgba(163, 113, 247, 0.3);
+}
+
+.cell-btn.run-btn:hover {
+    background: rgba(57, 255, 20, 0.1);
+    border-color: rgba(57, 255, 20, 0.3);
+}
+
+.cell-btn.delete-btn:hover {
+    background: rgba(255, 123, 114, 0.1);
+    border-color: rgba(255, 123, 114, 0.3);
+}
+
+/* Cell 输入区域 */
+.cell-input-area {
+    padding: 8px;
+}
+
+.cell-source {
+    width: 100%;
+    min-height: 60px;
+    padding: 10px 12px;
+    background: var(--terminal-input-bg);
+    border: 1px solid var(--border-secondary);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 0.95em;
+    line-height: 1.5;
+    resize: vertical;
+    transition: border-color 0.2s ease;
+}
+
+.cell-source:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background: rgba(22, 27, 34, 0.8);
+}
+
+.cell-source::placeholder {
+    color: var(--text-secondary);
+}
+
+/* Cell 输出区域 */
+.cell-output-area {
+    padding: 8px;
+    border-top: 1px solid var(--border-secondary);
+    background: rgba(0, 0, 0, 0.2);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.cell-output-area.hidden {
+    display: none;
+}
+
+/* 输出类型样式 */
+.cell-output-text {
+    padding: 8px 12px;
+    font-family: inherit;
+    white-space: pre-wrap;
+    color: var(--terminal-output);
+}
+
+.cell-output-code {
+    margin: 0;
+    padding: 12px;
+    background: rgba(10, 14, 39, 0.8);
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.cell-output-code code {
+    color: #51CF66;
+    font-family: "Consolas", monospace;
+}
+
+.cell-output-chart {
+    width: 100%;
+    min-height: 300px;
+}
+
+.cell-output-image img {
+    max-width: 100%;
+    border-radius: 4px;
+}
+
+.cell-output-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.cell-output-table th,
+.cell-output-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--border-secondary);
+    text-align: left;
+}
+
+.cell-output-table th {
+    background: rgba(163, 113, 247, 0.1);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.cell-output-error {
+    padding: 12px;
+    background: rgba(255, 123, 114, 0.1);
+    border-left: 3px solid var(--color-error);
+    border-radius: 4px;
+}
+
+.cell-output-error .error-message {
+    color: var(--color-error);
+    font-weight: 500;
+}
+
+.cell-output-error .error-traceback {
+    margin-top: 8px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    overflow-x: auto;
+}
+
+/* Cell 状态指示器 */
+.cell-status {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8em;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.status-indicator.idle {
+    background: var(--text-muted);
+}
+
+.status-indicator.pending {
+    background: var(--color-warning);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-indicator.running {
+    background: var(--accent-primary);
+    animation: pulse 0.8s ease-in-out infinite;
+}
+
+.status-indicator.success {
+    background: var(--color-success);
+}
+
+.status-indicator.failed {
+    background: var(--color-error);
+}
+
+.status-indicator.cancelled {
+    background: var(--text-secondary);
+}
+
+/* Cell 执行状态类 */
+.notebook-cell.cell-state-running {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 10px rgba(163, 113, 247, 0.3);
+}
+
+.notebook-cell.cell-state-success {
+    border-left: 3px solid var(--color-success);
+}
+
+.notebook-cell.cell-state-failed {
+    border-left: 3px solid var(--color-error);
+}
+
+/* 拖拽样式 */
+.notebook-cell.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+}
+
+.cell-drop-indicator {
+    position: absolute;
+    height: 3px;
+    background: var(--accent-primary);
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 0 8px var(--accent-primary);
+}
+
+.cell-drop-indicator.hidden {
+    display: none;
+}
+
+/* 空状态 */
+.notebook-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    padding: 48px;
+}
+
+.notebook-empty-state .empty-icon {
+    font-size: 4em;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.notebook-empty-state p {
+    font-size: 1.1em;
+}
+
+/* Light 主题适配 */
+[data-theme="light"] .notebook-sidebar {
+    background: #FFFFFF;
+    border-color: #EDEFF1;
+}
+
+[data-theme="light"] .notebook-main {
+    background: #F7F9FA;
+    border-color: #EDEFF1;
+}
+
+[data-theme="light"] .notebook-cell {
+    background: #FFFFFF;
+    border-color: #EDEFF1;
+}
+
+[data-theme="light"] .cell-gutter {
+    background: #F7F9FA;
+}
+
+[data-theme="light"] .cell-source {
+    background: #FFFFFF;
+    border-color: #EDEFF1;
+}
+
+[data-theme="light"] .cell-output-area {
+    background: #F7F9FA;
+}
+
+/* Notebook 响应式 */
+@media (max-width: 768px) {
+    .notebook-container {
+        flex-direction: column;
+        padding: 8px;
+    }
+
+    .notebook-sidebar {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 8px 8px 0 0;
+        max-height: 200px;
+    }
+
+    .notebook-main {
+        border-left: 1px solid var(--border-primary);
+        border-radius: 0 0 8px 8px;
+    }
+
+    .cell-toolbar {
+        flex-wrap: wrap;
     }
 }
 "#;

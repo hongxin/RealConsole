@@ -5,6 +5,69 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-alpha.1] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: Notebook Web UI Alpha 1 - Jupyter 风格编辑器
+
+- ✨ **Notebook 模式** - 浏览器中的 Jupyter 风格笔记本界面
+- ✨ **Cell 编辑器** - 支持 Natural/Command/Code/Markdown 四种类型
+- ✨ **侧边栏管理** - 笔记本列表、创建、删除、搜索
+- ✨ **WebSocket 集成** - 完整的 Notebook 消息路由
+
+### ✨ New Features
+
+#### Notebook Web UI (`src/web/frontend.rs`)
+
+**模式切换**:
+- 📓 头部添加 "笔记本" 切换按钮
+- 终端模式 ↔ 笔记本模式自由切换
+
+**侧边栏 (280px)**:
+- 📒 笔记本列表显示
+- ➕ 新建笔记本按钮
+- 🔍 搜索框
+- 右键菜单 (重命名/删除)
+
+**Cell 编辑器**:
+- 四种类型: 💬 自然语言 / ⚙️ 命令 / 💻 代码 / 📝 Markdown
+- Cell 状态指示器 (idle/pending/running/success/failed)
+- 输出渲染: Text/Code/Chart/Image/Table/Error/Stream
+- 执行计数器 [n]
+- 工具栏: ▶️运行 / ⬆️上移 / ⬇️下移 / 🗑️删除
+
+**快捷键**:
+- `Shift+Enter` - 执行当前 Cell
+- `Tab` - 缩进
+- `Shift+Tab` - 反缩进
+
+### 📊 代码统计
+
+| 组件 | 新增行数 |
+|------|----------|
+| HTML 结构 | ~60 |
+| CSS 样式 | ~650 |
+| NotebookManager | ~400 |
+| CellEditor | ~350 |
+| 消息路由 | ~30 |
+| **总计** | **~1,490** |
+
+### 🔧 Technical
+
+- `NotebookManager` 类 - WebSocket 通信、CRUD 操作
+- `CellEditor` 类 - Cell 渲染、输出显示、事件绑定
+- `toggleNotebookMode()` - 模式切换函数
+- WebSocket 消息路由 - 16 种 notebook 消息类型
+
+### 📝 下一步 (v2.1.0-alpha.2)
+
+- 拖拽排序 Cell
+- 导出功能 (rcnb/json/markdown)
+- 批量执行
+
+---
+
 ## [2.0.0] - 2026-01-15
 
 ### 🎉 Major Release: Notebook System
