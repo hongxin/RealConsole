@@ -5,6 +5,39 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0-alpha.1] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: 统一笔记本模式
+
+v2.2.0 将 RealConsole Web UI 统一到纯笔记本模式，移除了终端模式切换。
+
+- ✨ **统一笔记本** - 移除终端模式，默认进入 Notebook 界面
+- 🗑️ **简化 UI** - 移除模式切换按钮和视图模式按钮
+- 🔄 **自动初始化** - WebSocket 连接后自动初始化 NotebookManager
+
+### ⚠️ Breaking Changes
+
+- 移除了终端模式，所有交互统一到笔记本
+- 移除了 `notebook-mode-toggle` 按钮
+- 移除了 `view-mode-toggle` 按钮
+- 旧的 toolbar 暂时隐藏（功能将迁移到笔记本界面）
+
+### 🔧 Technical
+
+- 移除 `toggleNotebookMode()` 函数
+- 新增 `initNotebookMode()` 自动初始化函数
+- `notebook-container` 默认显示（移除 `.hidden` 类）
+- `terminal-container` 已移除
+
+### 📝 下一步 (v2.2.0-alpha.2)
+
+- 快捷输入栏（类 Jupyter 风格）
+- Cell 类型智能检测
+
+---
+
 ## [2.1.0] - 2026-01-15
 
 ### 🎯 Highlights

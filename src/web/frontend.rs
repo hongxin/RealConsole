@@ -64,10 +64,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <p data-i18n="web.header.tagline">融合东方哲学智慧的智能 CLI Agent</p>
         </div>
         <div id="header-right-controls">
-            <button id="notebook-mode-toggle" class="notebook-mode-btn" title="切换到笔记本模式">📓 笔记本</button>
             <button id="session-menu-btn" class="session-btn" title="会话管理">💾 会话</button>
-            <button id="view-mode-toggle" class="view-mode-btn" title="切换到传统流式输出">📊 回合</button>
-            <button id="clear-screen-btn" class="clear-btn" title="清空当前对话">🗑️ 清空</button>
+            <button id="clear-screen-btn" class="clear-btn" title="清空当前笔记本">🗑️ 清空</button>
         </div>
     </div>
     <!-- v1.40.0: 会话管理面板 -->
@@ -102,8 +100,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             </div>
         </div>
     </div>
-    <!-- v1.47.0: Jupyter 风格工具栏 -->
-    <div id="toolbar" class="toolbar">
+    <!-- v1.47.0: Jupyter 风格工具栏 (v2.2.0: 暂时隐藏，功能将迁移到笔记本界面) -->
+    <div id="toolbar" class="toolbar hidden">
         <div class="toolbar-section toolbar-left">
             <button id="upload-csv-btn" class="toolbar-btn" title="上传 CSV 文件">
                 <svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -188,8 +186,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         <div id="files-list" class="files-list"></div>
         <div class="files-panel-empty hidden">暂无文件，点击"上传 CSV"添加</div>
     </div>
-    <!-- v2.1.0: Notebook 模式容器 (Jupyter 风格) -->
-    <div id="notebook-container" class="notebook-container hidden">
+    <!-- v2.2.0: Notebook 模式容器 (Jupyter 风格) - 默认显示 -->
+    <div id="notebook-container" class="notebook-container">
         <!-- 侧边栏: Notebook 管理 -->
         <aside id="notebook-sidebar" class="notebook-sidebar">
             <div class="notebook-sidebar-header">
@@ -242,9 +240,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             </div>
         </main>
     </div>
-    <div id="terminal-container">
-        <!-- 混合终端：单一容器，统一滚动 -->
-    </div>
+    <!-- v2.2.0: 移除了 terminal-container，统一使用 Notebook 模式 -->
     <!-- v1.40.0: Toast 通知容器 -->
     <div id="toast-container" class="toast-container"></div>
     <div id="status">
@@ -1346,6 +1342,12 @@ const TERMINAL_JS: &str = r#"
         }
 
         init() {
+            // v2.2.0: 在纯笔记本模式下，container 可能不存在
+            if (!this.container) {
+                console.log('[HybridTerminal] No container, skipping init (Notebook-only mode)');
+                return;
+            }
+
             this.container.innerHTML = '';
             this.container.className = 'hybrid-terminal';
 
@@ -1366,6 +1368,9 @@ const TERMINAL_JS: &str = r#"
         }
 
         createInputLine() {
+            // v2.2.0: 在纯笔记本模式下跳过
+            if (!this.container) return;
+
             const line = document.createElement('div');
             line.className = 'terminal-input-field';
 
@@ -1781,14 +1786,21 @@ const TERMINAL_JS: &str = r#"
         // ========== 辅助方法 ==========
 
         appendToOutput(element) {
+            // v2.2.0: 在纯笔记本模式下跳过
+            if (!this.outputArea) return;
+
             this.outputArea.appendChild(element);
             this.lines.push(element);
             this.scrollToBottom();
         }
 
         scrollToBottom() {
+            // v2.2.0: 在纯笔记本模式下跳过
+            if (!this.outputArea) return;
+
             // 智能自动滚动：只在用户位于底部附近时滚动
             requestAnimationFrame(() => {
+                if (!this.outputArea) return;
                 const { scrollTop, scrollHeight, clientHeight } = this.outputArea;
                 const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
 
@@ -4763,8 +4775,13 @@ const TERMINAL_JS: &str = r#"
         // v1.46.0: 初始化 FileUploadManager
         terminal.fileUploadManager = new FileUploadManager(ws);
 
-        // v2.1.0: 保存 ws 引用供 NotebookManager 使用（延迟初始化）
+        // v2.2.0: 保存 ws 引用并初始化 NotebookManager
         window.ws = ws;
+
+        // v2.2.0: 自动初始化笔记本模式
+        if (window.initNotebookMode) {
+            window.initNotebookMode();
+        }
 
         // 应用初始语言设置
         updatePageText();
@@ -6474,45 +6491,9 @@ const TERMINAL_JS: &str = r#"
     }
 
     /**
-     * Notebook 模式管理
+     * v2.2.0: 统一笔记本模式
+     * 移除了终端模式切换，默认使用 Notebook 界面
      */
-    let isNotebookMode = false;
-
-    function toggleNotebookMode() {
-        const terminalContainer = document.getElementById('terminal-container');
-        const notebookContainer = document.getElementById('notebook-container');
-        const toolbar = document.getElementById('toolbar');
-        const btn = document.getElementById('notebook-mode-toggle');
-
-        isNotebookMode = !isNotebookMode;
-
-        if (isNotebookMode) {
-            // 切换到 Notebook 模式
-            terminalContainer.classList.add('hidden');
-            toolbar.classList.add('hidden');
-            notebookContainer.classList.remove('hidden');
-            btn.innerHTML = '📺 终端';
-            btn.title = '切换到终端模式';
-            btn.classList.add('active');
-
-            // 初始化 NotebookManager（只创建一次）
-            if (!window.notebookManager) {
-                window.notebookManager = new NotebookManager();
-                // 使用已存在的 WebSocket 连接
-                if (window.ws && window.ws.readyState === WebSocket.OPEN) {
-                    window.notebookManager.connect(window.ws);
-                }
-            }
-        } else {
-            // 切换到终端模式
-            notebookContainer.classList.add('hidden');
-            terminalContainer.classList.remove('hidden');
-            toolbar.classList.remove('hidden');
-            btn.innerHTML = '📓 笔记本';
-            btn.title = '切换到笔记本模式';
-            btn.classList.remove('active');
-        }
-    }
 
     // 检查是否是 Notebook 消息
     function isNotebookMessage(type) {
@@ -6535,18 +6516,32 @@ const TERMINAL_JS: &str = r#"
         }
     }
 
-    // 绑定模式切换按钮
-    document.addEventListener('DOMContentLoaded', () => {
-        const toggleBtn = document.getElementById('notebook-mode-toggle');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', toggleNotebookMode);
+    // v2.2.0: 自动初始化 NotebookManager（统一笔记本模式）
+    function initNotebookMode() {
+        // 创建 NotebookManager（如果还没有）
+        if (!window.notebookManager) {
+            window.notebookManager = new NotebookManager();
         }
+
+        // 连接 WebSocket（如果已就绪且尚未连接）
+        if (window.notebookManager && window.ws && window.ws.readyState === WebSocket.OPEN) {
+            if (!window.notebookManager.ws) {
+                window.notebookManager.connect(window.ws);
+            }
+        }
+    }
+
+    // DOMContentLoaded 时初始化
+    document.addEventListener('DOMContentLoaded', () => {
+        // v2.2.0: 自动进入笔记本模式
+        initNotebookMode();
     });
 
     // 初始化全局变量
     window.notebookManager = null;
     window.isNotebookMessage = isNotebookMessage;
     window.handleNotebookMessage = handleNotebookMessage;
+    window.initNotebookMode = initNotebookMode;
 
 })();
 "#;
