@@ -5,6 +5,84 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: Notebook Web UI - Jupyter 风格笔记本编辑器
+
+v2.1.0 为 RealConsole 带来全新的 **Notebook Web UI**，在浏览器中提供类 Jupyter 的交互式笔记本体验。
+
+- ✨ **Notebook 模式** - 浏览器中的 Jupyter 风格笔记本界面
+- ✨ **Cell 编辑器** - 支持 Natural/Command/Code/Markdown 四种类型
+- ✨ **拖拽排序** - 直观的 Cell 拖拽重新排序
+- ✨ **导出功能** - 支持 Markdown/JSON/RCNB 格式导出
+- ✨ **精美动画** - Cell 执行状态动画和输出渐入效果
+- ✨ **响应式布局** - 完美适配桌面、平板和移动设备
+
+### ✨ New Features
+
+#### Notebook Web UI
+
+**模式切换**:
+- 📓 头部 "笔记本" 按钮切换模式
+- 终端模式 ↔ 笔记本模式自由切换
+
+**侧边栏管理 (280px)**:
+- 📒 笔记本列表显示
+- ➕ 新建笔记本
+- 🔍 搜索过滤
+- 右键菜单 (重命名/删除)
+
+**Cell 编辑器**:
+- 四种类型: 💬 自然语言 / ⚙️ 命令 / 💻 代码 / 📝 Markdown
+- 状态指示: idle/pending/running/success/failed
+- 输出渲染: Text/Code/Chart/Image/Table/Error/Stream
+- 快捷键: `Shift+Enter` 执行, `Tab` 缩进
+
+**拖拽排序**:
+- ⠿ 拖拽手柄支持 HTML5 Drag & Drop
+- 紫色发光放置指示器
+- 前后端联动更新索引
+
+**导出功能**:
+- 📤 导出按钮下拉菜单
+- 📝 Markdown - 可读性导出
+- 📄 JSON - 完整数据导出
+- 💾 RCNB - 原生格式导出
+
+**执行动画**:
+- 🔄 Running - 紫色脉冲发光
+- ✅ Success - 绿色边框闪烁
+- ❌ Failed - 红色边框震动
+
+**响应式布局**:
+- 📱 1024px - 侧边栏缩小
+- 📱 768px - 工具栏简化
+- 📱 480px - 移动端垂直布局
+
+### 📊 代码统计
+
+| 组件 | 行数 |
+|------|------|
+| HTML 结构 | ~60 |
+| CSS 样式 | ~900 |
+| NotebookManager | ~450 |
+| CellEditor | ~400 |
+| DragDrop | ~100 |
+| 后端集成 | ~150 |
+| **总计** | **~2,060** |
+
+### 🔧 Technical
+
+- `NotebookManager` - WebSocket 通信、CRUD 操作、导出
+- `CellEditor` - Cell 渲染、输出显示、拖拽排序
+- 后端 15 种 Notebook 消息类型路由
+- CSS keyframes 动画系统
+- 响应式媒体查询
+
+---
+
 ## [2.1.0-beta.1] - 2026-01-15
 
 ### 🎯 Highlights
