@@ -1,4 +1,4 @@
-//! v2.0.0-beta.2: Notebook System
+//! v2.0.0-rc.1: Notebook System
 //!
 //! The Notebook module provides an interactive computational environment
 //! that combines natural language, commands, and code in a single document.
@@ -108,7 +108,7 @@ pub use collaboration::{
 };
 
 /// Notebook format version
-pub const NOTEBOOK_VERSION: &str = "2.0.0-beta.2";
+pub const NOTEBOOK_VERSION: &str = "2.0.0-rc.1";
 
 /// Default notebook file extension
 pub const NOTEBOOK_EXTENSION: &str = "rcnb";

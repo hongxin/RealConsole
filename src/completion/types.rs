@@ -426,18 +426,22 @@ mod tests {
         // GitContext::detect() should work without panicking
         let context = GitContext::detect();
 
-        // If we're in a git repo, verify we have branch info
-        // If not (e.g., running in CI sandbox), that's also valid
-        if context.is_git_repo {
-            // Git repo detected - should have branch info
-            assert!(context.branch.is_some(), "Git repo detected but no branch info");
-        } else {
+        // Valid states:
+        // 1. In git repo with branch info (normal state)
+        // 2. In git repo without branch (detached HEAD, rebasing, fresh init)
+        // 3. Not in git repo (CI sandbox, non-git directory)
+        //
+        // All states are valid - we just verify detect() doesn't panic
+        // and returns consistent data
+        if !context.is_git_repo {
             // Not in a git repo - should have default values
             assert!(context.branch.is_none());
             assert!(!context.has_changes);
             assert!(!context.has_untracked);
             assert!(!context.has_staged);
         }
+        // If is_git_repo is true, branch may or may not be Some
+        // depending on git state (detached HEAD, etc.)
     }
 
     #[test]

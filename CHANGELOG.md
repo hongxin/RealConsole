@@ -5,6 +5,40 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc.1] - 2026-01-15
+
+### 🎯 Highlights
+
+**主题**: Release Candidate 1 - 稳定性与测试修复
+
+- ✅ **测试稳定性** - 修复环境敏感测试
+- ✅ **Clippy 零警告** - 所有警告已处理
+- ✅ **API 稳定** - Notebook 模块 API 冻结
+- ✅ **总测试数**: 2671 (2628 单元测试 + 43 文档测试)
+
+### 🔧 Fixed
+
+- **环境敏感测试修复**
+  - `test_git_context_detect` - 支持所有 Git 状态 (正常/detached HEAD/非 Git 目录)
+  - `test_lazy_init_stats` - 移除时间敏感断言 (快速系统上 duration 可能为 0)
+
+- **Clippy 警告处理**
+  - `RetentionPolicy` - 允许 `Keep` 前缀 (语义清晰)
+  - `TraceError` - 允许 `Invalid` 前缀 (错误类型惯例)
+  - `TraceId/SpanId::to_hex` - 允许 `&self` 参数 (API 一致性)
+
+### 📦 Stable API
+
+**Notebook 模块 (Feature Complete)**:
+- `types` - Cell, Notebook, CellOutput, CellState, CellType
+- `storage` - NotebookStorage, FileNotebookStorage, MemoryNotebookStorage
+- `execution` - CellExecutor, ExecutionConfig, ExecutionResult
+- `persistence` - RcnbFormat, RCNB_EXTENSION, RCNB_VERSION
+- `dependency` - DependencyGraph, ExecutionScheduler, DependencyAnalyzer
+- `collaboration` - CellOperation, TextOperation, OperationTransform, CollaborationSession
+
+---
+
 ## [2.0.0-beta.2] - 2026-01-15
 
 ### 🎯 Highlights

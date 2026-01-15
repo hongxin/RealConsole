@@ -95,6 +95,7 @@ impl fmt::Display for TraceFlags {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TraceId([u8; 16]);
 
+#[allow(clippy::wrong_self_convention)] // to_* methods take &self for API consistency
 impl TraceId {
     /// Create new random trace ID
     pub fn generate() -> Self {
@@ -160,6 +161,7 @@ impl fmt::Display for TraceId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SpanId([u8; 8]);
 
+#[allow(clippy::wrong_self_convention)] // to_* methods take &self for API consistency
 impl SpanId {
     /// Create new random span ID
     pub fn generate() -> Self {
@@ -974,6 +976,7 @@ impl SpanExporter {
 
 /// Trace error
 #[derive(Debug, Clone, thiserror::Error)]
+#[allow(clippy::enum_variant_names)] // Invalid prefix is appropriate for error variants
 pub enum TraceError {
     #[error("Invalid traceparent header: {0}")]
     InvalidTraceParent(String),

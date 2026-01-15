@@ -67,6 +67,7 @@ use std::collections::HashMap;
 
 /// 版本保留策略
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)] // Keep prefix is intentional for clarity
 pub enum RetentionPolicy {
     /// 保留所有版本
     KeepAll,
