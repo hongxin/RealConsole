@@ -5859,6 +5859,7 @@ const TERMINAL_JS: &str = r#"
             const menu = document.createElement('div');
             menu.className = 'export-menu';
             menu.innerHTML = `
+                <div class="export-menu-item" data-format="ipynb">🐍 Jupyter Notebook (.ipynb)</div>
                 <div class="export-menu-item" data-format="markdown">📝 Markdown (.md)</div>
                 <div class="export-menu-item" data-format="json">📄 JSON (.json)</div>
                 <div class="export-menu-item" data-format="rcnb">💾 RCNB (.rcnb)</div>
@@ -5913,6 +5914,7 @@ const TERMINAL_JS: &str = r#"
 
         getExportMimeType(format) {
             switch (format) {
+                case 'ipynb': return 'application/x-ipynb+json';
                 case 'markdown': return 'text/markdown';
                 case 'json': return 'application/json';
                 case 'rcnb': return 'application/json';

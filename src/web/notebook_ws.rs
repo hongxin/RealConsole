@@ -1094,6 +1094,16 @@ impl NotebookSession {
                 let content = export_to_markdown(notebook);
                 (content, "md")
             }
+            // v2.2.0: Jupyter Notebook export
+            "ipynb" => {
+                match IpynbConverter::to_ipynb_str(notebook) {
+                    Ok(content) => (content, "ipynb"),
+                    Err(e) => return NotebookServerMessage::Error {
+                        code: "EXPORT_ERROR".to_string(),
+                        message: format!("Failed to export .ipynb: {}", e),
+                    },
+                }
+            }
             _ => return NotebookServerMessage::Error {
                 code: "INVALID_FORMAT".to_string(),
                 message: format!("Unknown format: {}", format),

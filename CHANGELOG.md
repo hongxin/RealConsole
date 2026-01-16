@@ -5,6 +5,43 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-01-16
+
+### 🎯 Highlights
+
+**主题**: 统一笔记本模式 + Jupyter 生态互通（"北冥神功"）
+
+v2.2.0 实现了与 Jupyter 生态的双向互通：
+- 🔄 **双向转换** - 支持导入和导出 .ipynb 文件
+- 📓 **统一笔记本** - 移除终端模式，默认笔记本界面
+- ⚡ **快捷输入** - Jupyter 风格的快捷输入栏
+
+### ✨ New Features
+
+#### Jupyter Notebook 双向互通
+
+**导入** (.ipynb → RealConsole):
+- 📥 侧边栏导入按钮
+- 支持 code/markdown/raw cell 类型映射
+- 保留输出内容和执行计数
+
+**导出** (RealConsole → .ipynb):
+- 🐍 导出菜单新增 "Jupyter Notebook (.ipynb)" 选项
+- Natural/Command → raw，Code → code，Markdown → markdown
+- 可在 Jupyter 中直接打开
+
+#### 统一笔记本模式
+- 移除终端模式切换
+- 笔记本作为默认界面
+- 自动初始化 NotebookManager
+
+#### 快捷输入栏
+- 💬⚙️💻📝 类型选择器
+- Enter 执行，Shift+Enter 仅添加
+- 智能类型检测（`/` → Command，`!` → Code）
+
+---
+
 ## [2.2.0-beta.1] - 2026-01-16
 
 ### 🎯 Highlights
