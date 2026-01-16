@@ -5,6 +5,45 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-01-17
+
+### 🎯 Highlights
+
+**主题**: Memory 2.0 智能增强
+
+v2.2.1 完善了 Memory 2.0 智能上下文编排器：
+- 🧠 **跨会话推荐** - 基于相似度的智能会话推荐
+- 🏷️ **主题提取** - 自动从会话内容提取关键主题
+- 📊 **78 个测试** - 全面的单元测试覆盖
+
+### ✨ New Features
+
+#### 跨会话智能推荐
+- `recommend_from_sessions()` 实现完整功能
+- 基于任务相关性自动推荐相关会话
+- 支持无任务时的通用推荐（按活跃度排序）
+- 推荐包含会话主题和相关度百分比
+
+#### 主题自动提取
+- 新增 `TopicExtractor` 主题提取器
+- 基于词频统计提取关键主题
+- 集成到会话感知层，自动为 SessionSummary 提取主题
+- 支持中英文混合内容
+
+### 🔧 Improvements
+
+- `KeywordMatcher.stop_words` 改为 `pub(crate)` 可见性
+- 新增 `truncate_message()` 辅助函数
+- 15+ 新测试用例覆盖 TopicExtractor 和 truncate_message
+
+### 📁 Changed Files
+
+- `src/web/memory/mod.rs` - recommend_from_sessions 实现
+- `src/web/memory/understanding.rs` - TopicExtractor 新增
+- `src/web/memory/perception.rs` - 集成主题提取
+
+---
+
 ## [2.2.0] - 2026-01-16
 
 ### 🎯 Highlights

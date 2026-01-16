@@ -12,6 +12,7 @@
 use super::types::{
     DataDimension, MemoryStateVector, MultimodalChunk, MultimodalContent, TimeContext,
 };
+use super::understanding::TopicExtractor;
 use crate::web::session::{ChartHistoryEntry, ConversationRound, ImageHistoryEntry, SessionId};
 use crate::web::session_manager::{SerializableSession, SessionManager};
 use anyhow::Result;
@@ -71,6 +72,9 @@ pub struct WebUIPerceptionLayer {
     /// 图像历史（共享状态）
     image_history: Arc<RwLock<Vec<ImageHistoryEntry>>>,
 
+    /// v2.2.1: 主题提取器
+    topic_extractor: TopicExtractor,
+
     // TODO: 后续集成 CLI 四维
     // unified_tracer: Arc<UnifiedTracer>,
     // context_tracker: Arc<RwLock<ContextTracker>>,
@@ -87,6 +91,7 @@ impl WebUIPerceptionLayer {
             session_manager,
             chart_history,
             image_history,
+            topic_extractor: TopicExtractor::new(),
         }
     }
 
@@ -167,12 +172,18 @@ impl WebUIPerceptionLayer {
                 }
             })
             .map(|session_item| {
+                // v2.2.1: 自动提取主题
+                let topic = self.topic_extractor.extract_from_session(
+                    &session_item.name,
+                    &session_item.last_message,
+                );
+
                 // 为每个会话创建一个摘要 chunk
                 let content = MultimodalContent::SessionSummary {
                     session_id: session_item.id.clone(),
                     name: session_item.name.clone(),
                     round_count: session_item.round_count,
-                    topic: None, // TODO: 后续实现主题提取
+                    topic,
                     last_message: session_item.last_message.clone(),
                 };
 

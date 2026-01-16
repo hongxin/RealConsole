@@ -71,6 +71,7 @@ pub use orchestration::{
 };
 pub use understanding::{
     TaskComplexity, TaskComplexityAnalyzer, adaptive_token_budget,
+    TopicExtractor,
 };
 
 // ============================================================================
@@ -234,16 +235,91 @@ impl SmartWebUIOrchestrator {
 
     /// WebUI 特有：跨会话智能推荐
     ///
-    /// Phase 1: 基础实现（基于相似度）
-    /// Phase 3: 升级为复杂的模式识别
+    /// v2.2.1: 基于会话相似度的智能推荐
+    ///
+    /// # 参数
+    /// - `current_task`: 当前任务描述（None = 通用推荐）
+    ///
+    /// # 返回
+    /// 推荐列表（最多3条）
     pub async fn recommend_from_sessions(
         &self,
-        _current_task: Option<&str>,
+        current_task: Option<&str>,
     ) -> Result<Vec<Recommendation>> {
-        // Phase 1: 简化实现
-        // TODO: Phase 3 实现完整的跨会话推荐
+        // 1. 采集所有会话数据（最近7天）
+        let time_range = TimeRange::recent_days(7);
+        let chunks = self.perception
+            .collect_multimodal_data(Some(time_range), Some(vec![types::DataDimension::SessionManager]))
+            .await?;
 
-        Ok(vec![])
+        if chunks.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // 2. 如果有当前任务，计算相关性评分
+        let scored_chunks = if let Some(task) = current_task {
+            self.understanding.score_relevance(task, chunks).await?
+        } else {
+            // 无任务时，按时间排序
+            chunks
+        };
+
+        // 3. 生成推荐（取前3个高相关会话）
+        let mut recommendations = Vec::new();
+        for chunk in scored_chunks.iter().take(5) {
+            // 只推荐相关性 > 0.3 的会话
+            let relevance = chunk.state_vector.understanding_score;
+            if current_task.is_some() && relevance < 0.3 {
+                continue;
+            }
+
+            if let MultimodalContent::SessionSummary {
+                session_id,
+                name,
+                topic,
+                round_count,
+                last_message,
+            } = &chunk.content
+            {
+                let description = if current_task.is_some() {
+                    format!(
+                        "会话「{}」与当前任务相关 (相关度: {:.0}%)\n主题: {}\n最近消息: {}",
+                        name,
+                        relevance * 100.0,
+                        topic.as_deref().unwrap_or("未知"),
+                        truncate_message(last_message, 50)
+                    )
+                } else {
+                    format!(
+                        "最近活跃的会话「{}」({} 轮对话)\n主题: {}",
+                        name,
+                        round_count,
+                        topic.as_deref().unwrap_or("未知")
+                    )
+                };
+
+                let rec = Recommendation {
+                    type_: RecommendationType::WorkflowReuse,
+                    description,
+                    confidence: if current_task.is_some() { relevance } else { 0.5 },
+                    actions: vec![format!("切换到会话: {}", session_id)],
+                    pre_fill_params: std::collections::HashMap::new(),
+                };
+
+                recommendations.push(rec);
+
+                if recommendations.len() >= 3 {
+                    break;
+                }
+            }
+        }
+
+        eprintln!(
+            "[Memory 2.0] Generated {} cross-session recommendations",
+            recommendations.len()
+        );
+
+        Ok(recommendations)
     }
 
     /// 快速查询：仅返回最相关的前 N 个片段
@@ -494,6 +570,20 @@ pub struct MemoryStats {
 }
 
 // ============================================================================
+// 辅助函数
+// ============================================================================
+
+/// 截断消息文本
+fn truncate_message(message: &str, max_len: usize) -> String {
+    if message.chars().count() <= max_len {
+        message.to_string()
+    } else {
+        let truncated: String = message.chars().take(max_len).collect();
+        format!("{}...", truncated)
+    }
+}
+
+// ============================================================================
 // 测试
 // ============================================================================
 
@@ -664,5 +754,39 @@ mod tests {
     fn test_module_compiles() {
         // 确保模块可以编译
         assert!(true);
+    }
+
+    // ========================================================================
+    // truncate_message 测试（v2.2.1）
+    // ========================================================================
+
+    #[test]
+    fn test_truncate_message_short() {
+        let result = super::truncate_message("Hello", 10);
+        assert_eq!(result, "Hello");
+    }
+
+    #[test]
+    fn test_truncate_message_exact() {
+        let result = super::truncate_message("Hello", 5);
+        assert_eq!(result, "Hello");
+    }
+
+    #[test]
+    fn test_truncate_message_long() {
+        let result = super::truncate_message("Hello World!", 5);
+        assert_eq!(result, "Hello...");
+    }
+
+    #[test]
+    fn test_truncate_message_chinese() {
+        let result = super::truncate_message("你好世界测试", 3);
+        assert_eq!(result, "你好世...");
+    }
+
+    #[test]
+    fn test_truncate_message_empty() {
+        let result = super::truncate_message("", 10);
+        assert_eq!(result, "");
     }
 }
