@@ -6,10 +6,11 @@
 //! - Real-time execution streaming
 //! - Notebook listing and search
 
+use crate::llm::LlmClient;
 use crate::notebook::{
     Cell, CellExecutor, CellOutput, CellState, CellType, ExecutionConfig,
     ExecutionResult, FileNotebookStorage, IpynbConverter, MemoryNotebookStorage, Notebook,
-    NotebookStorage, NotebookStorageError, RcnbFormat,
+    NotebookContext, NotebookStorage, NotebookStorageError, RcnbFormat,
 };
 use axum::extract::ws::{Message, WebSocket};
 use chrono::{DateTime, Utc};
@@ -356,12 +357,14 @@ impl From<&CellOutput> for CellOutputData {
 pub struct NotebookSession {
     /// Currently open notebooks (id -> notebook)
     notebooks: RwLock<HashMap<Uuid, Notebook>>,
-    /// Cell executor
-    executor: CellExecutor,
+    /// Cell executor (with optional LLM)
+    executor: RwLock<CellExecutor>,
     /// Storage backend
     storage: Arc<dyn NotebookStorage>,
     /// Base directory for file storage
     base_dir: PathBuf,
+    /// Notebook context for cross-cell LLM execution (v2.3.0)
+    context: RwLock<HashMap<Uuid, NotebookContext>>,
 }
 
 impl NotebookSession {
@@ -369,9 +372,10 @@ impl NotebookSession {
     pub fn new(base_dir: PathBuf) -> Self {
         Self {
             notebooks: RwLock::new(HashMap::new()),
-            executor: CellExecutor::new(ExecutionConfig::default()),
+            executor: RwLock::new(CellExecutor::new(ExecutionConfig::default())),
             storage: Arc::new(MemoryNotebookStorage::new()),
             base_dir,
+            context: RwLock::new(HashMap::new()),
         }
     }
 
@@ -380,10 +384,26 @@ impl NotebookSession {
         let storage_dir = base_dir.join("notebooks");
         Self {
             notebooks: RwLock::new(HashMap::new()),
-            executor: CellExecutor::new(ExecutionConfig::default()),
+            executor: RwLock::new(CellExecutor::new(ExecutionConfig::default())),
             storage: Arc::new(FileNotebookStorage::new(storage_dir)),
             base_dir,
+            context: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// Configure LLM client for Natural cell execution (v2.3.0)
+    ///
+    /// This enables Natural cells to process user input through the LLM.
+    pub async fn configure_llm(&self, client: Box<dyn LlmClient>) {
+        let mut executor = self.executor.write().await;
+        // Create new executor with LLM
+        *executor = CellExecutor::new(ExecutionConfig::default()).with_llm(client);
+    }
+
+    /// Check if LLM is configured
+    pub async fn has_llm(&self) -> bool {
+        let executor = self.executor.read().await;
+        executor.has_llm()
     }
 
     /// Handle notebook message
@@ -870,11 +890,19 @@ impl NotebookSession {
             cell_id: cell_id.to_string(),
         }).await?;
 
+        // Get notebook context for LLM cells (v2.3.0)
+        let context = {
+            let contexts = self.context.read().await;
+            contexts.get(&nb_id).cloned()
+        };
+
         // Get cell and execute
         let mut notebooks = self.notebooks.write().await;
         if let Some(notebook) = notebooks.get_mut(&nb_id) {
             if let Some(cell) = notebook.get_cell_mut(cell_uuid) {
-                let result = self.executor.execute(cell).await;
+                // Execute with context for Natural cells
+                let executor = self.executor.read().await;
+                let result = executor.execute_with_context(cell, context.as_ref()).await;
 
                 match result {
                     Ok(exec_result) => {
@@ -885,6 +913,24 @@ impl NotebookSession {
                                 cell_id: cell_id.to_string(),
                                 output: CellOutputData::from(output),
                             }).await?;
+                        }
+
+                        // Update context with this cell's output (v2.3.0)
+                        if exec_result.success {
+                            let output_text = cell.outputs.iter()
+                                .filter_map(|o| match o {
+                                    CellOutput::Text { content } => Some(content.clone()),
+                                    CellOutput::Code { content, .. } => Some(content.clone()),
+                                    _ => None,
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+
+                            if !output_text.is_empty() {
+                                let mut contexts = self.context.write().await;
+                                let ctx = contexts.entry(nb_id).or_insert_with(NotebookContext::new);
+                                ctx.add_cell_output(cell.source.clone(), output_text);
+                            }
                         }
 
                         // Send completion

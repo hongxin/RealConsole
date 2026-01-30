@@ -630,6 +630,14 @@ impl Session {
             .join(".realconsole");
         let notebook_session = Arc::new(NotebookSession::with_file_storage(notebook_base_dir));
 
+        // v2.3.0: 配置 Notebook LLM（创建独立的 LLM 客户端用于 Natural Cell 执行）
+        if let Some(ref primary_cfg) = web_config.llm.primary {
+            if let Some(client) = Self::create_notebook_llm_client(primary_cfg) {
+                notebook_session.configure_llm(client).await;
+                eprintln!("[Session] Notebook LLM 已配置: {}", primary_cfg.provider);
+            }
+        }
+
         Self {
             id,
             agent: Arc::new(RwLock::new(agent)),
@@ -920,6 +928,40 @@ impl Session {
                     .map_err(|e| format!("{}: {}", i18n::t("web.session.deepseek_client_creation_failed"), e))
             }
             other => Err(format!("{}: {}", i18n::t("web.session.unknown_llm_provider"), other)),
+        }
+    }
+
+    /// 创建 Notebook 专用的 LLM 客户端（v2.3.0）
+    ///
+    /// 返回 Box<dyn LlmClient> 供 NotebookSession 使用
+    fn create_notebook_llm_client(
+        provider_config: &crate::config::LlmProvider,
+    ) -> Option<Box<dyn LlmClient>> {
+        match provider_config.provider.as_str() {
+            "ollama" => {
+                let model = provider_config.model.as_deref().unwrap_or("qwen2.5:latest");
+                let endpoint = provider_config
+                    .endpoint
+                    .as_deref()
+                    .unwrap_or("http://localhost:11434");
+
+                OllamaClient::new(model, endpoint)
+                    .map(|client| Box::new(client) as Box<dyn LlmClient>)
+                    .ok()
+            }
+            "deepseek" => {
+                let api_key = provider_config.api_key.as_ref()?;
+                let model = provider_config.model.as_deref().unwrap_or("deepseek-chat");
+                let endpoint = provider_config
+                    .endpoint
+                    .as_deref()
+                    .unwrap_or("https://api.deepseek.com/v1");
+
+                DeepseekClient::new(api_key, model, endpoint)
+                    .map(|client| Box::new(client) as Box<dyn LlmClient>)
+                    .ok()
+            }
+            _ => None,
         }
     }
 
