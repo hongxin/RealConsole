@@ -31,6 +31,9 @@ config.local.yaml
 /sandbox/
 /testbed/
 
+# 对话历史备份（文件较大，不提交）
+docs/04-reports/features/session-conversations/backups/
+
 # 日志文件
 *.log
 logs/
