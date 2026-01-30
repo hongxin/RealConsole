@@ -39,6 +39,7 @@ pub mod file_transfer; // v1.102.0: 文件传输增强（拖放上传、批量�
 pub mod collaboration; // v1.103.0: 协作功能（会话共享、权限控制、实时同步基础）
 pub mod session_storage; // v1.108.0: Web Session 存储迁移（Storage Layer 2.0 集成）
 pub mod notebook_ws; // v2.0.0-alpha.2: Notebook WebSocket 集成（创建/编辑/执行 Cell）
+pub mod knowledge; // v2.3.0: 知识图谱系统（对话历史导入、主题提取、智能检索）
 
 pub use server::WebServer;
 pub use notebook_ws::{NotebookClientMessage, NotebookServerMessage, NotebookSession};
