@@ -90,6 +90,7 @@ pub use storage::{
 
 pub use execution::{
     CellExecutor, ExecutionConfig, ExecutionResult, ExecutionError,
+    NotebookContext, // v2.3.0: Context for LLM execution
 };
 
 pub use persistence::{
