@@ -5,6 +5,48 @@ All notable changes to RealConsole will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-01-31
+
+### 🎯 Highlights
+
+**主题**: Natural Notebook + Knowledge Graph 基础
+
+v2.3.0 实现了 Notebook 中的自然语言执行能力：
+- 🧠 **Natural Cell LLM** - 自然语言单元格直接调用 LLM
+- 🌐 **Web LLM 集成** - Web 界面支持 Natural Cell 执行
+- 📊 **Knowledge Graph** - Claude Code 对话历史导入 (Alpha)
+
+### ✨ New Features
+
+#### Natural Cell LLM 执行
+- `CellExecutor` 支持可选 LLM 客户端
+- `NotebookContext` 跨单元格上下文追踪
+- `execute_with_context()` 带上下文的 LLM 调用
+- 默认系统提示词配置
+- 40+ 单元测试覆盖
+
+#### Web WebSocket LLM 集成
+- `NotebookSession::configure_llm()` 异步 LLM 配置
+- 每个 Notebook 独立上下文追踪
+- 成功执行后自动更新上下文
+- 完整的错误处理和消息协议
+
+#### Knowledge Graph 基础 (Alpha)
+- 数据结构: ConversationMessage, Session, Topic, Decision
+- 导入器: 从 ~/.claude/projects/ 加载 JSONL
+- 主题提取: 时间窗口聚类 + 关键词提取
+- 检索引擎: 关键词搜索 + 时间范围查询
+- 服务层: 统一 API 封装
+
+### 📁 Changed Files
+
+- `src/notebook/execution.rs` - Natural Cell 执行核心
+- `src/web/notebook_ws.rs` - WebSocket LLM 集成
+- `src/web/session.rs` - Session LLM 配置
+- `src/web/knowledge/` - Knowledge Graph 模块 (新增)
+
+---
+
 ## [2.2.1] - 2026-01-17
 
 ### 🎯 Highlights
